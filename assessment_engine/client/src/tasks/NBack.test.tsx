@@ -160,3 +160,16 @@ test('hiding the page aborts the current trial; it resumes at the next trial', (
   expect(onDone).toHaveBeenCalledOnce()
   Object.defineProperty(document, 'hidden', { configurable: true, get: () => false })
 })
+
+test('a keyboard-activated stream button (click, detail 0) responds; Ctrl+A does not', () => {
+  setup(params([trial({ answer: { position: true, symbol: true } })]))
+  advance(200)
+  act(() => void fireEvent.keyDown(window, { key: 'a', ctrlKey: true }))
+  const btn = screen.getByRole('button', { name: 'Symbol match (L)' })
+  btn.focus()
+  act(() => void fireEvent.click(btn, { detail: 0 }))
+  advance(1800)
+  expect(pushed).toHaveLength(2)
+  expect(pushed[0]).toMatchObject({ score_norm: 0, response_time_ms: 2000 }) // position: Ctrl+A ignored
+  expect(pushed[1]).toMatchObject({ score_norm: 1, response_time_ms: 200 })
+})

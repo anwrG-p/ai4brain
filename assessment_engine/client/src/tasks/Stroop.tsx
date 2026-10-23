@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useTimedTrials } from '../telemetry/useTimedTrials'
+import { pressProps, useTimedTrials } from '../telemetry/useTimedTrials'
 import type { StroopParams } from '../telemetry/types'
 import type { TaskProps } from './TaskRunner'
 
@@ -12,7 +12,7 @@ export function Stroop({ params, recorder, onDone }: TaskProps<StroopParams>) {
   useEffect(() => {
     if (!t) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.repeat) return
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
       const c = colors[Number(e.key) - 1]
       if (/^[1-9]$/.test(e.key) && c !== undefined) respond(c === t.answer)
     }
@@ -29,7 +29,7 @@ export function Stroop({ params, recorder, onDone }: TaskProps<StroopParams>) {
       )}
       <div>
         {colors.map((c, k) => (
-          <button key={c} type="button" onPointerDown={() => respond(c === t.answer)}>
+          <button key={c} type="button" {...pressProps(() => respond(c === t.answer))}>
             {c} ({k + 1})
           </button>
         ))}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { tracker } from '../telemetry/tracker'
 import { useInputCapture } from '../telemetry/useInputCapture'
+import { pressProps } from '../telemetry/useTimedTrials'
 import type { NBackParams, TelemetryEvent } from '../telemetry/types'
 import type { TaskProps } from './TaskRunner'
 
@@ -84,7 +85,7 @@ export function NBack({ params, recorder, onDone }: TaskProps<NBackParams>) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.repeat) return
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
       const s = KEYS[e.key.toLowerCase()]
       if (s) respond(s)
     }
@@ -143,7 +144,7 @@ export function NBack({ params, recorder, onDone }: TaskProps<NBackParams>) {
       </svg>
       <div>
         {params.streams.map((s) => (
-          <button key={s} type="button" onPointerDown={() => respond(s)}>
+          <button key={s} type="button" {...pressProps(() => respond(s))}>
             {LABEL[s]}
           </button>
         ))}

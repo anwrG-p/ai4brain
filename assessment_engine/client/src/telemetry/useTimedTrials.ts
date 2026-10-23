@@ -25,6 +25,8 @@ export function useTimedTrials(recorder: TrialRecorder, count: number, timeLimit
     recorder.start(i)
     live.current = true
     const id = setTimeout(() => {
+      // An abort (hidden page) can land before this effect's cleanup clears the timer.
+      if (!live.current) return
       live.current = false
       tracker.push(recorder.finish({ correct: false, windowMs: timeLimitMs }))
       setI(i + 1)
@@ -63,3 +65,13 @@ export function useTimedTrials(recorder: TrialRecorder, count: number, timeLimit
 
   return { i, paused, respond }
 }
+
+// Response button handlers: pointer presses answer on pointerdown (RT at the press); a keyboard
+// activation (Enter/Space) arrives as a click with detail 0. Pointer clicks (detail >= 1) are
+// skipped so a press is not counted twice.
+export const pressProps = (respond: () => void) => ({
+  onPointerDown: respond,
+  onClick: (e: { detail: number }) => {
+    if (e.detail === 0) respond()
+  },
+})

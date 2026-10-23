@@ -68,3 +68,17 @@ test('on-screen buttons answer too; a timeout scores 0 at time_limit_ms', () => 
   expect(pushed.map((e) => e.score_norm)).toEqual([1, 0])
   expect(pushed[1].response_time_ms).toBe(7000)
 })
+
+test('keyboard activation of a button answers once; Ctrl+F / Meta+J are not responses', () => {
+  setup(params([different, same]))
+  act(() => {
+    fireEvent.keyDown(window, { key: 'f', ctrlKey: true })
+    fireEvent.keyDown(window, { key: 'j', metaKey: true })
+  })
+  expect(pushed).toHaveLength(0)
+  const btn = screen.getByRole('button', { name: /different/i })
+  btn.focus()
+  act(() => void fireEvent.click(btn, { detail: 0 }))
+  expect(pushed).toHaveLength(1)
+  expect(pushed[0]).toMatchObject({ trial_index: 0, score_norm: 1 })
+})

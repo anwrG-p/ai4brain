@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useTimedTrials } from '../telemetry/useTimedTrials'
+import { pressProps, useTimedTrials } from '../telemetry/useTimedTrials'
 import type { RotationParams } from '../telemetry/types'
 import type { TaskProps } from './TaskRunner'
 import { CellsView } from './svg'
@@ -17,7 +17,7 @@ export function MentalRotation({ params, recorder, onDone }: TaskProps<RotationP
     if (!t) return
     const onKey = (e: KeyboardEvent) => {
       const a = KEYS[e.key.toLowerCase()]
-      if (!e.repeat && a) respond(a === t.answer)
+      if (!e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && a) respond(a === t.answer)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -34,10 +34,10 @@ export function MentalRotation({ params, recorder, onDone }: TaskProps<RotationP
         </div>
       )}
       <div>
-        <button type="button" onPointerDown={() => respond(t.answer === 'same')}>
+        <button type="button" {...pressProps(() => respond(t.answer === 'same'))}>
           Same (F)
         </button>
-        <button type="button" onPointerDown={() => respond(t.answer === 'different')}>
+        <button type="button" {...pressProps(() => respond(t.answer === 'different'))}>
           Different (J)
         </button>
       </div>

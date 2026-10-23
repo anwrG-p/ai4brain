@@ -78,3 +78,13 @@ test('a wrong option scores 0; a timeout scores 0 at time_limit_ms', () => {
   expect(pushed).toHaveLength(1)
   expect(pushed[0]).toMatchObject({ score_norm: 0, response_time_ms: 30000 })
 })
+
+test('a keyboard-activated option (click, detail 0) answers exactly once', () => {
+  const { onDone } = setup()
+  const btn = screen.getAllByRole('button')[params.answer]
+  btn.focus()
+  act(() => void fireEvent.click(btn, { detail: 0 }))
+  expect(pushed).toHaveLength(1)
+  expect(pushed[0].score_norm).toBe(1)
+  expect(onDone).toHaveBeenCalledOnce()
+})

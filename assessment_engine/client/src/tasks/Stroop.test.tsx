@@ -108,3 +108,43 @@ test('hiding the page aborts the current trial; it resumes at the next trial', (
   expect(onDone).toHaveBeenCalledOnce()
   Object.defineProperty(document, 'hidden', { configurable: true, get: () => false })
 })
+
+test('a focused button activated by keyboard (click, detail 0) answers once; a pointer press is not double-counted', () => {
+  setup(params([conflict, conflict, conflict]))
+  const blue = () => screen.getByRole('button', { name: /blue/ })
+  blue().focus()
+  act(() => void fireEvent.click(blue(), { detail: 0 }))
+  expect(pushed).toHaveLength(1)
+  act(() => {
+    fireEvent.pointerDown(blue())
+    fireEvent.click(blue(), { detail: 1 })
+  })
+  expect(pushed).toHaveLength(2)
+  expect(pushed.map((e) => e.trial_index)).toEqual([0, 1])
+})
+
+test('modified keys (Ctrl+1, Alt+2, Meta+3) are not responses', () => {
+  setup(params([conflict]))
+  act(() => {
+    fireEvent.keyDown(window, { key: '1', ctrlKey: true })
+    fireEvent.keyDown(window, { key: '2', altKey: true })
+    fireEvent.keyDown(window, { key: '3', metaKey: true })
+  })
+  expect(pushed).toHaveLength(0)
+  key('3')
+  expect(pushed).toHaveLength(1)
+})
+
+test('a time limit that expires right after a hide (before cleanup) does not finish the aborted trial', () => {
+  setup(params([conflict, conflict]))
+  act(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
+    document.dispatchEvent(new Event('visibilitychange'))
+    vi.advanceTimersByTime(3000) // same batch: the trial's timer is still scheduled
+  })
+  expect(pushed).toHaveLength(0)
+  Object.defineProperty(document, 'hidden', { configurable: true, get: () => false })
+  act(() => void document.dispatchEvent(new Event('visibilitychange')))
+  press('blue')
+  expect(pushed.map((e) => e.trial_index)).toEqual([1])
+})
