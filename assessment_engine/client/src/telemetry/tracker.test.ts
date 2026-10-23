@@ -95,8 +95,8 @@ describe('TrialRecorder', () => {
     off.start(0)
     const e1 = off.finish({ correct: true, voice })
     expect(e1.voice_opt_in).toBe(false)
-    expect(e1.voice_latency_ms ?? null).toBeNull()
-    expect(e1.vocal_pace_hz ?? null).toBeNull()
+    expect(e1).not.toHaveProperty('voice_latency_ms')
+    expect(e1).not.toHaveProperty('vocal_pace_hz')
 
     const on = new TrialRecorder({ ...ctx, voice_opt_in: true }, clock().now)
     on.start(0)
@@ -168,6 +168,36 @@ describe('Tracker', () => {
     expect(sent(fetchFn, 2)).toEqual([1, 2])
     await t.flush()
     expect(fetchFn).toHaveBeenCalledTimes(3)
+  })
+
+  test('rejected batch (422) is dropped and logged, later events still sent', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const fetchFn = vi
+      .fn(async (_url: string, _init?: RequestInit) => new Response(null, { status: 202 }))
+      .mockResolvedValueOnce(new Response(null, { status: 422 }))
+    const t = make({ fetchFn, beacon: vi.fn() })
+    t.push(ev(1))
+    t.push(ev(2))
+    await t.flush()
+    expect(errSpy).toHaveBeenCalledTimes(1)
+    expect(String(errSpy.mock.calls[0][0])).toMatch(/2 events.*422/)
+    t.push(ev(3))
+    await t.flush()
+    expect(sent(fetchFn, 1)).toEqual([3])
+    errSpy.mockRestore()
+  })
+
+  test('408 and 429 are retried', async () => {
+    const fetchFn = vi
+      .fn(async (_url: string, _init?: RequestInit) => new Response(null, { status: 202 }))
+      .mockResolvedValueOnce(new Response(null, { status: 408 }))
+      .mockResolvedValueOnce(new Response(null, { status: 429 }))
+    const t = make({ fetchFn, beacon: vi.fn() })
+    t.push(ev(1))
+    await t.flush()
+    await t.flush()
+    await t.flush()
+    expect(sent(fetchFn, 2)).toEqual([1])
   })
 
   test('buffer caps at maxBuffer dropping oldest', async () => {

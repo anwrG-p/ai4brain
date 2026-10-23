@@ -122,7 +122,12 @@ export class Tracker {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(batch),
       })
-      if (res.ok) {
+      // A 4xx (other than 408/429) will never succeed: the server rejects the whole batch, so drop it
+      // rather than block the queue head. 5xx, 408, 429 and network errors retry.
+      const rejected =
+        res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429
+      if (rejected) console.error(`telemetry: dropped ${batch.length} events (HTTP ${res.status})`)
+      if (res.ok || rejected) {
         const done = new Set(batch)
         this.buffer = this.buffer.filter((e) => !done.has(e))
       }
