@@ -13,7 +13,7 @@
         { "pos": [0, 0], "symbol": "A", "rule": "position", "trial_type": "standard", "answer": { "position": false, "symbol": false } },
         { "pos": [1, 2], "symbol": "B", "rule": "position", "trial_type": "standard", "answer": { "position": false, "symbol": false } },
         { "pos": [0, 0], "symbol": "C", "rule": "position", "trial_type": "target", "answer": { "position": true, "symbol": false } },
-        { "pos": [2, 1], "symbol": "C", "rule": "position", "trial_type": "lure_minus", "answer": { "position": false, "symbol": false } },
+        { "pos": [0, 0], "symbol": "C", "rule": "position", "trial_type": "lure_minus", "answer": { "position": false, "symbol": false } },
         { "pos": [0, 0], "symbol": "C", "rule": "position", "trial_type": "target", "answer": { "position": true, "symbol": true } },
         { "pos": [1, 1], "symbol": "D", "rule": "symbol", "trial_type": "switch", "answer": { "position": false, "symbol": false } },
         { "pos": [2, 2], "symbol": "C", "rule": "symbol", "trial_type": "target", "answer": { "position": false, "symbol": true } },

@@ -112,6 +112,29 @@ describe('fixtures.json', () => {
     }
   })
 
+  test('n_back: answer equals the true n-back match per stream; labels hold on the active stream', () => {
+    const { n, trials } = byType<NBackParams>('n_back')
+    type T = (typeof trials)[number]
+    const same = {
+      position: (a: T, b: T) => String(a.pos) === String(b.pos),
+      symbol: (a: T, b: T) => a.symbol === b.symbol,
+    }
+    trials.forEach((t, i) => {
+      const back = (k: number) => trials[i - k]
+      const pos = i >= n && same.position(t, back(n))
+      // Parity rule: the symbol answer is "the symbol is an even digit", not a match.
+      const sym = t.rule === 'parity' ? Number(t.symbol) % 2 === 0 : i >= n && same.symbol(t, back(n))
+      expect(t.answer, `trial ${i}`).toEqual({ position: pos, symbol: sym })
+      if (t.rule === 'parity') return
+      // trial_type is relative to the active rule's stream.
+      const active = same[t.rule]
+      const hit = t.rule === 'position' ? pos : sym
+      if (t.trial_type === 'target') expect(hit, `trial ${i} target`).toBe(true)
+      if (t.trial_type === 'lure_minus') expect(!hit && i >= n - 1 && active(t, back(n - 1)), `trial ${i} lure_minus`).toBe(true)
+      if (t.trial_type === 'lure_plus') expect(!hit && i >= n + 1 && active(t, back(n + 1)), `trial ${i} lure_plus`).toBe(true)
+    })
+  })
+
   test('stroop: 4 trials, each answered with a known color', () => {
     const p = byType<StroopParams>('stroop')
     expect(p.trials).toHaveLength(4)

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import type { TrialRecorder } from '../telemetry/tracker'
-import type { TaskPayload } from '../telemetry/types'
+import type { NBackParams, TaskPayload } from '../telemetry/types'
+import { NBack } from './NBack'
 
 // Every task component takes these props and calls tracker.push(recorder.finish(...)) once per trial.
 export type TaskProps<P> = { params: P; recorder: TrialRecorder; onDone: () => void }
@@ -10,8 +11,9 @@ type Props = { task: TaskPayload; recorder: TrialRecorder; onDone: () => void }
 export function TaskRunner(props: Props) {
   const { task, onDone } = props
   switch (task.schema_type) {
-    // Tasks 5–11 add one case each, e.g.:
-    // case 'n_back': return <NBack params={task.params as NBackParams} recorder={props.recorder} onDone={onDone} />
+    // Tasks 5–11 add one case each.
+    case 'n_back':
+      return <NBack params={task.params as NBackParams} recorder={props.recorder} onDone={onDone} />
     default:
       return <Unsupported schemaType={task.schema_type} onDone={onDone} />
   }

@@ -14,7 +14,7 @@ afterEach(() => {
 test('a fetch error shows a message and retry loads the task', async () => {
   fetchNextTask
     .mockRejectedValueOnce(new Error('HTTP 500'))
-    .mockResolvedValueOnce({ task_id: 't1', dimension: 'working_memory', schema_type: 'n_back', params: {}, surface_seed: 0 })
+    .mockResolvedValueOnce({ task_id: 't1', dimension: 'working_memory', schema_type: 'bogus', params: {}, surface_seed: 0 })
   render(<App />)
   await userEvent.click(await screen.findByRole('button', { name: /try again/i }))
   expect(await screen.findByText(/Unsupported task/)).toBeTruthy()
