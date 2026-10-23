@@ -22,7 +22,7 @@ Dimension = Literal[
 
 
 class TelemetryEvent(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     user_id: Id
     session_id: Id
@@ -56,14 +56,17 @@ router = APIRouter()
 
 
 @router.post("/v1/telemetry/event", status_code=202)
-def ingest(body: TelemetryEvent | Batch) -> dict[str, int]:
+async def ingest(body: TelemetryEvent | Batch) -> dict[str, int]:
     events = body if isinstance(body, list) else [body]
     out_dir = Path(os.environ.get("TELEMETRY_DIR", "data/raw/telemetry"))
     out_dir.mkdir(parents=True, exist_ok=True)
     received_at = datetime.now(timezone.utc).isoformat()
-    # ponytail: single-line appends are fine for one uvicorn worker; Redis Streams if multiple workers.
+    # ponytail: sync appends inside an async handler are serialized on the event loop, so lines
+    # never interleave within one uvicorn worker; Redis Streams if multiple workers.
     for e in events:
-        line = json.dumps({**e.model_dump(mode="json"), "received_at": received_at})
+        line = json.dumps(
+            {**e.model_dump(mode="json"), "received_at": received_at}, allow_nan=False
+        )
         with open(out_dir / f"{e.user_id}.jsonl", "a", encoding="utf-8") as f:
             f.write(line + "\n")
     return {"accepted": len(events)}

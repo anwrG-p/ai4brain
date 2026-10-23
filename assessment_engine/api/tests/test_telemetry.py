@@ -92,3 +92,38 @@ def test_trial_meta_too_many_keys_rejected(client):
 
 def test_trial_meta_bad_key_rejected(client):
     assert post(client, trial_meta={"Bad-Key": 1}).status_code == 422
+
+
+def post_raw(client, raw: str):
+    return client.post(URL, content=raw, headers={"Content-Type": "application/json"})
+
+
+def event_raw(field: str, literal: str) -> str:
+    return json.dumps({**EVENT, field: "__X__"}).replace('"__X__"', literal)
+
+
+def test_infinity_in_numeric_field_rejected(client, tmp_path):
+    for field in ("hesitation_jitter", "keystroke_latency_ms"):
+        assert post_raw(client, event_raw(field, "Infinity")).status_code == 422
+    raw = event_raw("voice_latency_ms", "Infinity").replace(
+        '"trial_meta"', '"voice_opt_in": true, "trial_meta"'
+    )
+    assert post_raw(client, raw).status_code == 422
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_nan_in_trial_meta_rejected(client, tmp_path):
+    r = post_raw(client, event_raw("trial_meta", '{"x": NaN}'))
+    assert r.status_code == 422
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_nan_in_hesitation_jitter_returns_422_not_500(client, tmp_path):
+    r = post_raw(client, event_raw("hesitation_jitter", "NaN"))
+    assert r.status_code == 422
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_trial_meta_long_string_rejected(client, tmp_path):
+    assert post(client, trial_meta={"x": "a" * 65}).status_code == 422
+    assert list(tmp_path.iterdir()) == []
