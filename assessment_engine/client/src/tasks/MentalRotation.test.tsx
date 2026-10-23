@@ -1,0 +1,70 @@
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { TrialRecorder, tracker } from '../telemetry/tracker'
+import type { RotationParams, TelemetryEvent } from '../telemetry/types'
+import { MentalRotation } from './MentalRotation'
+
+type Trial = RotationParams['trials'][number]
+const L: [number, number][] = [[0, 0], [1, 0], [2, 0], [2, 1]]
+const same: Trial = { cells: L, angle_deg: 90, mirrored: false, answer: 'same' }
+const different: Trial = { cells: L, angle_deg: 180, mirrored: true, answer: 'different' }
+const params = (trials: Trial[]): RotationParams => ({ trials, time_limit_ms: 7000 })
+
+let pushed: TelemetryEvent[]
+
+beforeEach(() => {
+  vi.useFakeTimers()
+  pushed = []
+  vi.spyOn(tracker, 'push').mockImplementation((e) => void pushed.push(e))
+})
+
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+  vi.useRealTimers()
+})
+
+function setup(p: RotationParams) {
+  const recorder = new TrialRecorder({
+    user_id: 'u',
+    session_id: 's',
+    task_id: 't',
+    dimension: 'spatial_orientation',
+    voice_opt_in: false,
+  })
+  const onDone = vi.fn()
+  render(<MentalRotation params={p} recorder={recorder} onDone={onDone} />)
+  return { onDone }
+}
+
+const advance = (ms: number) => act(() => void vi.advanceTimersByTime(ms))
+const key = (k: string, repeat = false) => act(() => void fireEvent.keyDown(window, { key: k, repeat }))
+
+test('shows the original and the transformed shape side by side', () => {
+  setup(params([different]))
+  const [orig, moved] = screen.getAllByRole('img')
+  expect(orig.querySelector('g')?.getAttribute('transform')).toBe('rotate(0 1.75 0.75)')
+  expect(moved.querySelector('g')?.getAttribute('transform')).toMatch(/^rotate\(180 .*scale\(-1 1\)$/)
+})
+
+test('J on a different trial scores 1, F on a same trial scores 1, J on same scores 0', () => {
+  const { onDone } = setup(params([different, same, same]))
+  advance(800)
+  key('j')
+  key('F', true) // repeat: ignored
+  advance(600)
+  key('F')
+  key('j') // second press on the next trial
+  expect(pushed.map((e) => e.score_norm)).toEqual([1, 1, 0])
+  expect(pushed[0]).toMatchObject({ trial_index: 0, response_time_ms: 800 })
+  expect(pushed[1]).toMatchObject({ trial_index: 1, response_time_ms: 600 })
+  expect(onDone).toHaveBeenCalledOnce()
+})
+
+test('on-screen buttons answer too; a timeout scores 0 at time_limit_ms', () => {
+  setup(params([same, different]))
+  act(() => void fireEvent.pointerDown(screen.getByRole('button', { name: /same/i })))
+  advance(7000)
+  expect(pushed.map((e) => e.score_norm)).toEqual([1, 0])
+  expect(pushed[1].response_time_ms).toBe(7000)
+})

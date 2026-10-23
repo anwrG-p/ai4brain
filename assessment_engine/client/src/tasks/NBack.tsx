@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { tracker } from '../telemetry/tracker'
+import { useInputCapture } from '../telemetry/useInputCapture'
 import type { NBackParams, TelemetryEvent } from '../telemetry/types'
 import type { TaskProps } from './TaskRunner'
 
@@ -82,10 +83,8 @@ export function NBack({ params, recorder, onDone }: TaskProps<NBackParams>) {
   )
 
   useEffect(() => {
-    const onInput = () => live.current && recorder.input()
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat) return
-      onInput()
       const s = KEYS[e.key.toLowerCase()]
       if (s) respond(s)
     }
@@ -105,14 +104,15 @@ export function NBack({ params, recorder, onDone }: TaskProps<NBackParams>) {
       }
     }
     window.addEventListener('keydown', onKey)
-    window.addEventListener('pointerdown', onInput)
     document.addEventListener('visibilitychange', onVis)
     return () => {
       window.removeEventListener('keydown', onKey)
-      window.removeEventListener('pointerdown', onInput)
       document.removeEventListener('visibilitychange', onVis)
     }
   }, [recorder, respond])
+
+  // recorder.input() is a no-op between trials and after an abort, so only the pause gates it.
+  useInputCapture(recorder, !paused)
 
   if (!t) return null // no trials: the effect has already called onDone
   const showStim = stimOff !== i && !paused && i < trials.length

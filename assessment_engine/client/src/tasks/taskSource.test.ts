@@ -146,6 +146,8 @@ describe('fixtures.json', () => {
     expect(p.cells).toHaveLength(9)
     expect(p.cells.filter((c) => c === null)).toHaveLength(1)
     expect(p.options[p.answer]).toBeDefined()
+    // CSS color names, so GlyphView's aria-label reads e.g. "2 blue triangles".
+    for (const g of [...p.cells, ...p.options]) if (g) expect(g.color).toMatch(/^[a-z]+$/)
   })
 
   test('mental_rotation: every trial answered', () => {
