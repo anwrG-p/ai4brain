@@ -14,6 +14,11 @@ from clustering_engine.archetypes import (
 )
 from clustering_engine.temporal_smoother import LeakyIntegrator
 from clustering_engine.gmm_clusterer import SoftGMMClusterer
+from clustering_engine.hysteresis_gate import (
+    HysteresisState,
+    SchmittTriggerHysteresisGate,
+    TransitionDecision,
+)
 
 __all__ = [
     "ARCHETYPES",
@@ -23,4 +28,7 @@ __all__ = [
     "get_archetype_by_code",
     "LeakyIntegrator",
     "SoftGMMClusterer",
+    "HysteresisState",
+    "SchmittTriggerHysteresisGate",
+    "TransitionDecision",
 ]
