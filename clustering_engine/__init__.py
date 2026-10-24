@@ -1,14 +1,17 @@
 """AI4Brain Clustering Engine & Explainability Decoder.
 
-Provides soft Gaussian Mixture Model clustering over K=9 cognitive archetypes,
+Provides soft Gaussian Mixture Model clustering over dynamic K cognitive archetypes,
 Schmitt-trigger hysteresis gating with dwell-time filter, and non-clinical
-prototype explainability decoding.
+prototype explainability decoding across extensible cognitive dimensions.
 """
 
 from clustering_engine.archetypes import (
     ARCHETYPES,
+    DEFAULT_DIMENSIONS,
     Archetype,
+    ArchetypeRegistry,
     COGNITIVE_DIMENSIONS,
+    format_dimension_phrase,
     get_archetype,
     get_archetype_by_code,
 )
@@ -20,9 +23,7 @@ from clustering_engine.hysteresis_gate import (
     TransitionDecision,
 )
 from clustering_engine.explainability import (
-    DIMENSION_DESCRIPTIONS,
     ExplainabilityDecoder,
-    PACING_PHRASES,
     validate_non_clinical,
 )
 from clustering_engine.evaluator import (
@@ -33,8 +34,11 @@ from clustering_engine.evaluator import (
 
 __all__ = [
     "ARCHETYPES",
-    "Archetype",
+    "DEFAULT_DIMENSIONS",
     "COGNITIVE_DIMENSIONS",
+    "Archetype",
+    "ArchetypeRegistry",
+    "format_dimension_phrase",
     "get_archetype",
     "get_archetype_by_code",
     "LeakyIntegrator",
@@ -42,9 +46,7 @@ __all__ = [
     "HysteresisState",
     "SchmittTriggerHysteresisGate",
     "TransitionDecision",
-    "DIMENSION_DESCRIPTIONS",
     "ExplainabilityDecoder",
-    "PACING_PHRASES",
     "validate_non_clinical",
     "CognitiveEvaluator",
     "EvaluationResult",

@@ -1,25 +1,24 @@
-"""Unified Cognitive Evaluator for AI4Brain clustering and explainability.
+"""Unified Cognitive Evaluator for dynamic clusters and extensible cognitive dimensions.
 
 Integrates:
 1. Temporal State Smoothing (Leaky Integrator, eta = 0.12)
-2. Soft Gaussian Mixture Model (GMM) Clustering (K = 9 Archetypes)
+2. Soft Gaussian Mixture Model (GMM) Clustering (dynamic K archetypes)
 3. Schmitt-Trigger Hysteresis Gate (delta = 0.15, N_confirm = 3)
-4. Centroid Prototype Explainability Decoder (W_eval projection, Delta c, XAI)
+4. Centroid Prototype Explainability Decoder (dynamic M cognitive dimensions)
 
-Provides deterministic evaluation returning the exact JSON schema required by
-the AI4Brain Task 3 contract.
+Supports arbitrary K clusters and extensible dimension configurations.
 """
 
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 import numpy as np
 
 from clustering_engine.archetypes import (
-    ARCHETYPES,
-    COGNITIVE_DIMENSIONS,
+    DEFAULT_DIMENSIONS,
     Archetype,
+    ArchetypeRegistry,
     get_archetype,
 )
 from clustering_engine.explainability import ExplainabilityDecoder
@@ -45,7 +44,7 @@ class TransitionEvent:
 
 @dataclass(frozen=True)
 class EvaluationResult:
-    """Complete evaluation payload adhering to Task 3 contract."""
+    """Complete evaluation payload adhering to Task 3 contract with extensible dimensions."""
 
     user_id: str
     active_cluster_id: int
@@ -78,6 +77,8 @@ class CognitiveEvaluator:
     def __init__(
         self,
         dim: int = 64,
+        k: Optional[int] = None,
+        dimensions: Optional[Sequence[str]] = None,
         eta: float = 0.12,
         delta_hyst: float = 0.15,
         n_confirm: int = 3,
@@ -85,11 +86,14 @@ class CognitiveEvaluator:
         smoother: Optional[LeakyIntegrator] = None,
         hysteresis_gate: Optional[SchmittTriggerHysteresisGate] = None,
         xai_decoder: Optional[ExplainabilityDecoder] = None,
+        archetype_registry: Optional[ArchetypeRegistry] = None,
     ) -> None:
-        """Initialize the CognitiveEvaluator.
+        """Initialize CognitiveEvaluator with open clusters and dimensions.
 
         Args:
             dim: Latent vector dimension (default: 64).
+            k: Number of clusters (default: 9 or inferred from clusterer/registry).
+            dimensions: List of cognitive dimensions (default: DEFAULT_DIMENSIONS).
             eta: Leaky integrator smoothing factor (default: 0.12).
             delta_hyst: Schmitt-trigger hysteresis margin (default: 0.15).
             n_confirm: Dwell-time confirmation frames (default: 3).
@@ -97,9 +101,38 @@ class CognitiveEvaluator:
             smoother: Optional customized LeakyIntegrator instance.
             hysteresis_gate: Optional customized SchmittTriggerHysteresisGate instance.
             xai_decoder: Optional customized ExplainabilityDecoder instance.
+            archetype_registry: Optional custom ArchetypeRegistry instance.
         """
         self.dim = dim
-        self.clusterer = clusterer or SoftGMMClusterer(dim=dim)
+        self.dimensions: Tuple[str, ...] = tuple(dimensions) if dimensions is not None else DEFAULT_DIMENSIONS
+
+        # Resolve cluster count K
+        if k is not None:
+            resolved_k = k
+        elif clusterer is not None:
+            resolved_k = clusterer.k
+        elif archetype_registry is not None and len(archetype_registry) > 0:
+            resolved_k = len(archetype_registry)
+        else:
+            resolved_k = 9
+
+        self.k = resolved_k
+
+        # Resolve archetype registry
+        if archetype_registry is not None:
+            self.archetype_registry = archetype_registry
+        elif self.k == 9 and self.dimensions == DEFAULT_DIMENSIONS:
+            self.archetype_registry = ArchetypeRegistry.create_default()
+        else:
+            self.archetype_registry = ArchetypeRegistry.generate_for_k(
+                k=self.k,
+                dimensions=self.dimensions,
+            )
+
+        self.clusterer = clusterer or SoftGMMClusterer(
+            dim=dim,
+            k=self.k,
+        )
         self.smoother = smoother or LeakyIntegrator(eta=eta, expected_dim=dim)
         self.hysteresis_gate = hysteresis_gate or SchmittTriggerHysteresisGate(
             delta_hyst=delta_hyst,
@@ -107,7 +140,9 @@ class CognitiveEvaluator:
         )
         self.xai_decoder = xai_decoder or ExplainabilityDecoder(
             dim=dim,
+            dimensions=self.dimensions,
             centroids=self.clusterer.get_all_centroids(),
+            archetype_registry=self.archetype_registry,
         )
 
     def evaluate(
@@ -127,9 +162,9 @@ class CognitiveEvaluator:
         # Step 1: Temporal State Smoothing (Leaky Integrator)
         s_bar = self.smoother.smooth(user_id=user_id, s_t=latent_vector)
 
-        # Step 2: Soft GMM Clustering (K = 9 Archetypes)
+        # Step 2: Soft GMM Clustering (dynamic K archetypes)
         probs_by_code = self.clusterer.compute_responsibilities(s_bar)
-        probs_by_id = {int(code[1:]): p for code, p in probs_by_code.items()}
+        probs_by_id = self.clusterer.get_responsibilities_by_id(s_bar)
 
         # Step 3: Schmitt-Trigger Hysteresis Gate
         decision = self.hysteresis_gate.process(
@@ -137,7 +172,7 @@ class CognitiveEvaluator:
             responsibilities=probs_by_id,
         )
 
-        active_archetype = get_archetype(decision.active_cluster_id)
+        active_archetype = self.archetype_registry.get(decision.active_cluster_id)
 
         # Step 4: Centroid Prototype Explainability on Transition
         transition_event: Optional[TransitionEvent] = None
@@ -153,6 +188,7 @@ class CognitiveEvaluator:
                 to_cluster_id=decision.to_cluster,
                 delta_vector=delta_vector,
                 dominant_driver=dominant_driver,
+                to_cluster_name=active_archetype.name,
             )
 
             transition_event = TransitionEvent(
@@ -164,7 +200,7 @@ class CognitiveEvaluator:
                 xai_explanation=explanation,
             )
 
-        # Step 5: Radar Scores & Uncertainty Band
+        # Step 5: Dynamic Radar Scores & Uncertainty Band
         radar_scores = self.xai_decoder.compute_radar_scores(
             s_bar=s_bar,
             responsibilities=probs_by_code,
