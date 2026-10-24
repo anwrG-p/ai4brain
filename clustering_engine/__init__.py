@@ -19,6 +19,17 @@ from clustering_engine.hysteresis_gate import (
     SchmittTriggerHysteresisGate,
     TransitionDecision,
 )
+from clustering_engine.explainability import (
+    DIMENSION_DESCRIPTIONS,
+    ExplainabilityDecoder,
+    PACING_PHRASES,
+    validate_non_clinical,
+)
+from clustering_engine.evaluator import (
+    CognitiveEvaluator,
+    EvaluationResult,
+    TransitionEvent,
+)
 
 __all__ = [
     "ARCHETYPES",
@@ -31,4 +42,11 @@ __all__ = [
     "HysteresisState",
     "SchmittTriggerHysteresisGate",
     "TransitionDecision",
+    "DIMENSION_DESCRIPTIONS",
+    "ExplainabilityDecoder",
+    "PACING_PHRASES",
+    "validate_non_clinical",
+    "CognitiveEvaluator",
+    "EvaluationResult",
+    "TransitionEvent",
 ]
