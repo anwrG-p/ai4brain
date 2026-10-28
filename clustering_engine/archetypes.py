@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Final, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Final, List, Optional, Sequence, Tuple, Union
 
 
 # Default fallback dimensions (can be replaced with 4, 6, or arbitrary custom dimensions)
@@ -61,6 +61,19 @@ class Archetype:
     description: str = ""
     growth_focus: str = ""
     target_radar: Dict[str, float] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert archetype prototype to dictionary."""
+        return {
+            "id": self.id,
+            "code": self.code,
+            "name": self.name,
+            "proficiency_tier": self.proficiency_tier,
+            "pacing_strategy": self.pacing_strategy,
+            "description": self.description,
+            "growth_focus": self.growth_focus,
+            "target_radar": dict(self.target_radar),
+        }
 
 
 def _build_default_archetypes_dict() -> Dict[int, Archetype]:
@@ -158,45 +171,45 @@ def _build_default_archetypes_dict() -> Dict[int, Archetype]:
                 "pattern_processing": 72.0,
                 "processing_speed": 62.0,
                 "spatial_reasoning": 78.0,
-                "verification_rigor": 85.0,
+                "verification_rigor": 84.0,
             },
         ),
         7: Archetype(
             id=7,
             code="C7",
-            name="Rapid Strategist",
+            name="Adaptive Strategist",
             proficiency_tier="Strategic",
             pacing_strategy="Fast / Dynamic",
-            description="Synthesizes complex information dynamically at high speed with agile heuristic reasoning.",
-            growth_focus="Harmonizing rapid conceptual synthesis with persistent structural audits.",
+            description="Synthesizes diverse cues rapidly, dynamically shifting strategies with high pattern processing fluency.",
+            growth_focus="Sustaining peak verification rigor during prolonged high-demand problem solving.",
             target_radar={
                 "working_memory": 82.0,
-                "pattern_processing": 90.0,
-                "processing_speed": 88.0,
-                "spatial_reasoning": 79.0,
-                "verification_rigor": 70.0,
+                "pattern_processing": 88.0,
+                "processing_speed": 86.0,
+                "spatial_reasoning": 80.0,
+                "verification_rigor": 76.0,
             },
         ),
         8: Archetype(
             id=8,
             code="C8",
-            name="Adaptive Architect",
+            name="Systemic Integrator",
             proficiency_tier="Strategic",
-            pacing_strategy="Balanced / Versatile",
-            description="Navigates multi-modal cognitive challenges with high spatial adaptability and integrated processing.",
-            growth_focus="Orchestrating cross-domain cognitive strategies across high-complexity horizons.",
+            pacing_strategy="Balanced / Systemic",
+            description="Maintains comprehensive working memory hold and integrates complex spatial and logical dependencies seamlessly.",
+            growth_focus="Refining rapid transition agility across novel domain contexts.",
             target_radar={
-                "working_memory": 85.0,
-                "pattern_processing": 86.0,
-                "processing_speed": 80.0,
-                "spatial_reasoning": 89.0,
-                "verification_rigor": 82.0,
+                "working_memory": 88.0,
+                "pattern_processing": 84.0,
+                "processing_speed": 78.0,
+                "spatial_reasoning": 86.0,
+                "verification_rigor": 85.0,
             },
         ),
         9: Archetype(
             id=9,
             code="C9",
-            name="Deep Systemic Thinker",
+            name="Precision Architect",
             proficiency_tier="Strategic",
             pacing_strategy="Deliberate / In-Depth",
             description="Tackles deep structural dependencies with extensive working memory hold and comprehensive verification.",
@@ -232,6 +245,32 @@ class ArchetypeRegistry:
         self._archetypes[archetype.id] = archetype
         return self
 
+    def register_dynamic_centroid(
+        self,
+        cluster_id: int,
+        name: Optional[str] = None,
+        proficiency_tier: str = "Operational",
+        pacing_strategy: str = "Adaptive",
+        description: str = "",
+        growth_focus: str = "",
+        target_radar: Optional[Dict[str, float]] = None,
+    ) -> Archetype:
+        """Dynamically register a newly discovered or spawned centroid archetype."""
+        code = f"C{cluster_id}"
+        arch_name = name or f"Dynamic Archetype {code}"
+        arch = Archetype(
+            id=cluster_id,
+            code=code,
+            name=arch_name,
+            proficiency_tier=proficiency_tier,
+            pacing_strategy=pacing_strategy,
+            description=description or f"Dynamically discovered behavioral cluster {code}.",
+            growth_focus=growth_focus or "Continuous multi-dimensional strategy refinement.",
+            target_radar=target_radar or {},
+        )
+        self.register(arch)
+        return arch
+
     def get(self, cluster_id: int) -> Archetype:
         """Retrieve archetype by ID, with dynamic fallback if unmapped."""
         if cluster_id in self._archetypes:
@@ -246,6 +285,18 @@ class ArchetypeRegistry:
             description=f"Dynamic behavioral cluster C{cluster_id}.",
             growth_focus="Expanding multi-dimensional cognitive integration.",
         )
+
+    def get_archetype(self, cluster_id: int) -> Archetype:
+        """Alias for get(cluster_id)."""
+        return self.get(cluster_id)
+
+    def has_cluster(self, cluster_id: int) -> bool:
+        """Check if archetype registry contains a cluster ID."""
+        return cluster_id in self._archetypes
+
+    def __contains__(self, cluster_id: int) -> bool:
+        """Check if cluster ID is registered."""
+        return cluster_id in self._archetypes
 
     def get_by_code(self, code: str) -> Archetype:
         """Retrieve archetype by code ('C1', 'C2', ...)."""

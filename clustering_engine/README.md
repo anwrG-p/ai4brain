@@ -1,6 +1,6 @@
 # clustering_engine (Member 3)
 
-The **Clustering Engine & Centroid Explainability Decoder** serves as the behavioral anchor and non-clinical explainability layer of the AI4Brain Cognitive Growth Agent. It consumes continuous latent vectors $s_t \in \mathbb{R}^d$ ($d=64$) produced by the Brain Twin (SAT-JEPA) Context Encoder, decouples transient fluctuations via temporal smoothing, evaluates soft responsibilities across cognitive archetypes, eliminates boundary jitter using a Schmitt-trigger hysteresis filter, and generates supportive, growth-mindset explanations across extensible cognitive dimensions.
+The **Clustering Engine & Centroid Explainability Decoder** serves as the behavioral anchor and non-clinical explainability layer of the AI4Brain Cognitive Growth Agent. It consumes continuous latent vectors $s_t \in \mathbb{R}^d$ ($d=64$) produced by the Brain Twin (SAT-JEPA) Context Encoder, decouples transient fluctuations via temporal smoothing, evaluates soft responsibilities across dynamic cognitive archetypes, eliminates boundary jitter using a Schmitt-trigger hysteresis filter, tracks continuous cognitive trajectories through online centroid adaptation, and generates supportive, growth-mindset explanations across extensible cognitive dimensions.
 
 ---
 
@@ -21,7 +21,9 @@ The **Clustering Engine & Centroid Explainability Decoder** serves as the behavi
                       ┌───────────────────────────────────────────┐
                       │   Soft Gaussian Mixture Model (GMM)       │
                       │    γ_{t, k} = P(C_k | s̄_t) (Log-Sum-Exp)  │
-                      │    Supports arbitrary K archetypes        │
+                      │    Dynamic K archetypes (not fixed to 9)  │
+                      │    Online Centroid Adaptation (Soft EM)   │
+                      │    Novelty Centroid Spawning              │
                       └─────────────────────┬─────────────────────┘
                                             │ Responsibilities γ_{t, k}
                                             ▼
@@ -59,20 +61,26 @@ The **Clustering Engine & Centroid Explainability Decoder** serves as the behavi
 - **Numerical Guardrails:** Validates that incoming vectors contain only finite numbers (`np.isfinite`). Rejects `NaN` and `Inf` to prevent permanent state corruption.
 - **Session Memory Management:** Employs an `OrderedDict` LRU cache capped at `max_sessions=10000`. Inactive sessions are automatically evicted, preventing memory leaks under high traffic.
 
-### 2. Soft GMM Clustering (`SoftGMMClusterer`)
+### 2. Soft GMM Clustering with Dynamic Centroids (`SoftGMMClusterer`)
 - **Mathematical formulation:** Computes soft responsibilities using component log-likelihoods:
   $$\ln \mathcal{N}(x; \mu_k, \Sigma_k) = -\frac{1}{2}\left[d \ln(2\pi) + \ln|\Sigma_k| + (x - \mu_k)^T \Sigma_k^{-1} (x - \mu_k)\right]$$
   $$\gamma_{t, k} = \frac{\pi_k \mathcal{N}(\bar{s}_t; \mu_k, \Sigma_k)}{\sum_{j=1}^K \pi_j \mathcal{N}(\bar{s}_t; \mu_j, \Sigma_j)}$$
+- **Dynamic Centroids (Not Fixed to 9):**
+  - **Online Centroid Adaptation:** Centroids dynamically adapt online via soft EM updates tracking continuous cognitive drift:
+    $$\mu_k \leftarrow \mu_k + \eta_{\text{lr}} \cdot \gamma_{t, k} (\bar{s}_t - \mu_k)$$
+  - **Runtime Centroid Spawning:** Spawns new centroids dynamically via `add_centroid(new_vec)` ($K \leftarrow K + 1$), automatically re-normalizing priors and updating cluster codes.
+  - **Novelty Spawning:** When `novelty_threshold` is enabled, observations outside existing cluster density ($\max_k \text{affinity}(\bar{s}_t, \mu_k) < \tau_{\text{novel}}$) automatically spawn a new archetype centroid.
+  - **Dynamic $K$ Discovery (BIC):** Evaluates candidate $K$ components across $[k_{\min}, k_{\max}]$ via Bayesian Information Criterion (BIC), dynamically finding the optimal model complexity without manual tuning.
 - **Numerical Stability:** Uses SciPy's `logsumexp` to guarantee posteriors sum to $1.0 \pm 10^{-5}$ without underflow or overflow.
-- **Dynamic Clusters:** Supports any $K \ge 1$ clusters with deterministic orthogonal initialization, scikit-learn EM fitting (`fit()`), and JSON parameter serialization.
 
 ### 3. Dynamic Archetype Registry (`ArchetypeRegistry`)
 - **Extensible Registry:** Allows registering archetypes at runtime, loading from JSON/dict configs, or auto-generating definitions for arbitrary $K$ clusters.
+- **Dynamic Centroid Registration:** `register_dynamic_centroid()` automatically constructs descriptive, non-clinical archetypes when new centroids are spawned.
 - **Robust Key Parsing:** Robustly parses integer and string keys (`"C1"`, `"c1"`, `"1"`, `"arch_1"`, etc.).
 - **Default Grid:** 9 pre-calibrated non-clinical archetypes spanning a $3 \times 3$ grid:
   - **Developing:** Intuitive Explorer (C1), Stepwise Builder (C2), Deliberate Observer (C3)
   - **Operational:** Agile Sprinter (C4), Calibrated Operator (C5), Methodical Analyst (C6)
-  - **Strategic:** Rapid Strategist (C7), Adaptive Architect (C8), Deep Systemic Thinker (C9)
+  - **Strategic:** Adaptive Strategist (C7), Systemic Integrator (C8), Precision Architect (C9)
 
 ### 4. Schmitt-Trigger Hysteresis Gate (`SchmittTriggerHysteresisGate`)
 - **Mathematical formulation:** A transition from active cluster $C_{\text{active}}$ to candidate $C_{\text{target}}$ requires:
@@ -84,6 +92,7 @@ The **Clustering Engine & Centroid Explainability Decoder** serves as the behavi
 ### 5. Centroid Prototype Explainability Decoder (`ExplainabilityDecoder`)
 - **Linear Projection Matrix:** Calibrates $W_{\text{eval}} \in \mathbb{R}^{M \times d}$ via Moore-Penrose pseudo-inverse against archetype target profiles:
   $$Y = M W_{\text{eval}}^T \implies W_{\text{eval}} = Y^T (M^\dagger)^T$$
+  Dynamically recalibrates whenever centroids adapt or new centroids are registered via `update_centroids()`.
 - **Differential Transition Vector:** Computes change along each cognitive dimension:
   $$\Delta c = W_{\text{eval}}(\mu_{\text{target}} - \mu_{\text{active}})$$
 - **Dominant Driver Identification:**
@@ -97,9 +106,13 @@ The **Clustering Engine & Centroid Explainability Decoder** serves as the behavi
 - Bridges Task 2's JEPA Context Encoder output vectors to the clustering engine, returning serialized evaluation dictionaries matching the team data contract.
 
 ### 7. FastAPI Router (`api_router.py`)
-- Exposes `POST /v1/clustering/evaluate` and `POST /v1/clustering/reset/{user_id}`.
-- Supports dependency injection via `Depends(get_evaluator)` and `set_evaluator()`.
-- Validates vector dimensions and finite values, returning HTTP 422 for malformed payloads.
+- Exposes full REST API under `/v1/clustering`:
+  - `POST /v1/clustering/evaluate`: Ingests latent vectors, returns archetype classification, radar scores, transition events, and XAI explanations.
+  - `POST /v1/clustering/reset/{user_id}`: Resets smoother and hysteresis state for a user session.
+  - `GET /v1/clustering/centroids`: Returns current $K$, centroid coordinates, archetype metadata, and online adaptation settings.
+  - `POST /v1/clustering/centroids/spawn`: Dynamically registers a new centroid vector and creates its archetype descriptor.
+  - `POST /v1/clustering/centroids/adapt`: Configures online learning rate $\eta_{\text{lr}}$ and novelty threshold $\tau_{\text{novel}}$.
+  - `POST /v1/clustering/centroids/discover`: Discovers optimal $K$ from batch samples using BIC.
 
 ---
 
@@ -108,13 +121,13 @@ The **Clustering Engine & Centroid Explainability Decoder** serves as the behavi
 ```
 clustering_engine/
 ├── __init__.py               # Public API exports
-├── archetypes.py             # Archetype dataclass, ArchetypeRegistry, dimension formatting
+├── archetypes.py             # Archetype dataclass, ArchetypeRegistry, dynamic registration
 ├── temporal_smoother.py      # LeakyIntegrator (eta = 0.12, LRU session cache, NaN guard)
-├── gmm_clusterer.py          # SoftGMMClusterer (K clusters, log-sum-exp, EM fitting, save/load)
+├── gmm_clusterer.py          # SoftGMMClusterer (dynamic K, online adaptation, novelty, BIC)
 ├── hysteresis_gate.py        # SchmittTriggerHysteresisGate (delta=0.15, N_confirm=3, dynamic K)
-├── explainability.py         # ExplainabilityDecoder (W_eval, Delta c, XAI, non-clinical guardrails)
-├── evaluator.py              # CognitiveEvaluator (Unified end-to-end pipeline)
-├── api_router.py             # FastAPI router (/v1/clustering/evaluate, dependency injection)
+├── explainability.py         # ExplainabilityDecoder (dynamic W_eval, Delta c, XAI guardrails)
+├── evaluator.py              # CognitiveEvaluator (Unified end-to-end pipeline with dynamic centroids)
+├── api_router.py             # FastAPI router (evaluation & dynamic centroid management)
 ├── README.md                 # Technical documentation & guide
 ├── HANDOVER.md               # Inter-member integration contracts
 └── tests/
@@ -124,6 +137,7 @@ clustering_engine/
     ├── test_explainability.py# XAI projection, dominant drivers, non-clinical guardrails
     ├── test_evaluator.py     # End-to-end contract schema and FastAPI tests
     ├── test_dynamic_config.py# Arbitrary K and extensible dimension tests
+    ├── test_dynamic_centroids.py # Dynamic centroids, online adaptation, BIC discovery
     └── test_audit_fixes.py   # Regression tests for audit findings and edge cases
 
 brain_twin_jepa/
@@ -152,14 +166,19 @@ conda activate ai4brain-clustering
 
 ## 💻 Usage Examples
 
-### 1. Standard End-to-End Pipeline
+### 1. Standard End-to-End Pipeline with Dynamic Adaptation
 
 ```python
 import numpy as np
 from clustering_engine import CognitiveEvaluator
 
-# Initialize evaluator with default 9 archetypes and 5 dimensions
-evaluator = CognitiveEvaluator(dim=64)
+# Initialize evaluator with dynamic online adaptation enabled
+evaluator = CognitiveEvaluator(
+    dim=64,
+    adaptive_centroids=True,
+    centroid_lr=0.02,
+    novelty_threshold=0.05,
+)
 
 # Ingest latent vector from Task 2 JEPA
 s_t = np.random.randn(64)
@@ -172,7 +191,21 @@ if result.has_transitioned:
     print("XAI Explanation:", result.transition_event.xai_explanation)
 ```
 
-### 2. Member 1 Handover (6 Dimensions)
+### 2. Runtime Centroid Spawning
+
+```python
+# Dynamically spawn a 10th centroid at runtime
+new_vec = np.random.randn(64)
+new_id = evaluator.add_dynamic_centroid(
+    centroid=new_vec,
+    name="Adaptive Pioneer",
+    proficiency_tier="Strategic",
+    description="Exploratory state with rapid inductive pattern synthesis.",
+)
+print(f"Spawned cluster C{new_id}. Total K is now: {evaluator.k}")
+```
+
+### 3. Member 1 Handover (6 Dimensions)
 
 ```python
 from clustering_engine import CognitiveEvaluator
@@ -193,31 +226,22 @@ result = evaluator.evaluate("usr_02", np.random.randn(64))
 print(result.radar_scores)
 ```
 
-### 3. JEPA Clustering Bridge
-
-```python
-from brain_twin_jepa import BrainTwinClusteringBridge
-
-bridge = BrainTwinClusteringBridge()
-data = bridge.process_jepa_state(user_id="usr_03", s_t=[0.05] * 64)
-
-# Returns dictionary conforming to team contract
-print(data["active_cluster_id"], data["cluster_name"])
-```
-
-### 4. FastAPI Service with Dependency Injection
+### 4. FastAPI Service with Dynamic Endpoints
 
 ```python
 from fastapi import FastAPI
-from clustering_engine.api_router import router, set_evaluator
-from clustering_engine import CognitiveEvaluator
+from clustering_engine.api_router import router
 
 app = FastAPI(title="AI4Brain Cognitive Service")
 app.include_router(router)
 
-# Optional: customize evaluator parameters globally
-custom_evaluator = CognitiveEvaluator(k=6, dimensions=["dim_1", "dim_2"])
-set_evaluator(custom_evaluator)
+# Available endpoints:
+# POST /v1/clustering/evaluate
+# POST /v1/clustering/reset/{user_id}
+# GET  /v1/clustering/centroids
+# POST /v1/clustering/centroids/spawn
+# POST /v1/clustering/centroids/adapt
+# POST /v1/clustering/centroids/discover
 ```
 
 ---
@@ -230,11 +254,14 @@ Run the full test suite across both `clustering_engine` and `brain_twin_jepa`:
 C:\Users\User\miniconda3\envs\ai4brain-clustering\python.exe -m pytest clustering_engine/tests brain_twin_jepa/tests -v
 ```
 
-All 56 unit and integration tests verify:
+All 67 unit and integration tests verify:
 - Soft responsibilities sum to $1.0 \pm 10^{-5}$ across diverse inputs.
 - Finite number validation rejects `NaN` and `Inf` inputs, preserving clean session memory.
 - LRU cache evicts inactive sessions when `max_sessions` is reached.
 - Schmitt-trigger hysteresis gate prevents chattering and requires 3 sustained frames.
+- Dynamic centroids update online via soft EM, adapting to continuous user trajectories.
+- Runtime centroid spawning expands $K$ and registers new archetypes cleanly.
+- BIC discovery accurately detects optimal $K$ from empirical cluster data.
 - Extensible dimensions (4, 5, 6, custom) and arbitrary cluster counts ($K \ge 1$) execute deterministically.
 - Non-clinical safety guardrails strictly reject pathological terminology.
 - `BrainTwinClusteringBridge` correctly processes vectors and handles user resets.

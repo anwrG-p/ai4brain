@@ -2,11 +2,12 @@
 
 Integrates:
 1. Temporal State Smoothing (Leaky Integrator, eta = 0.12)
-2. Soft Gaussian Mixture Model (GMM) Clustering (dynamic K archetypes)
+2. Soft Gaussian Mixture Model (GMM) Clustering (dynamic K archetypes, online adaptation)
 3. Schmitt-Trigger Hysteresis Gate (delta = 0.15, N_confirm = 3)
 4. Centroid Prototype Explainability Decoder (dynamic M cognitive dimensions)
 
-Supports arbitrary K clusters and extensible dimension configurations.
+Supports dynamic centroids (online adaptation and novelty-based spawning)
+and extensible dimension configurations.
 """
 
 from __future__ import annotations
@@ -82,6 +83,9 @@ class CognitiveEvaluator:
         eta: float = 0.12,
         delta_hyst: float = 0.15,
         n_confirm: int = 3,
+        adaptive_centroids: bool = True,
+        centroid_lr: float = 0.02,
+        novelty_threshold: Optional[float] = None,
         clusterer: Optional[SoftGMMClusterer] = None,
         smoother: Optional[LeakyIntegrator] = None,
         hysteresis_gate: Optional[SchmittTriggerHysteresisGate] = None,
@@ -92,11 +96,14 @@ class CognitiveEvaluator:
 
         Args:
             dim: Latent vector dimension (default: 64).
-            k: Number of clusters (default: 9 or inferred from clusterer/registry).
+            k: Number of clusters (inferred from clusterer/registry or default: 9).
             dimensions: List of cognitive dimensions (default: DEFAULT_DIMENSIONS).
             eta: Leaky integrator smoothing factor (default: 0.12).
             delta_hyst: Schmitt-trigger hysteresis margin (default: 0.15).
             n_confirm: Dwell-time confirmation frames (default: 3).
+            adaptive_centroids: If True, dynamically updates centroid positions online.
+            centroid_lr: Learning rate for online centroid adaptation (default: 0.02).
+            novelty_threshold: Optional likelihood affinity threshold in [0, 1] below which a new centroid is spawned.
             clusterer: Optional customized SoftGMMClusterer instance.
             smoother: Optional customized LeakyIntegrator instance.
             hysteresis_gate: Optional customized SchmittTriggerHysteresisGate instance.
@@ -105,6 +112,9 @@ class CognitiveEvaluator:
         """
         self.dim = dim
         self.dimensions: Tuple[str, ...] = tuple(dimensions) if dimensions is not None else DEFAULT_DIMENSIONS
+        self.adaptive_centroids: bool = adaptive_centroids
+        self.centroid_lr: float = centroid_lr
+        self.novelty_threshold: Optional[float] = novelty_threshold
 
         # Resolve cluster count K
         if k is not None:
@@ -145,6 +155,69 @@ class CognitiveEvaluator:
             archetype_registry=self.archetype_registry,
         )
 
+    def add_dynamic_centroid(
+        self,
+        centroid: Union[np.ndarray, Sequence[float]],
+        name: Optional[str] = None,
+        proficiency_tier: str = "Operational",
+        pacing_strategy: str = "Adaptive",
+        description: str = "",
+        growth_focus: str = "",
+        target_radar: Optional[Dict[str, float]] = None,
+    ) -> int:
+        """Dynamically add a new centroid, growing K by 1.
+
+        Args:
+            centroid: Latent centroid vector of shape (dim,).
+            name: Optional display name for the archetype.
+            proficiency_tier: Tier category (Developing, Operational, Strategic, etc.).
+            pacing_strategy: Behavioral pacing descriptor.
+            description: Narrative summary.
+            growth_focus: Supportive growth direction.
+            target_radar: Optional target profile dictionary for radar scoring.
+
+        Returns:
+            1-based integer cluster ID of the new centroid.
+        """
+        new_id = self.clusterer.add_centroid(new_centroid=centroid)
+        self.k = self.clusterer.k
+        self.archetype_registry.register_dynamic_centroid(
+            cluster_id=new_id,
+            name=name,
+            proficiency_tier=proficiency_tier,
+            pacing_strategy=pacing_strategy,
+            description=description,
+            growth_focus=growth_focus,
+            target_radar=target_radar,
+        )
+        self.xai_decoder.update_centroids(self.clusterer.get_all_centroids())
+        return new_id
+
+    def get_dynamic_centroids(self) -> Dict[int, np.ndarray]:
+        """Return all current dynamic centroids keyed by 1-based cluster ID."""
+        return self.clusterer.get_all_centroids()
+
+    def discover_k_from_samples(
+        self,
+        X: np.ndarray,
+        k_min: int = 2,
+        k_max: int = 12,
+    ) -> int:
+        """Dynamically discover optimal cluster count K and fit centroids using BIC."""
+        discovered_k = self.clusterer.discover_optimal_k(X=X, k_min=k_min, k_max=k_max)
+        self.k = discovered_k
+        self.archetype_registry = ArchetypeRegistry.generate_for_k(
+            k=self.k,
+            dimensions=self.dimensions,
+        )
+        self.xai_decoder = ExplainabilityDecoder(
+            dim=self.dim,
+            dimensions=self.dimensions,
+            centroids=self.clusterer.get_all_centroids(),
+            archetype_registry=self.archetype_registry,
+        )
+        return self.k
+
     def evaluate(
         self,
         user_id: str,
@@ -165,6 +238,23 @@ class CognitiveEvaluator:
         # Step 2: Soft GMM Clustering (dynamic K archetypes)
         probs_by_code = self.clusterer.compute_responsibilities(s_bar)
         probs_by_id = self.clusterer.get_responsibilities_by_id(s_bar)
+
+        # Dynamic centroid discovery (spawn new centroid if state is novel)
+        if self.novelty_threshold is not None:
+            affinity = self.clusterer.compute_max_affinity(s_bar)
+            if affinity < self.novelty_threshold:
+                self.add_dynamic_centroid(centroid=s_bar)
+                probs_by_code = self.clusterer.compute_responsibilities(s_bar)
+                probs_by_id = self.clusterer.get_responsibilities_by_id(s_bar)
+
+        # Dynamic online centroid adaptation
+        if self.adaptive_centroids:
+            self.clusterer.update_online(
+                s_bar=s_bar,
+                lr=self.centroid_lr,
+                responsibilities=probs_by_code,
+            )
+            self.xai_decoder.update_centroids(self.clusterer.get_all_centroids())
 
         # Step 3: Schmitt-Trigger Hysteresis Gate
         decision = self.hysteresis_gate.process(

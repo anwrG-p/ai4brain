@@ -133,6 +133,16 @@ class ExplainabilityDecoder:
         else:
             self.w_eval = _create_default_w_eval(self.dimensions, self.dim)
 
+    def update_centroids(self, centroids: Dict[int, np.ndarray]) -> None:
+        """Dynamically re-calibrate projection matrix W_eval with updated centroids."""
+        if centroids and len(centroids) > 0:
+            self.w_eval = _calibrate_dynamic_projection_matrix(
+                dimensions=self.dimensions,
+                centroids=centroids,
+                dim=self.dim,
+                archetype_registry=self.archetype_registry,
+            )
+
     def project_latent(self, vector: Union[np.ndarray, Sequence[float]]) -> np.ndarray:
         """Project a latent vector into the configured cognitive dimensions.
 
