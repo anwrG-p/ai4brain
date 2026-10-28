@@ -13,7 +13,6 @@ import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { DoodleSquiggle, DoodleArrow } from '../components/ui/DoodleDecorations'
 import brianWavingImg from '../assets/mascot/brian-waving.png'
-import brianWavingDarkModeImg from '../assets/mascot/brian-waving-darkmode.png'
 
 type HeroPreviewState =
   | 'calibrated'
@@ -124,7 +123,6 @@ export default function WelcomePage() {
     dimensionPreset,
     activePersona,
     setActivePersona,
-    theme,
   } = useAppStore()
 
   const [previewState, setPreviewState] = useState<HeroPreviewState>('calibrated')
@@ -287,7 +285,7 @@ export default function WelcomePage() {
 
               {/* Scaled-Up Mascot directly on canvas */}
               <img
-                src={theme === 'dark' ? brianWavingDarkModeImg : brianWavingImg}
+                src={brianWavingImg}
                 alt="Brian the Axolotl mascot waving cheerfully"
                 style={{ transform: 'translate(100px, 25px)' }}
                 className="w-full max-w-[360px] sm:max-w-[420px] lg:max-w-[480px] h-auto object-contain drop-shadow-xl select-none transition-transform duration-300 hover:scale-105"

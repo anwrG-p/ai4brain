@@ -121,8 +121,7 @@ export function NodiCompanion({
   ariaHidden = false,
   showSpeechBubble = true,
 }: NodiCompanionProps) {
-  const { reducedMotion, theme } = useAppStore()
-  const isDark = theme === 'dark'
+  const { reducedMotion } = useAppStore()
 
   if (state === 'hidden') {
     return (
@@ -194,12 +193,9 @@ export function NodiCompanion({
           aria-hidden="true"
         />
 
+        {/* Mascot Image with accessible role & label */}
         <img
-          src={
-            isDark && (spec.imageSrc === '/mascot/brian-waving.png' || !spec.imageSrc)
-              ? '/mascot/brian-waving-darkmode.png'
-              : spec.imageSrc || '/mascot/brian-waving.png'
-          }
+          src={spec.imageSrc || '/mascot/brian-waving.png'}
           alt={spec.ariaDescription}
           role={ariaHidden ? undefined : 'img'}
           aria-label={ariaHidden ? undefined : spec.ariaDescription}
