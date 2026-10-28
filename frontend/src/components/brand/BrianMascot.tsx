@@ -1,4 +1,5 @@
 import React from 'react'
+import { useAppStore } from '../../store/useAppStore'
 
 export type BrianPose =
   | 'waving'
@@ -60,6 +61,12 @@ const POSE_IMAGE_MAP: Record<string, string> = {
   curious: '/mascot/brian-explorer.png',
 }
 
+const POSE_IMAGE_MAP_DARK: Record<string, string> = {
+  waving: '/mascot/brian-waving-darkmode.png',
+  hello: '/mascot/brian-waving-darkmode.png',
+  idle: '/mascot/brian-waving-darkmode.png',
+}
+
 const POSE_ALT_MAP: Record<string, string> = {
   waving: 'Cute friendly pink and sky-blue axolotl mascot named Brian waving cheerfully with one fin hand',
   celebrating: 'Cute ecstatic celebratory axolotl mascot named Brian jumping for joy with floating confetti and victory celebration',
@@ -100,8 +107,13 @@ export const BrianMascot: React.FC<BrianMascotProps> = ({
   alt,
   onClick,
 }) => {
+  const { theme } = useAppStore()
   const normalizedPose = POSE_IMAGE_MAP[pose] ? pose : 'waving'
-  const imageSrc = POSE_IMAGE_MAP[normalizedPose] || '/mascot/brian-waving.png'
+  const isDark = theme === 'dark'
+  const imageSrc =
+    isDark && POSE_IMAGE_MAP_DARK[normalizedPose]
+      ? POSE_IMAGE_MAP_DARK[normalizedPose]
+      : POSE_IMAGE_MAP[normalizedPose] || (isDark ? '/mascot/brian-waving-darkmode.png' : '/mascot/brian-waving.png')
   const altText = alt || POSE_ALT_MAP[normalizedPose] || 'Brian the Axolotl mascot'
   const effectiveSize = scale ?? size ?? 'md'
   const pixelSize = typeof effectiveSize === 'number' ? effectiveSize : SIZE_MAP[effectiveSize] || 96
