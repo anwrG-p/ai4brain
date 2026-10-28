@@ -42,13 +42,8 @@ test.describe('Page 01: Welcome (/) Hero Visual QA & A11y', () => {
     const accessibilityScanResults = await new AxeBuilder({ page }).analyze()
     expect(accessibilityScanResults.violations).toEqual([])
 
-    // Verify 10-dimension stress state + Low-Conf Hatched state screenshot
-    await page.getByRole('button', { name: '10 Dims (Stress)' }).click()
-    await page.getByRole('button', { name: 'Low-Conf (Hatched)' }).click()
-    await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, '01-welcome-10dims-hatched-1440.png'),
-      fullPage: true,
-    })
+    // Verify 2-minute baseline primary CTA
+    await expect(page.getByRole('button', { name: /Start my 2-minute baseline/i })).toBeVisible()
 
     // Verify Dark theme (Night Lab) screenshot & zero axe violations
     await page.getByRole('button', { name: /Dark \(Night Lab\)/i }).first().click()

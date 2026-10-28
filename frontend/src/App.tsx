@@ -25,6 +25,7 @@ const SettingsPage = React.lazy(() => import('./pages/SettingsPage'))
 const MethodologyPage = React.lazy(() => import('./pages/MethodologyPage'))
 const LayerDPage = React.lazy(() => import('./pages/LayerDPage'))
 const DesignSystemPage = React.lazy(() => import('./pages/DesignSystemPage'))
+const AuthPage = React.lazy(() => import('./pages/AuthPage'))
 
 function RouteLoadingSkeleton() {
   return (
@@ -50,6 +51,11 @@ export function App() {
           <Suspense fallback={<RouteLoadingSkeleton />}>
             <Routes>
               <Route path="/" element={<WelcomePage />} />
+              <Route path="/auth" element={<AuthPage />} />
+              <Route path="/login" element={<Navigate to="/auth" replace />} />
+              <Route path="/sign-in" element={<Navigate to="/auth" replace />} />
+              <Route path="/register" element={<Navigate to="/auth?mode=register" replace />} />
+              <Route path="/create-account" element={<Navigate to="/auth?mode=register" replace />} />
               <Route path="/onboarding" element={<OnboardingPage />} />
               <Route path="/assessment" element={<AssessmentHubPage />} />
               <Route
