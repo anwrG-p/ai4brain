@@ -306,18 +306,6 @@ export default function WelcomePage() {
                 className="w-48 sm:w-60 h-3 bg-ink/10 rounded-pill blur-sm -mt-2 pointer-events-none select-none"
                 aria-hidden="true"
               />
-
-              {/* Minimalist companion metadata label */}
-              <div className="mt-4 flex items-center justify-center gap-3 font-mono text-xs text-ink-muted">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-pill bg-surface-raised border border-border-strong shadow-doodle-sm">
-                  <span className="text-brand font-bold text-xs">★</span>
-                  <span>Companion Node Active</span>
-                </span>
-                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-pill bg-surface-raised border border-border-strong shadow-doodle-sm text-ink font-semibold">
-                  <span>🔒</span>
-                  <span>100% Non-Biometric</span>
-                </span>
-              </div>
             </div>
           </div>
         </div>
