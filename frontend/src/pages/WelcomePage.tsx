@@ -12,7 +12,7 @@ import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { DoodleSquiggle, DoodleArrow } from '../components/ui/DoodleDecorations'
-import brianWavingImg from '../assets/mascot/brian-waving-nobg.png'
+import brianWavingImg from '../assets/mascot/brian-waving.png'
 
 type HeroPreviewState =
   | 'calibrated'
@@ -235,15 +235,6 @@ export default function WelcomePage() {
             </div>
           </div>
 
-          {/* Trust Micro-Banner */}
-          <div className="flex items-center gap-2.5 pt-1 text-ink-muted text-xs sm:text-sm">
-            <div className="w-7 h-7 rounded-pill bg-surface-raised border-2 border-border-strong flex items-center justify-center text-brand shrink-0">
-              <span aria-hidden="true">🔒</span>
-            </div>
-            <span className="font-sans">
-              Hardware-sealed privacy: 100% non-biometric &amp; strictly on your terms
-            </span>
-          </div>
 
           {/* Micro Stats Ticker */}
           <div className="w-full grid grid-cols-3 gap-2.5 pt-4">
