@@ -134,11 +134,13 @@ The platform uses a closed-loop system divided into **5 decoupled modules**:
 
 * **Deliverable Files:**
 
-  * `src/brain_twin/jepa_model.py` (SAT-JEPA PyTorch implementation)
+  * `clustering_engine/` (Soft GMM, hysteresis gate, explainability decoder, evaluator, and FastAPI router)
 
-  * `src/brain_twin/clustering_gmm.py` (GMM fitting, posteriors & hysteresis gate)
+  * `brain_twin_jepa/clustering_bridge.py` (JEPA encoder to clustering engine bridge)
 
-  * `src/brain_twin/explainability.py` (Prototype delta calculator $\Delta c$)
+  * `clustering_engine/README.md` (Technical documentation, architecture & quickstart)
+
+  * `clustering_engine/HANDOVER.md` (Inter-member handover contracts & integration guide)
 
 ### Member 4: Adaptive Dashboard & Visual Analytics (Layer C)
 
@@ -211,7 +213,8 @@ The platform uses a closed-loop system divided into **5 decoupled modules**:
 | Source | Target | Endpoint / Channel | Data Contract | 
 | ----- | ----- | ----- | ----- | 
 | **Member 1** | **Member 3** | `POST /v1/telemetry/event` | `{ user_id, task_id, dimension, score, rt_ms, error, jitter }` | 
-| **Member 3** | **Member 5** | Internal State Bus | `{ user_id, active_cluster_id, centroid_vector, confidence }` | 
-| **Member 3** | **Member 2** | Internal State Bus | `{ user_id, transition_occurred: bool, delta_vector, uncertainty }` | 
+| **Member 3** | **Platform / All** | `POST /v1/clustering/evaluate` | `{ user_id, active_cluster_id, cluster_name, probabilities, transition_event, radar_scores, uncertainty_band }` |
+| **Member 3** | **Member 5** | Centroid Head / API | `{ user_id, active_cluster_id, centroid_vector, confidence }` | 
+| **Member 3** | **Member 2** | XAI Injection / Bus | `{ user_id, transition_occurred: bool, delta_vector, xai_explanation, uncertainty }` | 
 | **Member 5** | **Member 1** | `GET /v1/tasks/next` | `{ task_id, dimension, schema_type, params, surface_seed }` | 
 | **Member 3 & 2** | **Member 4** | `GET /v1/dashboard/profile` | `{ profile_pct, uncertainty_sigma, collab_score, predictions }` | 
