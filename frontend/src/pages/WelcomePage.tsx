@@ -236,19 +236,19 @@ export default function WelcomePage() {
           </div>
 
 
-          {/* Micro Stats Ticker */}
+          {/* Micro Stats Ticker - Highlighted for Easy Recall */}
           <div className="w-full grid grid-cols-3 gap-2.5 pt-4">
-            <div className="p-3 bg-surface-raised rounded-xl border-2 border-border-strong shadow-doodle-sm">
+            <div className="p-3 bg-reward/35 dark:bg-reward/20 rounded-xl border-2 border-warning dark:border-reward shadow-doodle-sm ring-2 ring-reward/60 transition-transform hover:scale-[1.02]">
               <div className="font-mono text-xl sm:text-2xl font-bold text-ink">6</div>
-              <div className="font-mono text-xs text-ink-muted">Focus Areas</div>
+              <div className="font-mono text-xs font-semibold text-ink/80">Focus Areas</div>
             </div>
-            <div className="p-3 bg-surface-raised rounded-xl border-2 border-border-strong shadow-doodle-sm">
+            <div className="p-3 bg-reward/35 dark:bg-reward/20 rounded-xl border-2 border-warning dark:border-reward shadow-doodle-sm ring-2 ring-reward/60 transition-transform hover:scale-[1.02]">
               <div className="font-mono text-xl sm:text-2xl font-bold text-ink">0</div>
-              <div className="font-mono text-xs text-ink-muted">Pressure</div>
+              <div className="font-mono text-xs font-semibold text-ink/80">Pressure</div>
             </div>
-            <div className="p-3 bg-surface-raised rounded-xl border-2 border-border-strong shadow-doodle-sm">
+            <div className="p-3 bg-reward/35 dark:bg-reward/20 rounded-xl border-2 border-warning dark:border-reward shadow-doodle-sm ring-2 ring-reward/60 transition-transform hover:scale-[1.02]">
               <div className="font-mono text-xl sm:text-2xl font-bold text-ink">High</div>
-              <div className="font-mono text-xs text-ink-muted">Clarity</div>
+              <div className="font-mono text-xs font-semibold text-ink/80">Clarity</div>
             </div>
           </div>
         </div>

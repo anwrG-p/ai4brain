@@ -26,8 +26,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const {
     theme,
     toggleTheme,
-    reducedMotion,
-    setReducedMotion,
     dimensionPreset,
     setDimensionPreset,
     simulateOffline,
@@ -194,16 +192,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
             {/* Utility Controls & Floating Judge Drawer Toggle */}
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                aria-label={reducedMotion ? 'Motion: Off' : 'Motion: On'}
-                title={reducedMotion ? 'Animations: Reduced' : 'Animations: Standard'}
-                onClick={() => setReducedMotion(!reducedMotion)}
-                className="focus-ring px-2.5 py-1 rounded-sm text-xs font-bold text-ink-muted hover:text-ink hover:bg-surface-raised border border-border-strong transition-colors cursor-pointer hidden lg:inline-flex"
-              >
-                {reducedMotion ? 'Motion: Off' : 'Motion: On'}
-              </button>
-
               <button
                 type="button"
                 aria-label={theme === 'light' ? 'Switch to Dark (Night Lab)' : 'Switch to Light (Playful Lab)'}
