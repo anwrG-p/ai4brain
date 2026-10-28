@@ -125,10 +125,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {!isTaskRoute && (
         <header
           role="banner"
-          className="sticky top-0 z-40 h-16 bg-surface/95 backdrop-blur-md border-b-2 border-border-strong px-4 transition-colors flex items-center"
+          className="sticky top-0 z-40 h-18 sm:h-20 bg-surface/95 backdrop-blur-md border-b-2 border-border-strong px-4 transition-colors flex items-center"
         >
           <div className="max-w-6xl w-full mx-auto flex items-center justify-between gap-4">
-            {/* Product Brand Mark */}
+            {/* Product Brand Mark (Scaled Up) */}
             <Link
               to="/"
               title={`${BRAND_CONFIG.productName} Home`}
@@ -138,7 +138,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <img
                 src={conceptALockup}
                 alt={BRAND_CONFIG.productName}
-                className={`h-8 sm:h-9 w-auto object-contain transition-transform group-hover:scale-105 ${
+                className={`h-11 sm:h-13 md:h-14 w-auto object-contain transition-transform group-hover:scale-105 ${
                   theme === 'dark' ? 'brightness-0 invert' : ''
                 }`}
               />

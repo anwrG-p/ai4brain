@@ -268,53 +268,61 @@ export default function WelcomePage() {
           </div>
         </div>
 
-        {/* Right Column: Brian Mascot Showcase */}
-        <div className="lg:col-span-6 relative flex flex-col items-center justify-center">
+        {/* Right Column: Brian Mascot Direct Display (Frameless, Scaled-Up, Aesthetic Speech Bubble) */}
+        <div className="lg:col-span-6 relative flex flex-col items-center justify-center pt-2">
           <div className="relative w-full max-w-lg mx-auto flex flex-col items-center">
-            {/* Friendly Speech Bubble */}
-            <div className="relative mb-6 bg-surface-raised p-4 sm:p-5 rounded-2xl border-2 border-border-strong shadow-doodle max-w-md w-full transition-transform hover:scale-[1.01]">
+            {/* Brian's Aesthetic Speech Bubble */}
+            <div className="relative mb-3 sm:mb-4 max-w-md w-full bg-surface-raised p-4 sm:p-5 rounded-3xl border-2 border-border-strong shadow-doodle transition-all hover:-translate-y-0.5">
               <p className="font-sans text-base sm:text-lg text-ink font-semibold leading-snug">
                 "Hey there! I'm Brian, your personal cognitive companion. Ready to map how your mind works in 2 minutes?"
               </p>
-              <div className="mt-3 flex items-center justify-between font-mono text-xs text-ink-muted">
-                <span className="flex items-center gap-1.5">
+              <div className="mt-3 flex items-center justify-between font-mono text-xs text-ink-muted pt-2 border-t border-border-strong/20">
+                <span className="flex items-center gap-1.5 font-semibold text-ink">
                   <span className="w-2.5 h-2.5 rounded-pill bg-success animate-pulse" />
                   Brian · Personal Cognitive Twin
                 </span>
-                <span className="text-ink font-bold">Online</span>
+                <span className="px-2 py-0.5 rounded-pill bg-success-subtle text-ink font-bold text-xs border border-border-strong/40">
+                  Online
+                </span>
               </div>
-              {/* Tactical Speech Pointer */}
+              {/* Tactical Speech Pointer pointing down towards Brian */}
               <div
                 className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-t-8 border-t-border-strong"
                 aria-hidden="true"
               />
             </div>
 
-            {/* Mascot Showcase Card */}
-            <div className="relative w-full rounded-3xl bg-surface-raised border-2 border-border-strong p-6 sm:p-8 shadow-doodle-lg flex flex-col items-center justify-center overflow-hidden group">
-              <div className="doodle-tape" />
-              <div className="absolute inset-0 bg-brand/5 rounded-3xl pointer-events-none" />
-
-              {/* Confidence Halo Glow */}
+            {/* Direct Scaled-Up Mascot without Frame */}
+            <div className="relative flex flex-col items-center justify-center w-full">
+              {/* Soft Confidence Glow Halo */}
               <div
-                className="absolute inset-12 rounded-full bg-brand/20 blur-3xl pointer-events-none animate-pulse"
+                className="absolute w-72 h-72 sm:w-96 sm:h-96 rounded-full bg-brand/15 blur-3xl pointer-events-none -z-10 animate-pulse"
                 aria-hidden="true"
               />
 
-              {/* Brian Waving Mascot Image */}
+              {/* Scaled-Up Mascot directly on canvas */}
               <img
                 src={brianWavingImg}
                 alt="Brian the Axolotl mascot waving cheerfully"
-                className="relative z-10 w-full max-w-[320px] sm:max-w-[360px] h-auto object-contain transition-transform duration-300 group-hover:scale-105 drop-shadow-md select-none"
+                className="w-full max-w-[360px] sm:max-w-[420px] lg:max-w-[460px] h-auto object-contain drop-shadow-xl select-none transition-transform duration-300 hover:scale-105"
               />
 
-              {/* Card Footer Badges */}
-              <div className="relative z-10 mt-6 flex items-center justify-between w-full pt-4 border-t-2 border-dashed border-border-strong/30 font-mono text-xs text-ink-muted">
-                <span className="flex items-center gap-1.5">
-                  <span className="text-brand font-bold text-sm">★</span>
+              {/* Subtle grounding contact shadow */}
+              <div
+                className="w-48 sm:w-60 h-3 bg-ink/10 rounded-pill blur-sm -mt-2 pointer-events-none select-none"
+                aria-hidden="true"
+              />
+
+              {/* Minimalist companion metadata label */}
+              <div className="mt-4 flex items-center justify-center gap-3 font-mono text-xs text-ink-muted">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-pill bg-surface-raised border border-border-strong shadow-doodle-sm">
+                  <span className="text-brand font-bold text-xs">★</span>
                   <span>Companion Node Active</span>
                 </span>
-                <span className="text-ink font-semibold">100% Non-Biometric</span>
+                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-pill bg-surface-raised border border-border-strong shadow-doodle-sm text-ink font-semibold">
+                  <span>🔒</span>
+                  <span>100% Non-Biometric</span>
+                </span>
               </div>
             </div>
           </div>
@@ -403,165 +411,163 @@ export default function WelcomePage() {
         aria-labelledby="radar-preview-heading"
         className="pt-6 space-y-6"
       >
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <span className="font-mono text-xs font-bold uppercase tracking-wider text-ink-muted">
-              Interactive Epistemic Visualization
-            </span>
-            <h2
-              id="radar-preview-heading"
-              className="font-display text-2xl sm:text-3xl font-bold text-ink"
-            >
-              Meet your evolving cognitive twin—Live Radar Preview
-            </h2>
-            <p className="text-sm text-ink-muted mt-1">
-              Inspect how confidence intervals (<code className="font-mono">±CI</code>) and hatched low-confidence states render live:
-            </p>
-          </div>
-          <Badge tone="brand" glyph="◈">
-            Active Persona: {activePersona}
-          </Badge>
-        </div>
-
-        {/* Interactive Preview State Switcher Buttons */}
-        <div
-          role="group"
-          aria-label="Hero Brain Twin preview state switcher"
-          className="flex flex-wrap gap-2"
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <span className="font-mono text-xs font-bold uppercase tracking-wider text-ink-muted">
+          Interactive Epistemic Visualization
+        </span>
+        <h2
+          id="radar-preview-heading"
+          className="font-display text-2xl sm:text-3xl font-bold text-ink"
         >
-          {(
-            [
-              { id: 'calibrated', label: 'Calibrated (84%)' },
-              { id: 'low-confidence', label: 'Low-Conf (Hatched)' },
-              { id: 'partial', label: 'Partial (1 Missing)' },
-              { id: 'loading', label: 'Loading' },
-              { id: 'empty', label: 'Empty (New)' },
-              { id: 'error', label: 'Error' },
-              { id: 'extreme-text', label: 'Extreme Values' },
-            ] as const
-          ).map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              aria-pressed={previewState === tab.id}
-              onClick={() => setPreviewState(tab.id)}
-              className={`focus-ring min-h-10 px-3.5 py-1.5 rounded-pill border-2 border-border-strong text-xs font-bold cursor-pointer transition-colors shadow-doodle-sm ${
-                previewState === tab.id
-                  ? 'bg-brand text-brand-ink'
-                  : 'bg-surface-raised text-ink hover:bg-brand-subtle'
+          Meet your evolving cognitive twin—Live Radar Preview
+        </h2>
+        <p className="text-sm text-ink-muted mt-1">
+          Inspect how confidence intervals (<code className="font-mono">±CI</code>) and hatched low-confidence states render live:
+        </p>
+      </div>
+      <Badge tone="brand" glyph="◈">
+        Active Persona: {activePersona}
+      </Badge>
+    </div>
+
+  {/* Interactive Preview State Switcher Buttons */ }
+  <div
+    role="group"
+    aria-label="Hero Brain Twin preview state switcher"
+    className="flex flex-wrap gap-2"
+  >
+    {(
+      [
+        { id: 'calibrated', label: 'Calibrated (84%)' },
+        { id: 'low-confidence', label: 'Low-Conf (Hatched)' },
+        { id: 'partial', label: 'Partial (1 Missing)' },
+        { id: 'loading', label: 'Loading' },
+        { id: 'empty', label: 'Empty (New)' },
+        { id: 'error', label: 'Error' },
+        { id: 'extreme-text', label: 'Extreme Values' },
+      ] as const
+    ).map((tab) => (
+      <button
+        key={tab.id}
+        type="button"
+        aria-pressed={previewState === tab.id}
+        onClick={() => setPreviewState(tab.id)}
+        className={`focus-ring min-h-10 px-3.5 py-1.5 rounded-pill border-2 border-border-strong text-xs font-bold cursor-pointer transition-colors shadow-doodle-sm ${previewState === tab.id
+            ? 'bg-brand text-brand-ink'
+            : 'bg-surface-raised text-ink hover:bg-brand-subtle'
+          }`}
+      >
+        {tab.label}
+      </button>
+    ))}
+  </div>
+
+  {/* Live Interactive Radar View */ }
+  <div className="w-full max-w-xl mx-auto p-4 sm:p-6 bg-surface rounded-2xl border-2 border-border-strong shadow-doodle-lg">
+    <UncertaintyRadar
+      dimensions={activeDimensions}
+      estimates={estimates}
+      title="Preview Radar"
+    />
+  </div>
+
+  {/* Evaluator Persona Launchers Grid */ }
+  <div className="space-y-3 pt-2">
+    <div className="flex items-center justify-between">
+      <h3 className="font-display text-lg font-bold text-ink">
+        Evaluator Persona Switcher (Demonstration Data)
+      </h3>
+      <span className="text-xs text-ink-muted font-mono">
+        Test &amp; Verify Archetypes
+      </span>
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {PERSONA_CARDS.map((card) => {
+        const isCurrent = activePersona === card.id
+        return (
+          <Card
+            key={card.id}
+            className={`p-5 flex flex-col justify-between gap-4 border-2 border-border-strong shadow-doodle transition-all ${isCurrent ? 'bg-brand-subtle/50 ring-2 ring-brand' : ''
               }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Live Interactive Radar View */}
-        <div className="w-full max-w-xl mx-auto p-4 sm:p-6 bg-surface rounded-2xl border-2 border-border-strong shadow-doodle-lg">
-          <UncertaintyRadar
-            dimensions={activeDimensions}
-            estimates={estimates}
-            title="Preview Radar"
-          />
-        </div>
-
-        {/* Evaluator Persona Launchers Grid */}
-        <div className="space-y-3 pt-2">
-          <div className="flex items-center justify-between">
-            <h3 className="font-display text-lg font-bold text-ink">
-              Evaluator Persona Switcher (Demonstration Data)
-            </h3>
-            <span className="text-xs text-ink-muted font-mono">
-              Test &amp; Verify Archetypes
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {PERSONA_CARDS.map((card) => {
-              const isCurrent = activePersona === card.id
-              return (
-                <Card
-                  key={card.id}
-                  className={`p-5 flex flex-col justify-between gap-4 border-2 border-border-strong shadow-doodle transition-all ${
-                    isCurrent ? 'bg-brand-subtle/50 ring-2 ring-brand' : ''
-                  }`}
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-xs font-bold text-ink">
-                        {card.roleLabel}
-                      </span>
-                      <Badge tone={card.badgeTone} glyph={card.badgeGlyph}>
-                        {card.badgeLabel}
-                      </Badge>
-                    </div>
-                    <h4 className="font-display text-base font-bold text-ink">
-                      {card.name}
-                    </h4>
-                    <p className="text-xs text-ink-muted leading-relaxed">
-                      {card.summary}
-                    </p>
-                  </div>
-
-                  <div className="space-y-2 pt-2 border-t-2 border-dashed border-border-strong/30">
-                    <p className="font-mono text-xs text-ink-muted">
-                      {card.metricsLine}
-                    </p>
-                    <Button
-                      variant={isCurrent ? 'primary' : 'secondary'}
-                      size="sm"
-                      className="w-full text-xs font-bold"
-                      onClick={() => handleSelectPersona(card)}
-                    >
-                      {card.ctaLabel}
-                    </Button>
-                  </div>
-                </Card>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* WhyThis Pedagogical Transparency Panel */}
-        <div className="pt-4">
-          <WhyThisPanel
-            trail={SAMPLE_WHY_THIS_TRAIL}
-            title="Pedagogical Transparency: Why This Next Step?"
-            defaultExpanded={false}
-          />
-        </div>
-      </section>
-
-      {/* Bottom Reassurance Dock */}
-      <div className="bg-surface-raised rounded-2xl p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 border-2 border-border-strong shadow-doodle-lg">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-pill bg-surface border-2 border-border-strong flex items-center justify-center text-brand text-2xl shadow-doodle-sm shrink-0">
-            🛡️
-          </div>
-          <div>
-            <h4 className="font-display text-lg font-bold text-ink">
-              Private by Architecture, Not Just by Policy
-            </h4>
-            <p className="text-xs sm:text-sm text-ink-muted">
-              No tracking beacons. No ad brokerage. Data stays in your browser's encrypted sandbox.
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <Link
-            to="/privacy"
-            className="w-full md:w-auto px-5 py-2.5 rounded-pill bg-surface text-ink font-mono text-xs font-bold hover:bg-brand-subtle transition-colors border-2 border-border-strong shadow-doodle-sm text-center no-underline"
           >
-            Explore Protocol Spec
-          </Link>
-          <Link
-            to="/assessment"
-            className="w-full md:w-auto px-5 py-2.5 rounded-pill bg-brand text-brand-ink font-mono text-xs font-bold hover:opacity-90 transition-opacity border-2 border-border-strong shadow-doodle-sm text-center no-underline"
-          >
-            Begin Assessment →
-          </Link>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-xs font-bold text-ink">
+                  {card.roleLabel}
+                </span>
+                <Badge tone={card.badgeTone} glyph={card.badgeGlyph}>
+                  {card.badgeLabel}
+                </Badge>
+              </div>
+              <h4 className="font-display text-base font-bold text-ink">
+                {card.name}
+              </h4>
+              <p className="text-xs text-ink-muted leading-relaxed">
+                {card.summary}
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t-2 border-dashed border-border-strong/30">
+              <p className="font-mono text-xs text-ink-muted">
+                {card.metricsLine}
+              </p>
+              <Button
+                variant={isCurrent ? 'primary' : 'secondary'}
+                size="sm"
+                className="w-full text-xs font-bold"
+                onClick={() => handleSelectPersona(card)}
+              >
+                {card.ctaLabel}
+              </Button>
+            </div>
+          </Card>
+        )
+      })}
+    </div>
+  </div>
+
+      {/* WhyThis Pedagogical Transparency Panel */}
+      <div className="pt-4">
+        <WhyThisPanel
+          trail={SAMPLE_WHY_THIS_TRAIL}
+          title="Pedagogical Transparency: Why This Next Step?"
+          defaultExpanded={false}
+        />
+      </div>
+    </section>
+
+    {/* Bottom Reassurance Dock */}
+    <div className="bg-surface-raised rounded-2xl p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 border-2 border-border-strong shadow-doodle-lg">
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 rounded-pill bg-surface border-2 border-border-strong flex items-center justify-center text-brand text-2xl shadow-doodle-sm shrink-0">
+          🛡️
+        </div>
+        <div>
+          <h4 className="font-display text-lg font-bold text-ink">
+            Private by Architecture, Not Just by Policy
+          </h4>
+          <p className="text-xs sm:text-sm text-ink-muted">
+            No tracking beacons. No ad brokerage. Data stays in your browser's encrypted sandbox.
+          </p>
         </div>
       </div>
+      <div className="flex items-center gap-3 w-full md:w-auto">
+        <Link
+          to="/privacy"
+          className="w-full md:w-auto px-5 py-2.5 rounded-pill bg-surface text-ink font-mono text-xs font-bold hover:bg-brand-subtle transition-colors border-2 border-border-strong shadow-doodle-sm text-center no-underline"
+        >
+          Explore Protocol Spec
+        </Link>
+        <Link
+          to="/assessment"
+          className="w-full md:w-auto px-5 py-2.5 rounded-pill bg-brand text-brand-ink font-mono text-xs font-bold hover:opacity-90 transition-opacity border-2 border-border-strong shadow-doodle-sm text-center no-underline"
+        >
+          Begin Assessment →
+        </Link>
+      </div>
     </div>
+  </div>
   )
 }
