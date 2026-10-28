@@ -195,13 +195,7 @@ export default function WelcomePage() {
         className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center pt-2 pb-6"
       >
         {/* Left Column: Narrative, Value Proposition & Primary CTA */}
-        <div className="lg:col-span-6 flex flex-col items-start gap-6">
-          {/* Warm Pill Eyebrow */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-pill bg-brand-subtle border-2 border-border-strong text-ink font-mono text-xs shadow-doodle-sm">
-            <span className="inline-block w-2 h-2 rounded-pill bg-success animate-pulse" />
-            <span className="font-semibold">✨ Personal Mental Fitness · 100% Non-Clinical</span>
-          </div>
-
+        <div className="lg:col-span-6 flex flex-col items-start gap-6 pt-10 sm:pt-12 lg:pt-14">
           {/* Headline & Subtitle */}
           <div className="flex flex-col gap-3">
             <h1
