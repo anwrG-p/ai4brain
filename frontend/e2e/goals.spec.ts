@@ -62,11 +62,8 @@ test.describe('Page 11: Goals & Habit Contracts (/goals) Visual QA & A11y', () =
       fullPage: true,
     })
 
-    // 3. Switch to Night Lab (Dark Theme) + 10 Dims + Expand Accessible Table
+    // 3. Switch to Night Lab (Dark Theme) + Expand Accessible Table
     await openJudgeMode(page)
-    await page
-      .getByRole('button', { name: '10 Dims (Stress)', exact: true })
-      .click()
     await page.getByRole('button', { name: /Dark \(Night Lab\)/i }).first().click()
     await page.waitForTimeout(300)
     await page
@@ -89,9 +86,6 @@ test.describe('Page 11: Goals & Habit Contracts (/goals) Visual QA & A11y', () =
 
     // Restore Light + 7 Dims for Tablet & Mobile checks
     await page.getByRole('button', { name: /Light \(Playful Lab\)/i }).first().click()
-    await page
-      .getByRole('button', { name: '7 Dims (Default)', exact: true })
-      .click()
     await closeJudgeMode(page)
     await page.waitForTimeout(300)
 

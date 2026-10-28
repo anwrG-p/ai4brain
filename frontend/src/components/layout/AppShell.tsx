@@ -14,7 +14,6 @@ import {
   Cpu,
 } from 'lucide-react'
 import { BRAND_CONFIG } from '../../config/brand'
-import { DIMENSION_PRESETS } from '../../config/dimensions'
 import conceptALockup from '../../assets/branding/concept-a-lockup.svg'
 import { useAppStore } from '../../store/useAppStore'
 import { telemetryQueue } from '../../services/telemetryQueue'
@@ -32,8 +31,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const {
     theme,
     toggleTheme,
-    dimensionPreset,
-    setDimensionPreset,
     simulateOffline,
     simulateLlmDown,
     userProfile,
@@ -257,56 +254,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      {/* Product Footer with Quiet Demo Data Badge, Disclaimer, & Dimension Presets */}
+      {/* Product Footer with Centered Non-Clinical Disclaimer */}
       {!isTaskRoute && (
         <footer
           role="contentinfo"
           className="border-t-2 border-border-strong bg-surface px-4 py-4 text-xs text-ink-muted"
         >
-          {isAuthRoute ? (
-            <div className="max-w-6xl mx-auto flex items-center justify-center text-center">
-              <p className="m-0">{BRAND_CONFIG.nonClinicalNotice}</p>
-            </div>
-          ) : (
-            <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-bold bg-surface-raised border border-border-strong text-ink">
-                  Demo Data Mode
-                </span>
-                <p className="m-0">{BRAND_CONFIG.nonClinicalNotice}</p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <div
-                  role="group"
-                  aria-label="Cognitive dimension preset"
-                  className="flex items-center gap-1 bg-surface-raised border border-border-strong rounded-sm p-0.5"
-                >
-                  {DIMENSION_PRESETS.map((item) => {
-                    const active = dimensionPreset === item.key
-                    return (
-                      <button
-                        key={item.key}
-                        type="button"
-                        aria-pressed={active}
-                        onClick={() => setDimensionPreset(item.key)}
-                        className={`focus-ring px-2 py-0.5 rounded-xs text-xs font-bold cursor-pointer transition-colors ${
-                          active
-                            ? 'bg-brand text-brand-ink'
-                            : 'text-ink-muted hover:text-ink'
-                        }`}
-                      >
-                        {item.label}
-                      </button>
-                    )
-                  })}
-                </div>
-                <span className="font-mono-tabular text-ink-muted">
-                  Registry: {dimensionPreset} dims · Theme: {theme}
-                </span>
-              </div>
-            </div>
-          )}
+          <div className="max-w-6xl mx-auto flex items-center justify-center text-center">
+            <p className="m-0">{BRAND_CONFIG.nonClinicalNotice}</p>
+          </div>
         </footer>
       )}
 

@@ -40,9 +40,8 @@ test.describe('Page 09: AI Coach (/coach) Hero Visual QA & A11y', () => {
       fullPage: true,
     })
 
-    // 2. Switch to 10-Dimensions + Deterministic Rule Fallback + Test Guardrail Interception
+    // 2. Deterministic Rule Fallback + Test Guardrail Interception
     await openJudgeMode(page)
-    await page.getByRole('button', { name: '10 Dims (Stress)' }).click()
     await page
       .getByRole('button', { name: /2 · ⚙ Rule Fallback/i })
       .click()
@@ -86,7 +85,6 @@ test.describe('Page 09: AI Coach (/coach) Hero Visual QA & A11y', () => {
 
     // Restore Light Mode + 7 Dims Default + Live Grounded
     await page.getByRole('button', { name: /Light \(Playful Lab\)/i }).first().click()
-    await page.getByRole('button', { name: '7 Dims (Default)' }).click()
     await closeJudgeMode(page)
     await page
       .getByRole('button', { name: /1 · Live Grounded/i })

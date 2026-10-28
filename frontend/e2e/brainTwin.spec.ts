@@ -40,9 +40,8 @@ test.describe('Page 08: Brain Twin & Historical Timeline (/brain-twin) Hero Visu
       fullPage: true,
     })
 
-    // 2. Switch to 10-Dimensions + Scrub to Early Snapshot (#1 Day 1 Cold Baseline) + Open Table View
+    // 2. Scrub to Early Snapshot (#1 Day 1 Cold Baseline) + Open Table View
     await openJudgeMode(page)
-    await page.getByRole('button', { name: '10 Dims (Stress)' }).click()
     await page
       .getByRole('button', { name: /2 · Scrub to Snap #1 \(Hatched\)/i })
       .click()
@@ -88,7 +87,6 @@ test.describe('Page 08: Brain Twin & Historical Timeline (/brain-twin) Hero Visu
 
     // Restore Light Mode + 7 Dims Default + Snap #14 Live
     await page.getByRole('button', { name: /Light \(Playful Lab\)/i }).first().click()
-    await page.getByRole('button', { name: '7 Dims (Default)' }).click()
     await closeJudgeMode(page)
     await page
       .getByRole('button', { name: /1 · Snap #14 vs #1 \(Live\)/i })
