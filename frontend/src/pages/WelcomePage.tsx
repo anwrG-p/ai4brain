@@ -240,15 +240,15 @@ export default function WelcomePage() {
           <div className="w-full grid grid-cols-3 gap-2.5 pt-4">
             <div className="p-3 bg-surface-raised rounded-xl border-2 border-border-strong shadow-doodle-sm">
               <div className="font-mono text-xl sm:text-2xl font-bold text-ink">6</div>
-              <div className="font-mono text-xs text-ink-muted">Flow Facets</div>
+              <div className="font-mono text-xs text-ink-muted">Focus Areas</div>
             </div>
             <div className="p-3 bg-surface-raised rounded-xl border-2 border-border-strong shadow-doodle-sm">
               <div className="font-mono text-xl sm:text-2xl font-bold text-ink">0</div>
-              <div className="font-mono text-xs text-ink-muted">Clinical Labels</div>
+              <div className="font-mono text-xs text-ink-muted">Pressure</div>
             </div>
             <div className="p-3 bg-surface-raised rounded-xl border-2 border-border-strong shadow-doodle-sm">
-              <div className="font-mono text-xl sm:text-2xl font-bold text-ink">±4%</div>
-              <div className="font-mono text-xs text-ink-muted">Confidence Band</div>
+              <div className="font-mono text-xl sm:text-2xl font-bold text-ink">High</div>
+              <div className="font-mono text-xs text-ink-muted">Clarity</div>
             </div>
           </div>
         </div>
