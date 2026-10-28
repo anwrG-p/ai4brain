@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from clustering_engine.evaluator import CognitiveEvaluator
@@ -16,6 +16,12 @@ _evaluator = CognitiveEvaluator()
 
 def get_evaluator() -> CognitiveEvaluator:
     return _evaluator
+
+
+def set_evaluator(evaluator: CognitiveEvaluator) -> None:
+    """Override the active evaluator instance (useful for tests or custom K/dimensions)."""
+    global _evaluator
+    _evaluator = evaluator
 
 
 class LatentEvaluationRequest(BaseModel):
@@ -49,20 +55,28 @@ class EvaluationResponse(BaseModel):
     status_code=status.HTTP_200_OK,
     summary="Evaluate cognitive state, archetype cluster, and XAI explanations",
 )
-def evaluate_latent_state(payload: LatentEvaluationRequest) -> Dict[str, Any]:
+def evaluate_latent_state(
+    payload: LatentEvaluationRequest,
+    evaluator: CognitiveEvaluator = Depends(get_evaluator),
+) -> Dict[str, Any]:
     """Evaluate latent vector through smoother, soft GMM, hysteresis gate, and XAI decoder."""
-    if len(payload.latent_vector) != _evaluator.dim:
+    if len(payload.latent_vector) != evaluator.dim:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Latent vector must have length {_evaluator.dim}, got {len(payload.latent_vector)}",
+            detail=f"Latent vector must have length {evaluator.dim}, got {len(payload.latent_vector)}",
         )
 
     try:
-        result = _evaluator.evaluate(
+        result = evaluator.evaluate(
             user_id=payload.user_id,
             latent_vector=payload.latent_vector,
         )
         return result.to_dict()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -75,6 +89,9 @@ def evaluate_latent_state(payload: LatentEvaluationRequest) -> Dict[str, Any]:
     status_code=status.HTTP_200_OK,
     summary="Reset user tracking state",
 )
-def reset_user_state(user_id: str) -> Dict[str, str]:
-    _evaluator.reset_user(user_id)
+def reset_user_state(
+    user_id: str,
+    evaluator: CognitiveEvaluator = Depends(get_evaluator),
+) -> Dict[str, str]:
+    evaluator.reset_user(user_id)
     return {"status": "ok", "message": f"State reset for user '{user_id}'"}

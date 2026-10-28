@@ -320,7 +320,8 @@ class ArchetypeRegistry:
         """Load archetype definitions from a dictionary."""
         registry = cls()
         for key, val in data.items():
-            cluster_id = int(key) if str(key).isdigit() else int(str(key).replace("C", ""))
+            digits = "".join(ch for ch in str(key) if ch.isdigit())
+            cluster_id = int(digits) if digits else (len(registry) + 1)
             code = val.get("code", f"C{cluster_id}")
             name = val.get("name", f"Archetype {code}")
             tier = val.get("proficiency_tier", "Operational")

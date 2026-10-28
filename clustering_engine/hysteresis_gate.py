@@ -10,7 +10,8 @@ across N_confirm consecutive evaluation windows (default: 3).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from collections import OrderedDict
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Union
 
 
@@ -21,7 +22,6 @@ class HysteresisState:
     active_cluster_id: int
     candidate_target_id: Optional[int] = None
     candidate_streak: int = 0
-    transition_history: List[int] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -45,23 +45,28 @@ class SchmittTriggerHysteresisGate:
         delta_hyst: float = 0.15,
         n_confirm: int = 3,
         default_cluster_id: int = 1,
+        max_sessions: int = 10000,
     ) -> None:
         """Initialize the hysteresis gate.
 
         Args:
             delta_hyst: Margin threshold required above active cluster probability (0.15).
             n_confirm: Consecutive frames the candidate must maintain margin before switching (3).
-            default_cluster_id: Fallback cluster ID if unassigned (1..9).
+            default_cluster_id: Fallback cluster ID if unassigned (default: 1).
+            max_sessions: Maximum concurrent user sessions kept in memory (default: 10000).
         """
         if delta_hyst < 0.0 or delta_hyst >= 1.0:
             raise ValueError(f"delta_hyst must be in [0.0, 1.0), got {delta_hyst}")
         if n_confirm < 1:
             raise ValueError(f"n_confirm must be >= 1, got {n_confirm}")
+        if default_cluster_id < 1:
+            raise ValueError(f"default_cluster_id must be >= 1, got {default_cluster_id}")
 
         self.delta_hyst: float = float(delta_hyst)
         self.n_confirm: int = int(n_confirm)
         self.default_cluster_id: int = int(default_cluster_id)
-        self._user_states: Dict[str, HysteresisState] = {}
+        self.max_sessions: int = max(1, max_sessions)
+        self._user_states: OrderedDict[str, HysteresisState] = OrderedDict()
 
     def process(
         self,
@@ -72,7 +77,7 @@ class SchmittTriggerHysteresisGate:
 
         Args:
             user_id: Unique user session identifier.
-            responsibilities: Cluster responsibilities keyed by int (1..9) or code ('C1'..'C9').
+            responsibilities: Cluster responsibilities keyed by int (1..K) or code ('C1'..'CK').
 
         Returns:
             TransitionDecision indicating active cluster, transition status, and margins.
@@ -81,7 +86,10 @@ class SchmittTriggerHysteresisGate:
         resp_by_id: Dict[int, float] = {}
         for k, v in responsibilities.items():
             if isinstance(k, str):
-                cluster_num = int(k.replace("C", ""))
+                digits = "".join(ch for ch in k if ch.isdigit())
+                if not digits:
+                    raise ValueError(f"Cannot extract cluster ID from key '{k}'")
+                cluster_num = int(digits)
             else:
                 cluster_num = int(k)
             resp_by_id[cluster_num] = float(v)
@@ -99,8 +107,10 @@ class SchmittTriggerHysteresisGate:
                 active_cluster_id=top_candidate_id,
                 candidate_target_id=None,
                 candidate_streak=0,
-                transition_history=[top_candidate_id],
             )
+            self._user_states.move_to_end(user_id)
+            if len(self._user_states) > self.max_sessions:
+                self._user_states.popitem(last=False)
             return TransitionDecision(
                 has_transitioned=False,
                 active_cluster_id=top_candidate_id,
@@ -112,6 +122,7 @@ class SchmittTriggerHysteresisGate:
             )
 
         state = self._user_states[user_id]
+        self._user_states.move_to_end(user_id)
         active_id = state.active_cluster_id
         active_prob = resp_by_id.get(active_id, 0.0)
 
@@ -146,7 +157,6 @@ class SchmittTriggerHysteresisGate:
                 from_cluster = active_id
                 to_cluster = top_candidate_id
                 state.active_cluster_id = to_cluster
-                state.transition_history.append(to_cluster)
                 state.candidate_target_id = None
                 state.candidate_streak = 0
 
@@ -187,24 +197,27 @@ class SchmittTriggerHysteresisGate:
     def get_active_cluster(self, user_id: str) -> int:
         """Get the active cluster ID for user, or default if uninitialized."""
         if user_id in self._user_states:
+            self._user_states.move_to_end(user_id)
             return self._user_states[user_id].active_cluster_id
         return self.default_cluster_id
 
     def set_active_cluster(self, user_id: str, cluster_id: int) -> None:
         """Explicitly set or override active cluster for a user."""
-        if not (1 <= cluster_id <= 9):
-            raise ValueError(f"Cluster id must be in 1..9, got {cluster_id}")
+        if cluster_id < 1:
+            raise ValueError(f"Cluster id must be >= 1, got {cluster_id}")
         if user_id not in self._user_states:
             self._user_states[user_id] = HysteresisState(
                 active_cluster_id=cluster_id,
                 candidate_target_id=None,
                 candidate_streak=0,
-                transition_history=[cluster_id],
             )
         else:
             self._user_states[user_id].active_cluster_id = cluster_id
             self._user_states[user_id].candidate_target_id = None
             self._user_states[user_id].candidate_streak = 0
+        self._user_states.move_to_end(user_id)
+        if len(self._user_states) > self.max_sessions:
+            self._user_states.popitem(last=False)
 
     def reset(self, user_id: Optional[str] = None) -> None:
         """Reset hysteresis state for specific user, or all users."""

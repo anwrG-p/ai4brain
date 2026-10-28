@@ -7,6 +7,7 @@ using an exponential smoothing filter:
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from typing import Dict, Optional, Sequence, Union
 import numpy as np
 
@@ -14,20 +15,28 @@ import numpy as np
 class LeakyIntegrator:
     """Exponential leaky integrator maintaining continuous state trajectories per user."""
 
-    def __init__(self, eta: float = 0.12, normalize: bool = False, expected_dim: int = 64) -> None:
+    def __init__(
+        self,
+        eta: float = 0.12,
+        normalize: bool = False,
+        expected_dim: int = 64,
+        max_sessions: int = 10000,
+    ) -> None:
         """Initialize the LeakyIntegrator.
 
         Args:
             eta: Smoothing rate in (0.0, 1.0]. Defaults to 0.12.
             normalize: If True, normalize smoothed vectors to unit L2 norm.
             expected_dim: Expected dimensionality of latent vectors (default: 64).
+            max_sessions: Maximum concurrent user sessions kept in memory (default: 10000).
         """
         if not (0.0 < eta <= 1.0):
             raise ValueError(f"eta must be in (0.0, 1.0], got {eta}")
         self.eta: float = float(eta)
         self.normalize: bool = normalize
         self.expected_dim: int = expected_dim
-        self._states: Dict[str, np.ndarray] = {}
+        self.max_sessions: int = max(1, max_sessions)
+        self._states: OrderedDict[str, np.ndarray] = OrderedDict()
 
     def smooth(
         self,
@@ -44,6 +53,8 @@ class LeakyIntegrator:
             Smoothed latent state vector s_bar_t.
         """
         arr = np.asarray(s_t, dtype=np.float64).flatten()
+        if not np.all(np.isfinite(arr)):
+            raise ValueError("Input vector must contain only finite numbers.")
         if self.expected_dim is not None and arr.shape[0] != self.expected_dim:
             raise ValueError(
                 f"Dimension mismatch: expected vector of dimension {self.expected_dim}, "
@@ -62,22 +73,31 @@ class LeakyIntegrator:
                 s_bar = s_bar / norm
 
         self._states[user_id] = s_bar
+        self._states.move_to_end(user_id)
+        if len(self._states) > self.max_sessions:
+            self._states.popitem(last=False)
         return s_bar.copy()
 
     def get_state(self, user_id: str) -> Optional[np.ndarray]:
         """Return the current smoothed state for user, or None if uninitialized."""
         if user_id in self._states:
+            self._states.move_to_end(user_id)
             return self._states[user_id].copy()
         return None
 
     def set_state(self, user_id: str, state: Union[np.ndarray, Sequence[float]]) -> None:
         """Explicitly set or restore smoothed state for a user."""
         arr = np.asarray(state, dtype=np.float64).flatten()
+        if not np.all(np.isfinite(arr)):
+            raise ValueError("State vector must contain only finite numbers.")
         if self.expected_dim is not None and arr.shape[0] != self.expected_dim:
             raise ValueError(
                 f"Dimension mismatch: expected {self.expected_dim}, got {arr.shape[0]}"
             )
         self._states[user_id] = arr.copy()
+        self._states.move_to_end(user_id)
+        if len(self._states) > self.max_sessions:
+            self._states.popitem(last=False)
 
     def reset(self, user_id: Optional[str] = None) -> None:
         """Reset state for a specific user, or all users if user_id is None."""

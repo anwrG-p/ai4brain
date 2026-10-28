@@ -213,22 +213,25 @@ class ExplainabilityDecoder:
 
         driver_val = delta_vector.get(dominant_driver, 0.0)
         driver_pct = int(round(abs(driver_val) * 100))
-        if driver_pct == 0:
-            driver_pct = 12
 
         dim_desc = format_dimension_phrase(dominant_driver)
         pacing_phrase = target_archetype.pacing_strategy.lower()
         if "pacing" not in pacing_phrase:
             pacing_phrase = f"{pacing_phrase} pacing"
 
-        if driver_val >= 0:
+        if driver_val > 0.005 and driver_pct > 0:
             explanation = (
                 f"Shifted to {cluster_name} due to a {driver_pct}% increase in "
                 f"{dim_desc} and {pacing_phrase}."
             )
-        else:
+        elif driver_val < -0.005:
             explanation = (
                 f"Shifted to {cluster_name} with streamlined {dim_desc} "
+                f"calibrating toward {pacing_phrase}."
+            )
+        else:
+            explanation = (
+                f"Shifted to {cluster_name} with balanced {dim_desc} "
                 f"calibrating toward {pacing_phrase}."
             )
 
@@ -251,7 +254,14 @@ class ExplainabilityDecoder:
             has_targets = False
 
             for code, prob in responsibilities.items():
-                cluster_id = int(str(code).replace("C", ""))
+                digits = "".join(ch for ch in str(code) if ch.isdigit())
+                if digits:
+                    cluster_id = int(digits)
+                else:
+                    try:
+                        cluster_id = self.archetype_registry.get_by_code(str(code)).id
+                    except Exception:
+                        cluster_id = 1
                 arch = self.archetype_registry.get(cluster_id)
                 for dim in self.dimensions:
                     if dim in arch.target_radar:
@@ -267,7 +277,7 @@ class ExplainabilityDecoder:
         proj = self.project_latent(s_bar)
         scores = {}
         for idx, dim in enumerate(self.dimensions):
-            val = 70.0 + proj[idx] * 50.0
+            val = 70.0 + proj[idx] * 100.0
             scores[dim] = float(round(np.clip(val, 0.0, 100.0), 1))
         return scores
 
