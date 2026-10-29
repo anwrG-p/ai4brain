@@ -112,6 +112,20 @@ export default function DashboardPage() {
     minHeight: boardMinHeight,
   }
 
+  // =========================================================================
+  // 🏫 CLASSROOM STAGE (BOARD + BRIAN TOGETHER) POSITION CONTROLS
+  // Adjust these values to move BOTH Teacher Brian and the Board together:
+  // - stageMoveDown: positive number moves DOWN (px), e.g. 40, 60, 100
+  // - stageMoveX: positive moves RIGHT (px), negative moves LEFT (px)
+  // =========================================================================
+  const stageMoveDown = 0 // Change this number to move Brian & Board down together (in px)
+  const stageMoveX = 0 // Change this number to move Brian & Board horizontally (in px)
+
+  const stageStyle: React.CSSProperties = {
+    marginTop: `${stageMoveDown}px`,
+    transform: stageMoveX !== 0 ? `translateX(${stageMoveX}px)` : undefined,
+  }
+
   return (
     <div className="space-y-8 pb-12">
       {/* STATE: LOADING SKELETON */}
@@ -222,7 +236,10 @@ export default function DashboardPage() {
         viewState === 'low-confidence' ||
         viewState === 'partial') && (
           <>
-            <div className="flex flex-col lg:flex-row items-stretch lg:items-end gap-6 relative">
+            <div
+              className="flex flex-col lg:flex-row items-stretch lg:items-end gap-6 relative"
+              style={stageStyle}
+            >
               {/* 1. TEACHER BRIAN THE AXOLOTL (FRONT PLANE) */}
               <div
                 id="brian-teacher-slot"
