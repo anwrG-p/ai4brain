@@ -101,7 +101,7 @@ export default function DashboardPage() {
 
   const teacherBrianScale = 3
   const teacherBrianMoveX = 0
-  const teacherBrianMoveY = -750
+  const teacherBrianMoveY = 150
 
   const teacherBrianStyle: React.CSSProperties = {
     transform: `translate(${teacherBrianMoveX}px, ${teacherBrianMoveY}px) scale(${teacherBrianScale})`,
@@ -243,34 +243,35 @@ export default function DashboardPage() {
                   aria-label="Classroom Performance Board"
                   className="board-wood-frame"
                 >
-                  <div className="board-canvas p-5 sm:p-7 space-y-6">
-                    {/* WEEKLY CONTINUITY & RHYTHM (On Classroom Board) */}
-                    <div className="w-full bg-surface rounded-2xl border-2 border-border-strong shadow-doodle p-5 space-y-4">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-brand text-xl" aria-hidden="true">
+                  <div className="board-canvas p-5 sm:p-7 space-y-5">
+                    {/* WEEKLY CONTINUITY & RHYTHM (Drawn directly on Classroom Board) */}
+                    <div className="space-y-4">
+                      {/* Minimalist Board Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 border-b-2 border-dashed border-border-strong/30 pb-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-brand text-lg" aria-hidden="true">
                             🔄
                           </span>
-                          <h2 className="font-display text-xl font-bold text-ink">
+                          <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-ink">
                             Weekly Continuity &amp; Rhythm
                           </h2>
-                          <span className="font-mono text-xs bg-surface-raised px-2.5 py-0.5 rounded-pill border border-border-strong text-ink-muted">
+                          <span className="font-mono text-xs px-2.5 py-0.5 rounded-pill border border-border-strong/40 text-ink-muted bg-surface/30">
                             Zero-Guilt Streak
                           </span>
                         </div>
-                        <div className="font-mono text-xs text-ink-muted">
+                        <p className="font-mono text-xs text-ink-muted italic m-0">
                           Consistency is about rhythm, not robotic streaks.
-                        </div>
+                        </p>
                       </div>
 
-                      {/* Seven-Day Ribbon Layout */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 items-stretch">
+                      {/* Seven-Day Minimalist Board Columns */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 items-stretch">
                         {/* MON */}
-                        <div className="p-3 rounded-xl bg-surface-raised border-2 border-border-strong shadow-doodle-sm flex flex-col items-center text-center justify-between min-h-[105px]">
-                          <span className="font-mono text-xs uppercase font-bold text-ink-muted">
+                        <div className="p-3 rounded-xl border border-dashed border-border-strong/35 bg-surface/20 flex flex-col items-center text-center justify-between min-h-24">
+                          <span className="font-mono text-xs uppercase font-bold text-ink-muted tracking-wider">
                             Mon
                           </span>
-                          <div className="w-8 h-8 rounded-pill bg-success border-2 border-border-strong flex items-center justify-center text-canvas font-bold shadow-xs">
+                          <div className="w-7 h-7 rounded-full bg-success/20 border border-success/60 flex items-center justify-center text-success font-bold text-sm">
                             ✓
                           </div>
                           <span className="font-mono text-xs font-semibold text-success">
@@ -279,11 +280,11 @@ export default function DashboardPage() {
                         </div>
 
                         {/* TUE */}
-                        <div className="p-3 rounded-xl bg-surface-raised border-2 border-border-strong shadow-doodle-sm flex flex-col items-center text-center justify-between min-h-[105px]">
-                          <span className="font-mono text-xs uppercase font-bold text-ink-muted">
+                        <div className="p-3 rounded-xl border border-dashed border-border-strong/35 bg-surface/20 flex flex-col items-center text-center justify-between min-h-24">
+                          <span className="font-mono text-xs uppercase font-bold text-ink-muted tracking-wider">
                             Tue
                           </span>
-                          <div className="w-8 h-8 rounded-pill bg-success border-2 border-border-strong flex items-center justify-center text-canvas font-bold shadow-xs">
+                          <div className="w-7 h-7 rounded-full bg-success/20 border border-success/60 flex items-center justify-center text-success font-bold text-sm">
                             ✓
                           </div>
                           <span className="font-mono text-xs font-semibold text-success">
@@ -292,35 +293,35 @@ export default function DashboardPage() {
                         </div>
 
                         {/* WED: TODAY */}
-                        <div className="col-span-2 sm:col-span-2 lg:col-span-2 p-3 sm:px-4 rounded-xl bg-reward-subtle border-2 border-border-strong shadow-doodle flex flex-col sm:flex-row items-center justify-between gap-3 relative">
-                          <div className="absolute -top-2.5 right-4 bg-brand text-brand-ink px-2 py-0.5 rounded-pill text-xs font-mono font-bold border border-border-strong shadow-xs">
-                            TODAY
-                          </div>
-                          <div className="flex items-center gap-3 text-left">
-                            <div className="w-10 h-10 rounded-pill bg-reward/40 border-2 border-border-strong flex items-center justify-center text-ink text-xl shadow-xs shrink-0">
+                        <div className="col-span-2 sm:col-span-2 lg:col-span-2 p-3 rounded-xl border-2 border-brand/70 bg-brand/10 flex flex-col sm:flex-row items-center justify-between gap-3 relative">
+                          <div className="flex items-center gap-3 text-left min-w-0">
+                            <div className="w-8 h-8 rounded-full bg-brand/20 border border-brand/60 flex items-center justify-center text-ink text-base shrink-0">
                               🌙
                             </div>
-                            <div>
-                              <div className="font-mono text-xs sm:text-sm font-bold text-ink">
-                                Wed · Scheduled Recovery Day
+                            <div className="min-w-0">
+                              <div className="font-mono text-xs font-bold text-ink flex items-center gap-1.5 flex-wrap">
+                                <span>Wed · Scheduled Recovery Day</span>
+                                <span className="bg-brand text-brand-ink px-1.5 py-0.5 rounded text-xs uppercase font-bold tracking-wider">
+                                  TODAY
+                                </span>
                               </div>
-                              <div className="font-mono text-xs text-ink-muted">
+                              <div className="font-mono text-xs text-ink-muted truncate">
                                 Active memory consolidation — streak protected
                               </div>
                             </div>
                           </div>
-                          <div className="shrink-0 flex items-center gap-1.5 px-3 py-1 bg-surface rounded-pill border border-border-strong font-mono text-xs font-bold text-success shadow-xs">
-                            <span>🛡️</span>
+                          <div className="shrink-0 flex items-center gap-1 px-2.5 py-1 bg-surface/60 rounded-pill border border-border-strong/40 font-mono text-xs font-bold text-success">
+                            <span aria-hidden="true">🛡️</span>
                             <span>Protected</span>
                           </div>
                         </div>
 
                         {/* THU */}
-                        <div className="p-3 rounded-xl bg-surface border-2 border-dashed border-border-strong/50 flex flex-col items-center text-center justify-between min-h-[105px]">
-                          <span className="font-mono text-xs uppercase font-bold text-ink-muted">
+                        <div className="p-3 rounded-xl border border-dashed border-border-strong/25 bg-surface/10 flex flex-col items-center text-center justify-between min-h-24 opacity-80">
+                          <span className="font-mono text-xs uppercase font-bold text-ink-muted tracking-wider">
                             Thu
                           </span>
-                          <div className="w-8 h-8 rounded-pill bg-surface-raised border border-border-strong/40 flex items-center justify-center text-ink-muted text-xs">
+                          <div className="w-7 h-7 rounded-full border border-border-strong/40 flex items-center justify-center text-ink-muted text-xs">
                             ⏱
                           </div>
                           <span className="font-mono text-xs text-ink-muted">
@@ -329,11 +330,11 @@ export default function DashboardPage() {
                         </div>
 
                         {/* FRI */}
-                        <div className="p-3 rounded-xl bg-surface border-2 border-dashed border-border-strong/50 flex flex-col items-center text-center justify-between min-h-[105px]">
-                          <span className="font-mono text-xs uppercase font-bold text-ink-muted">
+                        <div className="p-3 rounded-xl border border-dashed border-border-strong/25 bg-surface/10 flex flex-col items-center text-center justify-between min-h-24 opacity-80">
+                          <span className="font-mono text-xs uppercase font-bold text-ink-muted tracking-wider">
                             Fri
                           </span>
-                          <div className="w-8 h-8 rounded-pill bg-surface-raised border border-border-strong/40 flex items-center justify-center text-ink-muted text-xs">
+                          <div className="w-7 h-7 rounded-full border border-border-strong/40 flex items-center justify-center text-ink-muted text-xs">
                             ⏱
                           </div>
                           <span className="font-mono text-xs text-ink-muted">
@@ -342,11 +343,11 @@ export default function DashboardPage() {
                         </div>
 
                         {/* SAT-SUN */}
-                        <div className="p-3 rounded-xl bg-surface border-2 border-dashed border-border-strong/50 flex flex-col items-center text-center justify-between min-h-[105px]">
-                          <span className="font-mono text-xs uppercase font-bold text-ink-muted">
+                        <div className="p-3 rounded-xl border border-dashed border-border-strong/25 bg-surface/10 flex flex-col items-center text-center justify-between min-h-24 opacity-80">
+                          <span className="font-mono text-xs uppercase font-bold text-ink-muted tracking-wider">
                             Sat-Sun
                           </span>
-                          <div className="w-8 h-8 rounded-pill bg-surface-raised border border-border-strong/40 flex items-center justify-center text-ink-muted text-xs">
+                          <div className="w-7 h-7 rounded-full border border-border-strong/40 flex items-center justify-center text-ink-muted text-xs">
                             ☀️
                           </div>
                           <span className="font-mono text-xs text-ink-muted">
@@ -356,13 +357,13 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
-                    {/* DAILY SCIENCE BITE */}
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-xl bg-surface-raised border-2 border-border-strong shadow-doodle-sm">
-                      <div className="flex items-center gap-3">
-                        <span className="text-brand text-xl" aria-hidden="true">
+                    {/* DAILY SCIENCE BITE (Chalk/Marker Footnote on Board) */}
+                    <div className="pt-3 border-t border-dashed border-border-strong/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs sm:text-sm">
+                      <div className="flex items-center gap-2 text-ink">
+                        <span className="text-brand text-base shrink-0" aria-hidden="true">
                           📖
                         </span>
-                        <span className="text-xs sm:text-sm text-ink leading-snug">
+                        <span>
                           <strong>Daily Science Bite:</strong> Sleep consolidation strengthens pattern separation without active practice. Enjoy your rest day!
                         </span>
                       </div>
