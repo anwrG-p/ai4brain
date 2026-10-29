@@ -119,18 +119,30 @@ describe('AuthPage (Stitch BRIAN Cognitive Twin Login & Register in Doodle Style
     ).not.toBeInTheDocument()
   })
 
-  it('does not display passphrase robustness meter (Encryption Robustness: Solid & Sealed removed)', async () => {
+  it('displays passphrase robustness meter with non-classic natural metaphors (Fresh Canvas -> Gentle Breeze -> Sturdy Outpost -> Armored Citadel -> Cosmic Sanctuary)', async () => {
     renderAuthPage('/register')
 
     const passphraseInput = screen.getByLabelText(/Choose a Master Passphrase/i)
 
-    // Verify meter is not rendered
-    expect(screen.queryByText(/Encryption Robustness/i)).not.toBeInTheDocument()
-
-    // Typing passphrase
-    fireEvent.change(passphraseInput, { target: { value: 'gentle-rhythm-12' } })
-    expect(screen.queryByText(/Encryption Robustness/i)).not.toBeInTheDocument()
+    // Initial state: Level 0 (Fresh Canvas)
+    expect(screen.getByText(/Fresh Canvas/i)).toBeInTheDocument()
+    expect(screen.getByText(/Awaiting your spark/i)).toBeInTheDocument()
     expect(screen.queryByText(/Solid & Sealed/i)).not.toBeInTheDocument()
+
+    // Level 1: Gentle Breeze (short passphrase)
+    fireEvent.change(passphraseInput, { target: { value: 'pass' } })
+    expect(screen.getByText(/Gentle Breeze/i)).toBeInTheDocument()
+    expect(screen.getByText(/Easy to scatter/i)).toBeInTheDocument()
+
+    // Level 3: Armored Citadel (longer with digits/hyphen)
+    fireEvent.change(passphraseInput, { target: { value: 'secure-pass1' } })
+    expect(screen.getByText(/Armored Citadel/i)).toBeInTheDocument()
+    expect(screen.getByText(/Reinforced defense/i)).toBeInTheDocument()
+
+    // Level 4: Cosmic Sanctuary (high entropy passphrase)
+    fireEvent.change(passphraseInput, { target: { value: 'gentle-rhythm-sanctuary-12' } })
+    expect(screen.getByText(/Cosmic Sanctuary/i)).toBeInTheDocument()
+    expect(screen.getByText(/Impenetrable vault/i)).toBeInTheDocument()
   })
 
   it('toggles passphrase visibility between password and text', async () => {

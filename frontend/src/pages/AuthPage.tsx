@@ -60,6 +60,68 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [isSandboxModalOpen, setIsSandboxModalOpen] = useState(false)
 
+  // Passphrase Robustness Evaluation with Non-Classic Natural Metaphors
+  const getPassphraseRobustness = (phrase: string) => {
+    const len = phrase.length
+    if (len === 0) {
+      return {
+        level: 0,
+        label: '🌱 Fresh Canvas',
+        subtext: 'Awaiting your spark',
+        colorClass: 'bg-transparent',
+      }
+    }
+
+    let score = 0
+    if (len >= 6) score += 1
+    if (len >= 10) score += 1
+    if (len >= 14) score += 1
+
+    const hasMixed = /[a-z]/.test(phrase) && /[A-Z]/.test(phrase)
+    const hasDigitsOrSymbols = /[\d\W]/.test(phrase)
+    const hasSpacesOrHyphens = /[\s_-]/.test(phrase)
+
+    if (hasMixed || hasDigitsOrSymbols || hasSpacesOrHyphens) {
+      score += 1
+    }
+
+    const level = Math.max(1, Math.min(4, score))
+
+    switch (level) {
+      case 1:
+        return {
+          level: 1,
+          label: '🍃 Gentle Breeze',
+          subtext: 'Easy to scatter',
+          colorClass: 'bg-warning',
+        }
+      case 2:
+        return {
+          level: 2,
+          label: '🪵 Sturdy Outpost',
+          subtext: 'Resilient shelter',
+          colorClass: 'bg-brand',
+        }
+      case 3:
+        return {
+          level: 3,
+          label: '🏰 Armored Citadel',
+          subtext: 'Reinforced defense',
+          colorClass: 'bg-brand',
+        }
+      case 4:
+      default:
+        return {
+          level: 4,
+          label: '🌌 Cosmic Sanctuary',
+          subtext: 'Impenetrable vault',
+          colorClass: 'bg-success',
+        }
+    }
+  }
+
+  const passphraseRobustness = getPassphraseRobustness(passphrase)
+
   // Handle Preferred Name Change
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPreferredName(e.target.value)
@@ -244,6 +306,43 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
                         className="w-full px-4 py-3 rounded-md bg-surface text-ink font-sans text-base border-2 border-border-strong focus-ring shadow-doodle-sm placeholder:text-ink-muted/60 pr-10"
                         required
                       />
+                    </div>
+
+                    {/* Non-Classic Password Robustness Meter */}
+                    <div
+                      data-testid="passphrase-robustness-meter"
+                      className="pt-1.5 space-y-1.5"
+                      aria-live="polite"
+                    >
+                      <div className="h-2 w-full rounded-pill bg-surface-raised border border-border-strong/40 flex gap-1 p-0.5">
+                        <div
+                          className={`h-full flex-1 rounded-pill transition-all duration-300 ${
+                            passphraseRobustness.level >= 1 ? passphraseRobustness.colorClass : 'bg-transparent'
+                          }`}
+                        />
+                        <div
+                          className={`h-full flex-1 rounded-pill transition-all duration-300 ${
+                            passphraseRobustness.level >= 2 ? passphraseRobustness.colorClass : 'bg-transparent'
+                          }`}
+                        />
+                        <div
+                          className={`h-full flex-1 rounded-pill transition-all duration-300 ${
+                            passphraseRobustness.level >= 3 ? passphraseRobustness.colorClass : 'bg-transparent'
+                          }`}
+                        />
+                        <div
+                          className={`h-full flex-1 rounded-pill transition-all duration-300 ${
+                            passphraseRobustness.level >= 4 ? passphraseRobustness.colorClass : 'bg-transparent'
+                          }`}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between font-mono text-xs text-ink-muted">
+                        <span className="font-semibold text-ink flex items-center gap-1.5">
+                          <span className="text-ink-muted font-normal">Robustness:</span>
+                          <span>{passphraseRobustness.label}</span>
+                        </span>
+                        <span className="font-bold text-ink-muted">{passphraseRobustness.subtext}</span>
+                      </div>
                     </div>
                   </div>
 
