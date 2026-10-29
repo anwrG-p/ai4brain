@@ -59,42 +59,6 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [isSandboxModalOpen, setIsSandboxModalOpen] = useState(false)
-  // Passphrase Strength Calculation (Humane, non-anxious)
-  const getPassphraseStrength = (phrase: string) => {
-    const len = phrase.length
-    if (len === 0) {
-      return {
-        level: 0,
-        bars: [false, false, false],
-        label: 'Encryption Robustness: Ready to Form',
-        metric: '256-bit safe cipher',
-      }
-    }
-    if (len < 6) {
-      return {
-        level: 1,
-        bars: [true, false, false],
-        label: 'Encryption Robustness: Gently Forming',
-        metric: 'Keep going',
-      }
-    }
-    if (len < 12) {
-      return {
-        level: 2,
-        bars: [true, true, false],
-        label: 'Encryption Robustness: Solid & Sealed',
-        metric: 'Standard vault',
-      }
-    }
-    return {
-      level: 3,
-      bars: [true, true, true],
-      label: 'Encryption Robustness: Impenetrable Sanctuary',
-      metric: 'High-entropy cipher',
-    }
-  }
-
-  const passphraseStrength = getPassphraseStrength(passphrase)
 
   // Handle Preferred Name Change
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -280,28 +244,6 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
                         className="w-full px-4 py-3 rounded-md bg-surface text-ink font-sans text-base border-2 border-border-strong focus-ring shadow-doodle-sm placeholder:text-ink-muted/60 pr-10"
                         required
                       />
-                    </div>
-
-                    {/* Non-Anxious Robustness Meter */}
-                    <div className="pt-1 space-y-1">
-                      <div className="h-2 w-full rounded-pill bg-surface-raised border border-border-strong/40 flex gap-1 p-0.5">
-                        <div
-                          className={`h-full flex-1 rounded-pill transition-colors ${passphraseStrength.bars[0] ? 'bg-brand' : 'bg-transparent'
-                            }`}
-                        />
-                        <div
-                          className={`h-full flex-1 rounded-pill transition-colors ${passphraseStrength.bars[1] ? 'bg-brand' : 'bg-transparent'
-                            }`}
-                        />
-                        <div
-                          className={`h-full flex-1 rounded-pill transition-colors ${passphraseStrength.bars[2] ? 'bg-success' : 'bg-transparent'
-                            }`}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between font-mono text-xs text-ink-muted">
-                        <span>{passphraseStrength.label}</span>
-                        <span className="font-bold text-ink">{passphraseStrength.metric}</span>
-                      </div>
                     </div>
                   </div>
 

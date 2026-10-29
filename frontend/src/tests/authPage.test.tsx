@@ -119,21 +119,18 @@ describe('AuthPage (Stitch BRIAN Cognitive Twin Login & Register in Doodle Style
     ).not.toBeInTheDocument()
   })
 
-  it('updates passphrase robustness indicator without punitive anxiety messaging', async () => {
+  it('does not display passphrase robustness meter (Encryption Robustness: Solid & Sealed removed)', async () => {
     renderAuthPage('/register')
 
     const passphraseInput = screen.getByLabelText(/Choose a Master Passphrase/i)
 
-    // Initially ready to form
-    expect(screen.getByText(/Encryption Robustness: Ready to Form/i)).toBeInTheDocument()
+    // Verify meter is not rendered
+    expect(screen.queryByText(/Encryption Robustness/i)).not.toBeInTheDocument()
 
-    // Typing short passphrase
-    fireEvent.change(passphraseInput, { target: { value: 'pass' } })
-    expect(screen.getByText(/Encryption Robustness: Gently Forming/i)).toBeInTheDocument()
-
-    // Typing standard passphrase
+    // Typing passphrase
     fireEvent.change(passphraseInput, { target: { value: 'gentle-rhythm-12' } })
-    expect(screen.getByText(/Encryption Robustness: Impenetrable Sanctuary/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Encryption Robustness/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Solid & Sealed/i)).not.toBeInTheDocument()
   })
 
   it('toggles passphrase visibility between password and text', async () => {
