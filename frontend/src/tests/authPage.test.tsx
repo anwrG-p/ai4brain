@@ -46,10 +46,15 @@ describe('AuthPage (Stitch BRIAN Cognitive Twin Login & Register in Doodle Style
     })
     expect(submitBtn).toBeInTheDocument()
 
-    // Verify Hardware Key / Passkey button
+    // Verify Hardware Key / Passkey button is removed
     expect(
-      screen.getByRole('button', { name: /Resume with Hardware Key \/ Passkey/i }),
-    ).toBeInTheDocument()
+      screen.queryByRole('button', { name: /Resume with Hardware Key \/ Passkey/i }),
+    ).not.toBeInTheDocument()
+
+    // Verify subtitle copy is removed
+    expect(
+      screen.queryByText(/Pick up where your cognitive twin left off/i),
+    ).not.toBeInTheDocument()
 
     // Verify Mascot Showcase panel is removed
     expect(
@@ -106,6 +111,11 @@ describe('AuthPage (Stitch BRIAN Cognitive Twin Login & Register in Doodle Style
     // Verify Zero biometric tracking note is NOT on the register page
     expect(
       screen.queryByText(/Zero biometric tracking\. Your cognitive metrics/i),
+    ).not.toBeInTheDocument()
+
+    // Verify subtitle copy is removed
+    expect(
+      screen.queryByText(/No clinical labels\. No tests to fail/i),
     ).not.toBeInTheDocument()
   })
 

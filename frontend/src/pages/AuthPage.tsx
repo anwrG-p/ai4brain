@@ -101,24 +101,6 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
     setPreferredName(e.target.value)
   }
 
-  // Handle Passkey Simulation
-  const handlePasskeyClick = () => {
-    setIsSubmitting(true)
-    setTimeout(() => {
-      setIsSubmitting(false)
-      setSubmitSuccess(true)
-      loginUser({
-        preferredName: 'Arthur (Passkey)',
-        email: 'passkey-sealed@device.local',
-        focusGoal: 'Daily Mental Calm',
-        rememberOnDevice: true,
-      })
-      setTimeout(() => {
-        navigate('/dashboard')
-      }, 700)
-    }, 1100)
-  }
-
   // Form Submit Handler
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -223,12 +205,6 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
               <div className="max-w-xs">
                 <DoodleSquiggle className="text-brand" />
               </div>
-
-              <p className="text-sm sm:text-base text-ink-muted leading-relaxed pt-1">
-                {mode === 'register'
-                  ? 'No clinical labels. No tests to fail. Just 2 minutes a day calibrated to your natural rhythm.'
-                  : 'Pick up where your cognitive twin left off. Non-clinical & hardware-sealed.'}
-              </p>
             </div>
 
             {/* Form */}
@@ -482,19 +458,6 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
                     )}
                   </button>
                 </div>
-
-                {/* Alternate Hardware Key Button (Sign In mode) */}
-                {mode === 'signin' && (
-                  <button
-                    type="button"
-                    onClick={handlePasskeyClick}
-                    disabled={isSubmitting}
-                    className="w-full py-3 px-4 rounded-pill font-mono text-xs font-bold bg-surface text-ink hover:bg-surface-raised border-2 border-border-strong shadow-doodle-sm flex items-center justify-center gap-2 cursor-pointer transition-colors"
-                  >
-                    <Key size={14} aria-hidden="true" className="text-brand" />
-                    <span>Resume with Hardware Key / Passkey</span>
-                  </button>
-                )}
               </div>
 
 
