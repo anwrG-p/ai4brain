@@ -36,6 +36,11 @@
   --radius-xl: 16px;
   --radius-2xl: 20px;
   --radius-pill: 9999px;
+
+  --color-emotion-accent: var(--color-emotion-accent);
+  --color-emotion-tint: var(--color-emotion-tint);
+  --color-emotion-glow: var(--color-emotion-glow);
+  --color-emotion-badge: var(--color-emotion-badge);
 }
 
 :root,
@@ -97,6 +102,12 @@
   --shadow-hero: 5px 5px 0 #263D5B;
   --bg-hero-gradient: linear-gradient(135deg, #FFFFFF 0%, #FDF0E7 100%);
   --bg-card-gradient: linear-gradient(135deg, #FFFFFF 0%, #FFF5EE 100%);
+
+  /* EMILY Emotion Adaptive Color Tokens (Default: Calm Flow) */
+  --color-emotion-accent: #0D9488;
+  --color-emotion-tint: #F2F9F8;
+  --color-emotion-glow: rgba(13, 148, 136, 0.12);
+  --color-emotion-badge: #0D9488;
 
   /* Typography Families */
   --font-display: 'Delius Swash Caps', 'Delius', cursive, sans-serif;
@@ -201,6 +212,112 @@
   --shadow-hero: 5px 5px 0 #FF8C5A;
   --bg-hero-gradient: linear-gradient(135deg, #1E293B 0%, #172234 100%);
   --bg-card-gradient: linear-gradient(135deg, #1E293B 0%, #223046 100%);
+
+  /* EMILY Dark Emotion Adaptive Color Tokens (Default: Calm Flow) */
+  --color-emotion-accent: #4FD1C5;
+  --color-emotion-tint: #162432;
+  --color-emotion-glow: rgba(79, 209, 197, 0.14);
+  --color-emotion-badge: #4FD1C5;
+}
+
+/* ==========================================================================
+   EMILY Emotion-Adaptive Color Coding (Circumplex Affective Model)
+   Light Mode & Default Fallback
+   ========================================================================== */
+
+:root[data-emotion="calm_flow"],
+[data-theme="light"][data-emotion="calm_flow"],
+html[data-emotion="calm_flow"]:not([data-theme="dark"]) {
+  /* Deep Teal / Sage Green (Parasympathetic balance & clarity) */
+  --color-emotion-accent: #0D9488;
+  --color-emotion-tint: #F2F9F8;
+  --color-emotion-glow: rgba(13, 148, 136, 0.14);
+  --color-emotion-badge: #0D9488;
+}
+
+:root[data-emotion="energized"],
+[data-theme="light"][data-emotion="energized"],
+html[data-emotion="energized"]:not([data-theme="dark"]) {
+  /* Warm Terracotta Amber & Doodle Sky (High self-efficacy) */
+  --color-emotion-accent: #D96B43;
+  --color-emotion-tint: #FDF6F0;
+  --color-emotion-glow: rgba(217, 107, 67, 0.15);
+  --color-emotion-badge: #D96B43;
+}
+
+:root[data-emotion="frustrated"],
+[data-theme="light"][data-emotion="frustrated"],
+html[data-emotion="frustrated"]:not([data-theme="dark"]) {
+  /* Counter-Regulatory Tranquil Eucalyptus Sage (Anti-Red Policy: Never #DC2626) */
+  --color-emotion-accent: #4D9078;
+  --color-emotion-tint: #F1F7F4;
+  --color-emotion-glow: rgba(77, 144, 120, 0.14);
+  --color-emotion-badge: #4D9078;
+}
+
+:root[data-emotion="hesitant"],
+[data-theme="light"][data-emotion="hesitant"],
+html[data-emotion="hesitant"]:not([data-theme="dark"]) {
+  /* Serene Periwinkle & Warm Honey (Cognitive grounding) */
+  --color-emotion-accent: #5A67D8;
+  --color-emotion-tint: #F4F5FC;
+  --color-emotion-glow: rgba(90, 103, 216, 0.14);
+  --color-emotion-badge: #D97706;
+}
+
+:root[data-emotion="fatigued"],
+[data-theme="light"][data-emotion="fatigued"],
+html[data-emotion="fatigued"]:not([data-theme="dark"]) {
+  /* Twilight Indigo & Revitalizing Mint (Circadian recovery) */
+  --color-emotion-accent: #5C6B9C;
+  --color-emotion-tint: #F3F4F8;
+  --color-emotion-glow: rgba(92, 107, 156, 0.14);
+  --color-emotion-badge: #5C6B9C;
+}
+
+/* ==========================================================================
+   EMILY Emotion-Adaptive Color Coding (Dark Mode - Blackboard Sketch)
+   ========================================================================== */
+
+[data-theme="dark"][data-emotion="calm_flow"],
+html[data-theme="dark"][data-emotion="calm_flow"] {
+  --color-emotion-accent: #4FD1C5;
+  --color-emotion-tint: #162432;
+  --color-emotion-glow: rgba(79, 209, 197, 0.16);
+  --color-emotion-badge: #4FD1C5;
+}
+
+[data-theme="dark"][data-emotion="energized"],
+html[data-theme="dark"][data-emotion="energized"] {
+  --color-emotion-accent: #F5A65B;
+  --color-emotion-tint: #2B1D19;
+  --color-emotion-glow: rgba(245, 166, 91, 0.16);
+  --color-emotion-badge: #F5A65B;
+}
+
+[data-theme="dark"][data-emotion="frustrated"],
+html[data-theme="dark"][data-emotion="frustrated"] {
+  /* Counter-Regulatory Soft Mint Sage in Dark Mode (Anti-Red Policy) */
+  --color-emotion-accent: #68D391;
+  --color-emotion-tint: #15271F;
+  --color-emotion-glow: rgba(104, 211, 145, 0.16);
+  --color-emotion-badge: #68D391;
+}
+
+[data-theme="dark"][data-emotion="hesitant"],
+html[data-theme="dark"][data-emotion="hesitant"] {
+  --color-emotion-accent: #90CDF4;
+  --color-emotion-tint: #1A2536;
+  --color-emotion-glow: rgba(144, 205, 244, 0.16);
+  --color-emotion-badge: #FBBF24;
+}
+
+[data-theme="dark"][data-emotion="fatigued"],
+html[data-theme="dark"][data-emotion="fatigued"] {
+  --color-emotion-accent: #B794F4;
+  --color-emotion-tint: #201D33;
+  --color-emotion-glow: rgba(183, 148, 244, 0.16);
+  --color-emotion-badge: #B794F4;
 }
 
 @layer base {
@@ -224,6 +341,7 @@
     margin: 0;
     padding: 0;
     overflow-x: hidden;
+    transition: background-color 0.45s ease, border-color 0.45s ease, box-shadow 0.45s ease;
   }
 
   [data-theme="dark"] html,
@@ -361,6 +479,20 @@
 
   .animate-brian-float {
     animation: brian-float 3.5s ease-in-out infinite;
+  }
+
+  /* EMILY Emotion-Adaptive Utility Classes */
+  .border-emotion-accent {
+    border-color: var(--color-emotion-accent);
+  }
+  .bg-emotion-tint {
+    background-color: var(--color-emotion-tint);
+  }
+  .text-emotion-accent {
+    color: var(--color-emotion-accent);
+  }
+  .shadow-emotion-glow {
+    box-shadow: 0 0 14px var(--color-emotion-glow);
   }
 
 }

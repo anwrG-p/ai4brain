@@ -2,14 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { X, Pause } from 'lucide-react'
 import { getDimensionsByPreset, DIMENSION_PRESETS } from '../config/dimensions'
-import type { DimensionConfig, TaskSchemaType } from '../contracts'
+import type { DimensionConfig, TaskSchemaType } from '../types'
 import {
   buildEstimatesForDimensions,
   SAMPLE_WHY_THIS_TRAIL,
 } from '../services/mocks/fixtures'
-import { useAppStore } from '../store/useAppStore'
-import { WhyThisPanel } from '../components/signature/WhyThisPanel'
-import { NodiCompanion } from '../components/signature/NodiCompanion'
+import { useAppStore } from '../state/useAppStore'
+import { useEmilyStore } from '../state/useEmilyStore'
+import { WhyThisPanel } from '../components/features/coach/WhyThisPanel'
+import { NodiCompanion } from '../components/features/brand/NodiCompanion'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -647,6 +648,8 @@ export default function TaskRunnerPage() {
   const [stage, setStage] = useState<RunnerStage>('running')
   const [activeTrialIdx, setActiveTrialIdx] = useState<number>(1) // 0-based index; 1 = Trial 2 of 4 active
   const [showTelemetryTable, setShowTelemetryTable] = useState<boolean>(false)
+  const currentEmotion = useEmilyStore((s) => s.currentEmotion)
+  const [consecutiveErrors, setConsecutiveErrors] = useState<number>(0)
   const [recordedEvents, setRecordedEvents] = useState<RecordedTrialEvent[]>(
     () => [
       {
@@ -717,6 +720,13 @@ export default function TaskRunnerPage() {
 
       setRecordedEvents((prev) => [newEvent, ...prev])
 
+      const isError = !option.isCorrect
+      const nextConsecutive = isError ? consecutiveErrors + 1 : 0
+      setConsecutiveErrors(nextConsecutive)
+      if (nextConsecutive >= 2) {
+        useEmilyStore.getState().updateTelemetry([], { consecutiveErrors: nextConsecutive })
+      }
+
       if (activeTrialIdx + 1 >= trialSequence.length) {
         setStage('completed')
       } else {
@@ -731,6 +741,7 @@ export default function TaskRunnerPage() {
       currentDim.backendDimensionKey,
       currentTrial,
       trialSequence.length,
+      consecutiveErrors,
     ],
   )
 
@@ -924,6 +935,24 @@ export default function TaskRunnerPage() {
             {/* Zero-Distraction Lock indicator for a11y & automated test suite */}
             <span className="sr-only">Zero-Distraction Lock: Mascot Hidden</span>
           </div>
+
+          {/* Subtle Affective Guidance Banner during strain/hesitation */}
+          {currentEmotion === 'frustrated' && (
+            <div
+              role="status"
+              className="py-1 px-3 rounded-pill bg-surface-raised border border-border-strong text-xs font-mono text-ink-muted text-center"
+            >
+              🍃 Steady pace — no penalty for taking your time.
+            </div>
+          )}
+          {currentEmotion === 'hesitant' && (
+            <div
+              role="status"
+              className="py-1 px-3 rounded-pill bg-surface-raised border border-border-strong text-xs font-mono text-ink-muted text-center"
+            >
+              🧭 Take your time — every exploration counts.
+            </div>
+          )}
 
           {/* Response Buttons: [ Old ] 1   [ Similar ] 2   [ New ] 3 */}
           <div

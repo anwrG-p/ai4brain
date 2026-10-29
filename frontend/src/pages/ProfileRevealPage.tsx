@@ -5,10 +5,10 @@ import {
   buildEstimatesForDimensions,
   SAMPLE_WHY_THIS_TRAIL,
 } from '../services/mocks/fixtures'
-import { useAppStore, type PersonaId } from '../store/useAppStore'
-import { UncertaintyRadar } from '../components/signature/UncertaintyRadar'
-import { WhyThisPanel } from '../components/signature/WhyThisPanel'
-import { Mascot, type MascotState } from '../components/signature/Mascot'
+import { useAppStore, type PersonaId } from '../state/useAppStore'
+import { UncertaintyRadar } from '../components/features/radar/UncertaintyRadar'
+import { WhyThisPanel } from '../components/features/coach/WhyThisPanel'
+import { Mascot, type MascotState } from '../components/features/brand/Mascot'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'

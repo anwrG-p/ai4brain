@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, expect, it, beforeEach } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import AuthPage from '../pages/AuthPage'
-import { useAppStore } from '../store/useAppStore'
+import { useAppStore } from '../state/useAppStore'
 
 function renderAuthPage(initialPath = '/auth') {
   return render(

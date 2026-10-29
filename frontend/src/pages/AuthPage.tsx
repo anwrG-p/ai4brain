@@ -12,7 +12,7 @@ import {
   X,
   Flame,
 } from 'lucide-react'
-import { useAppStore } from '../store/useAppStore'
+import { useAppStore } from '../state/useAppStore'
 import { DoodleSquiggle, DoodleArrow } from '../components/ui/DoodleDecorations'
 import brianLoginImg from '../assets/mascot/brian-login.webp'
 import brianRegisterImg from '../assets/mascot/brian-register.webp'
@@ -323,20 +323,18 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
 
               {/* Full-Body Axolotl Character with Gentle Floating Animation */}
               <div
-                className={`relative z-10 flex items-center justify-center animate-brian-float transition-transform duration-200 ${
-                  avatarBounce ? 'scale-105' : 'scale-100'
-                }`}
+                className={`relative z-10 flex items-center justify-center animate-brian-float transition-transform duration-200 ${avatarBounce ? 'scale-105' : 'scale-100'
+                  }`}
               >
                 <img
                   src={mode === 'register' ? brianRegisterImg : brianLoginImg}
                   alt={mode === 'register' ? 'Brian the Axolotl with explorer hat and sketchbook' : 'Brian the Axolotl waving warmly'}
-                  className={`h-52 sm:h-56 w-auto max-w-full object-contain select-none drop-shadow-md transition-transform duration-300 ${
-                    activeFinPose === 'cover'
+                  className={`h-52 sm:h-56 w-auto max-w-full object-contain select-none drop-shadow-md transition-transform duration-300 ${activeFinPose === 'cover'
                       ? 'rotate-6'
                       : activeFinPose === 'wave'
                         ? '-rotate-6'
                         : ''
-                  }`}
+                    }`}
                 />
               </div>
 
@@ -782,7 +780,7 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
                   <span>1. RAM-Only Decryption</span>
                 </div>
                 <p className="text-xs text-ink-muted">
-                  Your passphrase never traverses external networks. Hashed with client-side WebAssembly before local vault decryption.
+                  Your  passphrase never traverses external networks. Hashed with client-side WebAssembly before local vault decryption.
                 </p>
               </div>
 

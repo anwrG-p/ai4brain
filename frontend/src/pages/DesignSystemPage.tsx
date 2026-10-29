@@ -4,13 +4,13 @@ import {
   buildEstimatesForDimensions,
   SAMPLE_WHY_THIS_TRAIL,
 } from '../services/mocks/fixtures'
-import { useAppStore } from '../store/useAppStore'
+import { useAppStore } from '../state/useAppStore'
 import { evaluateDesignSystemContrast } from '../utils/contrast'
 import { lintCopyText } from '../utils/copyLinter'
-import { UncertaintyRadar } from '../components/signature/UncertaintyRadar'
-import { WhyThisPanel } from '../components/signature/WhyThisPanel'
-import { Mascot } from '../components/signature/Mascot'
-import { BrianMascot } from '../components/brand/BrianMascot'
+import { UncertaintyRadar } from '../components/features/radar/UncertaintyRadar'
+import { WhyThisPanel } from '../components/features/coach/WhyThisPanel'
+import { Mascot } from '../components/features/brand/Mascot'
+import { BrianMascot } from '../components/features/brand/BrianMascot'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'

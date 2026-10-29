@@ -1,15 +1,15 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Mascot, type MascotState } from '../components/signature/Mascot'
-import { WhyThisPanel } from '../components/signature/WhyThisPanel'
+import { Mascot, type MascotState } from '../components/features/brand/Mascot'
+import { WhyThisPanel } from '../components/features/coach/WhyThisPanel'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { DoodleSquiggle } from '../components/ui/DoodleDecorations'
 import { getDimensionsByPreset } from '../config/dimensions'
-import type { DimensionConfig, WhyThisTrail } from '../contracts'
+import type { DimensionConfig, WhyThisTrail } from '../types'
 import { buildEstimatesForDimensions } from '../services/mocks/fixtures'
-import { useAppStore, type PersonaId } from '../store/useAppStore'
+import { useAppStore, type PersonaId } from '../state/useAppStore'
 import {
   lintCopyText,
   SAMPLE_GUARDRAIL_INTERCEPTION_INPUT,

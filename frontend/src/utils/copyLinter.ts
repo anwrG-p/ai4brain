@@ -1,9 +1,9 @@
-import type { CopyLintResult, CopyLintViolation } from '../contracts'
+import type { CopyLintResult, CopyLintViolation } from '../types'
 
 export interface BannedTermRule {
   pattern: RegExp
   termLabel: string
-  category: 'clinical_diagnostic' | 'punitive_guilt'
+  category: 'clinical_diagnostic' | 'punitive_guilt' | 'academic_ml_jargon'
   replacementSuggestion: string
 }
 

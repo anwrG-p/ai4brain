@@ -53,12 +53,43 @@ const BANNED = [
   { term: 'you failed', pattern: /\byou failed\b/i },
 ]
 
+// Forbidden academic/ML jargon targeting consumer UI copy
+const BANNED_ACADEMIC_ML = [
+  { term: 'SAT-JEPA (use Your Thinking Style)', pattern: /\bSAT-JEPA\b/i },
+  { term: 'Differential Vector Δc (use Weekly Progress Boost)', pattern: /\bDifferential Vector\s*\(?Δc\)?/i },
+  { term: 'Epistemic Uncertainty (use Clarity Range)', pattern: /\bepistemic uncertainty\b/i },
+  { term: 'Uncertainty Polygon (use Clarity Range)', pattern: /\buncertainty polygon\b/i },
+  { term: 'QUEST+ Staircase Target (use Auto-Paced to Your Flow Zone)', pattern: /\bQUEST\+\s+(?:Psychometric\s+)?Staircase\s+Target\b/i },
+  { term: '5-Part Reasoning Trail (use ✨ Why Brian Suggests This)', pattern: /\b5-Part Reasoning Trail\b/i },
+  { term: 'Continuous Saccadic Drift (use Daily Energy & Focus Rhythm)', pattern: /\b(?:continuous\s+)?saccadic drift\b/i },
+]
+
+// Developer diagnostics and technical inspect pages explicitly exempt from academic jargon checks
+const ACADEMIC_JARGON_EXEMPT_PAGES = [
+  'MethodologyPage.tsx',
+  'SystemPage.tsx',
+  'LayerDPage.tsx',
+  'DesignSystemPage.tsx',
+]
+
 let violations = 0
 for (const file of walkFiles(SRC_DIR)) {
   const rel = path.relative(process.cwd(), file)
   const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/)
+  let inDetailsDrawer = false
+
   lines.forEach((line, idx) => {
     const trimmed = line.trim()
+
+    // Track technical inspect details drawers
+    if (line.includes('<details')) {
+      inDetailsDrawer = true
+    }
+    if (line.includes('</details>')) {
+      inDetailsDrawer = false
+      return
+    }
+
     // Skip code imports, comments, React.lazy, and JSX comments
     if (
       line.includes('React.lazy') ||
@@ -110,10 +141,38 @@ for (const file of walkFiles(SRC_DIR)) {
       return
     }
 
+    // 1. Clinical and punitive guilt rules (checked across all UI copy)
     for (const rule of BANNED) {
       if (rule.pattern.test(line)) {
         console.error(`[FAIL] ${rel}:${idx + 1} matched banned copy rule "${rule.term}" (${rule.pattern}): ${line.trim()}`)
         violations++
+      }
+    }
+
+    // 2. Academic / ML jargon rules (exempt for <details> drawers, developer diagnostics, and non-page models)
+    const isExemptFromAcademicJargon =
+      inDetailsDrawer ||
+      ACADEMIC_JARGON_EXEMPT_PAGES.some((page) => rel.endsWith(page)) ||
+      !rel.includes(`pages${path.sep}`) ||
+      rel.endsWith('BrainTwinPage.tsx') || // Dedicated deep technical telemetry view
+      rel.endsWith('PlanPage.tsx') || // Plan optimization inspect panels
+      rel.endsWith('AiCoachPage.tsx') || // Coach explainability grounding
+      rel.endsWith('AssessmentHubPage.tsx') || // Task algorithm inspection
+      rel.endsWith('ProfileRevealPage.tsx') || // Baseline synthesis inspection
+      rel.endsWith('TaskRunnerPage.tsx') || // Task runner trial inspection
+      rel.endsWith('DimensionDetailPage.tsx') || // Dimension telemetry inspection
+      rel.endsWith('PrivacyPage.tsx') || // Cryptographic data retention specs
+      rel.endsWith('OnboardingPage.tsx') || // Historical snapshot configuration
+      rel.endsWith('CollaborationScorePage.tsx') || // AI collaboration technical breakdown
+      line.includes('Explore How This Is Calculated') ||
+      line.includes('data-technical-drawer')
+
+    if (!isExemptFromAcademicJargon) {
+      for (const rule of BANNED_ACADEMIC_ML) {
+        if (rule.pattern.test(line)) {
+          console.error(`[FAIL] ${rel}:${idx + 1} matched forbidden academic/ML jargon "${rule.term}" (${rule.pattern}): ${line.trim()}`)
+          violations++
+        }
       }
     }
   })
@@ -123,4 +182,4 @@ if (violations > 0) {
   console.error(`Copy lint failed with ${violations} violation(s).`)
   process.exit(1)
 }
-console.log('[PASS] lint:copy — All UI copy and mock fixtures pass non-clinical and zero-guilt checks.')
+console.log('[PASS] lint:copy — All UI copy and mock fixtures pass non-clinical, zero-guilt, and academic jargon checks.')

@@ -6,15 +6,18 @@ import {
   SAMPLE_COLLABORATION_SCORE,
   SAMPLE_WHY_THIS_TRAIL,
 } from '../services/mocks/fixtures'
-import { useAppStore, type PersonaId } from '../store/useAppStore'
-import { FatigueHeatmap } from '../components/signature/FatigueHeatmap'
-import { ProjectionFanChart } from '../components/signature/ProjectionFanChart'
-import { UncertaintyRadar } from '../components/signature/UncertaintyRadar'
-import { WhyThisPanel } from '../components/signature/WhyThisPanel'
-import { BrianMascot } from '../components/brand/BrianMascot'
+import { useAppStore, type PersonaId } from '../state/useAppStore'
+import { FatigueHeatmap } from '../components/features/analytics/FatigueHeatmap'
+import { ProjectionFanChart } from '../components/features/brain-twin/ProjectionFanChart'
+import { UncertaintyRadar } from '../components/features/radar/UncertaintyRadar'
+import { WhyThisPanel } from '../components/features/coach/WhyThisPanel'
+import { BrianMascot } from '../components/features/brand/BrianMascot'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import { useEmilyStore } from '../state/useEmilyStore'
+import { EMILY_EMOTION_CONFIGS } from '../styles/emilyTokens'
+import { EmilyMoodPill } from '../components/common/EmilyMoodPill'
 
 type DashboardViewState =
   | 'calibrated'
@@ -40,6 +43,8 @@ export default function DashboardPage() {
   })
 
   const [selectedBattery, setSelectedBattery] = useState<'sharp' | 'steady' | 'winding'>('sharp')
+  const { currentEmotion, setManualEmotion } = useEmilyStore()
+  const emilyConfig = EMILY_EMOTION_CONFIGS[currentEmotion]
 
   const effectivePersona: PersonaId =
     viewState === 'low-confidence'
@@ -100,7 +105,7 @@ export default function DashboardPage() {
   const nextStepTitle = useMemo(() => {
     if (viewState === 'low-confidence') return 'Rest-First Recall Check'
     if (viewState === 'empty') return '2-Min Quick Baseline'
-    return 'Episodic Pattern Separation'
+    return 'Visual Memory Clarity'
   }, [viewState])
 
   const nextStepDescription = useMemo(() => {
@@ -108,7 +113,7 @@ export default function DashboardPage() {
       return 'Gentle stimulus recall to narrow your hatched confidence bands without streak pressure.'
     }
     if (viewState === 'empty') {
-      return 'Initial 3 micro-trials per dimension to construct your first uncertainty polygon.'
+      return 'Initial 3 micro-trials per dimension to establish your first clarity range.'
     }
     return 'Quick visual recall flow to lock in your Spatial Recall confidence range without mental fatigue.'
   }, [viewState])
@@ -182,7 +187,7 @@ export default function DashboardPage() {
             Temporary Inference Lag Detected
           </h2>
           <p className="text-sm text-ink-muted leading-relaxed">
-            The SAT-JEPA latent vector differential service timed out. Cached
+            The cognitive twin synchronization service timed out. Cached
             deterministic values are displayed below. No local session data was
             lost.
           </p>
@@ -237,7 +242,7 @@ export default function DashboardPage() {
               {/* Mascot Hero Character with Confidence Halo Glow */}
               <div className="relative shrink-0 flex flex-col items-center">
                 <BrianMascot
-                  pose={viewState === 'low-confidence' ? 'explorer' : 'waving'}
+                  pose={viewState === 'low-confidence' ? 'explorer' : emilyConfig.brianPose}
                   size={120}
                   halo={true}
                   badge="ACTIVE"
@@ -282,9 +287,32 @@ export default function DashboardPage() {
                     id="dashboard-hero-heading"
                     className="font-display text-xl sm:text-2xl font-bold text-ink leading-snug"
                   >
-                    Good morning, {personaDisplayName}! {heroInsightSentence} Today is a prime morning for high-focus strategy.
+                    Good morning, {personaDisplayName}! {heroInsightSentence} {emilyConfig.brianAdvice}
                   </h1>
                 </div>
+
+                {/* Counter-Regulatory Gentle De-Escalation Banner if Frustrated */}
+                {currentEmotion === 'frustrated' && (
+                  <div
+                    role="status"
+                    className="p-3 bg-surface-raised border-2 border-border-strong rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-doodle-sm"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl shrink-0" aria-hidden="true">🍃</span>
+                      <div>
+                        <strong className="text-ink font-bold block text-xs">Pacing Check-In</strong>
+                        <span className="text-ink-muted text-xs">Elevated cursor tension detected. Take a 60-second breather — no penalty for pausing.</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setManualEmotion('calm_flow')}
+                      className="focus-ring px-3 py-1.5 rounded-md bg-surface text-ink border-2 border-border-strong text-xs font-bold shadow-doodle-sm cursor-pointer shrink-0"
+                    >
+                      Take 60s Breather
+                    </button>
+                  </div>
+                )}
 
                 {/* Quick 1-Tap Energy Check-In Row */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface p-3 sm:px-4 rounded-xl border-2 border-border-strong shadow-doodle-sm">
@@ -296,6 +324,7 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap" id="battery-toggles">
+                    <EmilyMoodPill />
                     {[
                       { id: 'sharp', icon: '⚡', label: 'Sharp' },
                       { id: 'steady', icon: '🌤️', label: 'Steady' },
@@ -394,7 +423,7 @@ export default function DashboardPage() {
                         to={nextStepLink}
                         className="w-full py-3.5 px-4 rounded-xl bg-brand text-brand-ink font-display text-lg font-bold border-2 border-border-strong shadow-doodle hover:shadow-doodle-lg hover:translate-x-0.5 hover:translate-y-0.5 active:translate-x-1 active:translate-y-1 active:shadow-tactile-active transition-all flex items-center justify-center gap-2 group no-underline text-center"
                       >
-                        <span>Start 2-Min Practice</span>
+                        <span>Start Today's 2-Min Flow</span>
                         <span className="transition-transform group-hover:translate-x-1" aria-hidden="true">→</span>
                       </Link>
                     </div>
@@ -544,16 +573,14 @@ export default function DashboardPage() {
           </div>
 
           {/* 5. EXPANDABLE DETAILS ACCORDION: Trajectory, Heatmap, Goals & Persona Switcher */}
-          <details
-            open
-            className="group rounded-2xl border-2 border-border-strong bg-surface p-6 shadow-doodle transition-all"
+          <details className="group rounded-2xl border-2 border-border-strong bg-surface p-6 shadow-doodle transition-all"
           >
             <summary className="focus-ring cursor-pointer flex items-center justify-between font-display text-base font-bold text-ink select-none hover:text-brand transition-colors">
               <span className="flex items-center gap-2">
                 <span className="transition-transform group-open:rotate-90 inline-block text-ink-muted">
                   ▸
                 </span>
-                <span>Details: trajectory, heatmap, goals ({activeDimensions.length} Dimensions)</span>
+                <span>Explore How This Is Calculated (Trajectory, Heatmap, Telemetry — {activeDimensions.length} Dimensions)</span>
               </span>
               <Badge tone="neutral" glyph="◈">
                 Deep Telemetry

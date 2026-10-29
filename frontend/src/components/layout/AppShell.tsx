@@ -15,13 +15,20 @@ import {
 } from 'lucide-react'
 import { BRAND_CONFIG } from '../../config/brand'
 import conceptALockup from '../../assets/branding/concept-a-lockup.svg'
-import { useAppStore } from '../../store/useAppStore'
-import { telemetryQueue } from '../../services/telemetryQueue'
+import { useAppStore } from '../../state/useAppStore'
+import { telemetryQueue } from '../../services/telemetry/telemetryQueue'
 import { Badge } from '../ui/Badge'
+import { EmilyMoodPill } from '../common/EmilyMoodPill'
+import { HumanReviewGate } from '../dev/HumanReviewGate'
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const location = useLocation()
-  const isTaskRoute = location.pathname.startsWith('/task')
+  const searchParams = new URLSearchParams(location.search)
+  const isBaselineMode = searchParams.get('mode') === 'baseline'
+  const isTaskRoute =
+    location.pathname.startsWith('/task') ||
+    location.pathname.startsWith('/practice') ||
+    isBaselineMode
   const isAuthRoute =
     location.pathname === '/login' ||
     location.pathname === '/sign-in' ||
@@ -68,8 +75,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         Skip to main content
       </a>
 
-      {/* Global Robustness Banner (Truth in claims: Real queue status) */}
-      {showOfflineBanner && (
+      {/* Global Robustness Banner (Truth in claims: Real queue status) - suppressed during distraction-free calibration */}
+      {!isBaselineMode && showOfflineBanner && (
         <div
           role="status"
           aria-live="polite"
@@ -93,7 +100,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {simulateLlmDown && (
+      {!isBaselineMode && simulateLlmDown && (
         <div
           role="status"
           aria-live="polite"
@@ -189,6 +196,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </nav>
             )}
 
+            {/* EMILY Emotion Atmosphere & Micro-Interaction Rhythm */}
+            <EmilyMoodPill />
+
             {/* Protected Streak Pill matching Stitch */}
             <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-surface-raised border-2 border-border-strong rounded-pill shadow-doodle-sm">
               <span className="text-danger text-xs" aria-hidden="true">🔥</span>
@@ -254,14 +264,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      {/* Product Footer with Centered Non-Clinical Disclaimer */}
+      {/* Product Footer with Centered Non-Clinical Disclaimer & Evaluator Controls */}
       {!isTaskRoute && (
         <footer
           role="contentinfo"
           className="border-t-2 border-border-strong bg-surface px-4 py-4 text-xs text-ink-muted"
         >
-          <div className="max-w-6xl mx-auto flex items-center justify-center text-center">
+          <div className="max-w-6xl mx-auto flex flex-col items-center justify-center text-center gap-2">
             <p className="m-0">{BRAND_CONFIG.nonClinicalNotice}</p>
+            <HumanReviewGate />
           </div>
         </footer>
       )}

@@ -7,7 +7,7 @@ import {
   type BaselineModeId,
   type FocusGoalId,
   type PeakWindowId,
-} from '../store/useAppStore'
+} from '../state/useAppStore'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'

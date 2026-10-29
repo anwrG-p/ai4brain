@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { evaluateDesignSystemContrast } from '../utils/contrast'
 import { lintCopyText } from '../utils/copyLinter'
 import { getDimensionsByPreset } from '../config/dimensions'
-import { useAppStore } from '../store/useAppStore'
+import { useAppStore } from '../state/useAppStore'
 import { App } from '../App'
 
 describe('Wave 1 & Wave 2 Pages & Design System Unit Suite', () => {

@@ -4,10 +4,10 @@ import { X } from 'lucide-react'
 import {
   BrainTwinTimeTravel,
   buildHistoricalSnapshots,
-} from '../components/signature/BrainTwinTimeTravel'
-import { BrianMascot } from '../components/brand/BrianMascot'
-import { UncertaintyRadar } from '../components/signature/UncertaintyRadar'
-import { WhyThisPanel } from '../components/signature/WhyThisPanel'
+} from '../components/features/brain-twin/BrainTwinTimeTravel'
+import { BrianMascot } from '../components/features/brand/BrianMascot'
+import { UncertaintyRadar } from '../components/features/radar/UncertaintyRadar'
+import { WhyThisPanel } from '../components/features/coach/WhyThisPanel'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -17,7 +17,7 @@ import {
   buildEstimatesForDimensions,
   SAMPLE_WHY_THIS_TRAIL,
 } from '../services/mocks/fixtures'
-import { useAppStore, type PersonaId } from '../store/useAppStore'
+import { useAppStore, type PersonaId } from '../state/useAppStore'
 
 type PreviewState =
   | 'live'

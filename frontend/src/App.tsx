@@ -66,6 +66,8 @@ export function App() {
               />
               <Route path="/task/:dimId" element={<TaskRunnerPage />} />
               <Route path="/profile-reveal" element={<ProfileRevealPage />} />
+              <Route path="/reveal" element={<Navigate to="/profile-reveal" replace />} />
+              <Route path="/practice" element={<Navigate to="/task/episodic_pattern_separation?mode=baseline" replace />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route
                 path="/dimensions"
