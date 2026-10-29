@@ -154,6 +154,28 @@ function ev(i: number): TelemetryEvent {
   return { trial_index: i } as TelemetryEvent
 }
 
+// A complete event, as the server accepts it; restore only keeps events of this shape.
+function full(i: number): TelemetryEvent {
+  return {
+    user_id: 'u1',
+    session_id: 's1',
+    task_id: 't1',
+    trial_index: i,
+    dimension: 'working_memory',
+    score_norm: 1,
+    response_time_ms: 500,
+    error_flag: false,
+    error_burst: 0,
+    hesitation_jitter: 0,
+    keystroke_latency_ms: null,
+    trial_meta: { item_id: `t1:${i}` },
+    voice_opt_in: false,
+    client_ts: '2026-10-30T00:00:00.000Z',
+  }
+}
+
+const stored = (events: unknown) => ({ [KEY]: JSON.stringify(events) })
+
 // jsdom's Blob has no text(); FileReader reads it, and needs real timers to fire onload.
 function readBlob(b: Blob): Promise<string> {
   vi.useRealTimers()
@@ -364,8 +386,8 @@ describe('Tracker', () => {
     test('pending events survive into a new tracker and are sent from there', async () => {
       const storage = memStorage()
       const a = make({ fetchFn: offlineFetch(), beacon: vi.fn(), storage })
-      a.push(ev(1))
-      a.push(ev(2))
+      a.push(full(1))
+      a.push(full(2))
       await a.flush()
       a.destroy()
       const fetchFn = okFetch()
@@ -389,6 +411,66 @@ describe('Tracker', () => {
       t.push(ev(2))
       expect(t.clear()).toBe(1)
       expect(sent(fetchFn)).toEqual([1])
+    })
+
+    test('restore keeps only well-formed events', async () => {
+      const valid = full(7)
+      const fetchFn = okFetch()
+      const t = make({
+        fetchFn,
+        beacon: vi.fn(),
+        storage: memStorage(stored([valid, { foo: 1 }, 5, null, 'x', { ...full(8), extra: 1 }])),
+      })
+      expect(t.getStatus().queuedCount).toBe(1)
+      await t.flush()
+      expect(JSON.parse(String(fetchFn.mock.calls[0]?.[1]?.body))).toEqual([valid])
+    })
+
+    test('events built by TrialRecorder survive the restore check', () => {
+      const r = new TrialRecorder(ctx, clock().now)
+      r.start(0)
+      r.input('key')
+      const e = r.finish({ correct: true, meta: { congruent: false } })
+      const t = make({ fetchFn: okFetch(), beacon: vi.fn(), storage: memStorage(stored([e])) })
+      expect(t.getStatus().queuedCount).toBe(1)
+    })
+
+    test('a non-JSON or non-array stored value restores nothing', () => {
+      for (const raw of ['{not json', '{"a":1}', '42', 'null']) {
+        const t = make({ fetchFn: okFetch(), beacon: vi.fn(), storage: memStorage({ [KEY]: raw }) })
+        expect(t.getStatus().queuedCount).toBe(0)
+      }
+    })
+
+    test('restore past maxBuffer keeps the newest 500, counts the rest, and sends at most 100', async () => {
+      const fetchFn = okFetch()
+      const events = Array.from({ length: 520 }, (_, i) => full(i))
+      const t = make({ fetchFn, beacon: vi.fn(), storage: memStorage(stored(events)) })
+      expect(t.getStatus()).toMatchObject({ queuedCount: 500, droppedCount: 20 })
+      await vi.advanceTimersByTimeAsync(0)
+      expect(fetchFn).toHaveBeenCalledTimes(1)
+      expect(sent(fetchFn)).toEqual(Array.from({ length: 100 }, (_, i) => 20 + i))
+    })
+
+    test('restoring batchSize events flushes on construction', async () => {
+      const fetchFn = okFetch()
+      const events = Array.from({ length: 20 }, (_, i) => full(i))
+      make({ fetchFn, beacon: vi.fn(), storage: memStorage(stored(events)) })
+      await vi.advanceTimersByTimeAsync(0)
+      expect(sent(fetchFn)).toHaveLength(20)
+    })
+
+    test('when storage is full, the stale copy is removed instead of kept', () => {
+      const storage = memStorage()
+      const t = make({ fetchFn: okFetch(), beacon: vi.fn(), storage })
+      t.push(full(1))
+      expect(storage.getItem(KEY)).not.toBeNull()
+      storage.setItem = () => {
+        throw new Error('QuotaExceededError')
+      }
+      t.push(full(2))
+      expect(storage.getItem(KEY)).toBeNull()
+      expect(t.getStatus().queuedCount).toBe(2)
     })
 
     test('the old queue key is removed on init and never resent', () => {
@@ -439,6 +521,45 @@ describe('Tracker', () => {
       t.clear()
       expect(t.getStatus().droppedCount).toBe(0)
       vi.mocked(console.error).mockRestore()
+    })
+
+    test('clear during an in-flight rejected flush leaves droppedCount at 0', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      let resolve!: (r: Response) => void
+      const fetchFn = vi.fn(
+        (_url: string, _init?: RequestInit) => new Promise<Response>((r) => (resolve = r)),
+      )
+      const t = make({ fetchFn, beacon: vi.fn() })
+      t.push(ev(1))
+      t.push(ev(2))
+      const p = t.flush()
+      expect(t.clear()).toBe(2)
+      t.push(ev(3))
+      resolve(new Response(null, { status: 422 }))
+      await p
+      expect(t.getStatus()).toMatchObject({ queuedCount: 1, droppedCount: 0 })
+      vi.mocked(console.error).mockRestore()
+    })
+
+    test('a throwing listener is logged and breaks neither push nor flush', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const fetchFn = okFetch()
+      const t = make({ fetchFn, beacon: vi.fn() })
+      const boom = () => {
+        throw new Error('listener')
+      }
+      t.subscribe(boom)
+      t.onEvent(boom)
+      const after = vi.fn()
+      t.subscribe(after)
+      expect(() => t.push(ev(1))).not.toThrow()
+      expect(after).toHaveBeenCalledTimes(1)
+      expect(t.getStatus().queuedCount).toBe(1)
+      await t.flush()
+      expect(t.getStatus().queuedCount).toBe(0)
+      expect(after).toHaveBeenCalledTimes(2)
+      expect(errSpy).toHaveBeenCalledTimes(3) // subscriber + onEvent on push, subscriber on flush
+      errSpy.mockRestore()
     })
 
     test('getStatus returns the same object until something changes', () => {

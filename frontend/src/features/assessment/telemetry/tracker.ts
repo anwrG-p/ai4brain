@@ -1,5 +1,5 @@
 import { hesitationJitter, nextErrorBurst } from './metrics'
-import type { Dimension, TelemetryEvent, TrialMeta } from './types'
+import { isTelemetryEvent, type Dimension, type TelemetryEvent, type TrialMeta } from './types'
 
 type TrialCtx = {
   user_id: string
@@ -110,6 +110,15 @@ function defaultStorage(): StorageLike | null {
   }
 }
 
+// A throwing listener must not break push() (and so the trial loop) or a flush.
+function safely(fn: () => void): void {
+  try {
+    fn()
+  } catch (err) {
+    console.error('telemetry: listener failed', err)
+  }
+}
+
 // Buffers events and sends them in the background; push() never awaits the network.
 // The buffer is mirrored to storage so pending events survive a reload.
 export class Tracker {
@@ -123,6 +132,7 @@ export class Tracker {
   private inFlight = false
   private isOnline = typeof navigator === 'undefined' ? true : navigator.onLine
   private droppedCount = 0
+  private clears = 0 // bumped by clear(), so an in-flight flush knows its batch was purged
   private status: TrackerStatus | null = null
   private listeners = new Set<() => void>()
   private eventListeners = new Set<(e: TelemetryEvent) => void>()
@@ -166,7 +176,7 @@ export class Tracker {
 
   push(e: TelemetryEvent): void {
     this.add([e])
-    for (const l of this.eventListeners) l(e)
+    for (const l of this.eventListeners) safely(() => l(e))
   }
 
   // Every event, new or restored, enters here: cap, persist, notify, flush at batchSize.
@@ -187,6 +197,7 @@ export class Tracker {
     this.inFlight = true
     // Events stay in the buffer until acknowledged, so failures retry and overflow still drops the oldest.
     const batch = this.buffer.slice(0, MAX_PER_REQUEST)
+    const clears = this.clears
     try {
       const res = await this.fetchFn(this.endpoint, {
         method: 'POST',
@@ -197,6 +208,8 @@ export class Tracker {
       // rather than block the queue head. 5xx, 408, 429 and network errors retry.
       const rejected =
         res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429
+      // clear() ran meanwhile: the batch is already gone and must not count as dropped.
+      if (clears !== this.clears) return
       if (rejected) {
         console.error(`telemetry: dropped ${batch.length} events (HTTP ${res.status})`)
         this.droppedCount += batch.length
@@ -253,6 +266,7 @@ export class Tracker {
     const cleared = this.buffer.length
     this.buffer = []
     this.droppedCount = 0
+    this.clears++
     this.changed()
     return cleared
   }
@@ -269,17 +283,21 @@ export class Tracker {
 
   // The buffer or counters changed: persist, then tell subscribers.
   private changed(): void {
-    this.store((s) =>
-      this.buffer.length
-        ? s.setItem(STORAGE_KEY, JSON.stringify(this.buffer))
-        : s.removeItem(STORAGE_KEY),
-    )
+    this.store((s) => {
+      if (!this.buffer.length) return s.removeItem(STORAGE_KEY)
+      try {
+        s.setItem(STORAGE_KEY, JSON.stringify(this.buffer))
+      } catch {
+        // Quota full: drop the stale copy rather than resend already-sent events after a reload.
+        s.removeItem(STORAGE_KEY)
+      }
+    })
     this.notify()
   }
 
   private notify(): void {
     this.status = null
-    for (const l of this.listeners) l()
+    for (const l of this.listeners) safely(l)
   }
 
   private restore(): TelemetryEvent[] {
@@ -287,9 +305,8 @@ export class Tracker {
     if (!raw) return []
     try {
       const parsed: unknown = JSON.parse(raw)
-      return Array.isArray(parsed)
-        ? parsed.filter((e): e is TelemetryEvent => typeof e === 'object' && e !== null)
-        : []
+      // The server rejects a whole batch over one bad event, so anything malformed stays behind.
+      return Array.isArray(parsed) ? parsed.filter(isTelemetryEvent) : []
     } catch {
       return []
     }

@@ -7,6 +7,15 @@ export type Dimension =
   | 'processing_speed'
   | 'episodic_memory'
 
+const DIMENSIONS: ReadonlySet<string> = new Set<Dimension>([
+  'working_memory',
+  'pattern_induction',
+  'executive_function',
+  'spatial_orientation',
+  'processing_speed',
+  'episodic_memory',
+])
+
 export type TrialMeta = Record<string, string | number | boolean>
 
 export type TelemetryEvent = {
@@ -26,6 +35,50 @@ export type TelemetryEvent = {
   voice_latency_ms?: number | null
   vocal_pace_hz?: number | null
   client_ts: string // ISO 8601
+}
+
+const EVENT_KEYS: ReadonlySet<string> = new Set<keyof TelemetryEvent>([
+  'user_id',
+  'session_id',
+  'task_id',
+  'trial_index',
+  'dimension',
+  'score_norm',
+  'response_time_ms',
+  'error_flag',
+  'error_burst',
+  'hesitation_jitter',
+  'keystroke_latency_ms',
+  'trial_meta',
+  'voice_opt_in',
+  'voice_latency_ms',
+  'vocal_pace_hz',
+  'client_ts',
+])
+
+const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
+const isOptNum = (v: unknown) => v === undefined || v === null || isNum(v)
+
+// Shape check for events read back from storage (types only; the server still checks ranges).
+export function isTelemetryEvent(x: unknown): x is TelemetryEvent {
+  if (typeof x !== 'object' || x === null || Array.isArray(x)) return false
+  const e = x as Record<string, unknown>
+  const meta = e.trial_meta
+  return (
+    Object.keys(e).every((k) => EVENT_KEYS.has(k)) &&
+    ['user_id', 'session_id', 'task_id', 'client_ts'].every((k) => typeof e[k] === 'string') &&
+    ['trial_index', 'score_norm', 'response_time_ms', 'error_burst', 'hesitation_jitter'].every((k) =>
+      isNum(e[k]),
+    ) &&
+    typeof e.error_flag === 'boolean' &&
+    typeof e.dimension === 'string' &&
+    DIMENSIONS.has(e.dimension) &&
+    isOptNum(e.keystroke_latency_ms) &&
+    isOptNum(e.voice_latency_ms) &&
+    isOptNum(e.vocal_pace_hz) &&
+    (e.voice_opt_in === undefined || typeof e.voice_opt_in === 'boolean') &&
+    (meta === undefined || (typeof meta === 'object' && meta !== null && !Array.isArray(meta)))
+  )
 }
 
 export type SchemaType =
