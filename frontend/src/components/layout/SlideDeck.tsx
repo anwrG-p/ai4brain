@@ -377,15 +377,11 @@ export function SlideDeck({
               onClick={nextSlide}
               disabled={activeSlide === slides.length - 1}
               aria-label="Next slide"
-              title={
-                activeSlide === slides.length - 1
-                  ? 'End of slides (Scroll down for details)'
-                  : 'Next slide (Arrow Down)'
-              }
+              title="Next slide (Arrow Down)"
               className={`fixed bottom-20 md:bottom-6 end-4 sm:end-6 z-40 w-11 h-11 rounded-xl bg-surface/90 backdrop-blur-md border-2 border-border-strong text-ink flex items-center justify-center transition-all cursor-pointer select-none ${
                 activeSlide === slides.length - 1
-                  ? 'opacity-40 cursor-not-allowed bg-canvas'
-                  : 'opacity-100 shadow-doodle hover:bg-brand hover:text-brand-ink hover:scale-105 active:scale-95'
+                  ? 'opacity-0 pointer-events-none translate-y-2'
+                  : 'opacity-100 translate-y-0 shadow-doodle hover:bg-brand hover:text-brand-ink hover:scale-105 active:scale-95'
               }`}
             >
               <span aria-hidden="true" className="font-bold text-sm">▼</span>
