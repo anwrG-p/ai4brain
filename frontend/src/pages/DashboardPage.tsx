@@ -17,7 +17,6 @@ import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { useEmilyStore } from '../state/useEmilyStore'
-import { EMILY_EMOTION_CONFIGS } from '../styles/emilyTokens'
 
 type DashboardViewState =
   | 'calibrated'
@@ -53,7 +52,6 @@ export default function DashboardPage() {
   })
 
   const { currentEmotion, setManualEmotion } = useEmilyStore()
-  const emilyConfig = EMILY_EMOTION_CONFIGS[currentEmotion]
 
   const effectivePersona: PersonaId =
     viewState === 'low-confidence'
@@ -86,22 +84,6 @@ export default function DashboardPage() {
     if (viewState === 'low-confidence') return 'Salma'
     if (viewState === 'empty') return 'Nour'
     return 'Youssef'
-  }, [viewState])
-
-  const heroInsightSentence = useMemo(() => {
-    if (viewState === 'low-confidence') {
-      return 'Your reaction time variance suggests a gentle recovery block today.'
-    }
-    if (viewState === 'empty') {
-      return 'Your cognitive baseline is ready for calibration.'
-    }
-    return 'Your working memory is trending up.'
-  }, [viewState])
-
-  const nextStepTitle = useMemo(() => {
-    if (viewState === 'low-confidence') return 'Rest-First Recall Check'
-    if (viewState === 'empty') return '2-Min Quick Baseline'
-    return 'Visual Memory Clarity'
   }, [viewState])
 
   const nextStepLink = useMemo(() => {
@@ -275,13 +257,30 @@ export default function DashboardPage() {
                     {/* WEEKLY CONTINUITY & RHYTHM (Drawn directly on Classroom Board) */}
                     <div className="space-y-4">
                       {/* Minimalist Board Header: Greeting & Streak */}
-                      <div className="flex items-center gap-2 border-b-2 border-dashed border-border-strong/30 pb-3">
-                        <span className="text-xl" aria-hidden="true">
-                          🔥
-                        </span>
-                        <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-ink">
-                          Welcome back, {personaDisplayName}! You're on a streak
-                        </h2>
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-border-strong/30 pb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl" aria-hidden="true">
+                            🔥
+                          </span>
+                          <h1
+                            id="dashboard-hero-heading"
+                            className="font-display text-xl sm:text-2xl font-bold tracking-tight text-ink"
+                          >
+                            Welcome back, {personaDisplayName}! You're on a streak
+                          </h1>
+                        </div>
+
+                        {viewState === 'low-confidence' && (
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-pill bg-brand-subtle border border-border-strong text-xs font-mono font-bold text-ink shadow-xs">
+                              <span>🌱</span>
+                              <span>Rest-First Pacing</span>
+                            </span>
+                            <span className="text-xs font-mono text-ink-muted">
+                              Non-Clinical Cognitive Space
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Seven-Day Minimalist Hand-Drawn Strip */}
@@ -340,6 +339,17 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
+                    {/* Middle Section: Start Today's 2-Min Flow Primary CTA */}
+                    <div className="my-auto py-4 flex items-center justify-center">
+                      <Link
+                        to={nextStepLink}
+                        className="tactile-btn py-3 px-8 rounded-xl bg-brand text-brand-ink font-display text-base sm:text-lg font-bold border-2 border-border-strong shadow-doodle hover:shadow-doodle-lg no-underline inline-flex items-center gap-2 text-center transition-transform hover:-translate-y-0.5 active:translate-y-0.5"
+                      >
+                        <span>Start Today's 2-Min Flow</span>
+                        <span aria-hidden="true">→</span>
+                      </Link>
+                    </div>
+
                     {/* DAILY SCIENCE BITE (Chalk/Marker Footnote on Board) */}
                     <div className="mt-auto pt-4 border-t border-dashed border-border-strong/30 flex items-center gap-2 text-xs sm:text-sm text-ink">
                       <span className="text-brand text-base shrink-0" aria-hidden="true">
@@ -354,82 +364,35 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* =========================================================================
-                UNDER THE BOARD: HERO GREETING & PRIMARY CTA
-                ========================================================================= */}
-            <Card className="p-6 border-2 border-border-strong bg-surface shadow-doodle space-y-4">
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div className="space-y-1.5 flex-1">
-                  {viewState === 'low-confidence' && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-pill bg-brand-subtle border border-border-strong text-xs font-mono font-bold text-ink shadow-xs">
-                        <span>🌱</span>
-                        <span>Rest-First Pacing</span>
-                      </span>
-                      <span className="text-xs font-mono text-ink-muted">
-                        Non-Clinical Cognitive Space
-                      </span>
-                    </div>
-                  )}
-
-                  <h1
-                    id="dashboard-hero-heading"
-                    className="font-display text-2xl sm:text-3xl font-extrabold text-ink tracking-tight"
-                  >
-                    Good morning, {personaDisplayName}!
-                  </h1>
-
-                  <p className="text-sm sm:text-base text-ink-muted leading-relaxed max-w-2xl m-0">
-                    {heroInsightSentence} {emilyConfig.brianAdvice}
-                  </p>
-                </div>
-
-                {/* Primary CTA Button */}
-                <div className="flex flex-col items-center sm:items-end gap-1 shrink-0">
-                  <Link
-                    to={nextStepLink}
-                    className="tactile-btn py-3 px-6 rounded-xl bg-brand text-brand-ink font-display text-base font-bold border-2 border-border-strong shadow-doodle hover:shadow-doodle-lg no-underline flex items-center justify-center gap-2 text-center"
-                  >
-                    <span>Start Today's 2-Min Flow</span>
-                    <span aria-hidden="true">→</span>
-                  </Link>
-                  <div className="text-xs font-mono text-ink-muted flex items-center gap-1.5 pt-0.5">
-                    <span className="w-2 h-2 rounded-full bg-success animate-pulse shrink-0" />
-                    <span>{nextStepTitle} · 120s max</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Frustrated De-Escalation Banner if detected */}
-              {currentEmotion === 'frustrated' && (
-                <div
-                  role="status"
-                  className="p-3 bg-surface-raised border-2 border-border-strong rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-doodle-sm text-start"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl shrink-0" aria-hidden="true">
-                      🍃
+            {/* Frustrated De-Escalation Banner if detected */}
+            {currentEmotion === 'frustrated' && (
+              <div
+                role="status"
+                className="p-3 bg-surface-raised border-2 border-border-strong rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-doodle-sm text-start"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-xl shrink-0" aria-hidden="true">
+                    🍃
+                  </span>
+                  <div>
+                    <strong className="text-ink font-bold block text-xs">
+                      Pacing Check-In
+                    </strong>
+                    <span className="text-ink-muted text-xs">
+                      Elevated cursor tension detected. Take a 60-second
+                      breather — no penalty for pausing.
                     </span>
-                    <div>
-                      <strong className="text-ink font-bold block text-xs">
-                        Pacing Check-In
-                      </strong>
-                      <span className="text-ink-muted text-xs">
-                        Elevated cursor tension detected. Take a 60-second
-                        breather — no penalty for pausing.
-                      </span>
-                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setManualEmotion('calm_flow')}
-                    className="focus-ring px-3 py-1.5 rounded-md bg-surface text-ink border-2 border-border-strong text-xs font-bold shadow-doodle-sm cursor-pointer shrink-0"
-                  >
-                    Take 60s Breather
-                  </button>
                 </div>
-              )}
-            </Card>
+                <button
+                  type="button"
+                  onClick={() => setManualEmotion('calm_flow')}
+                  className="focus-ring px-3 py-1.5 rounded-md bg-surface text-ink border-2 border-border-strong text-xs font-bold shadow-doodle-sm cursor-pointer shrink-0"
+                >
+                  Take 60s Breather
+                </button>
+              </div>
+            )}
 
             {/* =========================================================================
                 UNDER THE BOARD: 6-SKILL COGNITIVE BALANCE & CORE BALANCE INSIGHTS

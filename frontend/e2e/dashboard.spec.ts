@@ -14,7 +14,7 @@ test.describe('Page 06: Dashboard (/dashboard) Hero Visual QA & A11y', () => {
     await page.goto('/dashboard', { waitUntil: 'networkidle' })
     await expect(
       page.getByRole('heading', {
-        name: /Good morning|Your evolving cognitive twin/i,
+        name: /Good morning|Your evolving cognitive twin|Welcome back/i,
       }),
     ).toBeVisible()
 
