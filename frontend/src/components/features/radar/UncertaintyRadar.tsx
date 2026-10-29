@@ -8,6 +8,8 @@ export interface UncertaintyRadarProps {
   dimensions: readonly DimensionConfig[]
   estimates: readonly DimensionEstimate[]
   title?: string
+  subtitle?: string | null
+  showSubtitle?: boolean
   defaultShowTable?: boolean
   headingLevel?: 'h2' | 'h3'
 }
@@ -156,6 +158,8 @@ export function UncertaintyRadar({
   dimensions,
   estimates,
   title = 'Brain Twin Uncertainty Radar',
+  subtitle,
+  showSubtitle = true,
   defaultShowTable = false,
   headingLevel = 'h2',
 }: UncertaintyRadarProps) {
@@ -232,10 +236,14 @@ export function UncertaintyRadar({
           ) : (
             <h2 className="font-display text-lg font-bold text-ink">{title}</h2>
           )}
-          <p className="text-xs text-ink-muted">
-            Showing {dimensions.length} cognitive dimensions with 95% confidence bands
-            {hasAnyLowConfidence ? ' (hatched = preliminary low-confidence range)' : ''}.
-          </p>
+          {showSubtitle && subtitle !== null && (
+            <p className="text-xs text-ink-muted">
+              {subtitle ??
+                `Showing ${dimensions.length} cognitive dimensions with 95% confidence bands${
+                  hasAnyLowConfidence ? ' (hatched = preliminary low-confidence range)' : ''
+                }.`}
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {hasAnyLowConfidence && (

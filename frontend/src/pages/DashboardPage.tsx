@@ -310,6 +310,7 @@ export default function DashboardPage() {
                         dimensions={activeDimensions}
                         estimates={estimates}
                         title="6-Skill Cognitive Balance"
+                        showSubtitle={false}
                       />
                     </div>
 
