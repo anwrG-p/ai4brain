@@ -1,16 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getDimensionsByPreset } from '../config/dimensions'
-import {
-  buildEstimatesForDimensions,
-  SAMPLE_COLLABORATION_SCORE,
-  SAMPLE_WHY_THIS_TRAIL,
-} from '../services/mocks/fixtures'
+import { buildEstimatesForDimensions } from '../services/mocks/fixtures'
 import { useAppStore, type PersonaId } from '../state/useAppStore'
-import { FatigueHeatmap } from '../components/features/analytics/FatigueHeatmap'
-import { ProjectionFanChart } from '../components/features/brain-twin/ProjectionFanChart'
 import { UncertaintyRadar } from '../components/features/radar/UncertaintyRadar'
-import { WhyThisPanel } from '../components/features/coach/WhyThisPanel'
 import { BrianMascot } from '../components/features/brand/BrianMascot'
 import teacherBrianImg from '../assets/mascot/Teacher-Brian.png'
 import { Badge } from '../components/ui/Badge'
@@ -91,9 +84,9 @@ export default function DashboardPage() {
     return '/task/episodic_pattern_separation'
   }, [viewState])
 
-  const teacherBrianScale = 3
+  const teacherBrianScale = 3.1
   const teacherBrianMoveX = 0
-  const teacherBrianMoveY = 150
+  const teacherBrianMoveY = 200
 
   const teacherBrianStyle: React.CSSProperties = {
     transform: `translate(${teacherBrianMoveX}px, ${teacherBrianMoveY}px) scale(${teacherBrianScale})`,
@@ -533,163 +526,6 @@ export default function DashboardPage() {
                 </Card>
               </div>
             </div>
-
-            {/* 3. EXPANDABLE DETAILS ACCORDION: Trajectory, Heatmap, Goals & Persona Switcher */}
-            <details
-              data-technical-drawer
-              className="group rounded-2xl border-2 border-border-strong bg-surface p-6 shadow-doodle transition-all mt-6"
-            >
-              <summary className="focus-ring cursor-pointer flex items-center justify-between font-display text-base font-bold text-ink select-none hover:text-brand transition-colors">
-                <span className="flex items-center gap-2">
-                  <span className="transition-transform group-open:rotate-90 inline-block text-ink-muted">
-                    ▸
-                  </span>
-                  <span>
-                    Explore How This Is Calculated (Trajectory, Heatmap, Telemetry —{' '}
-                    {activeDimensions.length} Dimensions)
-                  </span>
-                </span>
-                <Badge tone="neutral" glyph="◈">
-                  Deep Telemetry
-                </Badge>
-              </summary>
-
-              <div className="mt-6 space-y-8 pt-6 border-t-2 border-dashed border-border-strong/30">
-                {/* Profile Snapshot Switcher Strip */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b-2 border-dashed border-border-strong/30">
-                  <span className="text-xs font-semibold text-ink-muted">
-                    Demonstration Profile:
-                  </span>
-                  <div
-                    role="group"
-                    aria-label="Dashboard persona and state switcher"
-                    className="flex flex-wrap items-center gap-1.5"
-                  >
-                    {(
-                      [
-                        { id: 'calibrated', label: 'Calibrated Twin (Youssef · 84%)' },
-                        {
-                          id: 'low-confidence',
-                          label: 'Low-Conf Hatched (Salma · 54%)',
-                        },
-                        { id: 'partial', label: 'Partial (1 Missing Dim)' },
-                        { id: 'empty', label: 'Empty (New Learner)' },
-                        { id: 'loading', label: 'Loading Skeleton' },
-                        { id: 'error', label: 'Error Recovery' },
-                        { id: 'extreme-text', label: 'Extreme Values' },
-                      ] as const
-                    ).map((tab) => (
-                      <button
-                        key={tab.id}
-                        type="button"
-                        aria-pressed={viewState === tab.id}
-                        onClick={() => handleSelectViewState(tab.id)}
-                        className={`focus-ring min-h-10 px-3 py-1 rounded-pill border-2 border-border-strong text-xs font-bold cursor-pointer transition-colors shadow-doodle-sm ${viewState === tab.id
-                          ? 'bg-brand text-brand-ink'
-                          : 'bg-surface-raised text-ink hover:bg-brand-subtle'
-                          }`}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Trajectory Fan Chart */}
-                <section aria-label="Trajectory Fan Chart" className="space-y-3">
-                  <ProjectionFanChart
-                    dimensions={activeDimensions}
-                    persona={effectivePersona}
-                  />
-                </section>
-
-                {/* Why This Coaching Explainability Trail */}
-                <section aria-label="Why This Trail" className="space-y-3">
-                  <WhyThisPanel
-                    trail={SAMPLE_WHY_THIS_TRAIL}
-                    title="Today's Priority AI Coach Recommendation (5-Part Reasoning Trail)"
-                    showSummaryUpfront={true}
-                    defaultExpanded={false}
-                  />
-                </section>
-
-                {/* Session Fatigue Heatmap & AI Collaboration Score */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-                  <div className="lg:col-span-7">
-                    <FatigueHeatmap persona={effectivePersona} />
-                  </div>
-
-                  <Card className="lg:col-span-5 p-5 flex flex-col justify-between gap-4 border-2 border-border-strong shadow-doodle">
-                    <div className="space-y-3">
-                      <div className="flex flex-wrap items-start justify-between gap-2 border-b-2 border-dashed border-border-strong/30 pb-3">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-display text-lg font-bold text-ink">
-                              Co-Pilot Synergy with Brian (0–100)
-                            </h3>
-                            <Badge tone="reward" glyph="★">
-                              {SAMPLE_COLLABORATION_SCORE.totalScore} ± 4 / 100
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-ink-muted mt-0.5">
-                            Epistemic synergy index across human pace &amp; AI co-adaptation.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-xs font-mono">
-                          <span className="text-ink-muted">Pacing Alignment</span>
-                          <span className="font-bold text-ink">88 / 100</span>
-                        </div>
-                        <div className="w-full h-2 rounded-pill bg-surface-raised border border-border-strong overflow-hidden">
-                          <div
-                            className="h-full bg-brand rounded-pill"
-                            style={{ width: '88%' }}
-                          />
-                        </div>
-
-                        <div className="flex justify-between text-xs font-mono pt-1">
-                          <span className="text-ink-muted">
-                            Adaptation Feedback
-                          </span>
-                          <span className="font-bold text-ink">79 / 100</span>
-                        </div>
-                        <div className="w-full h-2 rounded-pill bg-surface-raised border border-border-strong overflow-hidden">
-                          <div
-                            className="h-full bg-success rounded-pill"
-                            style={{ width: '79%' }}
-                          />
-                        </div>
-
-                        <div className="flex justify-between text-xs font-mono pt-1">
-                          <span className="text-ink-muted">Cognitive Synergy</span>
-                          <span className="font-bold text-ink">84 / 100</span>
-                        </div>
-                        <div className="w-full h-2 rounded-pill bg-surface-raised border border-border-strong overflow-hidden">
-                          <div
-                            className="h-full bg-reward rounded-pill"
-                            style={{ width: '84%' }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t-2 border-dashed border-border-strong/30 flex items-center justify-between">
-                      <span className="text-xs font-mono text-ink-muted">
-                        Formula: 0.40P + 0.35A + 0.25S
-                      </span>
-                      <Link
-                        to="/collaboration"
-                        className="font-mono text-xs font-bold text-brand hover:underline"
-                      >
-                        Deep Breakdown →
-                      </Link>
-                    </div>
-                  </Card>
-                </div>
-              </div>
-            </details>
           </>
         )}
     </div>

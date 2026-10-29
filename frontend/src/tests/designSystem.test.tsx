@@ -221,7 +221,7 @@ describe('Wave 1 & Wave 2 Pages & Design System Unit Suite', () => {
     expect(screen.getByText(/SNAP-2026-SALMA-01/i)).toBeInTheDocument()
   })
 
-  it('renders Page 06 Dashboard (/dashboard) and supports trajectory fan table toggle, fatigue heatmap table toggle, and 3-to-10 dimensions', async () => {
+  it('renders Page 06 Dashboard (/dashboard) with classroom lecture stage, Teacher Brian, and Core Balance Insights', async () => {
     window.history.pushState({}, '', '/dashboard')
     render(<App />)
 
@@ -234,28 +234,12 @@ describe('Wave 1 & Wave 2 Pages & Design System Unit Suite', () => {
     )
     expect(heading).toBeInTheDocument()
 
-    fireEvent.click(
-      screen.getByRole('button', { name: /View Trajectory as Table/i }),
-    )
+    expect(screen.getByTestId('brian-teacher-slot')).toBeInTheDocument()
     expect(
-      screen.getByRole('table', {
-        name: /Brain Twin 6-week historical trajectory and 2-week forecast table/i,
-      }),
+      screen.getByRole('link', { name: /Start Today\'s 2-Min Flow/i }),
     ).toBeInTheDocument()
-
-    fireEvent.click(
-      screen.getByRole('button', { name: /View Heatmap as Table/i }),
-    )
-    expect(
-      screen.getByRole('table', {
-        name: /Session Fatigue and Alertness by Time of Day and Day of Week/i,
-      }),
-    ).toBeInTheDocument()
-
-    fireEvent.click(
-      screen.getByRole('button', { name: /Low-Conf Hatched \(Salma/i }),
-    )
-    expect(screen.getByText(/Rest-First Pacing/i)).toBeInTheDocument()
+    expect(screen.getByText(/6-Skill Cognitive Balance/i)).toBeInTheDocument()
+    expect(screen.getByText(/Core Balance Insights/i)).toBeInTheDocument()
   })
 
   it('renders Page 08 Brain Twin (/brain-twin) with Signature #2 BrainTwinTimeTravel scrubber, snapshot diff table toggle, and manifold trajectory', async () => {
