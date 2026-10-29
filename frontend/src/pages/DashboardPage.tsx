@@ -84,6 +84,27 @@ export default function DashboardPage() {
     return '/task/episodic_pattern_separation'
   }, [viewState])
 
+  // =========================================================================
+  // 🏫 1. ENTIRE CLASSROOM BLOCK (PODIUM / BRIAN / BOARD TOGETHER) POSITION
+  // Move Teacher Brian, the Classroom Board, and the Wooden Podium ALL TOGETHER:
+  // - blockMoveDown: positive number moves DOWN (in px), negative moves UP (e.g. 0, 40, 80, 120, 200)
+  // - blockMoveX: positive moves RIGHT (in px), negative moves LEFT (in px) (e.g. -50, 0, 50)
+  // =========================================================================
+  const blockMoveDown: number = 80 // Change this number to move the ENTIRE block (Podium/Brian/Board) UP or DOWN (in px)
+  const blockMoveX: number = 0 // Change this number to move the ENTIRE block (Podium/Brian/Board) LEFT or RIGHT (in px)
+
+  const stageStyle: React.CSSProperties = {
+    marginTop: `${blockMoveDown}px`,
+    transform: blockMoveX !== 0 ? `translateX(${blockMoveX}px)` : undefined,
+  }
+
+  // =========================================================================
+  // 🧑‍🏫 2. TEACHER BRIAN MASCOT (INDIVIDUAL POSITION & SCALE)
+  // Adjust Brian individually relative to the stage:
+  // - teacherBrianScale: scale multiplier (default 3.1)
+  // - teacherBrianMoveX: horizontal offset (in px, positive = right, negative = left)
+  // - teacherBrianMoveY: vertical offset (in px, positive = down, negative = up)
+  // =========================================================================
   const teacherBrianScale = 3.1
   const teacherBrianMoveX = 0
   const teacherBrianMoveY = 200
@@ -96,8 +117,8 @@ export default function DashboardPage() {
   }
 
   // =========================================================================
-  // 🪵 BRIAN'S WOODEN PODIUM MANUAL CONTROLS (SIZE & POSITION)
-  // Adjust these values to position and scale the wooden podium:
+  // 🪵 3. BRIAN'S WOODEN PODIUM (INDIVIDUAL POSITION & SIZE)
+  // Adjust the wooden stage platform individually:
   // - podiumWithoutPadding: true extends edge-to-edge across horizontal distance without padding
   // - podiumWidth: custom width (e.g. 'calc(100% + 2rem)' or '100%' or '400px')
   // - podiumMoveY: vertical position (in px, 146px directly meets Brian's feet)
@@ -121,8 +142,8 @@ export default function DashboardPage() {
   }
 
   // =========================================================================
-  // 📐 CLASSROOM BOARD MANUAL DIMENSIONS (SCALE & SIZE CONTROLS)
-  // Adjust these values to change the board's dimensions:
+  // 📐 4. CLASSROOM BOARD MANUAL DIMENSIONS (SCALE & SIZE CONTROLS)
+  // Adjust the board's dimensions individually:
   // - boardWidth: '100%' (or e.g. '800px', '900px', '1000px')
   // - boardMaxWidth: '100%' (e.g. '950px', '1200px')
   // - boardMinHeight: 'auto' (or e.g. '300px', '380px', '450px' to make taller)
@@ -138,20 +159,11 @@ export default function DashboardPage() {
   }
 
   // =========================================================================
-  // 🏫 CLASSROOM STAGE (BOARD + BRIAN TOGETHER) POSITION CONTROLS
-  // Adjust these values to move BOTH Teacher Brian and the Board together:
-  // - stageMoveDown: positive number moves DOWN (px), e.g. 40, 60, 100
-  // - stageMoveX: positive moves RIGHT (px), negative moves LEFT (px)
-  // =========================================================================
-  const stageMoveDown = 80 // Change this number to move Brian & Board down together (in px)
-  const stageMoveX = 0 // Change this number to move Brian & Board horizontally (in px)
-
-  // =========================================================================
-  // 🧭 COGNITIVE RADAR GRAPH CONTROLS (SIZE, POSITION & CARD OFFSETS)
+  // 🧭 5. COGNITIVE RADAR GRAPH CONTROLS (SIZE, POSITION & CARD OFFSETS)
   // Adjust these values to customize the radar graph:
   // - radarSize: coordinate diameter (e.g. 550, 600, 660, 720)
   // - radarMoveDown: positive number moves DOWN (in px), e.g. 20, 40, 60, 100, 300
-  // - radarMoveX: positive moves RIGHT, negative moves LEFT (in px)
+  // - radarMoveX: positive moves RIGHT (in px), negative moves LEFT (in px)
   // - cardOffsetFromCenter: distance from the radar center to the description card (in px)
   //     (e.g. 340 closer, 360 default, 400 wider, 450 farther)
   // - cardOffsetY: vertical adjustment for description card (in px, positive = down, negative = up)
@@ -165,11 +177,6 @@ export default function DashboardPage() {
   const radarStyle: React.CSSProperties = {
     marginTop: `${radarMoveDown}px`,
     transform: radarMoveX !== 0 ? `translateX(${radarMoveX}px)` : undefined,
-  }
-
-  const stageStyle: React.CSSProperties = {
-    marginTop: `${stageMoveDown}px`,
-    transform: stageMoveX !== 0 ? `translateX(${stageMoveX}px)` : undefined,
   }
 
   return (
