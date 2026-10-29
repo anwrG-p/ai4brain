@@ -28,6 +28,16 @@ type DashboardViewState =
   | 'error'
   | 'extreme-text'
 
+const WEEK_DAYS = [
+  { day: 'Mon', completed: true, isRest: false, isToday: false },
+  { day: 'Tue', completed: true, isRest: false, isToday: false },
+  { day: 'Wed', completed: false, isRest: true, isToday: true },
+  { day: 'Thu', completed: false, isRest: false, isToday: false },
+  { day: 'Fri', completed: false, isRest: false, isToday: false },
+  { day: 'Sat', completed: false, isRest: false, isToday: false },
+  { day: 'Sun', completed: false, isRest: true, isToday: false },
+] as const
+
 export default function DashboardPage() {
   const {
     dimensionPreset,
@@ -256,96 +266,61 @@ export default function DashboardPage() {
                         </h2>
                       </div>
 
-                      {/* Seven-Day Minimalist Board Columns */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 items-stretch">
-                        {/* MON */}
-                        <div className="p-3 rounded-xl border border-dashed border-border-strong/35 bg-surface/20 flex flex-col items-center text-center justify-between min-h-24">
-                          <span className="font-mono text-xs uppercase font-bold text-ink-muted tracking-wider">
-                            Mon
-                          </span>
-                          <div className="w-7 h-7 rounded-full bg-success/20 border border-success/60 flex items-center justify-center text-success font-bold text-sm">
-                            ✓
-                          </div>
-                          <span className="font-mono text-xs font-semibold text-success">
-                            Focused · 4m
-                          </span>
-                        </div>
+                      {/* Seven-Day Minimalist Hand-Drawn Strip */}
+                      <div className="grid grid-cols-7 gap-2 sm:gap-3 items-stretch py-1">
+                        {WEEK_DAYS.map((item) => (
+                          <div
+                            key={item.day}
+                            className={`p-2.5 sm:p-3 rounded-xl flex flex-col items-center justify-between text-center min-h-24 transition-colors ${
+                              item.isToday
+                                ? 'border-2 border-dashed border-brand/80 bg-brand/10'
+                                : 'border border-dashed border-border-strong/30 bg-surface/20'
+                            }`}
+                          >
+                            {/* Hand-drawn Day Name */}
+                            <span
+                              className={`font-display text-sm sm:text-base font-bold tracking-wide ${
+                                item.isToday ? 'text-brand' : 'text-ink'
+                              }`}
+                            >
+                              {item.day}
+                            </span>
 
-                        {/* TUE */}
-                        <div className="p-3 rounded-xl border border-dashed border-border-strong/35 bg-surface/20 flex flex-col items-center text-center justify-between min-h-24">
-                          <span className="font-mono text-xs uppercase font-bold text-ink-muted tracking-wider">
-                            Tue
-                          </span>
-                          <div className="w-7 h-7 rounded-full bg-success/20 border border-success/60 flex items-center justify-center text-success font-bold text-sm">
-                            ✓
-                          </div>
-                          <span className="font-mono text-xs font-semibold text-success">
-                            Speed · 3m
-                          </span>
-                        </div>
-
-                        {/* WED: TODAY */}
-                        <div className="col-span-2 sm:col-span-2 lg:col-span-2 p-3 rounded-xl border-2 border-brand/70 bg-brand/10 flex flex-col sm:flex-row items-center justify-between gap-3 relative">
-                          <div className="flex items-center gap-3 text-left min-w-0">
-                            <div className="w-8 h-8 rounded-full bg-brand/20 border border-brand/60 flex items-center justify-center text-ink text-base shrink-0">
-                              🌙
-                            </div>
-                            <div className="min-w-0">
-                              <div className="font-mono text-xs font-bold text-ink flex items-center gap-1.5 flex-wrap">
-                                <span>Wed · Scheduled Recovery Day</span>
-                                <span className="bg-brand text-brand-ink px-1.5 py-0.5 rounded text-xs uppercase font-bold tracking-wider">
-                                  TODAY
+                            {/* Status: Green Check on completed days or Moon on rest days */}
+                            <div className="my-auto flex items-center justify-center">
+                              {item.completed ? (
+                                <span
+                                  className="font-display text-2xl font-bold text-success leading-none select-none"
+                                  aria-label={`${item.day}: Completed`}
+                                >
+                                  ✓
                                 </span>
-                              </div>
-                              <div className="font-mono text-xs text-ink-muted truncate">
-                                Active memory consolidation — streak protected
-                              </div>
+                              ) : item.isRest ? (
+                                <span
+                                  className="text-xl select-none"
+                                  title="Rest Day"
+                                  aria-label={`${item.day}: Rest Day`}
+                                >
+                                  🌙
+                                </span>
+                              ) : (
+                                <span
+                                  className="w-4 h-4 rounded-full border border-dashed border-border-strong/40 inline-block opacity-40"
+                                  aria-label={`${item.day}: Upcoming`}
+                                />
+                              )}
                             </div>
-                          </div>
-                          <div className="shrink-0 flex items-center gap-1 px-2.5 py-1 bg-surface/60 rounded-pill border border-border-strong/40 font-mono text-xs font-bold text-success">
-                            <span aria-hidden="true">🛡️</span>
-                            <span>Protected</span>
-                          </div>
-                        </div>
 
-                        {/* THU */}
-                        <div className="p-3 rounded-xl border border-dashed border-border-strong/25 bg-surface/10 flex flex-col items-center text-center justify-between min-h-24 opacity-80">
-                          <span className="font-mono text-xs uppercase font-bold text-ink-muted tracking-wider">
-                            Thu
-                          </span>
-                          <div className="w-7 h-7 rounded-full border border-border-strong/40 flex items-center justify-center text-ink-muted text-xs">
-                            ⏱
+                            {/* Minimal Indicator (Today / Rest) */}
+                            <span className="font-mono text-xs text-ink-muted">
+                              {item.isToday ? (
+                                <span className="text-brand font-bold">Today</span>
+                              ) : item.isRest ? (
+                                <span>Rest</span>
+                              ) : null}
+                            </span>
                           </div>
-                          <span className="font-mono text-xs text-ink-muted">
-                            Flexibility
-                          </span>
-                        </div>
-
-                        {/* FRI */}
-                        <div className="p-3 rounded-xl border border-dashed border-border-strong/25 bg-surface/10 flex flex-col items-center text-center justify-between min-h-24 opacity-80">
-                          <span className="font-mono text-xs uppercase font-bold text-ink-muted tracking-wider">
-                            Fri
-                          </span>
-                          <div className="w-7 h-7 rounded-full border border-border-strong/40 flex items-center justify-center text-ink-muted text-xs">
-                            ⏱
-                          </div>
-                          <span className="font-mono text-xs text-ink-muted">
-                            Recall
-                          </span>
-                        </div>
-
-                        {/* SAT-SUN */}
-                        <div className="p-3 rounded-xl border border-dashed border-border-strong/25 bg-surface/10 flex flex-col items-center text-center justify-between min-h-24 opacity-80">
-                          <span className="font-mono text-xs uppercase font-bold text-ink-muted tracking-wider">
-                            Sat-Sun
-                          </span>
-                          <div className="w-7 h-7 rounded-full border border-border-strong/40 flex items-center justify-center text-ink-muted text-xs">
-                            ☀️
-                          </div>
-                          <span className="font-mono text-xs text-ink-muted">
-                            Open Play
-                          </span>
-                        </div>
+                        ))}
                       </div>
                     </div>
 
