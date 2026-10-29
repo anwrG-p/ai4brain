@@ -271,7 +271,7 @@ export default function DashboardPage() {
                   className="board-wood-frame"
                   style={boardStyle}
                 >
-                  <div className="board-canvas p-5 sm:p-7 space-y-5">
+                  <div className="board-canvas p-5 sm:p-7 flex-1 flex flex-col justify-between">
                     {/* WEEKLY CONTINUITY & RHYTHM (Drawn directly on Classroom Board) */}
                     <div className="space-y-4">
                       {/* Minimalist Board Header: Greeting & Streak */}
@@ -341,7 +341,7 @@ export default function DashboardPage() {
                     </div>
 
                     {/* DAILY SCIENCE BITE (Chalk/Marker Footnote on Board) */}
-                    <div className="pt-3 border-t border-dashed border-border-strong/30 flex items-center gap-2 text-xs sm:text-sm text-ink">
+                    <div className="mt-auto pt-4 border-t border-dashed border-border-strong/30 flex items-center gap-2 text-xs sm:text-sm text-ink">
                       <span className="text-brand text-base shrink-0" aria-hidden="true">
                         📖
                       </span>

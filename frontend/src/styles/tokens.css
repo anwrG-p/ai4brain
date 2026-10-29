@@ -469,6 +469,8 @@ html[data-theme="dark"][data-emotion="fatigued"] {
 
   /* Classroom Lecture Board (Doodle Aesthetic) */
   .board-wood-frame {
+    display: flex;
+    flex-direction: column;
     background-color: #E2B179;
     background-image: linear-gradient(135deg, #ECC18A 0%, #D4A373 100%);
     border: 3.5px solid var(--color-border-strong);
@@ -488,6 +490,9 @@ html[data-theme="dark"][data-emotion="fatigued"] {
 
   /* Board Canvas: Whiteboard in Light Mode */
   .board-canvas {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
     background-color: #FFFFFF;
     background-image: radial-gradient(rgba(38, 61, 91, 0.08) 1.2px, transparent 1.2px);
     background-size: 24px 24px;
