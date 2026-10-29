@@ -41,18 +41,6 @@
   --color-emotion-tint: var(--color-emotion-tint);
   --color-emotion-glow: var(--color-emotion-glow);
   --color-emotion-badge: var(--color-emotion-badge);
-
-  /* Classroom Blackboard & Chalk Tokens */
-  --color-chalkboard: #182422;
-  --color-chalkboard-surface: #202E2B;
-  --color-chalkboard-frame: #4E3629;
-  --color-chalkboard-tray: #382419;
-  --color-chalk-white: #F8FAFC;
-  --color-chalk-yellow: #FDE047;
-  --color-chalk-mint: #5EEAD4;
-  --color-chalk-peach: #FDBA74;
-  --color-chalk-muted: #94A3B8;
-  --color-chalk-border: #334441;
 }
 
 :root,
@@ -416,30 +404,6 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     position: relative;
   }
 
-  /* Classroom Flat Blackboard Utilities */
-  .blackboard-frame {
-    background-color: var(--color-chalkboard);
-    border: 4px solid var(--color-chalkboard-frame);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-doodle-lg);
-    position: relative;
-  }
-
-  .chalk-card {
-    background-color: var(--color-chalkboard-surface);
-    border: 1.5px dashed var(--color-chalk-border);
-    border-radius: var(--radius-lg);
-  }
-
-  .chalkboard-radar {
-    --color-surface: var(--color-chalkboard-surface);
-    --color-border-strong: var(--color-chalk-border);
-    --color-border: var(--color-chalk-border);
-    --color-ink: var(--color-chalk-white);
-    --color-ink-muted: var(--color-chalk-muted);
-    --shadow-doodle: 2px 2px 0 var(--color-chalkboard-frame);
-  }
-
   .glass-dock {
     background: color-mix(in srgb, var(--color-surface) 96%, transparent);
     backdrop-filter: blur(12px);
@@ -501,6 +465,124 @@ html[data-theme="dark"][data-emotion="fatigued"] {
   .doodle-wobble-border {
     border: 2px solid var(--color-border-strong);
     border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
+  }
+
+  /* Classroom Lecture Board (Doodle Aesthetic) */
+  .board-wood-frame {
+    background-color: #E2B179;
+    background-image: linear-gradient(135deg, #ECC18A 0%, #D4A373 100%);
+    border: 3.5px solid var(--color-border-strong);
+    border-radius: 28px;
+    padding: 16px;
+    box-shadow: 6px 6px 0 var(--color-border-strong);
+    position: relative;
+    transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  [data-theme="dark"] .board-wood-frame {
+    background-color: #6E3F1F;
+    background-image: linear-gradient(135deg, #7D4925 0%, #563016 100%);
+    border-color: #FF8C5A;
+    box-shadow: 6px 6px 0 #FF8C5A;
+  }
+
+  .board-canvas-whiteboard {
+    background-color: #FFFFFF;
+    background-image: radial-gradient(rgba(38, 61, 91, 0.08) 1.2px, transparent 1.2px);
+    background-size: 24px 24px;
+    border: 2.5px solid var(--color-border-strong);
+    border-radius: 18px;
+    color: #111827;
+    position: relative;
+  }
+
+  .board-canvas-blackboard {
+    background-color: #182A24;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1.2px, transparent 1.2px);
+    background-size: 24px 24px;
+    border: 2.5px solid rgba(255, 255, 255, 0.3);
+    border-radius: 18px;
+    color: #F8FAFC;
+    position: relative;
+  }
+
+  [data-theme="dark"] .board-canvas-whiteboard {
+    background-color: #1E293B;
+    color: #FFFFFF;
+    border-color: #FF8C5A;
+  }
+
+  [data-theme="dark"] .board-canvas-blackboard {
+    background-color: #13221E;
+    border-color: #FF8C5A;
+  }
+
+  .board-canvas-blackboard h1,
+  .board-canvas-blackboard h2,
+  .board-canvas-blackboard h3,
+  .board-canvas-blackboard h4 {
+    color: #FFFFFF;
+  }
+
+  .board-canvas-blackboard .text-ink {
+    color: #FFFFFF !important;
+  }
+
+  .board-canvas-blackboard .text-ink-muted {
+    color: #CBD5E1 !important;
+  }
+
+  .board-canvas-blackboard .tactile-card,
+  .board-canvas-blackboard .bg-surface {
+    background-color: rgba(255, 255, 255, 0.06) !important;
+    border-color: rgba(255, 255, 255, 0.22) !important;
+    color: #FFFFFF !important;
+  }
+
+  .board-canvas-blackboard .bg-surface-raised {
+    background-color: rgba(255, 255, 255, 0.09) !important;
+    border-color: rgba(255, 255, 255, 0.24) !important;
+    color: #FFFFFF !important;
+  }
+
+  .board-canvas-blackboard .border-border-strong {
+    border-color: rgba(255, 255, 255, 0.28) !important;
+  }
+
+  .board-canvas-blackboard .border-border {
+    border-color: rgba(255, 255, 255, 0.16) !important;
+  }
+
+  .board-canvas-blackboard svg text {
+    fill: #FFFFFF !important;
+    stroke: #182A24 !important;
+  }
+
+  .board-tray {
+    background: #D4A373;
+    background-image: linear-gradient(180deg, #ECC18A 0%, #C89666 100%);
+    border: 2px solid var(--color-border-strong);
+    border-radius: 8px;
+    box-shadow: 2px 2px 0 var(--color-border-strong);
+  }
+
+  [data-theme="dark"] .board-tray {
+    background: #6E3F1F;
+    border-color: #FF8C5A;
+    box-shadow: 2px 2px 0 #FF8C5A;
+  }
+
+  .board-eraser {
+    background: #ECC18A;
+    border: 1.5px solid var(--color-border-strong);
+    border-radius: 4px;
+    box-shadow: 1px 1px 0 var(--color-border-strong);
+  }
+
+  [data-theme="dark"] .board-eraser {
+    background: #7D4925;
+    border-color: #FF8C5A;
+    box-shadow: 1px 1px 0 #FF8C5A;
   }
 
   /* Gentle Floating Idle Animation for Hero Character */
