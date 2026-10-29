@@ -16,7 +16,7 @@ import {
 import { BRAND_CONFIG } from '../../config/brand'
 import conceptALockup from '../../assets/branding/concept-a-lockup.svg'
 import { useAppStore } from '../../state/useAppStore'
-import { telemetryQueue } from '../../services/telemetry/telemetryQueue'
+import { tracker } from '../../features/assessment/telemetry/tracker'
 import { Badge } from '../ui/Badge'
 import { EmilyMoodPill } from '../common/EmilyMoodPill'
 import { HumanReviewGate } from '../dev/HumanReviewGate'
@@ -45,11 +45,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   } = useAppStore()
 
   // Real offline queue status
-  const [queueStatus, setQueueStatus] = useState(() => telemetryQueue.getStatus())
+  const [queueStatus, setQueueStatus] = useState(() => tracker.getStatus())
 
   useEffect(() => {
-    return telemetryQueue.subscribe(() => {
-      setQueueStatus(telemetryQueue.getStatus())
+    return tracker.subscribe(() => {
+      setQueueStatus(tracker.getStatus())
     })
   }, [])
 

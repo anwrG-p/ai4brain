@@ -426,6 +426,16 @@ describe('Tracker', () => {
       expect(JSON.parse(String(fetchFn.mock.calls[0]?.[1]?.body))).toEqual([valid])
     })
 
+    test('restore drops events whose trial_meta values are not string, number or boolean', () => {
+      const ok = { ...full(1), trial_meta: { item_id: 't1:1', n: 2, flag: true } }
+      const bad = [{ nested: { a: 1 } }, { list: [1] }, { nothing: null }].map((trial_meta, i) => ({
+        ...full(2 + i),
+        trial_meta,
+      }))
+      const t = make({ fetchFn: okFetch(), beacon: vi.fn(), storage: memStorage(stored([ok, ...bad])) })
+      expect(t.getStatus().queuedCount).toBe(1)
+    })
+
     test('events built by TrialRecorder survive the restore check', () => {
       const r = new TrialRecorder(ctx, clock().now)
       r.start(0)

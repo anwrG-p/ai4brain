@@ -7,14 +7,17 @@ export type Dimension =
   | 'processing_speed'
   | 'episodic_memory'
 
-const DIMENSIONS: ReadonlySet<string> = new Set<Dimension>([
-  'working_memory',
-  'pattern_induction',
-  'executive_function',
-  'spatial_orientation',
-  'processing_speed',
-  'episodic_memory',
-])
+// `satisfies Record<Dimension, true>` makes a dimension added to the type fail to compile until listed here.
+const DIMENSIONS: ReadonlySet<string> = new Set(
+  Object.keys({
+    working_memory: true,
+    pattern_induction: true,
+    executive_function: true,
+    spatial_orientation: true,
+    processing_speed: true,
+    episodic_memory: true,
+  } satisfies Record<Dimension, true>),
+)
 
 export type TrialMeta = Record<string, string | number | boolean>
 
@@ -37,27 +40,32 @@ export type TelemetryEvent = {
   client_ts: string // ISO 8601
 }
 
-const EVENT_KEYS: ReadonlySet<string> = new Set<keyof TelemetryEvent>([
-  'user_id',
-  'session_id',
-  'task_id',
-  'trial_index',
-  'dimension',
-  'score_norm',
-  'response_time_ms',
-  'error_flag',
-  'error_burst',
-  'hesitation_jitter',
-  'keystroke_latency_ms',
-  'trial_meta',
-  'voice_opt_in',
-  'voice_latency_ms',
-  'vocal_pace_hz',
-  'client_ts',
-])
+// Same trick: a field added to TelemetryEvent fails to compile until the guard knows it.
+const EVENT_KEYS: ReadonlySet<string> = new Set(
+  Object.keys({
+    user_id: true,
+    session_id: true,
+    task_id: true,
+    trial_index: true,
+    dimension: true,
+    score_norm: true,
+    response_time_ms: true,
+    error_flag: true,
+    error_burst: true,
+    hesitation_jitter: true,
+    keystroke_latency_ms: true,
+    trial_meta: true,
+    voice_opt_in: true,
+    voice_latency_ms: true,
+    vocal_pace_hz: true,
+    client_ts: true,
+  } satisfies Record<keyof TelemetryEvent, true>),
+)
 
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
 const isOptNum = (v: unknown) => v === undefined || v === null || isNum(v)
+// The server's MetaValue: string, int, float or bool.
+const isMetaValue = (v: unknown) => typeof v === 'string' || typeof v === 'boolean' || isNum(v)
 
 // Shape check for events read back from storage (types only; the server still checks ranges).
 export function isTelemetryEvent(x: unknown): x is TelemetryEvent {
@@ -77,7 +85,11 @@ export function isTelemetryEvent(x: unknown): x is TelemetryEvent {
     isOptNum(e.voice_latency_ms) &&
     isOptNum(e.vocal_pace_hz) &&
     (e.voice_opt_in === undefined || typeof e.voice_opt_in === 'boolean') &&
-    (meta === undefined || (typeof meta === 'object' && meta !== null && !Array.isArray(meta)))
+    (meta === undefined ||
+      (typeof meta === 'object' &&
+        meta !== null &&
+        !Array.isArray(meta) &&
+        Object.values(meta).every(isMetaValue)))
   )
 }
 
