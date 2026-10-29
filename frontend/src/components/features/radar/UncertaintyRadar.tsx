@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { scaleLinear } from 'd3-scale'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -200,6 +200,17 @@ export function UncertaintyRadar({
     setInternalSelectedDim(next)
   }
 
+  useEffect(() => {
+    if (!interactive || !activeSelectedDimId) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleSelectDimension(null)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [interactive, activeSelectedDimId])
+
   const radarSize = size ?? (bare ? 660 : 430)
   const center = radarSize / 2
   const maxRadius = bare ? Math.round(radarSize * 0.3) : 112
@@ -292,7 +303,7 @@ export function UncertaintyRadar({
           type="button"
           onClick={() => handleSelectDimension(null)}
           aria-label="Close dimension details"
-          className="focus-ring p-1.5 rounded-lg border border-border-strong/40 bg-surface hover:bg-surface-raised text-ink-muted hover:text-ink cursor-pointer transition-colors shadow-xs shrink-0"
+          className="focus-ring p-1.5 rounded-lg border border-border-strong/40 bg-surface hover:bg-surface-raised active:scale-90 text-ink-muted hover:text-ink cursor-pointer transition-all shadow-xs shrink-0"
         >
           <X size={16} aria-hidden="true" />
         </button>
@@ -445,14 +456,25 @@ export function UncertaintyRadar({
       <div className="w-full flex flex-col items-center justify-center pt-2">
         <div className="w-full flex flex-col lg:flex-row items-center justify-center gap-y-6 lg:gap-0 relative">
           {/* LEFT: Dimension Detail Info Card (Only for Left-side dimensions) */}
-          <AnimatePresence mode="wait">
+          <AnimatePresence>
             {interactive && selectedRow && cardSide === 'left' && (
               <motion.div
                 key={`card-left-${selectedRow.dim.id}`}
-                initial={{ opacity: 0, x: -35, y: cardOffsetY, scale: 0.96 }}
-                animate={{ opacity: 1, x: 0, y: cardOffsetY, scale: 1 }}
-                exit={{ opacity: 0, x: -35, y: cardOffsetY, scale: 0.96 }}
-                transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+                initial={{ opacity: 0, x: -28, y: cardOffsetY, scale: 0.96 }}
+                animate={{
+                  opacity: 1,
+                  x: 0,
+                  y: cardOffsetY,
+                  scale: 1,
+                  transition: { type: 'spring', stiffness: 340, damping: 28 },
+                }}
+                exit={{
+                  opacity: 0,
+                  x: -20,
+                  y: cardOffsetY,
+                  scale: 0.94,
+                  transition: { duration: 0.18, ease: [0.23, 1, 0.32, 1] },
+                }}
                 className="w-full sm:w-80 lg:w-80 shrink-0 z-10"
                 style={{ marginRight: `${cardMargin}px` }}
               >
@@ -463,8 +485,13 @@ export function UncertaintyRadar({
 
           {/* CENTER: The Radar SVG Graph (layout animated, maintaining its exact scale) */}
           <motion.div
-            layout
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            layout="position"
+            transition={{
+              type: 'spring',
+              stiffness: 260,
+              damping: 26,
+              mass: 0.8,
+            }}
             className="flex flex-col items-center justify-center shrink-0"
             style={{ width: `${radarSize}px`, maxWidth: '100%' }}
           >
@@ -474,6 +501,11 @@ export function UncertaintyRadar({
               className="h-auto overflow-visible select-none"
               role="img"
               aria-label={`${title || 'Cognitive Radar'} across ${dimensions.length} cognitive dimensions`}
+              onClick={(e) => {
+                if (e.target === e.currentTarget && interactive && activeSelectedDimId) {
+                  handleSelectDimension(null)
+                }
+              }}
             >
               <defs>
                 <pattern
@@ -537,7 +569,7 @@ export function UncertaintyRadar({
                     stroke={isSelected ? 'var(--color-brand)' : 'var(--color-border)'}
                     strokeWidth={isSelected ? 3 : 1.25}
                     strokeDasharray={isSelected ? undefined : '2 2'}
-                    className="transition-colors duration-300"
+                    className="transition-all duration-300 ease-out"
                   />
                 )
               })}
@@ -615,27 +647,34 @@ export function UncertaintyRadar({
                       <circle cx={vx} cy={vy} r={bare ? 28 : 22} fill="transparent" />
                     )}
 
-                    {/* Selected Animated Halo Ring */}
-                    {isSelected && (
-                      <circle
-                        cx={vx}
-                        cy={vy}
-                        r={bare ? 16 : 13}
-                        fill="none"
-                        stroke="var(--color-brand)"
-                        strokeWidth={2.5}
-                        strokeDasharray="3 2"
-                        className="animate-spin"
-                        style={{
-                          transformOrigin: `${vx}px ${vy}px`,
-                          animationDuration: '6s',
-                        }}
-                      />
-                    )}
+                    {/* Selected Animated Halo Ring with smooth enter & exit */}
+                    <AnimatePresence>
+                      {isSelected && (
+                        <motion.circle
+                          key={`halo-${r.dim.id}`}
+                          cx={vx}
+                          cy={vy}
+                          r={bare ? 16 : 13}
+                          fill="none"
+                          stroke="var(--color-brand)"
+                          strokeWidth={2.5}
+                          strokeDasharray="3 2"
+                          className="animate-spin"
+                          style={{
+                            transformOrigin: `${vx}px ${vy}px`,
+                            animationDuration: '6s',
+                          }}
+                          initial={{ scale: 0.3, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          exit={{ scale: 0.3, opacity: 0 }}
+                          transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+                        />
+                      )}
+                    </AnimatePresence>
 
-                    {/* Vertex Marker with scale-up on hover/selected */}
+                    {/* Vertex Marker with scale-up on hover/selected and smooth return on deselect */}
                     <g
-                      className={`transition-transform duration-200 ${
+                      className={`transition-transform duration-300 ease-out ${
                         isSelected
                           ? 'scale-125'
                           : interactive
@@ -653,26 +692,34 @@ export function UncertaintyRadar({
                       )}
                     </g>
 
-                    {/* Selected Label Backdrop Pill */}
-                    {isSelected && (
-                      <rect
-                        x={
-                          textAnchor === 'middle'
-                            ? lx - (bare ? 54 : 44)
-                            : textAnchor === 'start'
-                              ? lx - 6
-                              : lx - (bare ? 102 : 82)
-                        }
-                        y={ly - (bare ? 13 : 10)}
-                        width={bare ? 108 : 88}
-                        height={bare ? 26 : 20}
-                        rx={bare ? 13 : 10}
-                        fill="var(--color-brand)"
-                        stroke="var(--color-border-strong)"
-                        strokeWidth={1.5}
-                        className="shadow-xs"
-                      />
-                    )}
+                    {/* Selected Label Backdrop Pill with smooth enter & exit */}
+                    <AnimatePresence>
+                      {isSelected && (
+                        <motion.rect
+                          key={`pill-${r.dim.id}`}
+                          x={
+                            textAnchor === 'middle'
+                              ? lx - (bare ? 54 : 44)
+                              : textAnchor === 'start'
+                                ? lx - 6
+                                : lx - (bare ? 102 : 82)
+                          }
+                          y={ly - (bare ? 13 : 10)}
+                          width={bare ? 108 : 88}
+                          height={bare ? 26 : 20}
+                          rx={bare ? 13 : 10}
+                          fill="var(--color-brand)"
+                          stroke="var(--color-border-strong)"
+                          strokeWidth={1.5}
+                          className="shadow-xs"
+                          initial={{ scale: 0.7, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          exit={{ scale: 0.7, opacity: 0 }}
+                          style={{ transformOrigin: `${lx}px ${ly}px` }}
+                          transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+                        />
+                      )}
+                    </AnimatePresence>
 
                     {/* Label Text */}
                     <text
@@ -702,14 +749,25 @@ export function UncertaintyRadar({
           </motion.div>
 
           {/* RIGHT: Dimension Detail Info Card (For Right-side dimensions & WM) */}
-          <AnimatePresence mode="wait">
+          <AnimatePresence>
             {interactive && selectedRow && cardSide === 'right' && (
               <motion.div
                 key={`card-right-${selectedRow.dim.id}`}
-                initial={{ opacity: 0, x: 35, y: cardOffsetY, scale: 0.96 }}
-                animate={{ opacity: 1, x: 0, y: cardOffsetY, scale: 1 }}
-                exit={{ opacity: 0, x: 35, y: cardOffsetY, scale: 0.96 }}
-                transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+                initial={{ opacity: 0, x: 28, y: cardOffsetY, scale: 0.96 }}
+                animate={{
+                  opacity: 1,
+                  x: 0,
+                  y: cardOffsetY,
+                  scale: 1,
+                  transition: { type: 'spring', stiffness: 340, damping: 28 },
+                }}
+                exit={{
+                  opacity: 0,
+                  x: 20,
+                  y: cardOffsetY,
+                  scale: 0.94,
+                  transition: { duration: 0.18, ease: [0.23, 1, 0.32, 1] },
+                }}
                 className="w-full sm:w-80 lg:w-80 shrink-0 z-10"
                 style={{ marginLeft: `${cardMargin}px` }}
               >
@@ -735,7 +793,7 @@ export function UncertaintyRadar({
                   type="button"
                   aria-pressed={isSelected}
                   onClick={() => handleSelectDimension(r.dim.id)}
-                  className={`focus-ring px-3.5 py-1.5 rounded-pill border-2 text-xs sm:text-sm font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  className={`focus-ring px-3.5 py-1.5 rounded-pill border-2 text-xs sm:text-sm font-mono font-bold flex items-center gap-1.5 transition-all duration-300 ease-out active:scale-95 cursor-pointer ${
                     isSelected
                       ? 'bg-brand text-brand-ink border-border-strong shadow-doodle-sm scale-105'
                       : 'bg-surface text-ink border-border-strong/40 hover:border-border-strong hover:bg-surface-raised shadow-xs'

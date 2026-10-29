@@ -134,7 +134,7 @@ export default function DashboardPage() {
   const radarSize = 660
   const radarMoveDown: number = 300 // Change this number to move the radar DOWN (in px)
   const radarMoveX: number = 0 // Change this number to move the radar horizontally (in px)
-  const cardOffsetFromCenter: number = 360 // Change this number to move description card closer/farther from center (in px)
+  const cardOffsetFromCenter: number = 380 // Change this number to move description card closer/farther from center (in px)
   const cardOffsetY: number = 0 // Change this number to shift description card vertically (in px)
 
   const radarStyle: React.CSSProperties = {
