@@ -676,6 +676,39 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     box-shadow: 0 0 14px var(--color-emotion-glow);
   }
 
+  /* =========================================================================
+     Full-Page Slide Deck Presentation & Scrolling Transition Animations
+     ========================================================================= */
+  .slide-stage {
+    scroll-margin-top: 5rem;
+    min-height: calc(100vh - 6rem);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+  }
+
+  .slide-anim-active {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    transition: opacity 650ms cubic-bezier(0.16, 1, 0.3, 1), transform 650ms cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform, opacity;
+  }
+
+  .slide-anim-next {
+    opacity: 0.35;
+    transform: translateY(28px) scale(0.975);
+    transition: opacity 650ms cubic-bezier(0.16, 1, 0.3, 1), transform 650ms cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform, opacity;
+  }
+
+  .slide-anim-prev {
+    opacity: 0.35;
+    transform: translateY(-28px) scale(0.975);
+    transition: opacity 650ms cubic-bezier(0.16, 1, 0.3, 1), transform 650ms cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform, opacity;
+  }
+
 }
 
 /* Reduced Motion & Timed-Trial Zero-Distraction Lock */
@@ -690,8 +723,13 @@ html[data-theme="dark"][data-emotion="fatigued"] {
   }
   .tactile-btn:active:not(:disabled),
   .tactile-card:hover,
-  .animate-brian-float {
+  .animate-brian-float,
+  .slide-anim-active,
+  .slide-anim-next,
+  .slide-anim-prev {
     transform: none !important;
+    opacity: 1 !important;
+    transition: none !important;
   }
 }
 
@@ -707,8 +745,13 @@ html[data-theme="dark"][data-emotion="fatigued"] {
 [data-reduced-motion="true"] .tactile-card:hover,
 [data-timed-trial="true"] .tactile-card:hover,
 [data-reduced-motion="true"] .animate-brian-float,
-[data-timed-trial="true"] .animate-brian-float {
+[data-timed-trial="true"] .animate-brian-float,
+[data-reduced-motion="true"] .slide-anim-active,
+[data-reduced-motion="true"] .slide-anim-next,
+[data-reduced-motion="true"] .slide-anim-prev {
   transform: none !important;
+  opacity: 1 !important;
+  transition: none !important;
 }
 
 /* Accessible text contrast overrides for light theme status & brand text tokens (WCAG 2.1 AA ≥4.5:1) */

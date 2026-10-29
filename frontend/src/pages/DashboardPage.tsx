@@ -9,6 +9,7 @@ import teacherBrianImg from '../assets/mascot/Teacher-Brian.png'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import { SlideDeck, Slide } from '../components/layout/SlideDeck'
 import { useEmilyStore } from '../state/useEmilyStore'
 
 type DashboardViewState =
@@ -90,7 +91,7 @@ export default function DashboardPage() {
   // - blockMoveDown: positive number moves DOWN (in px), negative moves UP (e.g. 0, 40, 80, 120, 200)
   // - blockMoveX: positive moves RIGHT (in px), negative moves LEFT (in px) (e.g. -50, 0, 50)
   // =========================================================================
-  const blockMoveDown: number = 80 // Change this number to move the ENTIRE block (Podium/Brian/Board) UP or DOWN (in px)
+  const blockMoveDown: number = 50 // Change this number to move the ENTIRE block (Podium/Brian/Board) UP or DOWN (in px)
   const blockMoveX: number = 0 // Change this number to move the ENTIRE block (Podium/Brian/Board) LEFT or RIGHT (in px)
 
   const stageStyle: React.CSSProperties = {
@@ -159,17 +160,17 @@ export default function DashboardPage() {
   }
 
   // =========================================================================
-  // 🧭 5. COGNITIVE RADAR GRAPH CONTROLS (SIZE, POSITION & CARD OFFSETS)
-  // Adjust these values to customize the radar graph:
+  // 🧭 5. COGNITIVE RADAR GRAPH CONTROLS (SIZE, POSITION & CARD OFFSETS - SLIDE 2)
+  // Adjust these values to customize the radar graph on its dedicated slide:
   // - radarSize: coordinate diameter (e.g. 550, 600, 660, 720)
-  // - radarMoveDown: positive number moves DOWN (in px), e.g. 20, 40, 60, 100, 300
+  // - radarMoveDown: positive number moves DOWN on Slide 2 (in px), e.g. 0, 20, 40, 60
   // - radarMoveX: positive moves RIGHT (in px), negative moves LEFT (in px)
   // - cardOffsetFromCenter: distance from the radar center to the description card (in px)
   //     (e.g. 340 closer, 360 default, 400 wider, 450 farther)
   // - cardOffsetY: vertical adjustment for description card (in px, positive = down, negative = up)
   // =========================================================================
   const radarSize = 660
-  const radarMoveDown: number = 300 // Change this number to move the radar DOWN (in px)
+  const radarMoveDown: number = 0 // Change this number to move the radar DOWN on Slide 2 (in px)
   const radarMoveX: number = 0 // Change this number to move the radar horizontally (in px)
   const cardOffsetFromCenter: number = 380 // Change this number to move description card closer/farther from center (in px)
   const cardOffsetY: number = 0 // Change this number to shift description card vertically (in px)
@@ -280,209 +281,231 @@ export default function DashboardPage() {
       )}
 
       {/* =========================================================================
-          ANIMATED CLASSROOM LECTURE STAGE
-          Composition:
-          - Left: Reserved empty space for Teacher Brian image (#brian-teacher-slot)
-          - Right: Flat Classroom Board with wooden frame, marker/eraser tray & all metrics
+          ANIMATED CLASSROOM LECTURE STAGE & SLIDE DECK
+          Split into 3 distinct slides with scroll-triggered animations:
+          - Slide 1: Classroom Lecture Stage (Teacher Brian, Board & Wooden Podium)
+          - Slide 2: Cognitive Radar Graph (Interactive Skill Map & Dimension Card)
+          - Slide 3: Core Balance Insights (3 Pillar Metrics & Weekly Goal)
           ========================================================================= */}
       {(viewState === 'calibrated' ||
         viewState === 'low-confidence' ||
         viewState === 'partial') && (
-          <>
-            <div
-              className="flex flex-col lg:flex-row items-stretch lg:items-end gap-6 relative"
-              style={stageStyle}
+          <SlideDeck>
+            {/* =========================================================================
+                SLIDE 1: CLASSROOM LECTURE STAGE
+                ========================================================================= */}
+            <Slide
+              id="dashboard-slide-stage"
+              title="Classroom Board"
+              shortLabel="Board"
+              icon="🏫"
+              showNextPrompt={true}
+              nextPromptLabel="Next Slide: Cognitive Radar"
             >
-              {/* 1. TEACHER BRIAN THE AXOLOTL (FRONT PLANE) */}
               <div
-                id="brian-teacher-slot"
-                data-testid="brian-teacher-slot"
-                className="flex w-64 sm:w-72 lg:w-80 shrink-0 flex-col items-center justify-end relative z-20 self-center lg:self-end min-h-[350px] lg:min-h-[500px] pointer-events-none"
-                aria-label="Teacher Brian mascot illustration"
+                className="flex flex-col lg:flex-row items-stretch lg:items-end gap-6 relative"
+                style={stageStyle}
               >
-                <img
-                  src={teacherBrianImg}
-                  alt="Teacher Brian presenting the classroom performance board"
-                  style={teacherBrianStyle}
-                  className="w-full h-auto select-none pointer-events-none drop-shadow-md relative z-20"
-                />
-              </div>
-
-              {/* 2. THE FLAT CLASSROOM BOARD */}
-              <div className="flex-1 min-w-0 relative z-10">
-                <section
-                  id="classroom-board"
-                  aria-label="Classroom Performance Board"
-                  className="board-wood-frame"
-                  style={boardStyle}
+                {/* 1. TEACHER BRIAN THE AXOLOTL (FRONT PLANE) */}
+                <div
+                  id="brian-teacher-slot"
+                  data-testid="brian-teacher-slot"
+                  className="flex w-64 sm:w-72 lg:w-80 shrink-0 flex-col items-center justify-end relative z-20 self-center lg:self-end min-h-[350px] lg:min-h-[500px] pointer-events-none"
+                  aria-label="Teacher Brian mascot illustration"
                 >
-                  <div className="board-canvas p-5 sm:p-7 flex-1 flex flex-col justify-between">
-                    {/* WEEKLY CONTINUITY & RHYTHM (Drawn directly on Classroom Board) */}
-                    <div className="space-y-4">
-                      {/* Minimalist Board Header: Greeting & Streak */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-border-strong/30 pb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl" aria-hidden="true">
-                            🔥
-                          </span>
-                          <h1
-                            id="dashboard-hero-heading"
-                            className="font-display text-xl sm:text-2xl font-bold tracking-tight text-ink"
-                          >
-                            Welcome back, {personaDisplayName}! You're on a streak
-                          </h1>
+                  <img
+                    src={teacherBrianImg}
+                    alt="Teacher Brian presenting the classroom performance board"
+                    style={teacherBrianStyle}
+                    className="w-full h-auto select-none pointer-events-none drop-shadow-md relative z-20"
+                  />
+                </div>
+
+                {/* 2. THE FLAT CLASSROOM BOARD */}
+                <div className="flex-1 min-w-0 relative z-10">
+                  <section
+                    id="classroom-board"
+                    aria-label="Classroom Performance Board"
+                    className="board-wood-frame"
+                    style={boardStyle}
+                  >
+                    <div className="board-canvas p-5 sm:p-7 flex-1 flex flex-col justify-between">
+                      {/* WEEKLY CONTINUITY & RHYTHM (Drawn directly on Classroom Board) */}
+                      <div className="space-y-4">
+                        {/* Minimalist Board Header: Greeting & Streak */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-border-strong/30 pb-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl" aria-hidden="true">
+                              🔥
+                            </span>
+                            <h1
+                              id="dashboard-hero-heading"
+                              className="font-display text-xl sm:text-2xl font-bold tracking-tight text-ink"
+                            >
+                              Welcome back, {personaDisplayName}! You're on a streak
+                            </h1>
+                          </div>
+
+                          {viewState === 'low-confidence' && (
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-pill bg-brand-subtle border border-border-strong text-xs font-mono font-bold text-ink shadow-xs">
+                                <span>🌱</span>
+                                <span>Rest-First Pacing</span>
+                              </span>
+                              <span className="text-xs font-mono text-ink-muted">
+                                Non-Clinical Cognitive Space
+                              </span>
+                            </div>
+                          )}
                         </div>
 
-                        {viewState === 'low-confidence' && (
-                          <div className="flex items-center gap-2">
-                            <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-pill bg-brand-subtle border border-border-strong text-xs font-mono font-bold text-ink shadow-xs">
-                              <span>🌱</span>
-                              <span>Rest-First Pacing</span>
-                            </span>
-                            <span className="text-xs font-mono text-ink-muted">
-                              Non-Clinical Cognitive Space
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Seven-Day Minimalist Hand-Drawn Strip */}
-                      <div className="grid grid-cols-7 gap-2 sm:gap-3 items-stretch py-1">
-                        {WEEK_DAYS.map((item) => (
-                          <div
-                            key={item.day}
-                            className={`p-2.5 sm:p-3 rounded-xl flex flex-col items-center justify-between text-center min-h-24 transition-colors ${item.isToday
-                              ? 'border-2 border-dashed border-brand/80 bg-brand/10'
-                              : 'border border-dashed border-border-strong/30 bg-surface/20'
-                              }`}
-                          >
-                            {/* Hand-drawn Day Name */}
-                            <span
-                              className={`font-display text-sm sm:text-base font-bold tracking-wide ${item.isToday ? 'text-brand' : 'text-ink'
+                        {/* Seven-Day Minimalist Hand-Drawn Strip */}
+                        <div className="grid grid-cols-7 gap-2 sm:gap-3 items-stretch py-1">
+                          {WEEK_DAYS.map((item) => (
+                            <div
+                              key={item.day}
+                              className={`p-2.5 sm:p-3 rounded-xl flex flex-col items-center justify-between text-center min-h-24 transition-colors ${item.isToday
+                                ? 'border-2 border-dashed border-brand/80 bg-brand/10'
+                                : 'border border-dashed border-border-strong/30 bg-surface/20'
                                 }`}
                             >
-                              {item.day}
-                            </span>
+                              {/* Hand-drawn Day Name */}
+                              <span
+                                className={`font-display text-sm sm:text-base font-bold tracking-wide ${item.isToday ? 'text-brand' : 'text-ink'
+                                  }`}
+                              >
+                                {item.day}
+                              </span>
 
-                            {/* Status: Green Check on completed days or Moon on rest days */}
-                            <div className="my-auto flex items-center justify-center">
-                              {item.completed ? (
-                                <span
-                                  className="font-display text-2xl font-bold text-success leading-none select-none"
-                                  aria-label={`${item.day}: Completed`}
-                                >
-                                  ✓
-                                </span>
-                              ) : item.isRest ? (
-                                <span
-                                  className="text-xl select-none"
-                                  title="Rest Day"
-                                  aria-label={`${item.day}: Rest Day`}
-                                >
-                                  🌙
-                                </span>
-                              ) : (
-                                <span
-                                  className="w-4 h-4 rounded-full border border-dashed border-border-strong/40 inline-block opacity-40"
-                                  aria-label={`${item.day}: Upcoming`}
-                                />
-                              )}
+                              {/* Status: Green Check on completed days or Moon on rest days */}
+                              <div className="my-auto flex items-center justify-center">
+                                {item.completed ? (
+                                  <span
+                                    className="font-display text-2xl font-bold text-success leading-none select-none"
+                                    aria-label={`${item.day}: Completed`}
+                                  >
+                                    ✓
+                                  </span>
+                                ) : item.isRest ? (
+                                  <span
+                                    className="text-xl select-none"
+                                    title="Rest Day"
+                                    aria-label={`${item.day}: Rest Day`}
+                                  >
+                                    🌙
+                                  </span>
+                                ) : (
+                                  <span
+                                    className="w-4 h-4 rounded-full border border-dashed border-border-strong/40 inline-block opacity-40"
+                                    aria-label={`${item.day}: Upcoming`}
+                                  />
+                                )}
+                              </div>
+
+                              {/* Minimal Indicator (Today / Rest) */}
+                              <span className="font-mono text-xs text-ink-muted">
+                                {item.isToday ? (
+                                  <span className="text-brand font-bold">Today</span>
+                                ) : item.isRest ? (
+                                  <span>Rest</span>
+                                ) : null}
+                              </span>
                             </div>
+                          ))}
+                        </div>
+                      </div>
 
-                            {/* Minimal Indicator (Today / Rest) */}
-                            <span className="font-mono text-xs text-ink-muted">
-                              {item.isToday ? (
-                                <span className="text-brand font-bold">Today</span>
-                              ) : item.isRest ? (
-                                <span>Rest</span>
-                              ) : null}
-                            </span>
-                          </div>
-                        ))}
+                      {/* Middle Section: Start Today's 2-Min Flow Primary CTA */}
+                      <div className="my-auto py-4 flex items-center justify-center">
+                        <Link
+                          to={nextStepLink}
+                          className="tactile-btn py-3 px-8 rounded-xl bg-brand text-brand-ink font-display text-base sm:text-lg font-bold border-2 border-border-strong shadow-doodle hover:shadow-doodle-lg no-underline inline-flex items-center gap-2 text-center transition-transform hover:-translate-y-0.5 active:translate-y-0.5"
+                        >
+                          <span>Start Today's 2-Min Flow</span>
+                          <span aria-hidden="true">→</span>
+                        </Link>
+                      </div>
+
+                      {/* DAILY TIP (Chalk/Marker Footnote on Board) */}
+                      <div className="mt-auto pt-4 border-t border-dashed border-border-strong/30 flex items-center gap-2 text-xs sm:text-sm text-ink">
+                        <span className="text-brand text-base shrink-0" aria-hidden="true">
+                          📖
+                        </span>
+                        <span>
+                          <strong>Daily Tip:</strong> Sleep consolidation strengthens pattern separation without active practice. Enjoy your rest day!
+                        </span>
                       </div>
                     </div>
-
-                    {/* Middle Section: Start Today's 2-Min Flow Primary CTA */}
-                    <div className="my-auto py-4 flex items-center justify-center">
-                      <Link
-                        to={nextStepLink}
-                        className="tactile-btn py-3 px-8 rounded-xl bg-brand text-brand-ink font-display text-base sm:text-lg font-bold border-2 border-border-strong shadow-doodle hover:shadow-doodle-lg no-underline inline-flex items-center gap-2 text-center transition-transform hover:-translate-y-0.5 active:translate-y-0.5"
-                      >
-                        <span>Start Today's 2-Min Flow</span>
-                        <span aria-hidden="true">→</span>
-                      </Link>
-                    </div>
-
-                    {/* DAILY TIP (Chalk/Marker Footnote on Board) */}
-                    <div className="mt-auto pt-4 border-t border-dashed border-border-strong/30 flex items-center gap-2 text-xs sm:text-sm text-ink">
-                      <span className="text-brand text-base shrink-0" aria-hidden="true">
-                        📖
-                      </span>
-                      <span>
-                        <strong>Daily Tip:</strong> Sleep consolidation strengthens pattern separation without active practice. Enjoy your rest day!
-                      </span>
-                    </div>
-                  </div>
-                </section>
-              </div>
-
-              {/* 3. WOODEN LECTURE STAGE PLATFORM (HORIZONTAL ACROSS FULL DISTANCE WITHOUT PADDING) */}
-              <div
-                id="brian-wooden-podium"
-                data-testid="brian-wooden-podium"
-                className="wooden-podium"
-                style={podiumStyle}
-                aria-hidden="true"
-              >
-                {/* Top Tier: Standing platform */}
-                <div className="podium-top-tier" />
-
-                {/* Middle Tier: Main wooden riser with timber grooving */}
-                <div className="podium-mid-tier">
-                  <div className="podium-planks-overlay" />
+                  </section>
                 </div>
 
-                {/* Base Tier: Sturdy wooden foundation plinth */}
-                <div className="podium-base-tier" />
-              </div>
-            </div>
-
-            {/* Frustrated De-Escalation Banner if detected */}
-            {currentEmotion === 'frustrated' && (
-              <div
-                role="status"
-                className="p-3 bg-surface-raised border-2 border-border-strong rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-doodle-sm text-start"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-xl shrink-0" aria-hidden="true">
-                    🍃
-                  </span>
-                  <div>
-                    <strong className="text-ink font-bold block text-xs">
-                      Pacing Check-In
-                    </strong>
-                    <span className="text-ink-muted text-xs">
-                      Elevated cursor tension detected. Take a 60-second
-                      breather — no penalty for pausing.
-                    </span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setManualEmotion('calm_flow')}
-                  className="focus-ring px-3 py-1.5 rounded-md bg-surface text-ink border-2 border-border-strong text-xs font-bold shadow-doodle-sm cursor-pointer shrink-0"
+                {/* 3. WOODEN LECTURE STAGE PLATFORM (HORIZONTAL ACROSS FULL DISTANCE WITHOUT PADDING) */}
+                <div
+                  id="brian-wooden-podium"
+                  data-testid="brian-wooden-podium"
+                  className="wooden-podium"
+                  style={podiumStyle}
+                  aria-hidden="true"
                 >
-                  Take 60s Breather
-                </button>
+                  {/* Top Tier: Standing platform */}
+                  <div className="podium-top-tier" />
+
+                  {/* Middle Tier: Main wooden riser with timber grooving */}
+                  <div className="podium-mid-tier">
+                    <div className="podium-planks-overlay" />
+                  </div>
+
+                  {/* Base Tier: Sturdy wooden foundation plinth */}
+                  <div className="podium-base-tier" />
+                </div>
               </div>
-            )}
+
+              {/* Frustrated De-Escalation Banner if detected */}
+              {currentEmotion === 'frustrated' && (
+                <div
+                  role="status"
+                  className="mt-6 p-3 bg-surface-raised border-2 border-border-strong rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-doodle-sm text-start"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl shrink-0" aria-hidden="true">
+                      🍃
+                    </span>
+                    <div>
+                      <strong className="text-ink font-bold block text-xs">
+                        Pacing Check-In
+                      </strong>
+                      <span className="text-ink-muted text-xs">
+                        Elevated cursor tension detected. Take a 60-second
+                        breather — no penalty for pausing.
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setManualEmotion('calm_flow')}
+                    className="focus-ring px-3 py-1.5 rounded-md bg-surface text-ink border-2 border-border-strong text-xs font-bold shadow-doodle-sm cursor-pointer shrink-0"
+                  >
+                    Take 60s Breather
+                  </button>
+                </div>
+              )}
+            </Slide>
 
             {/* =========================================================================
-                UNDER THE BOARD: COGNITIVE RADAR & CORE BALANCE INSIGHTS
+                SLIDE 2: COGNITIVE RADAR GRAPH (INTERACTIVE SKILL MAP)
                 ========================================================================= */}
-            <div className="space-y-8">
-              {/* 1. Cognitive Radar Graph Directly on the Page (Animated & Interactive) */}
-              <div className="w-full min-w-0 py-2" style={radarStyle}>
+            <Slide
+              id="dashboard-slide-radar"
+              title="Cognitive Radar"
+              shortLabel="Radar"
+              icon="🧭"
+              showNextPrompt={true}
+              nextPromptLabel="Next Slide: Pillar Metrics"
+            >
+              <div
+                className="w-full min-w-0 py-2 flex flex-col items-center justify-center"
+                style={radarStyle}
+              >
                 <UncertaintyRadar
                   dimensions={activeDimensions}
                   estimates={estimates}
@@ -496,9 +519,18 @@ export default function DashboardPage() {
                   cardOffsetY={cardOffsetY}
                 />
               </div>
+            </Slide>
 
-              {/* 2. Core Balance Insights & Weekly Goal (Stacked Under Radar) */}
-              <div className="w-full min-w-0">
+            {/* =========================================================================
+                SLIDE 3: CORE BALANCE INSIGHTS & WEEKLY GOAL
+                ========================================================================= */}
+            <Slide
+              id="dashboard-slide-insights"
+              title="Balance Insights"
+              shortLabel="Insights"
+              icon="📊"
+            >
+              <div className="w-full min-w-0 max-w-5xl mx-auto space-y-4">
                 <Card className="p-5 sm:p-6 space-y-4 border-2 border-border-strong shadow-doodle">
                   <div className="flex items-center justify-between border-b-2 border-border pb-3">
                     <div>
@@ -619,9 +651,16 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 </Card>
+
+                {/* Guidance footnote at end of slides */}
+                <div className="pt-2 text-center">
+                  <span className="font-mono text-xs text-ink-muted">
+                    ✦ You've reached the end of today's slide overview · Scroll down for privacy &amp; system details
+                  </span>
+                </div>
               </div>
-            </div>
-          </>
+            </Slide>
+          </SlideDeck>
         )}
     </div>
   )
