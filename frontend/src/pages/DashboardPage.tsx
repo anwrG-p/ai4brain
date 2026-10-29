@@ -122,15 +122,20 @@ export default function DashboardPage() {
   const stageMoveX = 0 // Change this number to move Brian & Board horizontally (in px)
 
   // =========================================================================
-  // 🧭 COGNITIVE RADAR GRAPH CONTROLS (SIZE & POSITION)
+  // 🧭 COGNITIVE RADAR GRAPH CONTROLS (SIZE, POSITION & CARD OFFSETS)
   // Adjust these values to customize the radar graph:
   // - radarSize: coordinate diameter (e.g. 550, 600, 660, 720)
-  // - radarMoveDown: positive number moves DOWN (in px), e.g. 20, 40, 60, 100
+  // - radarMoveDown: positive number moves DOWN (in px), e.g. 20, 40, 60, 100, 300
   // - radarMoveX: positive moves RIGHT, negative moves LEFT (in px)
+  // - cardOffsetFromCenter: distance from the radar center to the description card (in px)
+  //     (e.g. 340 closer, 360 default, 400 wider, 450 farther)
+  // - cardOffsetY: vertical adjustment for description card (in px, positive = down, negative = up)
   // =========================================================================
   const radarSize = 660
   const radarMoveDown: number = 300 // Change this number to move the radar DOWN (in px)
   const radarMoveX: number = 0 // Change this number to move the radar horizontally (in px)
+  const cardOffsetFromCenter: number = 360 // Change this number to move description card closer/farther from center (in px)
+  const cardOffsetY: number = 0 // Change this number to shift description card vertically (in px)
 
   const radarStyle: React.CSSProperties = {
     marginTop: `${radarMoveDown}px`,
@@ -435,6 +440,8 @@ export default function DashboardPage() {
                   showSubtitle={false}
                   showTableToggle={false}
                   size={radarSize}
+                  cardOffsetFromCenter={cardOffsetFromCenter}
+                  cardOffsetY={cardOffsetY}
                 />
               </div>
 

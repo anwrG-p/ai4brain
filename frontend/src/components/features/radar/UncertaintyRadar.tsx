@@ -23,6 +23,8 @@ export interface UncertaintyRadarProps {
   size?: number
   className?: string
   style?: React.CSSProperties
+  cardOffsetFromCenter?: number
+  cardOffsetY?: number
 }
 
 function regularPolygonPoints(
@@ -182,6 +184,8 @@ export function UncertaintyRadar({
   size,
   className,
   style,
+  cardOffsetFromCenter,
+  cardOffsetY = 0,
 }: UncertaintyRadarProps) {
   const [showTable, setShowTable] = useState(defaultShowTable)
   const [internalSelectedDim, setInternalSelectedDim] = useState<string | null>(null)
@@ -257,6 +261,10 @@ export function UncertaintyRadar({
   }
 
   const cardSide = selectedRow ? getDimensionCardSide(selectedRow) : null
+
+  const halfRadar = radarSize / 2
+  const cardMargin =
+    cardOffsetFromCenter !== undefined ? cardOffsetFromCenter - halfRadar : 24
 
   const renderDetailCard = (row: NonNullable<typeof selectedRow>) => (
     <div className="p-5 sm:p-6 rounded-2xl bg-surface border-2 border-border-strong shadow-doodle space-y-4 text-start relative">
@@ -435,17 +443,18 @@ export function UncertaintyRadar({
 
       {/* Main Interactive Graph Stage */}
       <div className="w-full flex flex-col items-center justify-center pt-2">
-        <div className="w-full flex flex-col lg:flex-row items-center justify-center gap-6 relative">
+        <div className="w-full flex flex-col lg:flex-row items-center justify-center gap-y-6 lg:gap-0 relative">
           {/* LEFT: Dimension Detail Info Card (Only for Left-side dimensions) */}
           <AnimatePresence mode="wait">
             {interactive && selectedRow && cardSide === 'left' && (
               <motion.div
                 key={`card-left-${selectedRow.dim.id}`}
-                initial={{ opacity: 0, x: -35, scale: 0.96 }}
-                animate={{ opacity: 1, x: 0, scale: 1 }}
-                exit={{ opacity: 0, x: -35, scale: 0.96 }}
+                initial={{ opacity: 0, x: -35, y: cardOffsetY, scale: 0.96 }}
+                animate={{ opacity: 1, x: 0, y: cardOffsetY, scale: 1 }}
+                exit={{ opacity: 0, x: -35, y: cardOffsetY, scale: 0.96 }}
                 transition={{ type: 'spring', stiffness: 320, damping: 28 }}
                 className="w-full sm:w-80 lg:w-80 shrink-0 z-10"
+                style={{ marginRight: `${cardMargin}px` }}
               >
                 {renderDetailCard(selectedRow)}
               </motion.div>
@@ -697,11 +706,12 @@ export function UncertaintyRadar({
             {interactive && selectedRow && cardSide === 'right' && (
               <motion.div
                 key={`card-right-${selectedRow.dim.id}`}
-                initial={{ opacity: 0, x: 35, scale: 0.96 }}
-                animate={{ opacity: 1, x: 0, scale: 1 }}
-                exit={{ opacity: 0, x: 35, scale: 0.96 }}
+                initial={{ opacity: 0, x: 35, y: cardOffsetY, scale: 0.96 }}
+                animate={{ opacity: 1, x: 0, y: cardOffsetY, scale: 1 }}
+                exit={{ opacity: 0, x: 35, y: cardOffsetY, scale: 0.96 }}
                 transition={{ type: 'spring', stiffness: 320, damping: 28 }}
                 className="w-full sm:w-80 lg:w-80 shrink-0 z-10"
+                style={{ marginLeft: `${cardMargin}px` }}
               >
                 {renderDetailCard(selectedRow)}
               </motion.div>
