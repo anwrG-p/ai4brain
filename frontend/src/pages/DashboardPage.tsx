@@ -390,9 +390,9 @@ export default function DashboardPage() {
             {/* =========================================================================
                 UNDER THE BOARD: 6-SKILL COGNITIVE BALANCE & CORE BALANCE INSIGHTS
                 ========================================================================= */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-              {/* Left Wing (7 cols on lg): 6-Skill Cognitive Balance Radar */}
-              <div className="lg:col-span-7 min-w-0">
+            <div className="space-y-6">
+              {/* 1. 6-Skill Cognitive Balance Radar */}
+              <div className="w-full min-w-0">
                 <UncertaintyRadar
                   dimensions={activeDimensions}
                   estimates={estimates}
@@ -402,9 +402,9 @@ export default function DashboardPage() {
                 />
               </div>
 
-              {/* Right Wing (5 cols on lg): Core Balance Insights & Weekly Goal */}
-              <div className="lg:col-span-5 min-w-0 flex flex-col justify-between">
-                <Card className="p-5 flex flex-col justify-between h-full space-y-4 border-2 border-border-strong shadow-doodle">
+              {/* 2. Core Balance Insights & Weekly Goal (Stacked Under Radar) */}
+              <div className="w-full min-w-0">
+                <Card className="p-5 sm:p-6 space-y-4 border-2 border-border-strong shadow-doodle">
                   <div className="flex items-center justify-between border-b-2 border-border pb-3">
                     <div>
                       <h2 className="font-display text-lg font-bold text-ink">
@@ -420,7 +420,7 @@ export default function DashboardPage() {
                   </div>
 
                   {/* 3 Key Metric Cards */}
-                  <div className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
                     {/* Card 1: Mental Stamina */}
                     <div className="p-3.5 rounded-xl bg-surface-raised border-2 border-border-strong shadow-doodle-sm space-y-1">
                       <div className="flex items-center justify-between text-xs font-mono">
