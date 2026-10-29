@@ -59,6 +59,9 @@ docs/ux-pipeline/
 │
 ├── 04_contracts_and_architecture/            # Frontend-backend interface contracts and governance
 │   ├── contracts.md                          # Full TypeScript API contract & dimension telemetry bridge
+│   ├── SEQUENCE_DIAGRAMS.md                  # Rendered sequence diagrams (5-subsystem interoperability & UX flows)
+│   ├── sequence_diagrams_viewer.html         # Interactive visual diagram viewer (zoom, pan, export SVG/PNG)
+│   ├── diagrams/                             # High-resolution vector SVGs & Retina PNG diagram renders
 │   ├── DECISIONS.md                          # Architectural & UX decision log (DEC-001 through DEC-008)
 │   ├── STATE.md                              # Live UX sprint tracker & implementation status
 │   ├── ASSETS.md                             # Self-hosted fonts, icon sets, and illustration license ledger
