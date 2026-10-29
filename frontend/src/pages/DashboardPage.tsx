@@ -17,7 +17,6 @@ import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { useEmilyStore } from '../state/useEmilyStore'
 import { EMILY_EMOTION_CONFIGS } from '../styles/emilyTokens'
-import { EmilyMoodPill } from '../components/common/EmilyMoodPill'
 
 type DashboardViewState =
   | 'calibrated'
@@ -42,7 +41,6 @@ export default function DashboardPage() {
     return 'calibrated'
   })
 
-  const [selectedBattery, setSelectedBattery] = useState<'sharp' | 'steady' | 'winding'>('sharp')
   const { currentEmotion, setManualEmotion } = useEmilyStore()
   const emilyConfig = EMILY_EMOTION_CONFIGS[currentEmotion]
 
@@ -64,19 +62,6 @@ export default function DashboardPage() {
     () => buildEstimatesForDimensions(activeDimensions, effectivePersona),
     [activeDimensions, effectivePersona],
   )
-
-  const assessedEstimates = useMemo(
-    () => estimates.filter((e) => e.scorePct !== null),
-    [estimates],
-  )
-
-  const overallConfidencePct = useMemo(() => {
-    if (assessedEstimates.length === 0) return 0
-    const avg =
-      assessedEstimates.reduce((acc, item) => acc + item.confidence, 0) /
-      assessedEstimates.length
-    return Math.round(avg * 100)
-  }, [assessedEstimates])
 
   const handleSelectViewState = (next: DashboardViewState) => {
     setViewState(next)
@@ -106,16 +91,6 @@ export default function DashboardPage() {
     if (viewState === 'low-confidence') return 'Rest-First Recall Check'
     if (viewState === 'empty') return '2-Min Quick Baseline'
     return 'Visual Memory Clarity'
-  }, [viewState])
-
-  const nextStepDescription = useMemo(() => {
-    if (viewState === 'low-confidence') {
-      return 'Gentle stimulus recall to narrow your hatched confidence bands without streak pressure.'
-    }
-    if (viewState === 'empty') {
-      return 'Initial 3 micro-trials per dimension to establish your first clarity range.'
-    }
-    return 'Quick visual recall flow to lock in your Spatial Recall confidence range without mental fatigue.'
   }, [viewState])
 
   const nextStepLink = useMemo(() => {
@@ -230,72 +205,46 @@ export default function DashboardPage() {
         viewState === 'low-confidence' ||
         viewState === 'partial') && (
         <>
-          {/* 1. COMPANION GREETING BANNER WITH NOTEBOOK TAPE ACCENT */}
-          <section className="relative bg-surface rounded-2xl border-2 border-border-strong shadow-doodle p-5 sm:p-6 transition-all hover:shadow-doodle-lg">
-            {/* Hand-drawn tape accent */}
-            <div
-              className="absolute -top-3 left-8 sm:left-12 w-20 h-5 bg-brand-subtle border-2 border-border-strong -rotate-2 opacity-90 pointer-events-none shadow-xs"
-              aria-hidden="true"
-            />
-
-            <div className="flex flex-col md:flex-row items-center md:items-start gap-5 sm:gap-6">
-              {/* Mascot Hero Character with Confidence Halo Glow */}
-              <div className="relative shrink-0 flex flex-col items-center">
+          {/* 1. HERO GREETING: Axolotl Companion + Daily Focus + Single Primary CTA */}
+          <section className="bg-surface rounded-2xl border-2 border-border-strong shadow-doodle p-5 sm:p-7 transition-all hover:shadow-doodle-lg">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 sm:gap-6">
+              {/* Mascot Hero Character */}
+              <div className="shrink-0 flex flex-col items-center">
                 <BrianMascot
                   pose={viewState === 'low-confidence' ? 'explorer' : emilyConfig.brianPose}
-                  size={120}
+                  size={105}
                   halo={true}
-                  badge="ACTIVE"
-                  badgeTone="tertiary"
                 />
-                <span className="font-mono text-xs text-ink-muted font-bold mt-2">
-                  BRIAN v2.4
-                </span>
               </div>
 
-              {/* Speech Bubble Container with Tactical Beak */}
-              <div className="flex-1 w-full flex flex-col justify-between gap-4">
-                <div className="relative bg-surface-raised rounded-2xl border-2 border-border-strong p-4 sm:p-5 shadow-doodle">
-                  {/* Left pointing beak for desktop */}
-                  <div
-                    className="hidden md:block absolute top-7 -left-3 w-0 h-0 border-t-[9px] border-t-transparent border-r-[12px] border-r-border-strong border-b-[9px] border-b-transparent"
-                    aria-hidden="true"
-                  />
-                  <div
-                    className="hidden md:block absolute top-7 -left-[9px] w-0 h-0 border-t-[7px] border-t-transparent border-r-[10px] border-r-surface-raised border-b-[7px] border-b-transparent z-10"
-                    aria-hidden="true"
-                  />
-
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs uppercase tracking-wider text-brand font-bold">
-                        {viewState === 'low-confidence' ? 'Rest-First Pacing' : 'Companion Note · 08:30 AM'}
-                      </span>
-                      <span className="w-1 h-1 rounded-pill bg-ink-muted" />
-                      <span className="font-mono text-xs text-ink-muted">
-                        Non-Clinical Twin
-                      </span>
-                    </div>
-
-                    <div className="inline-flex items-center gap-1.5 text-success font-mono text-xs bg-surface px-2.5 py-0.5 rounded-pill border border-border-strong">
-                      <span className="text-xs">📈</span>
-                      <span>Band Tightened ({overallConfidencePct}% Sync)</span>
-                    </div>
+              {/* Speech / Content Area */}
+              <div className="flex-1 w-full space-y-4 text-center sm:text-start">
+                <div className="space-y-1.5">
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-pill bg-brand-subtle border border-border-strong text-xs font-mono font-bold text-ink shadow-xs">
+                      <span>✨</span>
+                      <span>{viewState === 'low-confidence' ? 'Rest-First Pacing' : 'Daily Sanctuary'}</span>
+                    </span>
+                    <span className="text-xs font-mono text-ink-muted">Non-Clinical Cognitive Space</span>
                   </div>
 
                   <h1
                     id="dashboard-hero-heading"
-                    className="font-display text-xl sm:text-2xl font-bold text-ink leading-snug"
+                    className="font-display text-2xl sm:text-3xl font-extrabold text-ink tracking-tight"
                   >
-                    Good morning, {personaDisplayName}! {heroInsightSentence} {emilyConfig.brianAdvice}
+                    Good morning, {personaDisplayName}!
                   </h1>
+
+                  <p className="text-sm sm:text-base text-ink-muted leading-relaxed max-w-2xl m-0">
+                    {heroInsightSentence} {emilyConfig.brianAdvice}
+                  </p>
                 </div>
 
                 {/* Counter-Regulatory Gentle De-Escalation Banner if Frustrated */}
                 {currentEmotion === 'frustrated' && (
                   <div
                     role="status"
-                    className="p-3 bg-surface-raised border-2 border-border-strong rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-doodle-sm"
+                    className="p-3 bg-surface-raised border-2 border-border-strong rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-doodle-sm text-start"
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-xl shrink-0" aria-hidden="true">🍃</span>
@@ -314,52 +263,20 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {/* Quick 1-Tap Energy Check-In Row */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface p-3 sm:px-4 rounded-xl border-2 border-border-strong shadow-doodle-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="text-brand text-base" aria-hidden="true">⚡</span>
-                    <span className="font-mono text-xs sm:text-sm text-ink font-bold">
-                      Mental battery right now:
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2 flex-wrap" id="battery-toggles">
-                    <EmilyMoodPill />
-                    {[
-                      { id: 'sharp', icon: '⚡', label: 'Sharp' },
-                      { id: 'steady', icon: '🌤️', label: 'Steady' },
-                      { id: 'winding', icon: '🌙', label: 'Winding Down' },
-                    ].map((btn) => (
-                      <button
-                        key={btn.id}
-                        type="button"
-                        onClick={() => setSelectedBattery(btn.id as typeof selectedBattery)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 border-border-strong font-mono text-xs font-bold transition-all cursor-pointer shadow-doodle-sm active:translate-x-0.5 active:translate-y-0.5 active:shadow-tactile-active ${
-                          selectedBattery === btn.id
-                            ? 'bg-brand text-brand-ink'
-                            : 'bg-surface-raised text-ink hover:bg-brand-subtle'
-                        }`}
-                      >
-                        <span>{btn.icon}</span>
-                        <span>{btn.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Section 1 Primary CTA: Start Today's 2-Min Flow */}
-                <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t-2 border-dashed border-border-strong/30">
-                  <div className="flex items-center gap-2 text-xs font-mono text-ink-muted">
-                    <span className="w-2 h-2 rounded-full bg-success animate-pulse shrink-0" />
-                    <span>Next 2-Min Flow: <strong>{nextStepTitle}</strong> · {nextStepDescription}</span>
-                  </div>
+                {/* Clean, Prominent Primary Action Row */}
+                <div className="pt-1 flex flex-col sm:flex-row items-center gap-4">
                   <Link
                     to={nextStepLink}
-                    className="w-full sm:w-auto py-3 px-6 rounded-xl bg-brand text-brand-ink font-display text-base font-bold border-2 border-border-strong shadow-doodle hover:shadow-doodle-lg hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 group no-underline text-center shrink-0"
+                    className="w-full sm:w-auto py-3.5 px-8 rounded-xl bg-brand text-brand-ink font-display text-base sm:text-lg font-bold border-2 border-border-strong shadow-doodle hover:shadow-doodle-lg hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 group no-underline text-center shrink-0"
                   >
                     <span>Start Today's 2-Min Flow</span>
                     <span className="transition-transform group-hover:translate-x-1" aria-hidden="true">→</span>
                   </Link>
+
+                  <div className="flex items-center gap-2 text-xs font-mono text-ink-muted">
+                    <span className="w-2 h-2 rounded-full bg-success animate-pulse shrink-0" />
+                    <span>{nextStepTitle} · 120s max · Zero failure penalty</span>
+                  </div>
                 </div>
               </div>
             </div>

@@ -68,15 +68,25 @@ export const useEmilyStore = create<EmilyStoreState>((set, get) => ({
       classifiedEmotion === 'hesitant' ||
       classifiedEmotion === 'fatigued'
 
+    const hasActiveTaskStrain =
+      (options?.consecutiveErrors !== undefined && options.consecutiveErrors >= 2) ||
+      metrics.clickBurstCount >= 1
+
     if (isStrainedState && !autoAdapt) {
-      set((state) => ({
-        metrics,
-        proposedEmotion: classifiedEmotion,
-        history: [
-          ...state.history.slice(-49),
-          { timestamp: Date.now(), emotion: state.currentEmotion, metrics },
-        ],
-      }))
+      // Only propose unprompted emotion changes if there is real task strain or rage clicks,
+      // never from passive reading pauses.
+      if (hasActiveTaskStrain) {
+        set((state) => ({
+          metrics,
+          proposedEmotion: classifiedEmotion,
+          history: [
+            ...state.history.slice(-49),
+            { timestamp: Date.now(), emotion: state.currentEmotion, metrics },
+          ],
+        }))
+        return
+      }
+      set({ metrics })
       return
     }
 
