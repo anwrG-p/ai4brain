@@ -135,7 +135,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {!isTaskRoute && (
         <header
           role="banner"
-          className="sticky top-0 z-40 h-18 sm:h-20 bg-surface/95 backdrop-blur-md border-b-2 border-border-strong px-4 transition-colors flex items-center"
+          className="sticky top-0 z-50 w-full h-18 sm:h-20 bg-surface/95 backdrop-blur-md border-b-2 border-border-strong px-4 transition-colors flex items-center"
         >
           <div className="max-w-6xl w-full mx-auto flex items-center justify-between gap-4">
             {/* Product Brand Mark (Scaled Up) */}

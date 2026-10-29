@@ -340,7 +340,7 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     line-height: var(--leading-base);
     margin: 0;
     padding: 0;
-    overflow-x: hidden;
+    overflow-x: clip;
     transition: background-color 0.45s ease, border-color 0.45s ease, box-shadow 0.45s ease;
   }
 
