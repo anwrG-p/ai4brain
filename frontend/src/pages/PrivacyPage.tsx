@@ -163,7 +163,7 @@ export default function PrivacyPage() {
   const handleConfirmPurge = () => {
     resetDemoState()
     // Drops pending events on this device; server-side deletion is Member 4's route.
-    tracker.clear()
+    const recordsPurged = tracker.clear()
 
     const cert: PurgeCertificate = {
       certificateId: `CERT-PURGE-2026-${Math.random()
@@ -172,7 +172,7 @@ export default function PrivacyPage() {
         .toUpperCase()}`,
       timestampIso: new Date().toISOString(),
       userHash: 'ANON_USER_SALT_8F4A',
-      recordsPurged: 0,
+      recordsPurged,
       storagePurged: [
         'data/raw/telemetry/*.jsonl',
         'sat_jepa_latent_snapshots',

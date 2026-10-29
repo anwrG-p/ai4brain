@@ -121,7 +121,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </span>
             ) : (
               <span>
-                <strong>Offline Mode Active:</strong> Trial telemetry is buffered locally (up to 500 events) and will sync automatically when your connection returns ({queueStatus.queuedCount} queued).
+                <strong>Offline Mode Active:</strong> Trial telemetry is buffered locally (up to {queueStatus.maxCapacity} events) and will sync automatically when your connection returns ({queueStatus.queuedCount} queued).
               </span>
             )}
           </span>
