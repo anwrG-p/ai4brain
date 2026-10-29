@@ -576,28 +576,12 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     border-radius: 8px 8px 0 0;
     position: relative;
     z-index: 3;
-    display: flex;
-    align-items: center;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
   }
 
   [data-theme="dark"] .podium-top-tier {
     background-color: #7D4925;
     background-image: linear-gradient(180deg, #8E532B 0%, #7D4925 55%, #633618 100%);
     border-color: #FF8C5A;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
-  }
-
-  /* Contact Shadows for Brian's Left and Right Feet */
-  .podium-foot-shadow {
-    width: 42px;
-    height: 8px;
-    border-radius: 50%;
-    background: radial-gradient(ellipse at center, rgba(60, 30, 10, 0.45) 0%, rgba(60, 30, 10, 0.15) 50%, transparent 75%);
-  }
-
-  [data-theme="dark"] .podium-foot-shadow {
-    background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0.3) 50%, transparent 75%);
   }
 
   /* Middle Tier: Main Column with Wooden Planks & Inset Bevel */
@@ -611,9 +595,6 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     border-bottom: 2px solid var(--color-border-strong);
     position: relative;
     z-index: 2;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     overflow: hidden;
   }
 
@@ -649,36 +630,7 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     );
   }
 
-  /* Engraved Brass / Wood Plaque */
-  .podium-plaque {
-    padding: 3px 14px;
-    border-radius: 8px;
-    background-color: #D4A373;
-    background-image: linear-gradient(180deg, #F0CCA0 0%, #DFAB74 50%, #C58E55 100%);
-    border: 2px solid var(--color-border-strong);
-    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.35), 1.5px 1.5px 0 var(--color-border-strong);
-    color: var(--color-ink);
-    font-family: var(--font-display);
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    position: relative;
-    z-index: 1;
-  }
-
-  [data-theme="dark"] .podium-plaque {
-    background-color: #563016;
-    background-image: linear-gradient(180deg, #7D4925 0%, #563016 50%, #40200C 100%);
-    border-color: #FF8C5A;
-    box-shadow: inset 0 1px 2px rgba(255, 140, 90, 0.25), 1.5px 1.5px 0 #FF8C5A;
-    color: #F8FAFC;
-  }
-
-  /* Base Tier: Sturdy Foundation Plinth with Doodle Drop Shadow */
+  /* Base Tier: Sturdy Foundation Plinth (No Drop Shadow) */
   .podium-base-tier {
     width: 100%;
     height: 20px;
@@ -686,7 +638,6 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     background-image: linear-gradient(180deg, #DFAB74 0%, #C89563 60%, #B88553 100%);
     border: 3.5px solid var(--color-border-strong);
     border-radius: 0 0 12px 12px;
-    box-shadow: 6px 6px 0 var(--color-border-strong);
     position: relative;
     z-index: 1;
   }
@@ -695,7 +646,6 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     background-color: #563016;
     background-image: linear-gradient(180deg, #6E3F1F 0%, #563016 60%, #40200C 100%);
     border-color: #FF8C5A;
-    box-shadow: 6px 6px 0 #FF8C5A;
   }
 
   /* Gentle Floating Idle Animation for Hero Character */

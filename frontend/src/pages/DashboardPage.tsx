@@ -427,29 +427,15 @@ export default function DashboardPage() {
                 style={podiumStyle}
                 aria-hidden="true"
               >
-                {/* Top Tier: Standing platform with foot contact shadows */}
-                <div className="podium-top-tier">
-                  <div
-                    className={`w-64 sm:w-72 lg:w-80 flex items-center justify-center gap-12 shrink-0 ${
-                      podiumWithoutPadding ? 'lg:ms-4' : ''
-                    } max-lg:mx-auto`}
-                  >
-                    <div className="podium-foot-shadow" />
-                    <div className="podium-foot-shadow" />
-                  </div>
-                </div>
+                {/* Top Tier: Standing platform */}
+                <div className="podium-top-tier" />
 
-                {/* Middle Tier: Main wooden riser with timber grooving and engraved plaque */}
+                {/* Middle Tier: Main wooden riser with timber grooving */}
                 <div className="podium-mid-tier">
                   <div className="podium-planks-overlay" />
-                  <div className="podium-plaque">
-                    <span>✦</span>
-                    <span>BRIAN</span>
-                    <span>✦</span>
-                  </div>
                 </div>
 
-                {/* Base Tier: Sturdy wooden foundation plinth with doodle drop-shadow */}
+                {/* Base Tier: Sturdy wooden foundation plinth */}
                 <div className="podium-base-tier" />
               </div>
             </div>
