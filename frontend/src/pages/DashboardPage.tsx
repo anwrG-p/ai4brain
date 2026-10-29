@@ -99,20 +99,15 @@ export default function DashboardPage() {
     return '/task/episodic_pattern_separation'
   }, [viewState])
 
-  // =========================================================================
-  // 🎓 TEACHER BRIAN MANUAL CONTROLS (SCALE & POSITION)
-  // Adjust these 3 values to scale or move Teacher Brian beside the board:
-  // - teacherBrianScale: 1.0 (e.g. 1.2 to enlarge, 0.85 to shrink)
-  // - teacherBrianMoveX: 0   (+ to move RIGHT in px, - to move LEFT in px)
-  // - teacherBrianMoveY: 0   (+ to move DOWN in px,  - to move UP in px)
-  // =========================================================================
-  const teacherBrianScale = 1.0
+  const teacherBrianScale = 3
   const teacherBrianMoveX = 0
-  const teacherBrianMoveY = 0
+  const teacherBrianMoveY = -750
 
   const teacherBrianStyle: React.CSSProperties = {
     transform: `translate(${teacherBrianMoveX}px, ${teacherBrianMoveY}px) scale(${teacherBrianScale})`,
     transformOrigin: 'bottom center',
+    zIndex: 20,
+    position: 'relative',
   }
 
   return (
@@ -224,536 +219,535 @@ export default function DashboardPage() {
       {(viewState === 'calibrated' ||
         viewState === 'low-confidence' ||
         viewState === 'partial') && (
-        <>
-          <div className="flex flex-col lg:flex-row items-stretch lg:items-end gap-6 relative">
-            {/* 1. TEACHER BRIAN THE AXOLOTL */}
-            <div
-              id="brian-teacher-slot"
-              data-testid="brian-teacher-slot"
-              className="flex w-64 sm:w-72 lg:w-80 shrink-0 flex-col items-center justify-end relative self-center lg:self-end min-h-[350px] lg:min-h-[500px]"
-              aria-label="Teacher Brian mascot illustration"
-            >
-              <img
-                src={teacherBrianImg}
-                alt="Teacher Brian presenting the classroom performance board"
-                style={teacherBrianStyle}
-                className="w-full h-auto select-none pointer-events-none drop-shadow-md"
-              />
-            </div>
-
-            {/* 2. THE FLAT CLASSROOM BOARD */}
-            <div className="flex-1 min-w-0">
-              <section
-                id="classroom-board"
-                aria-label="Classroom Performance Board"
-                className="board-wood-frame"
+          <>
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-end gap-6 relative">
+              {/* 1. TEACHER BRIAN THE AXOLOTL (FRONT PLANE) */}
+              <div
+                id="brian-teacher-slot"
+                data-testid="brian-teacher-slot"
+                className="flex w-64 sm:w-72 lg:w-80 shrink-0 flex-col items-center justify-end relative z-20 self-center lg:self-end min-h-[350px] lg:min-h-[500px] pointer-events-none"
+                aria-label="Teacher Brian mascot illustration"
               >
-                <div className="board-canvas p-5 sm:p-7 space-y-6">
-                  {/* BOARD TOP HEADER: Greeting, Teacher Note, Primary CTA */}
-                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b-2 border-dashed border-border-strong/30 pb-5">
-                    <div className="space-y-1.5 flex-1">
-                      {viewState === 'low-confidence' && (
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-pill bg-brand-subtle border border-border-strong text-xs font-mono font-bold text-ink shadow-xs">
-                            <span>🌱</span>
-                            <span>Rest-First Pacing</span>
-                          </span>
-                          <span className="text-xs font-mono text-ink-muted">
-                            Non-Clinical Cognitive Space
-                          </span>
-                        </div>
-                      )}
-
-                      <h1
-                        id="dashboard-hero-heading"
-                        className="font-display text-2xl sm:text-3xl font-extrabold text-ink tracking-tight"
-                      >
-                        Good morning, {personaDisplayName}!
-                      </h1>
-
-                      <p className="text-sm sm:text-base text-ink-muted leading-relaxed max-w-2xl m-0">
-                        {heroInsightSentence} {emilyConfig.brianAdvice}
-                      </p>
-                    </div>
-
-                    {/* Primary CTA Button */}
-                    <div className="flex flex-col items-center sm:items-end gap-1 shrink-0">
-                      <Link
-                        to={nextStepLink}
-                        className="tactile-btn py-3 px-6 rounded-xl bg-brand text-brand-ink font-display text-base font-bold border-2 border-border-strong shadow-doodle hover:shadow-doodle-lg no-underline flex items-center justify-center gap-2 text-center"
-                      >
-                        <span>Start Today's 2-Min Flow</span>
-                        <span aria-hidden="true">→</span>
-                      </Link>
-                      <div className="text-xs font-mono text-ink-muted flex items-center gap-1.5 pt-0.5">
-                        <span className="w-2 h-2 rounded-full bg-success animate-pulse shrink-0" />
-                        <span>{nextStepTitle} · 120s max</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Frustrated De-Escalation Banner if detected */}
-                  {currentEmotion === 'frustrated' && (
-                    <div
-                      role="status"
-                      className="p-3 bg-surface-raised border-2 border-border-strong rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-doodle-sm text-start"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl shrink-0" aria-hidden="true">
-                          🍃
-                        </span>
-                        <div>
-                          <strong className="text-ink font-bold block text-xs">
-                            Pacing Check-In
-                          </strong>
-                          <span className="text-ink-muted text-xs">
-                            Elevated cursor tension detected. Take a 60-second
-                            breather — no penalty for pausing.
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setManualEmotion('calm_flow')}
-                        className="focus-ring px-3 py-1.5 rounded-md bg-surface text-ink border-2 border-border-strong text-xs font-bold shadow-doodle-sm cursor-pointer shrink-0"
-                      >
-                        Take 60s Breather
-                      </button>
-                    </div>
-                  )}
-
-                  {/* MAIN BOARD SPLIT: 6-Skill Balance Radar (Left) + Core Balance Insights (Right) */}
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-                    {/* Left Wing (7 cols on lg): 6-Skill Cognitive Balance Radar */}
-                    <div className="lg:col-span-7 min-w-0">
-                      <UncertaintyRadar
-                        dimensions={activeDimensions}
-                        estimates={estimates}
-                        title="6-Skill Cognitive Balance"
-                        showSubtitle={false}
-                        showTableToggle={false}
-                      />
-                    </div>
-
-                    {/* Right Wing (5 cols on lg): Core Balance Insights & Weekly Goal */}
-                    <div className="lg:col-span-5 min-w-0 flex flex-col justify-between">
-                      <Card className="p-5 flex flex-col justify-between h-full space-y-4 border-2 border-border-strong shadow-doodle">
-                        <div className="flex items-center justify-between border-b-2 border-border pb-3">
-                          <div>
-                            <h2 className="font-display text-lg font-bold text-ink">
-                              Core Balance Insights
-                            </h2>
-                            <p className="text-xs text-ink-muted">
-                              Three verified pillars calibrated from your recent micro-rounds.
-                            </p>
-                          </div>
-                          <Badge tone="brand" glyph="◈">
-                            {activeDimensions.length} Skills
-                          </Badge>
-                        </div>
-
-                        {/* 3 Key Metric Cards */}
-                        <div className="space-y-3">
-                          {/* Card 1: Mental Stamina */}
-                          <div className="p-3.5 rounded-xl bg-surface-raised border-2 border-border-strong shadow-doodle-sm space-y-1">
-                            <div className="flex items-center justify-between text-xs font-mono">
-                              <span className="font-bold text-ink uppercase tracking-wider flex items-center gap-1.5">
-                                <span className="text-brand">⚡</span>
-                                <span>Mental Stamina</span>
-                              </span>
-                              <Badge tone="success" glyph="●">
-                                Steady Focus
-                              </Badge>
-                            </div>
-                            <div className="flex items-baseline justify-between pt-1">
-                              <span className="font-display text-2xl font-black text-ink">
-                                88%
-                              </span>
-                              <span className="font-mono text-xs text-ink-muted">
-                                Low fatigue drift
-                              </span>
-                            </div>
-                            <p className="text-xs text-ink-muted leading-relaxed m-0 pt-0.5">
-                              Maintains high processing speed across multi-round blocks without cognitive dip.
-                            </p>
-                          </div>
-
-                          {/* Card 2: Memory Sharpness */}
-                          <div className="p-3.5 rounded-xl bg-surface-raised border-2 border-border-strong shadow-doodle-sm space-y-1">
-                            <div className="flex items-center justify-between text-xs font-mono">
-                              <span className="font-bold text-ink uppercase tracking-wider flex items-center gap-1.5">
-                                <span className="text-brand">🧩</span>
-                                <span>Memory Sharpness</span>
-                              </span>
-                              <Badge tone="brand" glyph="●">
-                                Clarity Range ±4%
-                              </Badge>
-                            </div>
-                            <div className="flex items-baseline justify-between pt-1">
-                              <span className="font-display text-2xl font-black text-ink">
-                                {(estimates.find(
-                                  (e) =>
-                                    e.dimensionId ===
-                                    'episodic_pattern_separation',
-                                )?.scorePct ?? 81)}
-                                %
-                              </span>
-                              <span className="font-mono text-xs text-ink-muted">
-                                Visual Clarity Locked
-                              </span>
-                            </div>
-                            <p className="text-xs text-ink-muted leading-relaxed m-0 pt-0.5">
-                              Distinguishes subtle geometric and visual changes from memory lures without false alarms.
-                            </p>
-                          </div>
-
-                          {/* Card 3: Focus Consistency */}
-                          <div className="p-3.5 rounded-xl bg-surface-raised border-2 border-border-strong shadow-doodle-sm space-y-1">
-                            <div className="flex items-center justify-between text-xs font-mono">
-                              <span className="font-bold text-ink uppercase tracking-wider flex items-center gap-1.5">
-                                <span className="text-brand">🎯</span>
-                                <span>Focus Consistency</span>
-                              </span>
-                              <Badge tone="reward" glyph="★">
-                                Flow Zone
-                              </Badge>
-                            </div>
-                            <div className="flex items-baseline justify-between pt-1">
-                              <span className="font-display text-2xl font-black text-ink">
-                                94%
-                              </span>
-                              <span className="font-mono text-xs text-ink-muted">
-                                38 ms Jitter
-                              </span>
-                            </div>
-                            <p className="text-xs text-ink-muted leading-relaxed m-0 pt-0.5">
-                              Pointer rhythm and response tempos are tightly clustered within your natural flow zone.
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Active Goal Progress Strip */}
-                        <div className="space-y-2 pt-2 border-t-2 border-dashed border-border-strong/30">
-                          <div className="flex items-center justify-between font-mono text-xs">
-                            <span className="font-bold text-ink flex items-center gap-1">
-                              <span className="text-brand">🚩</span>
-                              <span>Weekly Calibration Goal</span>
-                            </span>
-                            <span className="font-bold text-ink bg-surface-raised px-2 py-0.5 rounded border border-border-strong">
-                              4 / 6 Flows
-                            </span>
-                          </div>
-                          <div className="relative w-full h-3 bg-surface-raised rounded-pill border-2 border-border-strong overflow-hidden p-0.5">
-                            <div
-                              className="h-full bg-brand rounded-pill border-r border-border-strong transition-all duration-500"
-                              style={{ width: '66.6%' }}
-                            />
-                          </div>
-                          <div className="flex items-center justify-between text-ink-muted font-mono text-xs">
-                            <span>4 of 6 weekly flows complete</span>
-                            <span className="text-ink font-semibold">
-                              ~2 left to reach ±6% clarity
-                            </span>
-                          </div>
-                        </div>
-                      </Card>
-                    </div>
-                  </div>
-
-                  {/* WEEKLY CONTINUITY & RHYTHM (Full Width Strip on Board) */}
-                  <div className="w-full bg-surface rounded-2xl border-2 border-border-strong shadow-doodle p-5 space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-brand text-xl" aria-hidden="true">
-                          🔄
-                        </span>
-                        <h2 className="font-display text-xl font-bold text-ink">
-                          Weekly Continuity &amp; Rhythm
-                        </h2>
-                        <span className="font-mono text-xs bg-surface-raised px-2.5 py-0.5 rounded-pill border border-border-strong text-ink-muted">
-                          Zero-Guilt Streak
-                        </span>
-                      </div>
-                      <div className="font-mono text-xs text-ink-muted">
-                        Consistency is about rhythm, not robotic streaks.
-                      </div>
-                    </div>
-
-                    {/* Seven-Day Ribbon Layout */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 items-stretch">
-                      {/* MON */}
-                      <div className="p-3 rounded-xl bg-surface-raised border-2 border-border-strong shadow-doodle-sm flex flex-col items-center text-center justify-between min-h-[105px]">
-                        <span className="font-mono text-xs uppercase font-bold text-ink-muted">
-                          Mon
-                        </span>
-                        <div className="w-8 h-8 rounded-pill bg-success border-2 border-border-strong flex items-center justify-center text-canvas font-bold shadow-xs">
-                          ✓
-                        </div>
-                        <span className="font-mono text-xs font-semibold text-success">
-                          Focused · 4m
-                        </span>
-                      </div>
-
-                      {/* TUE */}
-                      <div className="p-3 rounded-xl bg-surface-raised border-2 border-border-strong shadow-doodle-sm flex flex-col items-center text-center justify-between min-h-[105px]">
-                        <span className="font-mono text-xs uppercase font-bold text-ink-muted">
-                          Tue
-                        </span>
-                        <div className="w-8 h-8 rounded-pill bg-success border-2 border-border-strong flex items-center justify-center text-canvas font-bold shadow-xs">
-                          ✓
-                        </div>
-                        <span className="font-mono text-xs font-semibold text-success">
-                          Speed · 3m
-                        </span>
-                      </div>
-
-                      {/* WED: TODAY */}
-                      <div className="col-span-2 sm:col-span-2 lg:col-span-2 p-3 sm:px-4 rounded-xl bg-reward-subtle border-2 border-border-strong shadow-doodle flex flex-col sm:flex-row items-center justify-between gap-3 relative">
-                        <div className="absolute -top-2.5 right-4 bg-brand text-brand-ink px-2 py-0.5 rounded-pill text-xs font-mono font-bold border border-border-strong shadow-xs">
-                          TODAY
-                        </div>
-                        <div className="flex items-center gap-3 text-left">
-                          <div className="w-10 h-10 rounded-pill bg-reward/40 border-2 border-border-strong flex items-center justify-center text-ink text-xl shadow-xs shrink-0">
-                            🌙
-                          </div>
-                          <div>
-                            <div className="font-mono text-xs sm:text-sm font-bold text-ink">
-                              Wed · Scheduled Recovery Day
-                            </div>
-                            <div className="font-mono text-xs text-ink-muted">
-                              Active memory consolidation — streak protected
-                            </div>
-                          </div>
-                        </div>
-                        <div className="shrink-0 flex items-center gap-1.5 px-3 py-1 bg-surface rounded-pill border border-border-strong font-mono text-xs font-bold text-success shadow-xs">
-                          <span>🛡️</span>
-                          <span>Protected</span>
-                        </div>
-                      </div>
-
-                      {/* THU */}
-                      <div className="p-3 rounded-xl bg-surface border-2 border-dashed border-border-strong/50 flex flex-col items-center text-center justify-between min-h-[105px]">
-                        <span className="font-mono text-xs uppercase font-bold text-ink-muted">
-                          Thu
-                        </span>
-                        <div className="w-8 h-8 rounded-pill bg-surface-raised border border-border-strong/40 flex items-center justify-center text-ink-muted text-xs">
-                          ⏱
-                        </div>
-                        <span className="font-mono text-xs text-ink-muted">
-                          Flexibility
-                        </span>
-                      </div>
-
-                      {/* FRI */}
-                      <div className="p-3 rounded-xl bg-surface border-2 border-dashed border-border-strong/50 flex flex-col items-center text-center justify-between min-h-[105px]">
-                        <span className="font-mono text-xs uppercase font-bold text-ink-muted">
-                          Fri
-                        </span>
-                        <div className="w-8 h-8 rounded-pill bg-surface-raised border border-border-strong/40 flex items-center justify-center text-ink-muted text-xs">
-                          ⏱
-                        </div>
-                        <span className="font-mono text-xs text-ink-muted">
-                          Recall
-                        </span>
-                      </div>
-
-                      {/* SAT-SUN */}
-                      <div className="p-3 rounded-xl bg-surface border-2 border-dashed border-border-strong/50 flex flex-col items-center text-center justify-between min-h-[105px]">
-                        <span className="font-mono text-xs uppercase font-bold text-ink-muted">
-                          Sat-Sun
-                        </span>
-                        <div className="w-8 h-8 rounded-pill bg-surface-raised border border-border-strong/40 flex items-center justify-center text-ink-muted text-xs">
-                          ☀️
-                        </div>
-                        <span className="font-mono text-xs text-ink-muted">
-                          Open Play
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* DAILY SCIENCE BITE */}
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-xl bg-surface-raised border-2 border-border-strong shadow-doodle-sm">
-                    <div className="flex items-center gap-3">
-                      <span className="text-brand text-xl" aria-hidden="true">
-                        📖
-                      </span>
-                      <span className="text-xs sm:text-sm text-ink leading-snug">
-                        <strong>Daily Science Bite:</strong> Sleep consolidation strengthens pattern separation without active practice. Enjoy your rest day!
-                      </span>
-                    </div>
-                    <Link
-                      to="/methodology"
-                      className="shrink-0 font-mono text-xs text-brand hover:text-ink underline font-bold flex items-center gap-1"
-                    >
-                      <span>Read 1-min synaptic digest</span>
-                      <span aria-hidden="true">→</span>
-                    </Link>
-                  </div>
-                </div>
-              </section>
-            </div>
-          </div>
-
-          {/* 3. EXPANDABLE DETAILS ACCORDION: Trajectory, Heatmap, Goals & Persona Switcher */}
-          <details
-            data-technical-drawer
-            className="group rounded-2xl border-2 border-border-strong bg-surface p-6 shadow-doodle transition-all mt-6"
-          >
-            <summary className="focus-ring cursor-pointer flex items-center justify-between font-display text-base font-bold text-ink select-none hover:text-brand transition-colors">
-              <span className="flex items-center gap-2">
-                <span className="transition-transform group-open:rotate-90 inline-block text-ink-muted">
-                  ▸
-                </span>
-                <span>
-                  Explore How This Is Calculated (Trajectory, Heatmap, Telemetry —{' '}
-                  {activeDimensions.length} Dimensions)
-                </span>
-              </span>
-              <Badge tone="neutral" glyph="◈">
-                Deep Telemetry
-              </Badge>
-            </summary>
-
-            <div className="mt-6 space-y-8 pt-6 border-t-2 border-dashed border-border-strong/30">
-              {/* Profile Snapshot Switcher Strip */}
-              <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b-2 border-dashed border-border-strong/30">
-                <span className="text-xs font-semibold text-ink-muted">
-                  Demonstration Profile:
-                </span>
-                <div
-                  role="group"
-                  aria-label="Dashboard persona and state switcher"
-                  className="flex flex-wrap items-center gap-1.5"
-                >
-                  {(
-                    [
-                      { id: 'calibrated', label: 'Calibrated Twin (Youssef · 84%)' },
-                      {
-                        id: 'low-confidence',
-                        label: 'Low-Conf Hatched (Salma · 54%)',
-                      },
-                      { id: 'partial', label: 'Partial (1 Missing Dim)' },
-                      { id: 'empty', label: 'Empty (New Learner)' },
-                      { id: 'loading', label: 'Loading Skeleton' },
-                      { id: 'error', label: 'Error Recovery' },
-                      { id: 'extreme-text', label: 'Extreme Values' },
-                    ] as const
-                  ).map((tab) => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      aria-pressed={viewState === tab.id}
-                      onClick={() => handleSelectViewState(tab.id)}
-                      className={`focus-ring min-h-10 px-3 py-1 rounded-pill border-2 border-border-strong text-xs font-bold cursor-pointer transition-colors shadow-doodle-sm ${
-                        viewState === tab.id
-                          ? 'bg-brand text-brand-ink'
-                          : 'bg-surface-raised text-ink hover:bg-brand-subtle'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
+                <img
+                  src={teacherBrianImg}
+                  alt="Teacher Brian presenting the classroom performance board"
+                  style={teacherBrianStyle}
+                  className="w-full h-auto select-none pointer-events-none drop-shadow-md relative z-20"
+                />
               </div>
 
-              {/* Trajectory Fan Chart */}
-              <section aria-label="Trajectory Fan Chart" className="space-y-3">
-                <ProjectionFanChart
-                  dimensions={activeDimensions}
-                  persona={effectivePersona}
-                />
-              </section>
+              {/* 2. THE FLAT CLASSROOM BOARD */}
+              <div className="flex-1 min-w-0 relative z-10">
+                <section
+                  id="classroom-board"
+                  aria-label="Classroom Performance Board"
+                  className="board-wood-frame"
+                >
+                  <div className="board-canvas p-5 sm:p-7 space-y-6">
+                    {/* BOARD TOP HEADER: Greeting, Teacher Note, Primary CTA */}
+                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b-2 border-dashed border-border-strong/30 pb-5">
+                      <div className="space-y-1.5 flex-1">
+                        {viewState === 'low-confidence' && (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-pill bg-brand-subtle border border-border-strong text-xs font-mono font-bold text-ink shadow-xs">
+                              <span>🌱</span>
+                              <span>Rest-First Pacing</span>
+                            </span>
+                            <span className="text-xs font-mono text-ink-muted">
+                              Non-Clinical Cognitive Space
+                            </span>
+                          </div>
+                        )}
 
-              {/* Why This Coaching Explainability Trail */}
-              <section aria-label="Why This Trail" className="space-y-3">
-                <WhyThisPanel
-                  trail={SAMPLE_WHY_THIS_TRAIL}
-                  title="Today's Priority AI Coach Recommendation (5-Part Reasoning Trail)"
-                  showSummaryUpfront={true}
-                  defaultExpanded={false}
-                />
-              </section>
+                        <h1
+                          id="dashboard-hero-heading"
+                          className="font-display text-2xl sm:text-3xl font-extrabold text-ink tracking-tight"
+                        >
+                          Good morning, {personaDisplayName}!
+                        </h1>
 
-              {/* Session Fatigue Heatmap & AI Collaboration Score */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-                <div className="lg:col-span-7">
-                  <FatigueHeatmap persona={effectivePersona} />
-                </div>
-
-                <Card className="lg:col-span-5 p-5 flex flex-col justify-between gap-4 border-2 border-border-strong shadow-doodle">
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-start justify-between gap-2 border-b-2 border-dashed border-border-strong/30 pb-3">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-display text-lg font-bold text-ink">
-                            Co-Pilot Synergy with Brian (0–100)
-                          </h3>
-                          <Badge tone="reward" glyph="★">
-                            {SAMPLE_COLLABORATION_SCORE.totalScore} ± 4 / 100
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-ink-muted mt-0.5">
-                          Epistemic synergy index across human pace &amp; AI co-adaptation.
+                        <p className="text-sm sm:text-base text-ink-muted leading-relaxed max-w-2xl m-0">
+                          {heroInsightSentence} {emilyConfig.brianAdvice}
                         </p>
                       </div>
+
+                      {/* Primary CTA Button */}
+                      <div className="flex flex-col items-center sm:items-end gap-1 shrink-0">
+                        <Link
+                          to={nextStepLink}
+                          className="tactile-btn py-3 px-6 rounded-xl bg-brand text-brand-ink font-display text-base font-bold border-2 border-border-strong shadow-doodle hover:shadow-doodle-lg no-underline flex items-center justify-center gap-2 text-center"
+                        >
+                          <span>Start Today's 2-Min Flow</span>
+                          <span aria-hidden="true">→</span>
+                        </Link>
+                        <div className="text-xs font-mono text-ink-muted flex items-center gap-1.5 pt-0.5">
+                          <span className="w-2 h-2 rounded-full bg-success animate-pulse shrink-0" />
+                          <span>{nextStepTitle} · 120s max</span>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-xs font-mono">
-                        <span className="text-ink-muted">Pacing Alignment</span>
-                        <span className="font-bold text-ink">88 / 100</span>
+                    {/* Frustrated De-Escalation Banner if detected */}
+                    {currentEmotion === 'frustrated' && (
+                      <div
+                        role="status"
+                        className="p-3 bg-surface-raised border-2 border-border-strong rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-doodle-sm text-start"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl shrink-0" aria-hidden="true">
+                            🍃
+                          </span>
+                          <div>
+                            <strong className="text-ink font-bold block text-xs">
+                              Pacing Check-In
+                            </strong>
+                            <span className="text-ink-muted text-xs">
+                              Elevated cursor tension detected. Take a 60-second
+                              breather — no penalty for pausing.
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setManualEmotion('calm_flow')}
+                          className="focus-ring px-3 py-1.5 rounded-md bg-surface text-ink border-2 border-border-strong text-xs font-bold shadow-doodle-sm cursor-pointer shrink-0"
+                        >
+                          Take 60s Breather
+                        </button>
                       </div>
-                      <div className="w-full h-2 rounded-pill bg-surface-raised border border-border-strong overflow-hidden">
-                        <div
-                          className="h-full bg-brand rounded-pill"
-                          style={{ width: '88%' }}
+                    )}
+
+                    {/* MAIN BOARD SPLIT: 6-Skill Balance Radar (Left) + Core Balance Insights (Right) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                      {/* Left Wing (7 cols on lg): 6-Skill Cognitive Balance Radar */}
+                      <div className="lg:col-span-7 min-w-0">
+                        <UncertaintyRadar
+                          dimensions={activeDimensions}
+                          estimates={estimates}
+                          title="6-Skill Cognitive Balance"
+                          showSubtitle={false}
+                          showTableToggle={false}
                         />
                       </div>
 
-                      <div className="flex justify-between text-xs font-mono pt-1">
-                        <span className="text-ink-muted">
-                          Adaptation Feedback
+                      {/* Right Wing (5 cols on lg): Core Balance Insights & Weekly Goal */}
+                      <div className="lg:col-span-5 min-w-0 flex flex-col justify-between">
+                        <Card className="p-5 flex flex-col justify-between h-full space-y-4 border-2 border-border-strong shadow-doodle">
+                          <div className="flex items-center justify-between border-b-2 border-border pb-3">
+                            <div>
+                              <h2 className="font-display text-lg font-bold text-ink">
+                                Core Balance Insights
+                              </h2>
+                              <p className="text-xs text-ink-muted">
+                                Three verified pillars calibrated from your recent micro-rounds.
+                              </p>
+                            </div>
+                            <Badge tone="brand" glyph="◈">
+                              {activeDimensions.length} Skills
+                            </Badge>
+                          </div>
+
+                          {/* 3 Key Metric Cards */}
+                          <div className="space-y-3">
+                            {/* Card 1: Mental Stamina */}
+                            <div className="p-3.5 rounded-xl bg-surface-raised border-2 border-border-strong shadow-doodle-sm space-y-1">
+                              <div className="flex items-center justify-between text-xs font-mono">
+                                <span className="font-bold text-ink uppercase tracking-wider flex items-center gap-1.5">
+                                  <span className="text-brand">⚡</span>
+                                  <span>Mental Stamina</span>
+                                </span>
+                                <Badge tone="success" glyph="●">
+                                  Steady Focus
+                                </Badge>
+                              </div>
+                              <div className="flex items-baseline justify-between pt-1">
+                                <span className="font-display text-2xl font-black text-ink">
+                                  88%
+                                </span>
+                                <span className="font-mono text-xs text-ink-muted">
+                                  Low fatigue drift
+                                </span>
+                              </div>
+                              <p className="text-xs text-ink-muted leading-relaxed m-0 pt-0.5">
+                                Maintains high processing speed across multi-round blocks without cognitive dip.
+                              </p>
+                            </div>
+
+                            {/* Card 2: Memory Sharpness */}
+                            <div className="p-3.5 rounded-xl bg-surface-raised border-2 border-border-strong shadow-doodle-sm space-y-1">
+                              <div className="flex items-center justify-between text-xs font-mono">
+                                <span className="font-bold text-ink uppercase tracking-wider flex items-center gap-1.5">
+                                  <span className="text-brand">🧩</span>
+                                  <span>Memory Sharpness</span>
+                                </span>
+                                <Badge tone="brand" glyph="●">
+                                  Clarity Range ±4%
+                                </Badge>
+                              </div>
+                              <div className="flex items-baseline justify-between pt-1">
+                                <span className="font-display text-2xl font-black text-ink">
+                                  {(estimates.find(
+                                    (e) =>
+                                      e.dimensionId ===
+                                      'episodic_pattern_separation',
+                                  )?.scorePct ?? 81)}
+                                  %
+                                </span>
+                                <span className="font-mono text-xs text-ink-muted">
+                                  Visual Clarity Locked
+                                </span>
+                              </div>
+                              <p className="text-xs text-ink-muted leading-relaxed m-0 pt-0.5">
+                                Distinguishes subtle geometric and visual changes from memory lures without false alarms.
+                              </p>
+                            </div>
+
+                            {/* Card 3: Focus Consistency */}
+                            <div className="p-3.5 rounded-xl bg-surface-raised border-2 border-border-strong shadow-doodle-sm space-y-1">
+                              <div className="flex items-center justify-between text-xs font-mono">
+                                <span className="font-bold text-ink uppercase tracking-wider flex items-center gap-1.5">
+                                  <span className="text-brand">🎯</span>
+                                  <span>Focus Consistency</span>
+                                </span>
+                                <Badge tone="reward" glyph="★">
+                                  Flow Zone
+                                </Badge>
+                              </div>
+                              <div className="flex items-baseline justify-between pt-1">
+                                <span className="font-display text-2xl font-black text-ink">
+                                  94%
+                                </span>
+                                <span className="font-mono text-xs text-ink-muted">
+                                  38 ms Jitter
+                                </span>
+                              </div>
+                              <p className="text-xs text-ink-muted leading-relaxed m-0 pt-0.5">
+                                Pointer rhythm and response tempos are tightly clustered within your natural flow zone.
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Active Goal Progress Strip */}
+                          <div className="space-y-2 pt-2 border-t-2 border-dashed border-border-strong/30">
+                            <div className="flex items-center justify-between font-mono text-xs">
+                              <span className="font-bold text-ink flex items-center gap-1">
+                                <span className="text-brand">🚩</span>
+                                <span>Weekly Calibration Goal</span>
+                              </span>
+                              <span className="font-bold text-ink bg-surface-raised px-2 py-0.5 rounded border border-border-strong">
+                                4 / 6 Flows
+                              </span>
+                            </div>
+                            <div className="relative w-full h-3 bg-surface-raised rounded-pill border-2 border-border-strong overflow-hidden p-0.5">
+                              <div
+                                className="h-full bg-brand rounded-pill border-r border-border-strong transition-all duration-500"
+                                style={{ width: '66.6%' }}
+                              />
+                            </div>
+                            <div className="flex items-center justify-between text-ink-muted font-mono text-xs">
+                              <span>4 of 6 weekly flows complete</span>
+                              <span className="text-ink font-semibold">
+                                ~2 left to reach ±6% clarity
+                              </span>
+                            </div>
+                          </div>
+                        </Card>
+                      </div>
+                    </div>
+
+                    {/* WEEKLY CONTINUITY & RHYTHM (Full Width Strip on Board) */}
+                    <div className="w-full bg-surface rounded-2xl border-2 border-border-strong shadow-doodle p-5 space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-brand text-xl" aria-hidden="true">
+                            🔄
+                          </span>
+                          <h2 className="font-display text-xl font-bold text-ink">
+                            Weekly Continuity &amp; Rhythm
+                          </h2>
+                          <span className="font-mono text-xs bg-surface-raised px-2.5 py-0.5 rounded-pill border border-border-strong text-ink-muted">
+                            Zero-Guilt Streak
+                          </span>
+                        </div>
+                        <div className="font-mono text-xs text-ink-muted">
+                          Consistency is about rhythm, not robotic streaks.
+                        </div>
+                      </div>
+
+                      {/* Seven-Day Ribbon Layout */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 items-stretch">
+                        {/* MON */}
+                        <div className="p-3 rounded-xl bg-surface-raised border-2 border-border-strong shadow-doodle-sm flex flex-col items-center text-center justify-between min-h-[105px]">
+                          <span className="font-mono text-xs uppercase font-bold text-ink-muted">
+                            Mon
+                          </span>
+                          <div className="w-8 h-8 rounded-pill bg-success border-2 border-border-strong flex items-center justify-center text-canvas font-bold shadow-xs">
+                            ✓
+                          </div>
+                          <span className="font-mono text-xs font-semibold text-success">
+                            Focused · 4m
+                          </span>
+                        </div>
+
+                        {/* TUE */}
+                        <div className="p-3 rounded-xl bg-surface-raised border-2 border-border-strong shadow-doodle-sm flex flex-col items-center text-center justify-between min-h-[105px]">
+                          <span className="font-mono text-xs uppercase font-bold text-ink-muted">
+                            Tue
+                          </span>
+                          <div className="w-8 h-8 rounded-pill bg-success border-2 border-border-strong flex items-center justify-center text-canvas font-bold shadow-xs">
+                            ✓
+                          </div>
+                          <span className="font-mono text-xs font-semibold text-success">
+                            Speed · 3m
+                          </span>
+                        </div>
+
+                        {/* WED: TODAY */}
+                        <div className="col-span-2 sm:col-span-2 lg:col-span-2 p-3 sm:px-4 rounded-xl bg-reward-subtle border-2 border-border-strong shadow-doodle flex flex-col sm:flex-row items-center justify-between gap-3 relative">
+                          <div className="absolute -top-2.5 right-4 bg-brand text-brand-ink px-2 py-0.5 rounded-pill text-xs font-mono font-bold border border-border-strong shadow-xs">
+                            TODAY
+                          </div>
+                          <div className="flex items-center gap-3 text-left">
+                            <div className="w-10 h-10 rounded-pill bg-reward/40 border-2 border-border-strong flex items-center justify-center text-ink text-xl shadow-xs shrink-0">
+                              🌙
+                            </div>
+                            <div>
+                              <div className="font-mono text-xs sm:text-sm font-bold text-ink">
+                                Wed · Scheduled Recovery Day
+                              </div>
+                              <div className="font-mono text-xs text-ink-muted">
+                                Active memory consolidation — streak protected
+                              </div>
+                            </div>
+                          </div>
+                          <div className="shrink-0 flex items-center gap-1.5 px-3 py-1 bg-surface rounded-pill border border-border-strong font-mono text-xs font-bold text-success shadow-xs">
+                            <span>🛡️</span>
+                            <span>Protected</span>
+                          </div>
+                        </div>
+
+                        {/* THU */}
+                        <div className="p-3 rounded-xl bg-surface border-2 border-dashed border-border-strong/50 flex flex-col items-center text-center justify-between min-h-[105px]">
+                          <span className="font-mono text-xs uppercase font-bold text-ink-muted">
+                            Thu
+                          </span>
+                          <div className="w-8 h-8 rounded-pill bg-surface-raised border border-border-strong/40 flex items-center justify-center text-ink-muted text-xs">
+                            ⏱
+                          </div>
+                          <span className="font-mono text-xs text-ink-muted">
+                            Flexibility
+                          </span>
+                        </div>
+
+                        {/* FRI */}
+                        <div className="p-3 rounded-xl bg-surface border-2 border-dashed border-border-strong/50 flex flex-col items-center text-center justify-between min-h-[105px]">
+                          <span className="font-mono text-xs uppercase font-bold text-ink-muted">
+                            Fri
+                          </span>
+                          <div className="w-8 h-8 rounded-pill bg-surface-raised border border-border-strong/40 flex items-center justify-center text-ink-muted text-xs">
+                            ⏱
+                          </div>
+                          <span className="font-mono text-xs text-ink-muted">
+                            Recall
+                          </span>
+                        </div>
+
+                        {/* SAT-SUN */}
+                        <div className="p-3 rounded-xl bg-surface border-2 border-dashed border-border-strong/50 flex flex-col items-center text-center justify-between min-h-[105px]">
+                          <span className="font-mono text-xs uppercase font-bold text-ink-muted">
+                            Sat-Sun
+                          </span>
+                          <div className="w-8 h-8 rounded-pill bg-surface-raised border border-border-strong/40 flex items-center justify-center text-ink-muted text-xs">
+                            ☀️
+                          </div>
+                          <span className="font-mono text-xs text-ink-muted">
+                            Open Play
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* DAILY SCIENCE BITE */}
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-xl bg-surface-raised border-2 border-border-strong shadow-doodle-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="text-brand text-xl" aria-hidden="true">
+                          📖
                         </span>
-                        <span className="font-bold text-ink">79 / 100</span>
+                        <span className="text-xs sm:text-sm text-ink leading-snug">
+                          <strong>Daily Science Bite:</strong> Sleep consolidation strengthens pattern separation without active practice. Enjoy your rest day!
+                        </span>
                       </div>
-                      <div className="w-full h-2 rounded-pill bg-surface-raised border border-border-strong overflow-hidden">
-                        <div
-                          className="h-full bg-success rounded-pill"
-                          style={{ width: '79%' }}
-                        />
-                      </div>
-
-                      <div className="flex justify-between text-xs font-mono pt-1">
-                        <span className="text-ink-muted">Cognitive Synergy</span>
-                        <span className="font-bold text-ink">84 / 100</span>
-                      </div>
-                      <div className="w-full h-2 rounded-pill bg-surface-raised border border-border-strong overflow-hidden">
-                        <div
-                          className="h-full bg-reward rounded-pill"
-                          style={{ width: '84%' }}
-                        />
-                      </div>
+                      <Link
+                        to="/methodology"
+                        className="shrink-0 font-mono text-xs text-brand hover:text-ink underline font-bold flex items-center gap-1"
+                      >
+                        <span>Read 1-min synaptic digest</span>
+                        <span aria-hidden="true">→</span>
+                      </Link>
                     </div>
                   </div>
-
-                  <div className="pt-2 border-t-2 border-dashed border-border-strong/30 flex items-center justify-between">
-                    <span className="text-xs font-mono text-ink-muted">
-                      Formula: 0.40P + 0.35A + 0.25S
-                    </span>
-                    <Link
-                      to="/collaboration"
-                      className="font-mono text-xs font-bold text-brand hover:underline"
-                    >
-                      Deep Breakdown →
-                    </Link>
-                  </div>
-                </Card>
+                </section>
               </div>
             </div>
-          </details>
-        </>
-      )}
+
+            {/* 3. EXPANDABLE DETAILS ACCORDION: Trajectory, Heatmap, Goals & Persona Switcher */}
+            <details
+              data-technical-drawer
+              className="group rounded-2xl border-2 border-border-strong bg-surface p-6 shadow-doodle transition-all mt-6"
+            >
+              <summary className="focus-ring cursor-pointer flex items-center justify-between font-display text-base font-bold text-ink select-none hover:text-brand transition-colors">
+                <span className="flex items-center gap-2">
+                  <span className="transition-transform group-open:rotate-90 inline-block text-ink-muted">
+                    ▸
+                  </span>
+                  <span>
+                    Explore How This Is Calculated (Trajectory, Heatmap, Telemetry —{' '}
+                    {activeDimensions.length} Dimensions)
+                  </span>
+                </span>
+                <Badge tone="neutral" glyph="◈">
+                  Deep Telemetry
+                </Badge>
+              </summary>
+
+              <div className="mt-6 space-y-8 pt-6 border-t-2 border-dashed border-border-strong/30">
+                {/* Profile Snapshot Switcher Strip */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b-2 border-dashed border-border-strong/30">
+                  <span className="text-xs font-semibold text-ink-muted">
+                    Demonstration Profile:
+                  </span>
+                  <div
+                    role="group"
+                    aria-label="Dashboard persona and state switcher"
+                    className="flex flex-wrap items-center gap-1.5"
+                  >
+                    {(
+                      [
+                        { id: 'calibrated', label: 'Calibrated Twin (Youssef · 84%)' },
+                        {
+                          id: 'low-confidence',
+                          label: 'Low-Conf Hatched (Salma · 54%)',
+                        },
+                        { id: 'partial', label: 'Partial (1 Missing Dim)' },
+                        { id: 'empty', label: 'Empty (New Learner)' },
+                        { id: 'loading', label: 'Loading Skeleton' },
+                        { id: 'error', label: 'Error Recovery' },
+                        { id: 'extreme-text', label: 'Extreme Values' },
+                      ] as const
+                    ).map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        aria-pressed={viewState === tab.id}
+                        onClick={() => handleSelectViewState(tab.id)}
+                        className={`focus-ring min-h-10 px-3 py-1 rounded-pill border-2 border-border-strong text-xs font-bold cursor-pointer transition-colors shadow-doodle-sm ${viewState === tab.id
+                          ? 'bg-brand text-brand-ink'
+                          : 'bg-surface-raised text-ink hover:bg-brand-subtle'
+                          }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Trajectory Fan Chart */}
+                <section aria-label="Trajectory Fan Chart" className="space-y-3">
+                  <ProjectionFanChart
+                    dimensions={activeDimensions}
+                    persona={effectivePersona}
+                  />
+                </section>
+
+                {/* Why This Coaching Explainability Trail */}
+                <section aria-label="Why This Trail" className="space-y-3">
+                  <WhyThisPanel
+                    trail={SAMPLE_WHY_THIS_TRAIL}
+                    title="Today's Priority AI Coach Recommendation (5-Part Reasoning Trail)"
+                    showSummaryUpfront={true}
+                    defaultExpanded={false}
+                  />
+                </section>
+
+                {/* Session Fatigue Heatmap & AI Collaboration Score */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                  <div className="lg:col-span-7">
+                    <FatigueHeatmap persona={effectivePersona} />
+                  </div>
+
+                  <Card className="lg:col-span-5 p-5 flex flex-col justify-between gap-4 border-2 border-border-strong shadow-doodle">
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-start justify-between gap-2 border-b-2 border-dashed border-border-strong/30 pb-3">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="font-display text-lg font-bold text-ink">
+                              Co-Pilot Synergy with Brian (0–100)
+                            </h3>
+                            <Badge tone="reward" glyph="★">
+                              {SAMPLE_COLLABORATION_SCORE.totalScore} ± 4 / 100
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-ink-muted mt-0.5">
+                            Epistemic synergy index across human pace &amp; AI co-adaptation.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs font-mono">
+                          <span className="text-ink-muted">Pacing Alignment</span>
+                          <span className="font-bold text-ink">88 / 100</span>
+                        </div>
+                        <div className="w-full h-2 rounded-pill bg-surface-raised border border-border-strong overflow-hidden">
+                          <div
+                            className="h-full bg-brand rounded-pill"
+                            style={{ width: '88%' }}
+                          />
+                        </div>
+
+                        <div className="flex justify-between text-xs font-mono pt-1">
+                          <span className="text-ink-muted">
+                            Adaptation Feedback
+                          </span>
+                          <span className="font-bold text-ink">79 / 100</span>
+                        </div>
+                        <div className="w-full h-2 rounded-pill bg-surface-raised border border-border-strong overflow-hidden">
+                          <div
+                            className="h-full bg-success rounded-pill"
+                            style={{ width: '79%' }}
+                          />
+                        </div>
+
+                        <div className="flex justify-between text-xs font-mono pt-1">
+                          <span className="text-ink-muted">Cognitive Synergy</span>
+                          <span className="font-bold text-ink">84 / 100</span>
+                        </div>
+                        <div className="w-full h-2 rounded-pill bg-surface-raised border border-border-strong overflow-hidden">
+                          <div
+                            className="h-full bg-reward rounded-pill"
+                            style={{ width: '84%' }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t-2 border-dashed border-border-strong/30 flex items-center justify-between">
+                      <span className="text-xs font-mono text-ink-muted">
+                        Formula: 0.40P + 0.35A + 0.25S
+                      </span>
+                      <Link
+                        to="/collaboration"
+                        className="font-mono text-xs font-bold text-brand hover:underline"
+                      >
+                        Deep Breakdown →
+                      </Link>
+                    </div>
+                  </Card>
+                </div>
+              </div>
+            </details>
+          </>
+        )}
     </div>
   )
 }
