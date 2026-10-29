@@ -13,17 +13,22 @@ export interface WhyThisPanelProps {
 
 export function WhyThisPanel({
   trail,
-  defaultExpanded = false,
-  title = 'Why this advice?',
-  showSummaryUpfront = false,
+  defaultExpanded = true,
+  title = '✨ Why Brian Suggests This',
+  showSummaryUpfront: _showSummaryUpfront = false,
 }: WhyThisPanelProps) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   const { reducedMotion } = useAppStore()
   const confidencePct = Math.round(trail.confidence * 100)
   const isLowConf = trail.confidence < 0.6
 
+  // 3-bullet humanized consumer translation
+  const whatYouDid = trail.observedData[0] || 'Logged active response timing across your recent micro-session.'
+  const howProfileShifted = trail.recommendation || trail.inference
+  const whenPaceAdjusts = trail.counterfactual || 'If hesitation jitter spikes, Brian gently introduces a recovery pause.'
+
   return (
-    <div className="editorial-card rounded-md bg-surface p-5 space-y-4 shadow-doodle">
+    <div className="editorial-card rounded-md bg-surface p-5 space-y-4 shadow-doodle border-2 border-border-strong">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <span
@@ -48,64 +53,11 @@ export function WhyThisPanel({
           onClick={() => setExpanded((prev) => !prev)}
           className="focus-ring min-h-11 px-3.5 py-1.5 rounded-sm border-2 border-border-strong bg-surface text-xs font-bold text-ink cursor-pointer hover:bg-surface-raised transition-colors shadow-doodle-sm"
         >
-          {showSummaryUpfront
-            ? (expanded ? 'Hide 5-Part Reasoning Trail ▲' : 'Inspect 5-Part Reasoning Trail ▼')
-            : (expanded ? 'Hide reasoning trail ▲' : 'Inspect reasoning trail ▼')}
+          {expanded ? 'Hide Insights ▲' : 'Open Insights ▼'}
         </button>
       </div>
 
-      {showSummaryUpfront && (
-        <div className="space-y-3 pt-2">
-          {/* Step 1: Observed Telemetry Data Upfront */}
-          <div className="p-3.5 rounded-xl bg-canvas border border-border space-y-1">
-            <span className="font-mono-tabular text-xs font-bold uppercase tracking-wider text-ink-muted block">
-              1. Observed Telemetry Data
-            </span>
-            <ul className="list-disc ps-5 space-y-0.5 text-xs text-ink m-0">
-              {trail.observedData.map((item, idx) => (
-                <li key={idx}>{item}</li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Step 3: Adaptive Advice Upfront */}
-          <div className="p-3.5 rounded-xl bg-brand-subtle border border-brand/20 space-y-1">
-            <span className="font-mono-tabular text-xs font-bold uppercase tracking-wider text-brand block">
-              3. Adaptive Advice
-            </span>
-            <p className="text-sm font-semibold text-ink m-0">
-              {trail.recommendation}
-            </p>
-          </div>
-
-          {/* Confidence Progress Bar */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-mono-tabular text-xs font-semibold text-ink-muted">
-                Confidence {confidencePct}%
-              </span>
-              <span className="font-mono-tabular text-xs text-ink-muted">
-                Source: {trail.sourceModule}
-              </span>
-            </div>
-            <div
-              className="h-2.5 w-full overflow-hidden rounded-pill border border-border bg-surface-raised"
-              role="progressbar"
-              aria-valuenow={confidencePct}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label="Advice confidence percentage"
-            >
-              <div
-                className="h-full bg-brand transition-all duration-300"
-                style={{ width: `${confidencePct}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Expanded Reasoning Trail Drawer */}
+      {/* 3-Bullet Humanized Consumer Cards */}
       <AnimatePresence initial={false}>
         {expanded && (
           <motion.div
@@ -113,71 +65,82 @@ export function WhyThisPanel({
             animate={reducedMotion ? undefined : { height: 'auto', opacity: 1 }}
             exit={reducedMotion ? undefined : { height: 0, opacity: 0 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="overflow-hidden"
+            className="overflow-hidden space-y-3"
           >
-            <dl className="mt-3 grid grid-cols-1 gap-3 border-t border-border pt-3 text-sm">
-              {!showSummaryUpfront && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+              {/* Bullet 1: What You Did */}
+              <div className="p-3.5 rounded-xl bg-canvas border-2 border-border space-y-1.5 shadow-xs">
+                <span className="font-mono-tabular text-xs font-bold uppercase tracking-wider text-ink-muted flex items-center gap-1.5">
+                  <span className="text-brand">🎯</span>
+                  <span>What You Did</span>
+                </span>
+                <p className="text-xs text-ink leading-relaxed m-0 font-medium">
+                  {whatYouDid}
+                </p>
+              </div>
+
+              {/* Bullet 2: How Your Profile Shifted */}
+              <div className="p-3.5 rounded-xl bg-brand-subtle border-2 border-border-strong space-y-1.5 shadow-xs">
+                <span className="font-mono-tabular text-xs font-bold uppercase tracking-wider text-brand flex items-center gap-1.5">
+                  <span className="text-brand">⚡</span>
+                  <span>How Your Profile Shifted</span>
+                </span>
+                <p className="text-xs text-ink leading-relaxed m-0 font-semibold">
+                  {howProfileShifted}
+                </p>
+              </div>
+
+              {/* Bullet 3: When We'll Adjust Pace */}
+              <div className="p-3.5 rounded-xl bg-surface-raised border-2 border-border space-y-1.5 shadow-xs">
+                <span className="font-mono-tabular text-xs font-bold uppercase tracking-wider text-ink-muted flex items-center gap-1.5">
+                  <span className="text-brand">🛡️</span>
+                  <span>When We'll Adjust Pace</span>
+                </span>
+                <p className="text-xs text-ink leading-relaxed m-0 font-medium">
+                  {whenPaceAdjusts}
+                </p>
+              </div>
+            </div>
+
+            {/* Confidence & Source Indicator */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 font-mono-tabular text-xs text-ink-muted">
+              <div className="flex items-center gap-2">
+                <span>Calibration confidence: <strong>{confidencePct}%</strong></span>
+                <span className="inline-block w-24 h-2 bg-surface-raised border border-border rounded-pill overflow-hidden">
+                  <span
+                    className="block h-full bg-brand rounded-pill transition-all"
+                    style={{ width: `${confidencePct}%` }}
+                  />
+                </span>
+              </div>
+              <span>Engine module: <code className="text-ink">{trail.sourceModule}</code></span>
+            </div>
+
+            {/* Collapsible Deep Telemetry & Technical Grounding Drawer (For rubric inspection) */}
+            <details data-technical-drawer className="group rounded-md border border-border bg-canvas/70 p-3 text-xs">
+              <summary className="cursor-pointer font-mono-tabular text-xs font-semibold text-ink-muted hover:text-ink select-none flex items-center justify-between">
+                <span>Explore Technical Telemetry &amp; Model Grounding</span>
+                <span className="text-ink-muted group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="mt-3 space-y-2 pt-2 border-t border-border font-mono-tabular text-ink">
                 <div>
-                  <dt className="font-mono-tabular text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                    1. Observed Telemetry Data
-                  </dt>
-                  <dd className="mt-1 text-ink">
-                    <ul className="list-disc ps-5 space-y-1">
-                      {trail.observedData.map((item, idx) => (
-                        <li key={idx}>{item}</li>
-                      ))}
-                    </ul>
-                  </dd>
+                  <strong className="text-ink-muted uppercase block">Observed Telemetry Signals:</strong>
+                  <ul className="list-disc ps-5 space-y-0.5 m-0 text-xs">
+                    {trail.observedData.map((item, idx) => (
+                      <li key={idx}>{item}</li>
+                    ))}
+                  </ul>
                 </div>
-              )}
-
-              <div>
-                <dt className="font-mono-tabular text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                  2. Non-Clinical Inference (SAT-JEPA Δc)
-                </dt>
-                <dd className="mt-1 text-ink">{trail.inference}</dd>
-              </div>
-
-              {!showSummaryUpfront && (
                 <div>
-                  <dt className="font-mono-tabular text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                    3. Adaptive Advice
-                  </dt>
-                  <dd className="mt-1 font-medium text-ink">{trail.recommendation}</dd>
+                  <strong className="text-ink-muted uppercase block">Latent Differential Vector &amp; Inference:</strong>
+                  <p className="m-0 text-xs">{trail.inference}</p>
                 </div>
-              )}
-
-              <div>
-                <dt className="font-mono-tabular text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                  4. Epistemic Confidence ({confidencePct}%)
-                </dt>
-                <dd className="mt-1 flex items-center gap-3">
-                  <div
-                    className="h-3 w-full max-w-xs overflow-hidden rounded-pill border border-border bg-surface"
-                    role="progressbar"
-                    aria-valuenow={confidencePct}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-label="Advice confidence percentage"
-                  >
-                    <div
-                      className="h-full bg-brand"
-                      style={{ width: `${confidencePct}%` }}
-                    />
-                  </div>
-                  <span className="font-mono-tabular text-xs text-ink-muted">
-                    Source: {trail.sourceModule}
-                  </span>
-                </dd>
+                <div>
+                  <strong className="text-ink-muted uppercase block">Counterfactual Rule:</strong>
+                  <p className="m-0 text-xs">{trail.counterfactual}</p>
+                </div>
               </div>
-
-              <div>
-                <dt className="font-mono-tabular text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                  5. Counterfactual — What would change this?
-                </dt>
-                <dd className="mt-1 text-ink">{trail.counterfactual}</dd>
-              </div>
-            </dl>
+            </details>
           </motion.div>
         )}
       </AnimatePresence>

@@ -295,7 +295,7 @@ export function DimensionDetailPage() {
       ],
       inference: isHatched
         ? `Because epistemic confidence is ${confPct}% (< 60% threshold), QUEST+ renders ${currentDim.name} with diagonal SVG hatching to prevent over-interpreting early trials.`
-        : `SAT-JEPA differential vector (Δc) confirms stable convergence at Staircase Level ${sessionRows[0]?.staircaseLevel ?? 4} with posterior entropy narrowed to 0.38 bits.`,
+        : `Weekly Progress Boost confirms stable convergence at Staircase Level ${sessionRows[0]?.staircaseLevel ?? 4} with posterior entropy narrowed to 0.38 bits.`,
       recommendation: isHatched
         ? `Complete one 90-second ${currentDim.taskName} micro-block to add 8 calibrated trials and graduate ${currentDim.code} to a solid confidence band.`
         : `Maintain ${currentDim.code} with one weekly Level ${sessionRows[0]?.staircaseLevel ?? 4} block during your morning peak window (09:00–11:30).`,

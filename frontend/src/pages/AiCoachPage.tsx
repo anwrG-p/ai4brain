@@ -323,7 +323,7 @@ export default function AiCoachPage() {
               >
                 {simulateLlmDown || previewState === 'fallback-mode'
                   ? 'Engine: Deterministic Rule Fallback'
-                  : 'Engine: SAT-JEPA + LLM Grounded'}
+                  : 'Engine: Cognitive Twin + Brian AI'}
               </Badge>
               <Badge tone="success" glyph="✓">
                 Copy Linter: 0 Violations
@@ -337,10 +337,7 @@ export default function AiCoachPage() {
             </h1>
             <DoodleSquiggle className="max-w-xs mt-1" />
             <p className="text-base text-ink-muted">
-              Every recommendation is grounded in your SAT-JEPA differential
-              vector (<code className="font-mono-tabular">Δc</code>) and QUEST+
-              confidence bands—with a 5-part reasoning trail and deterministic
-              rule fallback.
+              Every recommendation is grounded in your Weekly Progress Boost and Clarity Range—with a clean 3-bullet explainability card and deterministic rule fallback.
             </p>
           </div>
 
@@ -445,7 +442,7 @@ export default function AiCoachPage() {
         >
           <div className="flex items-center justify-between">
             <span className="font-display text-lg font-bold text-ink">
-              Synthesizing SAT-JEPA Differential Vector (
+              Synthesizing Weekly Progress Boost & Strategy (
               <code className="font-mono-tabular">Δc</code>) &amp; Running Copy
               Guardrail…
             </span>
@@ -495,7 +492,7 @@ export default function AiCoachPage() {
             </Badge>
           </div>
           <p className="text-sm text-ink">
-            SynapseTwin automatically failed over to the deterministic SAT-JEPA
+            SynapseTwin automatically failed over to the deterministic
             rule engine so your coaching recommendations and 5-part reasoning
             trails remain 100% available.
           </p>
@@ -700,7 +697,7 @@ export default function AiCoachPage() {
               {/* Embedded Signature #3 <WhyThisPanel /> */}
               <WhyThisPanel
                 trail={effectiveWhyThis}
-                title={`5-Part Reasoning Trail · ${activeTurn.dimensionCode} Strategy`}
+                title={`✨ Why Brian Suggests This · ${activeTurn.dimensionCode} Strategy`}
                 defaultExpanded
               />
 
@@ -766,18 +763,17 @@ export default function AiCoachPage() {
                     1 · Vector Grounding
                   </span>
                   <p className="text-ink font-medium">
-                    Every prompt maps to SAT-JEPA differential vector{' '}
-                    <code className="font-mono-tabular">Δc</code> across{' '}
-                    {activeDimensions.length} axes.
+                    Every prompt maps to your Weekly Progress Boost across{' '}
+                    {activeDimensions.length} skills.
                   </p>
                 </div>
                 <div className="rounded-sm border border-border bg-canvas p-2.5 space-y-1">
                   <span className="font-mono-tabular font-bold uppercase text-ink-muted block">
-                    2 · 5-Part Audit Trail
+                    2 · Explainability Card
                   </span>
                   <p className="text-ink font-medium">
                     Embedded <code className="font-mono-tabular">WhyThisPanel</code>{' '}
-                    cites trigger, telemetry, confidence, and source.
+                    cites what you did, how your profile shifted, and pacing adjustments.
                   </p>
                 </div>
                 <div className="rounded-sm border border-border bg-canvas p-2.5 space-y-1">
@@ -807,7 +803,7 @@ export default function AiCoachPage() {
                     id="dimension-grounding-heading"
                     className="font-display text-lg font-bold text-ink"
                   >
-                    SAT-JEPA Δc Dimension Grounding ({activeDimensions.length}{' '}
+                    Cognitive Skill Grounding ({activeDimensions.length}{' '}
                     Axes)
                   </h2>
                   <p className="text-xs text-ink-muted">

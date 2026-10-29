@@ -22,7 +22,7 @@ const PRIVACY_WHY_THIS_TRAIL: WhyThisTrail = {
   inference:
     'Hardware-level software lockout permanently guarantees no camera, microphone, or biometric sensors are ever invoked or accessible.',
   recommendation:
-    'Keeping Historical Snapshots active allows the SAT-JEPA engine to detect learning plateaus and recommend rest days with zero streak penalties.',
+    'Keeping Historical Snapshots active allows your Personal Cognitive Twin to detect learning plateaus and recommend rest days with zero streak penalties.',
   counterfactual:
     'If Core Telemetry were revoked, adaptive staircase latency estimation would be unable to calibrate trial difficulty.',
   sourceModule: 'quest_staircase',

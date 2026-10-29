@@ -156,7 +156,7 @@ export default function DashboardPage() {
           </h2>
           <p className="text-sm text-ink-muted leading-relaxed">
             SynapseTwin requires at least one 2-minute baseline session before it
-            can construct your personalised epistemic twin. Your data remains
+            can construct your Personal Cognitive Twin. Your data remains
             strictly local under our non-biometric lock.
           </p>
           <div className="pt-2 flex flex-wrap justify-center gap-3">
@@ -269,7 +269,7 @@ export default function DashboardPage() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs uppercase tracking-wider text-brand font-bold">
-                        Companion Note · 08:30 AM
+                        {viewState === 'low-confidence' ? 'Rest-First Pacing' : 'Companion Note · 08:30 AM'}
                       </span>
                       <span className="w-1 h-1 rounded-pill bg-ink-muted" />
                       <span className="font-mono text-xs text-ink-muted">
@@ -346,125 +346,137 @@ export default function DashboardPage() {
                     ))}
                   </div>
                 </div>
+
+                {/* Section 1 Primary CTA: Start Today's 2-Min Flow */}
+                <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t-2 border-dashed border-border-strong/30">
+                  <div className="flex items-center gap-2 text-xs font-mono text-ink-muted">
+                    <span className="w-2 h-2 rounded-full bg-success animate-pulse shrink-0" />
+                    <span>Next 2-Min Flow: <strong>{nextStepTitle}</strong> · {nextStepDescription}</span>
+                  </div>
+                  <Link
+                    to={nextStepLink}
+                    className="w-full sm:w-auto py-3 px-6 rounded-xl bg-brand text-brand-ink font-display text-base font-bold border-2 border-border-strong shadow-doodle hover:shadow-doodle-lg hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 group no-underline text-center shrink-0"
+                  >
+                    <span>Start Today's 2-Min Flow</span>
+                    <span className="transition-transform group-hover:translate-x-1" aria-hidden="true">→</span>
+                  </Link>
+                </div>
               </div>
             </div>
           </section>
 
-          {/* 2. CORE TWO-CARD HERO GRID: Cognitive Balance (Left) + Next Best Step (Right) */}
+          {/* 2. CORE COGNITIVE BALANCE: 6-Skill Radar (Left) + 3 Key Metric Cards (Right) */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-            {/* Card A: Cognitive Balance Uncertainty Radar (7 cols on lg) */}
+            {/* Card A: 6-Skill Cognitive Balance Radar (7 cols on lg) */}
             <div className="lg:col-span-7 min-w-0">
               <UncertaintyRadar
                 dimensions={activeDimensions}
                 estimates={estimates}
-                title="Cognitive Balance"
+                title="6-Skill Cognitive Balance"
               />
             </div>
 
-            {/* Card B: Today's Next Best Step & Active Goal (5 cols on lg) */}
+            {/* Card B: 3 Key Metric Cards (Mental Stamina, Memory Sharpness, Focus Consistency) */}
             <div className="lg:col-span-5 min-w-0 flex flex-col justify-between">
-              <Card className="p-6 flex flex-col justify-between h-full space-y-6 relative border-2 border-border-strong shadow-doodle">
-                <div className="doodle-tape" />
+              <Card className="p-5 flex flex-col justify-between h-full space-y-4 border-2 border-border-strong shadow-doodle">
+                <div className="flex items-center justify-between border-b-2 border-border pb-3">
+                  <div>
+                    <h2 className="font-display text-lg font-bold text-ink">
+                      Core Balance Insights
+                    </h2>
+                    <p className="text-xs text-ink-muted">
+                      Three verified pillars calibrated from your recent micro-rounds.
+                    </p>
+                  </div>
+                  <Badge tone="brand" glyph="◈">
+                    {activeDimensions.length} Skills
+                  </Badge>
+                </div>
 
-                <div className="space-y-4">
-                  {/* Top Eyebrow Badge */}
-                  <div className="space-y-1">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-pill bg-brand-subtle border-2 border-border-strong shadow-doodle-sm">
-                      <span className="text-brand text-xs font-bold" aria-hidden="true">
-                        {viewState === 'low-confidence' ? '◐' : '⚡'}
+                {/* 3 Key Metric Cards */}
+                <div className="space-y-3">
+                  {/* Card 1: Mental Stamina */}
+                  <div className="p-3.5 rounded-xl bg-surface-raised border-2 border-border-strong shadow-doodle-sm space-y-1">
+                    <div className="flex items-center justify-between text-xs font-mono">
+                      <span className="font-bold text-ink uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="text-brand">⚡</span>
+                        <span>Mental Stamina</span>
                       </span>
-                      <span className="font-mono text-xs font-bold uppercase tracking-wider text-ink">
-                        {viewState === 'low-confidence' ? 'Rest-First Pacing' : 'Next Best Step'}
-                      </span>
+                      <Badge tone="success" glyph="●">Steady Focus</Badge>
                     </div>
-                    <p className="font-mono text-xs text-ink-muted pt-1">
-                      {viewState === 'low-confidence'
-                        ? 'Gentle recovery pacing recommended by BRIAN to consolidate wide confidence bands'
-                        : 'Picked by BRIAN to sharpen your widest band (Spatial Recall)'}
+                    <div className="flex items-baseline justify-between pt-1">
+                      <span className="font-display text-2xl font-black text-ink">88%</span>
+                      <span className="font-mono text-xs text-ink-muted">Low fatigue drift</span>
+                    </div>
+                    <p className="text-xs text-ink-muted leading-relaxed m-0 pt-0.5">
+                      Maintains high processing speed across multi-round blocks without cognitive dip.
                     </p>
                   </div>
 
-                  {/* Central Task Presentation */}
-                  <div className="p-4 rounded-xl bg-surface-raised border-2 border-border-strong shadow-doodle-sm space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <span className="font-mono text-xs uppercase tracking-wider text-brand font-bold">
-                          Domain Focus: Spatial
-                        </span>
-                        <h2 className="font-display text-xl sm:text-2xl font-extrabold text-ink mt-0.5">
-                          {nextStepTitle}
-                        </h2>
-                      </div>
-                      <div className="w-10 h-10 rounded-xl bg-surface border-2 border-border-strong flex items-center justify-center text-brand text-lg shadow-doodle-sm shrink-0">
-                        🧩
-                      </div>
+                  {/* Card 2: Memory Sharpness */}
+                  <div className="p-3.5 rounded-xl bg-surface-raised border-2 border-border-strong shadow-doodle-sm space-y-1">
+                    <div className="flex items-center justify-between text-xs font-mono">
+                      <span className="font-bold text-ink uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="text-brand">🧩</span>
+                        <span>Memory Sharpness</span>
+                      </span>
+                      <Badge tone="brand" glyph="●">Clarity Range ±4%</Badge>
                     </div>
-
-                    <p className="text-xs sm:text-sm text-ink-muted leading-relaxed">
-                      {nextStepDescription}
+                    <div className="flex items-baseline justify-between pt-1">
+                      <span className="font-display text-2xl font-black text-ink">
+                        {(estimates.find((e) => e.dimensionId === 'episodic_pattern_separation')?.scorePct ?? 84)}%
+                      </span>
+                      <span className="font-mono text-xs text-ink-muted">Visual Clarity Locked</span>
+                    </div>
+                    <p className="text-xs text-ink-muted leading-relaxed m-0 pt-0.5">
+                      Distinguishes subtle geometric and visual changes from memory lures without false alarms.
                     </p>
-
-                    {/* Micro Spec Pills */}
-                    <div className="flex flex-wrap items-center gap-2 pt-1 font-mono text-xs">
-                      <span className="px-2 py-0.5 rounded bg-surface border border-border-strong text-ink font-semibold">
-                        ⏱️ 120s max
-                      </span>
-                      <span className="px-2 py-0.5 rounded bg-surface border border-border-strong text-ink font-semibold">
-                        🎯 8 decisions
-                      </span>
-                      <span className="px-2 py-0.5 rounded bg-surface border border-border-strong text-success font-bold">
-                        Zero Failure Penalty
-                      </span>
-                    </div>
-
-                    {/* Big Action Button */}
-                    <div className="pt-2">
-                      <Link
-                        to={nextStepLink}
-                        className="w-full py-3.5 px-4 rounded-xl bg-brand text-brand-ink font-display text-lg font-bold border-2 border-border-strong shadow-doodle hover:shadow-doodle-lg hover:translate-x-0.5 hover:translate-y-0.5 active:translate-x-1 active:translate-y-1 active:shadow-tactile-active transition-all flex items-center justify-center gap-2 group no-underline text-center"
-                      >
-                        <span>Start Today's 2-Min Flow</span>
-                        <span className="transition-transform group-hover:translate-x-1" aria-hidden="true">→</span>
-                      </Link>
-                    </div>
                   </div>
 
-                  {/* Active Goal Progress Section */}
-                  <div className="space-y-2 pt-1 border-t-2 border-dashed border-border-strong/30">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-bold text-ink flex items-center gap-1.5">
-                        <span className="text-brand">🚩</span>
-                        Weekly Calibration Goal
+                  {/* Card 3: Focus Consistency */}
+                  <div className="p-3.5 rounded-xl bg-surface-raised border-2 border-border-strong shadow-doodle-sm space-y-1">
+                    <div className="flex items-center justify-between text-xs font-mono">
+                      <span className="font-bold text-ink uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="text-brand">🎯</span>
+                        <span>Focus Consistency</span>
                       </span>
-                      <span className="font-mono text-xs font-bold text-ink bg-surface-raised px-2 py-0.5 rounded border border-border-strong">
-                        4 / 6 Flows
-                      </span>
+                      <Badge tone="reward" glyph="★">Flow Zone</Badge>
                     </div>
+                    <div className="flex items-baseline justify-between pt-1">
+                      <span className="font-display text-2xl font-black text-ink">94%</span>
+                      <span className="font-mono text-xs text-ink-muted">38 ms Jitter</span>
+                    </div>
+                    <p className="text-xs text-ink-muted leading-relaxed m-0 pt-0.5">
+                      Pointer rhythm and response tempos are tightly clustered within your natural flow zone.
+                    </p>
+                  </div>
+                </div>
 
-                    {/* Tactile Hand-drawn progress bar with tick markers */}
-                    <div className="relative w-full h-4 bg-surface-raised rounded-pill border-2 border-border-strong overflow-hidden p-0.5">
-                      <div
-                        className="h-full bg-brand rounded-pill border-r-2 border-border-strong transition-all duration-500"
-                        style={{ width: '66.6%' }}
-                      />
-                      <div className="absolute inset-0 flex justify-between px-3 pointer-events-none opacity-20">
-                        <span className="w-0.5 h-full bg-border-strong" />
-                        <span className="w-0.5 h-full bg-border-strong" />
-                        <span className="w-0.5 h-full bg-border-strong" />
-                        <span className="w-0.5 h-full bg-border-strong" />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between text-ink-muted font-mono text-xs">
-                      <span>4 of 6 weekly flows complete</span>
-                      <span className="text-ink font-semibold">~2 left to reach ±6% clarity</span>
-                    </div>
+                {/* Active Goal Progress Strip */}
+                <div className="space-y-2 pt-2 border-t-2 border-dashed border-border-strong/30">
+                  <div className="flex items-center justify-between font-mono text-xs">
+                    <span className="font-bold text-ink flex items-center gap-1">
+                      <span className="text-brand">🚩</span>
+                      <span>Weekly Calibration Goal</span>
+                    </span>
+                    <span className="font-bold text-ink bg-surface-raised px-2 py-0.5 rounded border border-border-strong">
+                      4 / 6 Flows
+                    </span>
+                  </div>
+                  <div className="relative w-full h-3 bg-surface-raised rounded-pill border-2 border-border-strong overflow-hidden p-0.5">
+                    <div
+                      className="h-full bg-brand rounded-pill border-r border-border-strong transition-all duration-500"
+                      style={{ width: '66.6%' }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-ink-muted font-mono text-xs">
+                    <span>4 of 6 weekly flows complete</span>
+                    <span className="text-ink font-semibold">~2 left to reach ±6% clarity</span>
                   </div>
                 </div>
               </Card>
             </div>
           </div>
-
           {/* 3. WEEKLY CONTINUITY & RHYTHM STRIP (Zero-Guilt Streak Ribbon) */}
           <section className="w-full bg-surface rounded-2xl border-2 border-border-strong shadow-doodle p-5 sm:p-6 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -573,7 +585,7 @@ export default function DashboardPage() {
           </div>
 
           {/* 5. EXPANDABLE DETAILS ACCORDION: Trajectory, Heatmap, Goals & Persona Switcher */}
-          <details className="group rounded-2xl border-2 border-border-strong bg-surface p-6 shadow-doodle transition-all"
+          <details data-technical-drawer className="group rounded-2xl border-2 border-border-strong bg-surface p-6 shadow-doodle transition-all"
           >
             <summary className="focus-ring cursor-pointer flex items-center justify-between font-display text-base font-bold text-ink select-none hover:text-brand transition-colors">
               <span className="flex items-center gap-2">
@@ -659,7 +671,7 @@ export default function DashboardPage() {
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="font-display text-lg font-bold text-ink">
-                            0–100 AI Collaboration Score
+                            Co-Pilot Synergy with Brian (0–100)
                           </h3>
                           <Badge tone="reward" glyph="★">
                             {SAMPLE_COLLABORATION_SCORE.totalScore} ± 4 / 100

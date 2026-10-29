@@ -129,7 +129,7 @@ export function CollaborationScoreCard({
               id="collab-score-title"
               className="font-display text-2xl font-bold text-ink"
             >
-              Signature #5: AI Collaboration Score
+              Co-Pilot Synergy with Brian (0–100) · Signature #5: AI Collaboration Score
             </h2>
             <Badge tone="warning" glyph="⚠">
               {payload.statusBadge}

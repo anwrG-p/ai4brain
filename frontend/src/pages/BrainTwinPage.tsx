@@ -211,7 +211,7 @@ export default function BrainTwinPage() {
             </h1>
             <DoodleSquiggle className="max-w-xs mt-1" />
             <p className="text-base text-ink-muted">
-              Your evolving mental baseline synthesized across 42 days of active micro-sessions. Scrub across 14 historical SAT-JEPA snapshots (<code className="font-mono-tabular">s_t → c_t</code>), compare checkpoints side-by-side, and inspect how your 95% confidence intervals narrow.
+              Your evolving mental baseline synthesized across 42 days of active micro-sessions. Scrub across 14 historical Brain Twin snapshots, compare checkpoints side-by-side, and inspect how your Clarity Range narrows over time.
             </p>
           </div>
 
@@ -320,7 +320,7 @@ export default function BrainTwinPage() {
         >
           <div className="flex items-center justify-between">
             <span className="font-display text-lg font-bold text-ink">
-              Reconstructing 14-Snapshot SAT-JEPA Trajectory (
+              Reconstructing 14-Snapshot Brain Twin Trajectory (
               <code className="font-mono-tabular">s_1 … s_14</code>)…
             </span>
             <Badge tone="info" glyph="◌">
