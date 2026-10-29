@@ -121,6 +121,13 @@ export default function DashboardPage() {
   const stageMoveDown = 80 // Change this number to move Brian & Board down together (in px)
   const stageMoveX = 0 // Change this number to move Brian & Board horizontally (in px)
 
+  // =========================================================================
+  // 🧭 COGNITIVE RADAR GRAPH SIZE CONTROLS
+  // Adjust this value to make the radar bigger or smaller:
+  // e.g. 550, 600, 660, 720 (default 660)
+  // =========================================================================
+  const radarSize = 660
+
   const stageStyle: React.CSSProperties = {
     marginTop: `${stageMoveDown}px`,
     transform: stageMoveX !== 0 ? `translateX(${stageMoveX}px)` : undefined,
@@ -418,6 +425,7 @@ export default function DashboardPage() {
                   interactive={true}
                   showSubtitle={false}
                   showTableToggle={false}
+                  size={radarSize}
                 />
               </div>
 

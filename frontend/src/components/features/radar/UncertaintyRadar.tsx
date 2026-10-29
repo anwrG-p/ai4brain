@@ -57,8 +57,9 @@ function renderVertexMarker(
   cx: number,
   cy: number,
   color: string,
+  customRadius?: number,
 ) {
-  const r = 6
+  const r = customRadius ?? 6
   switch (shape) {
     case 'circle':
       return (
@@ -191,10 +192,10 @@ export function UncertaintyRadar({
     setInternalSelectedDim(next)
   }
 
-  const radarSize = size ?? (bare ? 490 : 430)
+  const radarSize = size ?? (bare ? 660 : 430)
   const center = radarSize / 2
-  const maxRadius = bare ? 136 : 112
-  const labelRadius = bare ? 176 : 142
+  const maxRadius = bare ? Math.round(radarSize * 0.3) : 112
+  const labelRadius = bare ? Math.round(radarSize * 0.385) : 142
   const radiusScale = scaleLinear().domain([0, 100]).range([0, maxRadius]).clamp(true)
 
   const count = Math.max(dimensions.length, 3)
@@ -211,7 +212,7 @@ export function UncertaintyRadar({
 
   const labelPointAt = (i: number): [number, number] => {
     const angle = angleForIndex(i)
-    const verticalBoost = Math.abs(Math.sin(angle)) > 0.85 ? 10 : 0
+    const verticalBoost = Math.abs(Math.sin(angle)) > 0.85 ? (bare ? 12 : 10) : 0
     const r = labelRadius + verticalBoost
     return [
       Math.round((center + r * Math.cos(angle)) * 100) / 100,
@@ -433,11 +434,15 @@ export function UncertaintyRadar({
           <motion.div
             layout
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="flex flex-col items-center justify-center shrink-0"
+            className="flex flex-col items-center justify-center shrink-0 w-full"
           >
             <svg
               viewBox={`0 0 ${radarSize} ${radarSize}`}
-              className="w-full max-w-md sm:max-w-lg h-auto overflow-visible select-none"
+              className={
+                bare
+                  ? 'w-full max-w-2xl lg:max-w-3xl h-auto overflow-visible select-none'
+                  : 'w-full max-w-md sm:max-w-lg h-auto overflow-visible select-none'
+              }
               role="img"
               aria-label={`${title || 'Cognitive Radar'} across ${dimensions.length} cognitive dimensions`}
             >
@@ -460,20 +465,32 @@ export function UncertaintyRadar({
                 </pattern>
               </defs>
 
-              {/* Concentric reference polygons */}
+              {/* Concentric reference polygons & scale percentages */}
               {rings.map((ringPct) => {
                 const poly = rows
                   .map((r) => pointAt(r.idx, ringPct).join(','))
                   .join(' ')
+                const [, ringY] = pointAt(0, ringPct)
                 return (
-                  <polygon
-                    key={ringPct}
-                    points={poly}
-                    fill="none"
-                    stroke="var(--color-border)"
-                    strokeDasharray={ringPct === 100 ? undefined : '3 3'}
-                    strokeWidth={ringPct === 100 ? 1.5 : 1}
-                  />
+                  <g key={ringPct}>
+                    <polygon
+                      points={poly}
+                      fill="none"
+                      stroke="var(--color-border)"
+                      strokeDasharray={ringPct === 100 ? undefined : '3 3'}
+                      strokeWidth={ringPct === 100 ? (bare ? 2 : 1.5) : 1}
+                    />
+                    <text
+                      x={center + 5}
+                      y={ringY - 4}
+                      fill="var(--color-ink-muted)"
+                      fontSize={bare ? '10' : '9'}
+                      fontFamily="inherit"
+                      className="font-mono-tabular select-none pointer-events-none opacity-50 font-bold"
+                    >
+                      {ringPct}%
+                    </text>
+                  </g>
                 )
               })}
 
@@ -489,7 +506,7 @@ export function UncertaintyRadar({
                     x2={x2}
                     y2={y2}
                     stroke={isSelected ? 'var(--color-brand)' : 'var(--color-border)'}
-                    strokeWidth={isSelected ? 2.5 : 1}
+                    strokeWidth={isSelected ? 3 : 1.25}
                     strokeDasharray={isSelected ? undefined : '2 2'}
                     className="transition-colors duration-300"
                   />
@@ -507,7 +524,7 @@ export function UncertaintyRadar({
                 fillOpacity={hasAnyLowConfidence ? 0.45 : 0.9}
                 stroke="var(--uncertainty-low-stroke)"
                 strokeDasharray="4 3"
-                strokeWidth={1.5}
+                strokeWidth={bare ? 2 : 1.5}
               />
 
               {/* Inner Uncertainty Band cutout */}
@@ -525,7 +542,7 @@ export function UncertaintyRadar({
                 points={scorePoints}
                 fill="var(--uncertainty-band-fill)"
                 stroke="var(--color-brand)"
-                strokeWidth={2.5}
+                strokeWidth={bare ? 3 : 2.5}
               />
 
               {/* Distinct Vertex Markers & Direct Labels */}
@@ -566,7 +583,7 @@ export function UncertaintyRadar({
                   >
                     {/* Invisible enlarged hit target for effortless tapping */}
                     {interactive && (
-                      <circle cx={vx} cy={vy} r={22} fill="transparent" />
+                      <circle cx={vx} cy={vy} r={bare ? 28 : 22} fill="transparent" />
                     )}
 
                     {/* Selected Animated Halo Ring */}
@@ -574,7 +591,7 @@ export function UncertaintyRadar({
                       <circle
                         cx={vx}
                         cy={vy}
-                        r={13}
+                        r={bare ? 16 : 13}
                         fill="none"
                         stroke="var(--color-brand)"
                         strokeWidth={2.5}
@@ -603,6 +620,7 @@ export function UncertaintyRadar({
                         vx,
                         vy,
                         r.dim.colorCssVar,
+                        bare ? 8 : 6,
                       )}
                     </g>
 
@@ -611,15 +629,15 @@ export function UncertaintyRadar({
                       <rect
                         x={
                           textAnchor === 'middle'
-                            ? lx - 44
+                            ? lx - (bare ? 54 : 44)
                             : textAnchor === 'start'
                               ? lx - 6
-                              : lx - 82
+                              : lx - (bare ? 102 : 82)
                         }
-                        y={ly - 10}
-                        width={88}
-                        height={20}
-                        rx={10}
+                        y={ly - (bare ? 13 : 10)}
+                        width={bare ? 108 : 88}
+                        height={bare ? 26 : 20}
+                        rx={bare ? 13 : 10}
                         fill="var(--color-brand)"
                         stroke="var(--color-border-strong)"
                         strokeWidth={1.5}
@@ -635,10 +653,10 @@ export function UncertaintyRadar({
                       dominantBaseline="middle"
                       fill={isSelected ? 'var(--color-brand-ink)' : 'var(--color-ink)'}
                       stroke={isSelected ? 'none' : 'var(--color-surface)'}
-                      strokeWidth={isSelected ? 0 : 3.5}
+                      strokeWidth={isSelected ? 0 : 4}
                       paintOrder="stroke"
                       className="font-mono-tabular transition-colors duration-200"
-                      fontSize={isSelected ? '12' : '11'}
+                      fontSize={bare ? (isSelected ? '14' : '13') : (isSelected ? '12' : '11')}
                       fontWeight="700"
                     >
                       <title>{`${r.dim.consumerLabel || r.dim.name}: ${
@@ -660,7 +678,7 @@ export function UncertaintyRadar({
           <div
             role="group"
             aria-label="Cognitive dimension selector"
-            className="mt-6 flex flex-wrap items-center justify-center gap-2 max-w-2xl px-2"
+            className="mt-6 flex flex-wrap items-center justify-center gap-2.5 max-w-3xl px-2"
           >
             {rows.map((r) => {
               const isSelected = activeSelectedDimId === r.dim.id
@@ -671,7 +689,7 @@ export function UncertaintyRadar({
                   type="button"
                   aria-pressed={isSelected}
                   onClick={() => handleSelectDimension(r.dim.id)}
-                  className={`focus-ring px-3 py-1.5 rounded-pill border-2 text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  className={`focus-ring px-3.5 py-1.5 rounded-pill border-2 text-xs sm:text-sm font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                     isSelected
                       ? 'bg-brand text-brand-ink border-border-strong shadow-doodle-sm scale-105'
                       : 'bg-surface text-ink border-border-strong/40 hover:border-border-strong hover:bg-surface-raised shadow-xs'
