@@ -549,33 +549,6 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     stroke: #162621 !important;
   }
 
-  .board-tray {
-    background: #D4A373;
-    background-image: linear-gradient(180deg, #ECC18A 0%, #C89666 100%);
-    border: 2px solid var(--color-border-strong);
-    border-radius: 8px;
-    box-shadow: 2px 2px 0 var(--color-border-strong);
-  }
-
-  [data-theme="dark"] .board-tray {
-    background: #6E3F1F;
-    border-color: #FF8C5A;
-    box-shadow: 2px 2px 0 #FF8C5A;
-  }
-
-  .board-eraser {
-    background: #ECC18A;
-    border: 1.5px solid var(--color-border-strong);
-    border-radius: 4px;
-    box-shadow: 1px 1px 0 var(--color-border-strong);
-  }
-
-  [data-theme="dark"] .board-eraser {
-    background: #7D4925;
-    border-color: #FF8C5A;
-    box-shadow: 1px 1px 0 #FF8C5A;
-  }
-
   /* Gentle Floating Idle Animation for Hero Character */
   @keyframes brian-float {
     0%, 100% {

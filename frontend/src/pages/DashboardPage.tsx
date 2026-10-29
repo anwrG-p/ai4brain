@@ -569,49 +569,6 @@ export default function DashboardPage() {
                     </Link>
                   </div>
                 </div>
-
-                {/* BOTTOM TRAY: Colored Markers & Eraser Ledge (Inspired by Reference Image) */}
-                <div className="board-tray mt-3 py-1.5 px-4 flex items-center justify-between gap-4 max-w-sm rounded-lg border-2 border-border-strong shadow-doodle-sm">
-                  <div className="flex items-center gap-3">
-                    {/* Slate / Black Marker */}
-                    <div className="flex flex-col items-center gap-0.5" title="Black Marker">
-                      <div className="w-2.5 h-3 rounded-t-sm bg-secondary border border-border-strong" />
-                      <div className="w-3.5 h-7 rounded-sm bg-surface-raised border border-border-strong flex items-center justify-center">
-                        <div className="w-1 h-4 bg-secondary rounded-full" />
-                      </div>
-                    </div>
-                    {/* Blue Marker */}
-                    <div className="flex flex-col items-center gap-0.5" title="Blue Marker">
-                      <div className="w-2.5 h-3 rounded-t-sm bg-brand border border-border-strong" />
-                      <div className="w-3.5 h-7 rounded-sm bg-surface-raised border border-border-strong flex items-center justify-center">
-                        <div className="w-1 h-4 bg-brand rounded-full" />
-                      </div>
-                    </div>
-                    {/* Red Marker */}
-                    <div className="flex flex-col items-center gap-0.5" title="Red Marker">
-                      <div className="w-2.5 h-3 rounded-t-sm bg-danger border border-border-strong" />
-                      <div className="w-3.5 h-7 rounded-sm bg-surface-raised border border-border-strong flex items-center justify-center">
-                        <div className="w-1 h-4 bg-danger rounded-full" />
-                      </div>
-                    </div>
-                    {/* Felt Eraser Block */}
-                    <div
-                      className="board-eraser ms-2 px-3 py-1.5 rounded flex items-center gap-1 border-2 border-border-strong shadow-xs"
-                      title="Board Felt Eraser"
-                    >
-                      <div className="w-6 h-3 rounded-xs bg-reward border border-border-strong flex items-center justify-center text-xs font-mono font-bold">
-                        <span>▨</span>
-                      </div>
-                      <span className="text-xs font-mono font-bold text-ink-muted">
-                        Eraser
-                      </span>
-                    </div>
-                  </div>
-
-                  <span className="text-xs font-mono text-ink-muted font-bold hidden sm:inline">
-                    Lecture Board
-                  </span>
-                </div>
               </section>
             </div>
           </div>
