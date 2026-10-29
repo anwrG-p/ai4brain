@@ -299,8 +299,6 @@ export default function DashboardPage() {
               title="Classroom Board"
               shortLabel="Board"
               icon="🏫"
-              showNextPrompt={true}
-              nextPromptLabel="Next Slide: Cognitive Radar"
             >
               <div
                 className="flex flex-col lg:flex-row items-stretch lg:items-end gap-6 relative"
@@ -499,8 +497,6 @@ export default function DashboardPage() {
               title="Cognitive Radar"
               shortLabel="Radar"
               icon="🧭"
-              showNextPrompt={true}
-              nextPromptLabel="Next Slide: Pillar Metrics"
             >
               <div
                 className="w-full min-w-0 py-2 flex flex-col items-center justify-center"
