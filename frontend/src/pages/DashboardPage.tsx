@@ -41,9 +41,6 @@ export default function DashboardPage() {
     return 'calibrated'
   })
 
-  // Board style state: default to blackboard as requested ("written on a blackboard"), with whiteboard toggle
-  const [boardStyle, setBoardStyle] = useState<'blackboard' | 'whiteboard'>('blackboard')
-
   const { currentEmotion, setManualEmotion } = useEmilyStore()
   const emilyConfig = EMILY_EMOTION_CONFIGS[currentEmotion]
 
@@ -229,14 +226,8 @@ export default function DashboardPage() {
                 aria-label="Classroom Performance Board"
                 className="board-wood-frame"
               >
-                <div
-                  className={
-                    boardStyle === 'blackboard'
-                      ? 'board-canvas-blackboard p-5 sm:p-7 space-y-6'
-                      : 'board-canvas-whiteboard p-5 sm:p-7 space-y-6'
-                  }
-                >
-                  {/* BOARD TOP HEADER: Greeting, Teacher Note, Board Mode Switcher, Primary CTA */}
+                <div className="board-canvas p-5 sm:p-7 space-y-6">
+                  {/* BOARD TOP HEADER: Greeting, Teacher Note, Primary CTA */}
                   <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b-2 border-dashed border-border-strong/30 pb-5">
                     <div className="space-y-1.5 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
@@ -265,42 +256,18 @@ export default function DashboardPage() {
                       </p>
                     </div>
 
-                    {/* Action & Board Switcher Controls */}
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
-                      {/* Board Style Switcher */}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setBoardStyle((prev) =>
-                            prev === 'blackboard' ? 'whiteboard' : 'blackboard',
-                          )
-                        }
-                        className="tactile-btn px-3 py-2 rounded-xl bg-surface border-2 border-border-strong text-xs font-mono font-bold shadow-doodle-sm cursor-pointer flex items-center justify-center gap-1.5"
-                        title="Toggle board visual theme"
+                    {/* Primary CTA Button */}
+                    <div className="flex flex-col items-center sm:items-end gap-1 shrink-0">
+                      <Link
+                        to={nextStepLink}
+                        className="tactile-btn py-3 px-6 rounded-xl bg-brand text-brand-ink font-display text-base font-bold border-2 border-border-strong shadow-doodle hover:shadow-doodle-lg no-underline flex items-center justify-center gap-2 text-center"
                       >
-                        <span>
-                          {boardStyle === 'blackboard'
-                            ? '📋 Chalkboard'
-                            : '⚪ Whiteboard'}
-                        </span>
-                        <span className="text-ink-muted font-normal text-xs">
-                          (Switch)
-                        </span>
-                      </button>
-
-                      {/* Primary CTA Button */}
-                      <div className="flex flex-col items-center sm:items-end gap-1">
-                        <Link
-                          to={nextStepLink}
-                          className="tactile-btn py-3 px-6 rounded-xl bg-brand text-brand-ink font-display text-base font-bold border-2 border-border-strong shadow-doodle hover:shadow-doodle-lg no-underline flex items-center justify-center gap-2 text-center"
-                        >
-                          <span>Start Today's 2-Min Flow</span>
-                          <span aria-hidden="true">→</span>
-                        </Link>
-                        <div className="text-xs font-mono text-ink-muted flex items-center gap-1.5 pt-0.5">
-                          <span className="w-2 h-2 rounded-full bg-success animate-pulse shrink-0" />
-                          <span>{nextStepTitle} · 120s max</span>
-                        </div>
+                        <span>Start Today's 2-Min Flow</span>
+                        <span aria-hidden="true">→</span>
+                      </Link>
+                      <div className="text-xs font-mono text-ink-muted flex items-center gap-1.5 pt-0.5">
+                        <span className="w-2 h-2 rounded-full bg-success animate-pulse shrink-0" />
+                        <span>{nextStepTitle} · 120s max</span>
                       </div>
                     </div>
                   </div>

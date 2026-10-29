@@ -486,7 +486,8 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     box-shadow: 6px 6px 0 #FF8C5A;
   }
 
-  .board-canvas-whiteboard {
+  /* Board Canvas: Whiteboard in Light Mode */
+  .board-canvas {
     background-color: #FFFFFF;
     background-image: radial-gradient(rgba(38, 61, 91, 0.08) 1.2px, transparent 1.2px);
     background-size: 24px 24px;
@@ -494,68 +495,58 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     border-radius: 18px;
     color: #111827;
     position: relative;
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
   }
 
-  .board-canvas-blackboard {
-    background-color: #182A24;
+  /* Board Canvas: Chalkboard in Dark Mode */
+  [data-theme="dark"] .board-canvas {
+    background-color: #162621;
     background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1.2px, transparent 1.2px);
     background-size: 24px 24px;
     border: 2.5px solid rgba(255, 255, 255, 0.3);
     border-radius: 18px;
     color: #F8FAFC;
-    position: relative;
   }
 
-  [data-theme="dark"] .board-canvas-whiteboard {
-    background-color: #1E293B;
-    color: #FFFFFF;
-    border-color: #FF8C5A;
-  }
-
-  [data-theme="dark"] .board-canvas-blackboard {
-    background-color: #13221E;
-    border-color: #FF8C5A;
-  }
-
-  .board-canvas-blackboard h1,
-  .board-canvas-blackboard h2,
-  .board-canvas-blackboard h3,
-  .board-canvas-blackboard h4 {
+  [data-theme="dark"] .board-canvas h1,
+  [data-theme="dark"] .board-canvas h2,
+  [data-theme="dark"] .board-canvas h3,
+  [data-theme="dark"] .board-canvas h4 {
     color: #FFFFFF;
   }
 
-  .board-canvas-blackboard .text-ink {
+  [data-theme="dark"] .board-canvas .text-ink {
     color: #FFFFFF !important;
   }
 
-  .board-canvas-blackboard .text-ink-muted {
+  [data-theme="dark"] .board-canvas .text-ink-muted {
     color: #CBD5E1 !important;
   }
 
-  .board-canvas-blackboard .tactile-card,
-  .board-canvas-blackboard .bg-surface {
+  [data-theme="dark"] .board-canvas .tactile-card,
+  [data-theme="dark"] .board-canvas .bg-surface {
     background-color: rgba(255, 255, 255, 0.06) !important;
     border-color: rgba(255, 255, 255, 0.22) !important;
     color: #FFFFFF !important;
   }
 
-  .board-canvas-blackboard .bg-surface-raised {
+  [data-theme="dark"] .board-canvas .bg-surface-raised {
     background-color: rgba(255, 255, 255, 0.09) !important;
     border-color: rgba(255, 255, 255, 0.24) !important;
     color: #FFFFFF !important;
   }
 
-  .board-canvas-blackboard .border-border-strong {
+  [data-theme="dark"] .board-canvas .border-border-strong {
     border-color: rgba(255, 255, 255, 0.28) !important;
   }
 
-  .board-canvas-blackboard .border-border {
+  [data-theme="dark"] .board-canvas .border-border {
     border-color: rgba(255, 255, 255, 0.16) !important;
   }
 
-  .board-canvas-blackboard svg text {
+  [data-theme="dark"] .board-canvas svg text {
     fill: #FFFFFF !important;
-    stroke: #182A24 !important;
+    stroke: #162621 !important;
   }
 
   .board-tray {
