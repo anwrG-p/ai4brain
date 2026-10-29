@@ -372,40 +372,25 @@ export function SlideDeck({
             </button>
 
             {/* Bottom-Right Corner Arrow: Next Slide */}
-            <div className="fixed bottom-20 md:bottom-6 end-4 sm:end-6 z-40 flex items-center gap-2 select-none">
-              {activeSlide > 0 && (
-                <button
-                  type="button"
-                  onClick={prevSlide}
-                  aria-label="Previous slide"
-                  title="Previous slide (Arrow Up)"
-                  className="w-10 h-10 rounded-xl bg-surface/90 backdrop-blur-md border-2 border-border-strong text-ink shadow-doodle hover:bg-brand hover:text-brand-ink hover:scale-105 active:scale-95 flex items-center justify-center transition-all cursor-pointer"
-                >
-                  <span aria-hidden="true" className="font-bold text-xs">▲</span>
-                  <span className="sr-only">Previous slide</span>
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={nextSlide}
-                disabled={activeSlide === slides.length - 1}
-                aria-label="Next slide"
-                title={
-                  activeSlide === slides.length - 1
-                    ? 'End of slides (Scroll down for details)'
-                    : 'Next slide (Arrow Down)'
-                }
-                className={`w-11 h-11 rounded-xl bg-surface/90 backdrop-blur-md border-2 border-border-strong text-ink flex items-center justify-center transition-all cursor-pointer ${
-                  activeSlide === slides.length - 1
-                    ? 'opacity-40 cursor-not-allowed bg-canvas'
-                    : 'opacity-100 shadow-doodle hover:bg-brand hover:text-brand-ink hover:scale-105 active:scale-95'
-                }`}
-              >
-                <span aria-hidden="true" className="font-bold text-sm">▼</span>
-                <span className="sr-only">Next slide</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={nextSlide}
+              disabled={activeSlide === slides.length - 1}
+              aria-label="Next slide"
+              title={
+                activeSlide === slides.length - 1
+                  ? 'End of slides (Scroll down for details)'
+                  : 'Next slide (Arrow Down)'
+              }
+              className={`fixed bottom-20 md:bottom-6 end-4 sm:end-6 z-40 w-11 h-11 rounded-xl bg-surface/90 backdrop-blur-md border-2 border-border-strong text-ink flex items-center justify-center transition-all cursor-pointer select-none ${
+                activeSlide === slides.length - 1
+                  ? 'opacity-40 cursor-not-allowed bg-canvas'
+                  : 'opacity-100 shadow-doodle hover:bg-brand hover:text-brand-ink hover:scale-105 active:scale-95'
+              }`}
+            >
+              <span aria-hidden="true" className="font-bold text-sm">▼</span>
+              <span className="sr-only">Next slide</span>
+            </button>
           </>
         )}
       </div>
