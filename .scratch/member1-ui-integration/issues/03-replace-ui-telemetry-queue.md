@@ -23,3 +23,7 @@ One telemetry path in the app. The offline banner and the privacy purge use the 
 ## Done when
 
 From `frontend/`, `npm run qa:checks` is green. Commit with no AI attribution.
+
+## Comments
+
+- **Dead code for the UI owner:** `frontend/src/services/api/apiClient.ts` still has `postTelemetryEvent`, `getNextTask` and `deleteUserTelemetry`. Nothing in the app calls them now: telemetry goes through `features/assessment/telemetry/tracker`, and the purge only clears the local Tracker until Member 4's delete route exists. They were left in place as this ticket asked, and the UI team can remove them.
