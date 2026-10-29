@@ -323,7 +323,7 @@ export function HumanReviewGate({
               onDismiss?.()
             }}
             aria-label="Close review gate"
-            className="focus-ring p-1 rounded hover:bg-canvas text-ink-muted hover:text-ink cursor-pointer"
+            className="focus-ring min-w-[44px] min-h-[44px] flex items-center justify-center rounded hover:bg-canvas text-ink-muted hover:text-ink cursor-pointer"
           >
             <X size={16} aria-hidden="true" />
           </button>

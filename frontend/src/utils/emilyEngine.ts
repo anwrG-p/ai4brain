@@ -223,6 +223,15 @@ export function computeEmilyMetrics(
     }
   }
 
+  // Account for active trailing pause since last event
+  const trailingIdleMs = latestTime - lastEvent.timestamp
+  if (trailingIdleMs > maxIdleGapMs) {
+    maxIdleGapMs = trailingIdleMs
+  }
+  if (trailingIdleMs > 2000) {
+    totalIdleMs += trailingIdleMs
+  }
+
   const idleFatigueRatio = Math.min(1.0, totalIdleMs / bufferDurationMs)
 
   // 4. Hover Hesitation
@@ -274,6 +283,7 @@ export function classifyEmilyEmotion(
   if (
     metrics.clickBurstCount >= 1 ||
     metrics.cursorJerk > 0.8 ||
+    metrics.isHeavyPress ||
     (options?.consecutiveErrors !== undefined && options.consecutiveErrors >= 2)
   ) {
     return 'frustrated'
@@ -304,6 +314,31 @@ export function classifyEmilyEmotion(
 
   // 5. Default: Calm Flow
   return 'calm_flow'
+}
+
+/**
+ * Returns a human-friendly plain-English description of current pointer rhythm.
+ */
+export function getKinematicsSummary(metrics: {
+  cursorVelocity: number
+  cursorJerk: number
+  pathDirectness: number
+  curvature: number
+  clickBurstCount: number
+}): string {
+  if (metrics.clickBurstCount > 0 || metrics.cursorJerk > 0.8) {
+    return 'Pointer Rhythm: Elevated acceleration spikes and rapid click clusters.'
+  }
+  if (metrics.pathDirectness < 0.48 || metrics.curvature > 2.0) {
+    return `Pointer Rhythm: Wandering arcs (directness ${(metrics.pathDirectness * 100).toFixed(0)}%) with searching pauses.`
+  }
+  if (metrics.cursorVelocity > 0.6 && metrics.pathDirectness >= 0.8) {
+    return `Pointer Rhythm: Brisk velocity (${metrics.cursorVelocity.toFixed(2)} px/ms) with direct decisive paths.`
+  }
+  if (metrics.cursorVelocity < 0.15) {
+    return `Pointer Rhythm: Gentle velocity (${metrics.cursorVelocity.toFixed(2)} px/ms) with extended rest intervals.`
+  }
+  return `Pointer Rhythm: Smooth arcs, steady velocity (${metrics.cursorVelocity.toFixed(2)} px/ms).`
 }
 
 /**

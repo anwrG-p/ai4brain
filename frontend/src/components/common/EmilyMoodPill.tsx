@@ -11,6 +11,7 @@ import {
 import { useEmilyStore } from '../../state/useEmilyStore'
 import {
   startEmilyListener,
+  getKinematicsSummary,
   type EmilyEmotion,
 } from '../../utils/emilyEngine'
 import { Badge } from '../ui/Badge'
@@ -45,28 +46,6 @@ const EMOTION_META: Record<
     shortLabel: 'Restorative Wind-Down',
     promptAction: 'Apply Rest Mode',
   },
-}
-
-function getKinematicsSummary(metrics: {
-  cursorVelocity: number
-  cursorJerk: number
-  pathDirectness: number
-  curvature: number
-  clickBurstCount: number
-}): string {
-  if (metrics.clickBurstCount > 0 || metrics.cursorJerk > 0.8) {
-    return 'Pointer Rhythm: Elevated acceleration spikes and rapid click clusters.'
-  }
-  if (metrics.pathDirectness < 0.48 || metrics.curvature > 2.0) {
-    return `Pointer Rhythm: Wandering arcs (directness ${(metrics.pathDirectness * 100).toFixed(0)}%) with searching pauses.`
-  }
-  if (metrics.cursorVelocity > 0.6 && metrics.pathDirectness >= 0.8) {
-    return `Pointer Rhythm: Brisk velocity (${metrics.cursorVelocity.toFixed(2)} px/ms) with direct decisive paths.`
-  }
-  if (metrics.cursorVelocity < 0.15) {
-    return `Pointer Rhythm: Gentle velocity (${metrics.cursorVelocity.toFixed(2)} px/ms) with extended rest intervals.`
-  }
-  return `Pointer Rhythm: Smooth arcs, steady velocity (${metrics.cursorVelocity.toFixed(2)} px/ms).`
 }
 
 export function EmilyMoodPill() {
@@ -207,7 +186,7 @@ export function EmilyMoodPill() {
                   type="button"
                   onClick={rejectProposedEmotion}
                   aria-label="Dismiss suggestion"
-                  className="focus-ring text-ink-muted hover:text-ink p-0.5 rounded cursor-pointer"
+                  className="focus-ring text-ink-muted hover:text-ink min-w-[44px] min-h-[44px] flex items-center justify-center rounded cursor-pointer"
                 >
                   <X size={13} aria-hidden="true" />
                 </button>
@@ -282,7 +261,7 @@ export function EmilyMoodPill() {
                 type="button"
                 onClick={() => setIsOpen(false)}
                 aria-label="Close EMILY settings"
-                className="focus-ring p-1 rounded hover:bg-surface-raised text-ink-muted hover:text-ink cursor-pointer"
+                className="focus-ring min-w-[44px] min-h-[44px] flex items-center justify-center rounded hover:bg-surface-raised text-ink-muted hover:text-ink cursor-pointer"
               >
                 <X size={15} aria-hidden="true" />
               </button>
@@ -299,14 +278,19 @@ export function EmilyMoodPill() {
               {getKinematicsSummary(metrics)}
             </p>
 
-            {/* Compact Monospace Telemetry Strip */}
-            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/60 text-xs font-mono text-ink-muted">
-              <span>v: {metrics.cursorVelocity.toFixed(2)} px/ms</span>
-              <span>·</span>
-              <span>arc: {(metrics.pathDirectness * 100).toFixed(0)}%</span>
-              <span>·</span>
-              <span>jerk: {metrics.cursorJerk.toFixed(2)}</span>
-            </div>
+            {/* Collapsible Technical Telemetry Inspect Drawer (ADR 0001 compliant) */}
+            <details data-technical-drawer className="mt-2 pt-1 border-t border-border/60">
+              <summary className="text-xs font-mono text-ink-muted cursor-pointer hover:text-ink">
+                Explore Kinematic Metrics
+              </summary>
+              <div className="flex items-center gap-2 mt-1.5 text-xs font-mono text-ink-muted">
+                <span>v: {metrics.cursorVelocity.toFixed(2)} px/ms</span>
+                <span>·</span>
+                <span>arc: {(metrics.pathDirectness * 100).toFixed(0)}%</span>
+                <span>·</span>
+                <span>jerk: {metrics.cursorJerk.toFixed(2)}</span>
+              </div>
+            </details>
           </div>
 
           {/* Emotion Selector: Manual Lock */}
