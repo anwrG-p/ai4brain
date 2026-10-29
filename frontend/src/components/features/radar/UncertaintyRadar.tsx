@@ -454,12 +454,15 @@ export function UncertaintyRadar({
 
       {/* Main Interactive Graph Stage */}
       <div className="w-full flex flex-col items-center justify-center pt-2">
-        <div className="w-full flex flex-col lg:flex-row items-center justify-center gap-y-6 lg:gap-0 relative">
+        <div
+          className="w-full flex flex-col lg:flex-row items-center justify-center gap-y-6 relative"
+          style={{ columnGap: `${Math.max(0, cardMargin)}px` }}
+        >
           {/* LEFT: Dimension Detail Info Card (Only for Left-side dimensions) */}
-          <AnimatePresence>
+          <AnimatePresence mode="popLayout">
             {interactive && selectedRow && cardSide === 'left' && (
               <motion.div
-                key={`card-left-${selectedRow.dim.id}`}
+                key="card-slot-left"
                 initial={{ opacity: 0, x: -28, y: cardOffsetY, scale: 0.96 }}
                 animate={{
                   opacity: 1,
@@ -473,12 +476,21 @@ export function UncertaintyRadar({
                   x: -20,
                   y: cardOffsetY,
                   scale: 0.94,
-                  transition: { duration: 0.18, ease: [0.23, 1, 0.32, 1] },
+                  transition: { duration: 0.16, ease: [0.23, 1, 0.32, 1] },
                 }}
                 className="w-full sm:w-80 lg:w-80 shrink-0 z-10"
-                style={{ marginRight: `${cardMargin}px` }}
               >
-                {renderDetailCard(selectedRow)}
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div
+                    key={selectedRow.dim.id}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.14, ease: 'easeOut' }}
+                  >
+                    {renderDetailCard(selectedRow)}
+                  </motion.div>
+                </AnimatePresence>
               </motion.div>
             )}
           </AnimatePresence>
@@ -486,6 +498,7 @@ export function UncertaintyRadar({
           {/* CENTER: The Radar SVG Graph (layout animated, maintaining its exact scale) */}
           <motion.div
             layout="position"
+            layoutDependency={activeSelectedDimId}
             transition={{
               type: 'spring',
               stiffness: 260,
@@ -749,10 +762,10 @@ export function UncertaintyRadar({
           </motion.div>
 
           {/* RIGHT: Dimension Detail Info Card (For Right-side dimensions & WM) */}
-          <AnimatePresence>
+          <AnimatePresence mode="popLayout">
             {interactive && selectedRow && cardSide === 'right' && (
               <motion.div
-                key={`card-right-${selectedRow.dim.id}`}
+                key="card-slot-right"
                 initial={{ opacity: 0, x: 28, y: cardOffsetY, scale: 0.96 }}
                 animate={{
                   opacity: 1,
@@ -766,12 +779,21 @@ export function UncertaintyRadar({
                   x: 20,
                   y: cardOffsetY,
                   scale: 0.94,
-                  transition: { duration: 0.18, ease: [0.23, 1, 0.32, 1] },
+                  transition: { duration: 0.16, ease: [0.23, 1, 0.32, 1] },
                 }}
                 className="w-full sm:w-80 lg:w-80 shrink-0 z-10"
-                style={{ marginLeft: `${cardMargin}px` }}
               >
-                {renderDetailCard(selectedRow)}
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div
+                    key={selectedRow.dim.id}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.14, ease: 'easeOut' }}
+                  >
+                    {renderDetailCard(selectedRow)}
+                  </motion.div>
+                </AnimatePresence>
               </motion.div>
             )}
           </AnimatePresence>
