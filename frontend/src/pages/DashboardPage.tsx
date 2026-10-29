@@ -337,55 +337,13 @@ export default function DashboardPage() {
 
                   {/* MAIN BOARD SPLIT: 6-Skill Balance Radar (Left) + Core Balance Insights (Right) */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-                    {/* Left Wing (7 cols on lg): 6-Skill Cognitive Balance Radar + Dimension Strip */}
-                    <div className="lg:col-span-7 min-w-0 space-y-4">
+                    {/* Left Wing (7 cols on lg): 6-Skill Cognitive Balance Radar */}
+                    <div className="lg:col-span-7 min-w-0">
                       <UncertaintyRadar
                         dimensions={activeDimensions}
                         estimates={estimates}
                         title="6-Skill Cognitive Balance"
                       />
-
-                      {/* Dimension 95% Confidence Band Strip */}
-                      <div className="p-3.5 rounded-xl bg-surface-raised border-2 border-border-strong shadow-doodle-sm space-y-2">
-                        <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-xs border-b border-border pb-2">
-                          <span className="font-bold text-ink">
-                            Showing {activeDimensions.length} cognitive dimensions with 95% confidence bands
-                          </span>
-                          <span className="font-mono text-xs px-2 py-0.5 rounded bg-warning-subtle text-warning border border-border-strong font-bold">
-                            ▨ Hatched = Confidence &lt; 60%
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-xs font-mono font-bold">
-                          <div className="p-2 rounded bg-surface border border-border flex flex-col items-center text-center justify-center gap-0.5">
-                            <span className="text-ink">● WM</span>
-                            <span className="text-brand">68%±5</span>
-                          </div>
-                          <div className="p-2 rounded bg-surface border border-border flex flex-col items-center text-center justify-center gap-0.5">
-                            <span className="text-ink">■ IC</span>
-                            <span className="text-brand">75%±6</span>
-                          </div>
-                          <div className="p-2 rounded bg-surface border border-border flex flex-col items-center text-center justify-center gap-0.5">
-                            <span className="text-ink">▲ CF</span>
-                            <span className="text-brand">82%±7</span>
-                          </div>
-                          <div className="p-2 rounded bg-surface border border-border flex flex-col items-center text-center justify-center gap-0.5">
-                            <span className="text-ink">◆ AN</span>
-                            <span className="text-brand">89%±5</span>
-                          </div>
-                          <div className="p-2 rounded bg-surface border border-border flex flex-col items-center text-center justify-center gap-0.5">
-                            <span className="text-ink">⬠ PS</span>
-                            <span className="text-brand">74%±6</span>
-                          </div>
-                          <div className="p-2 rounded bg-surface border border-border flex flex-col items-center text-center justify-center gap-0.5">
-                            <span className="text-ink">⬢ EP</span>
-                            <span className="text-brand">81%±16</span>
-                          </div>
-                          <div className="p-2 rounded bg-surface border border-border flex flex-col items-center text-center justify-center gap-0.5">
-                            <span className="text-ink">★ VP</span>
-                            <span className="text-brand">88%±5</span>
-                          </div>
-                        </div>
-                      </div>
                     </div>
 
                     {/* Right Wing (5 cols on lg): Core Balance Insights & Weekly Goal */}
