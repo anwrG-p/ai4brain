@@ -351,78 +351,62 @@ export function SlideDeck({
       <div className={`slide-deck-container relative ${className}`}>
         {children}
 
-        {/* Floating Doodle Slide Navigation Pill (Desktop & Tablet) */}
+        {/* Corner Slide Navigation Arrows (Replacing the Right Slide Indicator) */}
         {slides.length > 1 && (
-          <aside
-            aria-label="Slide navigation"
-            className="fixed end-3 sm:end-6 top-1/2 -translate-y-1/2 z-40 hidden md:flex flex-col items-center gap-2 p-2 bg-surface/90 backdrop-blur-md border-2 border-border-strong rounded-2xl shadow-doodle select-none"
-          >
-            {/* Previous Slide Button */}
+          <>
+            {/* Top-Right Corner Arrow: Previous Slide */}
             <button
               type="button"
               onClick={prevSlide}
               disabled={activeSlide === 0}
               aria-label="Previous slide"
               title="Previous slide (Arrow Up)"
-              className={`w-7 h-7 rounded-lg border border-border-strong flex items-center justify-center transition-all cursor-pointer ${
+              className={`fixed top-22 sm:top-24 end-4 sm:end-6 z-40 w-11 h-11 rounded-xl bg-surface/90 backdrop-blur-md border-2 border-border-strong text-ink flex items-center justify-center transition-all cursor-pointer select-none ${
                 activeSlide === 0
-                  ? 'opacity-30 cursor-not-allowed bg-canvas'
-                  : 'bg-surface hover:bg-surface-raised active:scale-95 shadow-doodle-sm'
+                  ? 'opacity-0 pointer-events-none -translate-y-2'
+                  : 'opacity-100 translate-y-0 shadow-doodle hover:bg-brand hover:text-brand-ink hover:scale-105 active:scale-95'
               }`}
             >
-              <span aria-hidden="true" className="font-bold text-xs">▲</span>
+              <span aria-hidden="true" className="font-bold text-sm">▲</span>
+              <span className="sr-only">Previous slide</span>
             </button>
 
-            {/* Slide Indicator Buttons */}
-            <div className="flex flex-col items-center gap-2 py-1">
-              {slides.map((slide, idx) => {
-                const isActive = idx === activeSlide
-                return (
-                  <button
-                    key={slide.id}
-                    type="button"
-                    onClick={() => goToSlide(idx)}
-                    aria-label={`Slide ${idx + 1}: ${slide.title}`}
-                    aria-current={isActive ? 'step' : undefined}
-                    title={`Slide ${idx + 1}: ${slide.title}`}
-                    className={`group relative flex items-center justify-center transition-all cursor-pointer ${
-                      isActive
-                        ? 'w-8 h-8 rounded-xl bg-brand text-brand-ink font-bold text-xs border-2 border-border-strong shadow-doodle-sm scale-110'
-                        : 'w-6 h-6 rounded-lg bg-surface text-ink-muted hover:text-ink hover:bg-surface-raised font-mono text-xs border border-border-strong hover:scale-105'
-                    }`}
-                  >
-                    <span>{slide.icon ? slide.icon : idx + 1}</span>
+            {/* Bottom-Right Corner Arrow: Next Slide */}
+            <div className="fixed bottom-20 md:bottom-6 end-4 sm:end-6 z-40 flex items-center gap-2 select-none">
+              {activeSlide > 0 && (
+                <button
+                  type="button"
+                  onClick={prevSlide}
+                  aria-label="Previous slide"
+                  title="Previous slide (Arrow Up)"
+                  className="w-10 h-10 rounded-xl bg-surface/90 backdrop-blur-md border-2 border-border-strong text-ink shadow-doodle hover:bg-brand hover:text-brand-ink hover:scale-105 active:scale-95 flex items-center justify-center transition-all cursor-pointer"
+                >
+                  <span aria-hidden="true" className="font-bold text-xs">▲</span>
+                  <span className="sr-only">Previous slide</span>
+                </button>
+              )}
 
-                    {/* Floating Hover Tooltip */}
-                    <span className="sr-only sm:not-sr-only absolute end-full me-3 px-2.5 py-1 rounded-lg bg-surface text-ink text-xs font-bold font-mono border-2 border-border-strong shadow-doodle-sm whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity">
-                      {slide.shortLabel ?? slide.title}
-                    </span>
-                  </button>
-                )
-              })}
+              <button
+                type="button"
+                onClick={nextSlide}
+                disabled={activeSlide === slides.length - 1}
+                aria-label="Next slide"
+                title={
+                  activeSlide === slides.length - 1
+                    ? 'End of slides (Scroll down for details)'
+                    : 'Next slide (Arrow Down)'
+                }
+                className={`w-11 h-11 rounded-xl bg-surface/90 backdrop-blur-md border-2 border-border-strong text-ink flex items-center justify-center transition-all cursor-pointer ${
+                  activeSlide === slides.length - 1
+                    ? 'opacity-40 cursor-not-allowed bg-canvas'
+                    : 'opacity-100 shadow-doodle hover:bg-brand hover:text-brand-ink hover:scale-105 active:scale-95'
+                }`}
+              >
+                <span aria-hidden="true" className="font-bold text-sm">▼</span>
+                <span className="sr-only">Next slide</span>
+              </button>
             </div>
-
-            {/* Next Slide Button */}
-            <button
-              type="button"
-              onClick={nextSlide}
-              disabled={activeSlide === slides.length - 1}
-              aria-label="Next slide"
-              title="Next slide (Arrow Down)"
-              className={`w-7 h-7 rounded-lg border border-border-strong flex items-center justify-center transition-all cursor-pointer ${
-                activeSlide === slides.length - 1
-                  ? 'opacity-30 cursor-not-allowed bg-canvas'
-                  : 'bg-surface hover:bg-surface-raised active:scale-95 shadow-doodle-sm'
-              }`}
-            >
-              <span aria-hidden="true" className="font-bold text-xs">▼</span>
-            </button>
-
-            {/* Slide Position Counter */}
-            <div className="pt-1 border-t border-dashed border-border-strong/40 text-center font-mono text-xs text-ink-muted">
-              <span>{activeSlide + 1}/{slides.length}</span>
-            </div>
-          </aside>
+          </>
         )}
       </div>
     </SlideDeckContext.Provider>
