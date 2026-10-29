@@ -120,6 +120,23 @@ export default function DashboardPage() {
     position: 'relative',
   }
 
+  // =========================================================================
+  // 📐 CLASSROOM BOARD MANUAL DIMENSIONS (SCALE & SIZE CONTROLS)
+  // Adjust these values to change the board's dimensions:
+  // - boardWidth: '100%' (or e.g. '800px', '900px', '1000px')
+  // - boardMaxWidth: '100%' (e.g. '950px', '1200px')
+  // - boardMinHeight: 'auto' (or e.g. '300px', '380px', '450px' to make taller)
+  // =========================================================================
+  const boardWidth = '100%'
+  const boardMaxWidth = '100%'
+  const boardMinHeight = 'auto'
+
+  const boardStyle: React.CSSProperties = {
+    width: boardWidth,
+    maxWidth: boardMaxWidth,
+    minHeight: boardMinHeight,
+  }
+
   return (
     <div className="space-y-8 pb-12">
       {/* STATE: LOADING SKELETON */}
@@ -252,6 +269,7 @@ export default function DashboardPage() {
                   id="classroom-board"
                   aria-label="Classroom Performance Board"
                   className="board-wood-frame"
+                  style={boardStyle}
                 >
                   <div className="board-canvas p-5 sm:p-7 space-y-5">
                     {/* WEEKLY CONTINUITY & RHYTHM (Drawn directly on Classroom Board) */}
