@@ -37,11 +37,8 @@ test.describe('Page 07: Dimension Detail (/dimensions/:dimId) Visual QA & A11y',
       fullPage: true,
     })
 
-    // 2. Switch to 10-Dim Stress + 2 · ⚡ Hatched (<60% CI) (Episodic Pattern Separation)
+    // 2. Switch to 2 · ⚡ Hatched (<60% CI) (Episodic Pattern Separation)
     await openJudgeMode(page)
-    await page
-      .getByRole('button', { name: '10 Dims (Stress)', exact: true })
-      .click()
     await page
       .getByRole('button', { name: /2 · ⚡ Hatched \(<60% CI\)/i })
       .click()
@@ -87,9 +84,6 @@ test.describe('Page 07: Dimension Detail (/dimensions/:dimId) Visual QA & A11y',
 
     // Restore Light + 7 Dims + WM for Tablet & Mobile checks
     await page.getByRole('button', { name: /Light \(Playful Lab\)/i }).first().click()
-    await page
-      .getByRole('button', { name: '7 Dims (Default)', exact: true })
-      .click()
     await closeJudgeMode(page)
     await page
       .getByRole('button', { name: /WM · Working Memory/i })

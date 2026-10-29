@@ -30,9 +30,8 @@ test.describe('Page 03: Assessment Hub (/assessment) Visual QA & A11y', () => {
       fullPage: true,
     })
 
-    // 2. Switch to 10-Dims + Hatched Priority Queue + Open Payload JSON + Table Toggle
+    // 2. Hatched Priority Queue + Open Payload JSON + Table Toggle
     await openJudgeMode(page)
-    await page.getByRole('button', { name: /10 Dims \(Stress\)/i }).click()
     await page
       .getByRole('button', { name: /Hatched Priority Queue \(Salma/i })
       .click()
@@ -73,9 +72,8 @@ test.describe('Page 03: Assessment Hub (/assessment) Visual QA & A11y', () => {
       fullPage: true,
     })
 
-    // Reset back to Light + 7 Dims + Calibrated Queue for Tablet & Mobile checks
+    // Reset back to Light + Calibrated Queue for Tablet & Mobile checks
     await page.getByRole('button', { name: /Light \(Playful Lab\)/i }).first().click()
-    await page.getByRole('button', { name: /7 Dims \(Default\)/i }).click()
     await closeJudgeMode(page)
     await page
       .getByRole('button', { name: /Calibrated Queue \(Youssef/i })

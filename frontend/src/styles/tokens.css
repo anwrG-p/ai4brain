@@ -349,6 +349,20 @@
     border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
   }
 
+  /* Gentle Floating Idle Animation for Hero Character */
+  @keyframes brian-float {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-5px);
+    }
+  }
+
+  .animate-brian-float {
+    animation: brian-float 3.5s ease-in-out infinite;
+  }
+
 }
 
 /* Reduced Motion & Timed-Trial Zero-Distraction Lock */
@@ -362,7 +376,8 @@
     scroll-behavior: auto !important;
   }
   .tactile-btn:active:not(:disabled),
-  .tactile-card:hover {
+  .tactile-card:hover,
+  .animate-brian-float {
     transform: none !important;
   }
 }
@@ -377,7 +392,9 @@
 [data-reduced-motion="true"] .tactile-btn:active:not(:disabled),
 [data-timed-trial="true"] .tactile-btn:active:not(:disabled),
 [data-reduced-motion="true"] .tactile-card:hover,
-[data-timed-trial="true"] .tactile-card:hover {
+[data-timed-trial="true"] .tactile-card:hover,
+[data-reduced-motion="true"] .animate-brian-float,
+[data-timed-trial="true"] .animate-brian-float {
   transform: none !important;
 }
 

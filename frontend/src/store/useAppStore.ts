@@ -34,6 +34,13 @@ export interface ConsentPreferences {
   updatedAtIso: string
 }
 
+export interface UserProfile {
+  preferredName: string
+  email: string
+  focusGoal: string
+  rememberOnDevice?: boolean
+}
+
 export const DEFAULT_CONSENT_PREFERENCES: ConsentPreferences = {
   focusGoal: 'balanced-360-twin',
   peakWindow: 'morning',
@@ -58,6 +65,10 @@ interface AppState {
   simulateOffline: boolean
   simulateLlmDown: boolean
   consentPreferences: ConsentPreferences
+  userProfile: UserProfile | null
+  isAuthenticated: boolean
+  loginUser: (profile: UserProfile) => void
+  logoutUser: () => void
   textScale: TextScale
   enhancedGlyphs: boolean
   soundEffects: boolean
@@ -106,6 +117,10 @@ export const useAppStore = create<AppState>((set) => ({
   simulateOffline: false,
   simulateLlmDown: false,
   consentPreferences: DEFAULT_CONSENT_PREFERENCES,
+  userProfile: null,
+  isAuthenticated: false,
+  loginUser: (profile: UserProfile) => set({ userProfile: profile, isAuthenticated: true }),
+  logoutUser: () => set({ userProfile: null, isAuthenticated: false }),
   textScale: '100',
   enhancedGlyphs: true,
   soundEffects: true,
@@ -206,6 +221,8 @@ export const useAppStore = create<AppState>((set) => ({
         simulateOffline: false,
         simulateLlmDown: false,
         consentPreferences: DEFAULT_CONSENT_PREFERENCES,
+        userProfile: null,
+        isAuthenticated: false,
         textScale: '100',
         enhancedGlyphs: true,
         soundEffects: true,

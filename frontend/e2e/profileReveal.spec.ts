@@ -33,7 +33,6 @@ test.describe('Page 05: Profile Reveal (/profile-reveal) + Mascot Sprint Visual 
 
     // 2. Switch to First-Session Hatched (Salma) + Open Snapshot JSON + 10 Dimensions Stress Mode
     await openJudgeMode(page)
-    await page.getByRole('button', { name: /10 Dims \(Stress\)/i }).click()
     await page
       .getByRole('button', { name: /First-Session Hatched \(Salma/i })
       .click()
@@ -65,7 +64,6 @@ test.describe('Page 05: Profile Reveal (/profile-reveal) + Mascot Sprint Visual 
 
     // Reset back to Light + 7 Dims + Calibrated for Tablet & Mobile checks
     await page.getByRole('button', { name: /Light \(Playful Lab\)/i }).first().click()
-    await page.getByRole('button', { name: /7 Dims \(Default\)/i }).click()
     await closeJudgeMode(page)
     await page
       .getByRole('button', { name: /Calibrated Reveal \(Youssef/i })

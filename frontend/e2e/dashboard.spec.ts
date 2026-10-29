@@ -33,9 +33,8 @@ test.describe('Page 06: Dashboard (/dashboard) Hero Visual QA & A11y', () => {
       fullPage: true,
     })
 
-    // 2. Desktop 1440px — 10 Dimensions Stress + Low-Confidence Hatched (Salma)
+    // 2. Desktop 1440px — Low-Confidence Hatched (Salma)
     await openJudgeMode(page)
-    await page.getByRole('button', { name: '10 Dims (Stress)' }).click()
     const salmaBtn = page.getByRole('button', { name: /Low-Conf Hatched \(Salma/i })
     await salmaBtn.click()
     await expect(salmaBtn).toHaveAttribute('aria-pressed', 'true')
@@ -62,7 +61,6 @@ test.describe('Page 06: Dashboard (/dashboard) Hero Visual QA & A11y', () => {
 
     // Switch back to Light & 7 Dims Calibrated for Tablet & Mobile captures
     await page.getByRole('button', { name: /Light \(Playful Lab\)/i }).first().click()
-    await page.getByRole('button', { name: '7 Dims (Default)' }).click()
     await closeJudgeMode(page)
     await page
       .getByRole('button', { name: /Calibrated Twin \(Youssef/i })

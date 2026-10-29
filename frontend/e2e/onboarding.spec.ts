@@ -33,9 +33,8 @@ test.describe('Page 02: Onboarding & Consent (/onboarding) Visual QA & A11y', ()
       fullPage: true,
     })
 
-    // 2. Desktop 1440px — All 3 Steps Expanded + 10 Dimensions Stress Check
+    // 2. Desktop 1440px — All 3 Steps Expanded
     await openJudgeMode(page)
-    await page.getByRole('button', { name: '10 Dims (Stress)' }).click()
     await page.getByRole('button', { name: 'View All 3 Steps' }).click()
     await expect(
       page.getByRole('heading', {
@@ -64,7 +63,6 @@ test.describe('Page 02: Onboarding & Consent (/onboarding) Visual QA & A11y', ()
 
     // Switch back to Light & 7 Dims Default for Tablet & Mobile captures
     await page.getByRole('button', { name: /Light \(Playful Lab\)/i }).first().click()
-    await page.getByRole('button', { name: '7 Dims (Default)' }).click()
     await closeJudgeMode(page)
     await page.waitForTimeout(300)
 

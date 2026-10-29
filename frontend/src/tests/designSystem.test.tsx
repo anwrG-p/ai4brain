@@ -40,7 +40,7 @@ describe('Wave 1 & Wave 2 Pages & Design System Unit Suite', () => {
     expect(getDimensionsByPreset('10')).toHaveLength(10)
   })
 
-  it('renders Page 01 Welcome (/) and supports persona switching, preview states, and 3-to-10 dimensions', async () => {
+  it('renders Page 01 Welcome (/) and supports starting baseline assessment and viewing how it works', async () => {
     window.history.pushState({}, '', '/')
     render(<App />)
 
@@ -53,14 +53,20 @@ describe('Wave 1 & Wave 2 Pages & Design System Unit Suite', () => {
     )
     expect(heading).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: /Low-Conf \(Hatched\)/i }))
-    expect(screen.getByText(/Hatched = Confidence < 60%/i)).toBeInTheDocument()
+    const startBtn = screen.getByRole('button', {
+      name: /Start my 2-minute baseline/i,
+    })
+    expect(startBtn).toBeInTheDocument()
+    expect(screen.getByText(/How SynapseTwin Works/i)).toBeInTheDocument()
+    expect(screen.getByText(/2-Minute Micro-Games/i)).toBeInTheDocument()
+    expect(screen.getByText(/Your Living Brain Twin/i)).toBeInTheDocument()
+    expect(screen.getByText(/Zero-Guilt Growth/i)).toBeInTheDocument()
 
-    fireEvent.click(
-      screen.getByRole('button', { name: /Load Salma \(Hatched Twin\)/i }),
-    )
+    fireEvent.click(startBtn)
     expect(
-      screen.getByText(/Active persona switched to Salma/i),
+      await screen.findByRole('heading', {
+        name: /Configure your cognitive twin on your own terms/i,
+      }),
     ).toBeInTheDocument()
   })
 

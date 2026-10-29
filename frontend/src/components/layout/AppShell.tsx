@@ -14,7 +14,6 @@ import {
   Cpu,
 } from 'lucide-react'
 import { BRAND_CONFIG } from '../../config/brand'
-import { DIMENSION_PRESETS } from '../../config/dimensions'
 import conceptALockup from '../../assets/branding/concept-a-lockup.svg'
 import { useAppStore } from '../../store/useAppStore'
 import { telemetryQueue } from '../../services/telemetryQueue'
@@ -23,15 +22,19 @@ import { Badge } from '../ui/Badge'
 export function AppShell({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const isTaskRoute = location.pathname.startsWith('/task')
+  const isAuthRoute =
+    location.pathname === '/login' ||
+    location.pathname === '/sign-in' ||
+    location.pathname === '/register' ||
+    location.pathname === '/create-account' ||
+    location.pathname === '/auth'
   const {
     theme,
     toggleTheme,
-    reducedMotion,
-    setReducedMotion,
-    dimensionPreset,
-    setDimensionPreset,
     simulateOffline,
     simulateLlmDown,
+    userProfile,
+    isAuthenticated,
   } = useAppStore()
 
   // Real offline queue status
@@ -125,10 +128,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {!isTaskRoute && (
         <header
           role="banner"
-          className="sticky top-0 z-40 h-16 bg-surface/95 backdrop-blur-md border-b-2 border-border-strong px-4 transition-colors flex items-center"
+          className="sticky top-0 z-40 h-18 sm:h-20 bg-surface/95 backdrop-blur-md border-b-2 border-border-strong px-4 transition-colors flex items-center"
         >
           <div className="max-w-6xl w-full mx-auto flex items-center justify-between gap-4">
-            {/* Product Brand Mark */}
+            {/* Product Brand Mark (Scaled Up) */}
             <Link
               to="/"
               title={`${BRAND_CONFIG.productName} Home`}
@@ -138,7 +141,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <img
                 src={conceptALockup}
                 alt={BRAND_CONFIG.productName}
-                className={`h-8 sm:h-9 w-auto object-contain transition-transform group-hover:scale-105 ${
+                className={`h-11 sm:h-13 md:h-14 w-auto object-contain transition-transform group-hover:scale-105 ${
                   theme === 'dark' ? 'brightness-0 invert' : ''
                 }`}
               />
@@ -194,16 +197,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
             {/* Utility Controls & Floating Judge Drawer Toggle */}
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                aria-label={reducedMotion ? 'Motion: Off' : 'Motion: On'}
-                title={reducedMotion ? 'Animations: Reduced' : 'Animations: Standard'}
-                onClick={() => setReducedMotion(!reducedMotion)}
-                className="focus-ring px-2.5 py-1 rounded-sm text-xs font-bold text-ink-muted hover:text-ink hover:bg-surface-raised border border-border-strong transition-colors cursor-pointer hidden lg:inline-flex"
-              >
-                {reducedMotion ? 'Motion: Off' : 'Motion: On'}
-              </button>
-
+              {!isAuthRoute && (
+                <Link
+                  to="/auth"
+                  title={isAuthenticated ? `Signed in as ${userProfile?.preferredName || 'Explorer'}` : 'Sign In to Your Sanctuary'}
+                  aria-label={isAuthenticated ? `Profile: ${userProfile?.preferredName || 'Explorer'}` : 'Sign In'}
+                  className="focus-ring px-3 py-1.5 rounded-sm border border-border-strong bg-surface text-ink hover:bg-surface-raised shadow-doodle-sm transition-colors no-underline inline-flex items-center gap-1.5 font-mono text-xs font-bold"
+                >
+                  <User size={14} aria-hidden="true" className={isAuthenticated ? 'text-success' : 'text-brand'} />
+                  <span className="hidden sm:inline">
+                    {isAuthenticated ? (userProfile?.preferredName || 'Explorer') : 'Sign In'}
+                  </span>
+                </Link>
+              )}
               <button
                 type="button"
                 aria-label={theme === 'light' ? 'Switch to Dark (Night Lab)' : 'Switch to Light (Playful Lab)'}
@@ -248,55 +254,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      {/* Product Footer with Quiet Demo Data Badge & Evaluator Link */}
+      {/* Product Footer with Centered Non-Clinical Disclaimer */}
       {!isTaskRoute && (
         <footer
           role="contentinfo"
           className="border-t-2 border-border-strong bg-surface px-4 py-4 text-xs text-ink-muted"
         >
-          <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-bold bg-surface-raised border border-border-strong text-ink">
-                Demo Data Mode
-              </span>
-              <p className="m-0">{BRAND_CONFIG.nonClinicalNotice}</p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <div
-                role="group"
-                aria-label="Cognitive dimension preset"
-                className="flex items-center gap-1 bg-surface-raised border border-border-strong rounded-sm p-0.5"
-              >
-                {DIMENSION_PRESETS.map((item) => {
-                  const active = dimensionPreset === item.key
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => setDimensionPreset(item.key)}
-                      className={`focus-ring px-2 py-0.5 rounded-xs text-xs font-bold cursor-pointer transition-colors ${
-                        active
-                          ? 'bg-brand text-brand-ink'
-                          : 'text-ink-muted hover:text-ink'
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  )
-                })}
-              </div>
-              <span className="font-mono-tabular text-ink-muted">
-                Registry: {dimensionPreset} dims · Theme: {theme}
-              </span>
-            </div>
+          <div className="max-w-6xl mx-auto flex items-center justify-center text-center">
+            <p className="m-0">{BRAND_CONFIG.nonClinicalNotice}</p>
           </div>
         </footer>
       )}
 
       {/* Mobile Bottom Tab Bar */}
-      {location.pathname !== '/' && !isTaskRoute && (
+      {location.pathname !== '/' && !isTaskRoute && !isAuthRoute && (
         <nav
           aria-label="Mobile bottom navigation"
           className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface/95 backdrop-blur-md border-t-2 border-border-strong flex items-center justify-around py-1.5 px-2"

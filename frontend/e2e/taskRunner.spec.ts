@@ -32,9 +32,8 @@ test.describe('Page 04: Task Runner (/task/:dimId) Hero Visual QA & A11y', () =>
       fullPage: true,
     })
 
-    // 2. Test Tab-Blur Auto-Pause + Post-Block Completion Summary in 10-Dims Mode
+    // 2. Test Tab-Blur Auto-Pause + Post-Block Completion Summary
     await openJudgeMode(page)
-    await page.getByRole('button', { name: /10 Dims \(Stress\)/i }).click()
     await page
       .getByRole('button', { name: /Simulate Tab-Blur Pause/i })
       .click()
@@ -79,7 +78,6 @@ test.describe('Page 04: Task Runner (/task/:dimId) Hero Visual QA & A11y', () =>
 
     // Reset back to Light + 7 Dims + EP Active Trial for Tablet & Mobile checks
     await page.getByRole('button', { name: /Light \(Playful Lab\)/i }).first().click()
-    await page.getByRole('button', { name: /7 Dims \(Default\)/i }).click()
     await closeJudgeMode(page)
     await page.getByRole('button', { name: /⬢ EP/i }).click()
     await page.waitForTimeout(300)

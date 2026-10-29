@@ -1,82 +1,9 @@
-import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { getDimensionsByPreset } from '../config/dimensions'
-import {
-  buildEstimatesForDimensions,
-  SAMPLE_WHY_THIS_TRAIL,
-} from '../services/mocks/fixtures'
-import { useAppStore, type PersonaId } from '../store/useAppStore'
-import { UncertaintyRadar } from '../components/signature/UncertaintyRadar'
-import { WhyThisPanel } from '../components/signature/WhyThisPanel'
+import { useAppStore } from '../store/useAppStore'
 import { Badge } from '../components/ui/Badge'
-import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { DoodleSquiggle, DoodleArrow } from '../components/ui/DoodleDecorations'
 import brianWavingImg from '../assets/mascot/brian-waving.png'
-
-type HeroPreviewState =
-  | 'calibrated'
-  | 'low-confidence'
-  | 'partial'
-  | 'loading'
-  | 'empty'
-  | 'error'
-  | 'extreme-text'
-
-interface PersonaLauncherCardSpec {
-  id: PersonaId
-  name: string
-  roleLabel: string
-  badgeLabel: string
-  badgeTone: 'brand' | 'low-confidence' | 'reward'
-  badgeGlyph: string
-  summary: string
-  metricsLine: string
-  ctaLabel: string
-  previewTargetState: HeroPreviewState
-}
-
-const PERSONA_CARDS: readonly PersonaLauncherCardSpec[] = [
-  {
-    id: 'steady-improver',
-    name: 'Youssef · Steady Improver',
-    roleLabel: '6 Weeks History · 14 Snapshots',
-    badgeLabel: 'Calibrated (84% Conf)',
-    badgeTone: 'brand',
-    badgeGlyph: '●',
-    summary:
-      'Consistent 2-minute blocks across 6 weeks with narrowing confidence intervals, active SAT-JEPA cluster progression, and high AI collaboration.',
-    metricsLine: 'Collab Score: 82 ± 4 · Mean RT: 585 ms · 0 Error Bursts',
-    ctaLabel: 'Load Youssef (Calibrated Twin)',
-    previewTargetState: 'calibrated',
-  },
-  {
-    id: 'noisy-low-confidence',
-    name: 'Salma · Irregular Schedule',
-    roleLabel: 'High RT Variance · Late-Night Blocks',
-    badgeLabel: 'Hatched Low-Conf (<60%)',
-    badgeTone: 'low-confidence',
-    badgeGlyph: '▨',
-    summary:
-      'Demonstrates how SynapseTwin handles noisy response times and small sample sizes with honest diagonal hatching and rest-first coaching.',
-    metricsLine: '4 Hatched Dimensions · Jitter: 195 ms · Preliminary Range',
-    ctaLabel: 'Load Salma (Hatched Twin)',
-    previewTargetState: 'low-confidence',
-  },
-  {
-    id: 'new-user',
-    name: 'Nour · First-Time Learner',
-    roleLabel: '0 Prior Sessions · Fresh Start',
-    badgeLabel: 'Ready for 2-Min Baseline',
-    badgeTone: 'reward',
-    badgeGlyph: '★',
-    summary:
-      'Experience the zero-data entry flow: granular consent, mandatory non-biometric lock, and the 2-minute Quick Baseline assessment.',
-    metricsLine: '0 Trials Logged · Non-Biometric Default ON · Est. 2 min',
-    ctaLabel: 'Load Nour (New Baseline)',
-    previewTargetState: 'empty',
-  },
-]
 
 const THREE_STEPS = [
   {
@@ -119,41 +46,7 @@ const THREE_STEPS = [
 
 export default function WelcomePage() {
   const navigate = useNavigate()
-  const {
-    dimensionPreset,
-    activePersona,
-    setActivePersona,
-  } = useAppStore()
-
-  const [previewState, setPreviewState] = useState<HeroPreviewState>('calibrated')
-  const [selectedNotice, setSelectedNotice] = useState<string | null>(null)
-
-  const effectivePersona: PersonaId =
-    previewState === 'low-confidence'
-      ? 'noisy-low-confidence'
-      : previewState === 'partial'
-        ? 'edge-missing-dim'
-        : previewState === 'empty'
-          ? 'new-user'
-          : 'steady-improver'
-
-  const activeDimensions = useMemo(
-    () => getDimensionsByPreset(dimensionPreset),
-    [dimensionPreset],
-  )
-
-  const estimates = useMemo(
-    () => buildEstimatesForDimensions(activeDimensions, effectivePersona),
-    [activeDimensions, effectivePersona],
-  )
-
-  const handleSelectPersona = (card: PersonaLauncherCardSpec) => {
-    setActivePersona(card.id)
-    setPreviewState(card.previewTargetState)
-    setSelectedNotice(
-      `Active persona switched to ${card.name} (${activeDimensions.length} cognitive dimensions active).`,
-    )
-  }
+  const { setActivePersona } = useAppStore()
 
   const handleStartBaseline = () => {
     setActivePersona('new-user')
@@ -162,31 +55,6 @@ export default function WelcomePage() {
 
   return (
     <div className="space-y-12 pb-12">
-      {/* Live Feedback Toast / Status Banner when Persona or Baseline is triggered */}
-      {selectedNotice && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="tactile-card bg-brand-subtle p-4 flex flex-wrap items-center justify-between gap-3 border-2 border-border-strong shadow-doodle"
-        >
-          <div className="flex items-center gap-2.5">
-            <Badge tone="brand" glyph="✓">
-              Persona Active
-            </Badge>
-            <span className="text-sm font-semibold text-ink">
-              {selectedNotice}
-            </span>
-          </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setSelectedNotice(null)}
-          >
-            Dismiss
-          </Button>
-        </div>
-      )}
-
       {/* =========================================================================
           HERO STAGE: 2-COLUMN SPLIT (Matches Stitch Screen 10 Welcome & Baseline)
           ========================================================================= */}
@@ -195,13 +63,7 @@ export default function WelcomePage() {
         className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center pt-2 pb-6"
       >
         {/* Left Column: Narrative, Value Proposition & Primary CTA */}
-        <div className="lg:col-span-6 flex flex-col items-start gap-6">
-          {/* Warm Pill Eyebrow */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-pill bg-brand-subtle border-2 border-border-strong text-ink font-mono text-xs shadow-doodle-sm">
-            <span className="inline-block w-2 h-2 rounded-pill bg-success animate-pulse" />
-            <span className="font-semibold">✨ Personal Mental Fitness · 100% Non-Clinical</span>
-          </div>
-
+        <div className="lg:col-span-6 flex flex-col items-start gap-6 pt-10 sm:pt-12 lg:pt-14">
           {/* Headline & Subtitle */}
           <div className="flex flex-col gap-3">
             <h1
@@ -235,87 +97,75 @@ export default function WelcomePage() {
               </button>
             </div>
 
-            <div className="flex items-center gap-2 px-3 py-2 text-ink-muted font-mono text-xs">
-              <span className="text-success font-bold" aria-hidden="true">⏱️</span>
-              <span>Est. 120 secs · Pausable</span>
-            </div>
+
+            <Link
+              to="/auth"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-pill bg-surface text-ink font-display text-base font-bold border-2 border-border-strong shadow-doodle hover:shadow-doodle-lg active:translate-x-0.5 active:translate-y-0.5 transition-all text-center no-underline cursor-pointer"
+            >
+              <span>Sign In</span>
+              <span aria-hidden="true">→</span>
+            </Link>
           </div>
 
-          {/* Trust Micro-Banner */}
-          <div className="flex items-center gap-2.5 pt-1 text-ink-muted text-xs sm:text-sm">
-            <div className="w-7 h-7 rounded-pill bg-surface-raised border-2 border-border-strong flex items-center justify-center text-brand shrink-0">
-              <span aria-hidden="true">🔒</span>
-            </div>
-            <span className="font-sans">
-              Hardware-sealed privacy: 100% non-biometric &amp; strictly on your terms
-            </span>
-          </div>
-
-          {/* Micro Stats Ticker */}
+          {/* Micro Stats Ticker - Highlighted for Easy Recall */}
           <div className="w-full grid grid-cols-3 gap-2.5 pt-4">
-            <div className="p-3 bg-surface-raised rounded-xl border-2 border-border-strong shadow-doodle-sm">
+            <div className="p-3 bg-reward/35 dark:bg-reward/20 rounded-xl border-2 border-warning dark:border-reward shadow-doodle-sm ring-2 ring-reward/60 transition-transform hover:scale-[1.02]">
               <div className="font-mono text-xl sm:text-2xl font-bold text-ink">6</div>
-              <div className="font-mono text-xs text-ink-muted">Flow Facets</div>
+              <div className="font-mono text-xs font-semibold text-ink/80">Focus Areas</div>
             </div>
-            <div className="p-3 bg-surface-raised rounded-xl border-2 border-border-strong shadow-doodle-sm">
+            <div className="p-3 bg-reward/35 dark:bg-reward/20 rounded-xl border-2 border-warning dark:border-reward shadow-doodle-sm ring-2 ring-reward/60 transition-transform hover:scale-[1.02]">
               <div className="font-mono text-xl sm:text-2xl font-bold text-ink">0</div>
-              <div className="font-mono text-xs text-ink-muted">Clinical Labels</div>
+              <div className="font-mono text-xs font-semibold text-ink/80">Pressure</div>
             </div>
-            <div className="p-3 bg-surface-raised rounded-xl border-2 border-border-strong shadow-doodle-sm">
-              <div className="font-mono text-xl sm:text-2xl font-bold text-ink">±4%</div>
-              <div className="font-mono text-xs text-ink-muted">Confidence Band</div>
+            <div className="p-3 bg-reward/35 dark:bg-reward/20 rounded-xl border-2 border-warning dark:border-reward shadow-doodle-sm ring-2 ring-reward/60 transition-transform hover:scale-[1.02]">
+              <div className="font-mono text-xl sm:text-2xl font-bold text-ink">High</div>
+              <div className="font-mono text-xs font-semibold text-ink/80">Clarity</div>
             </div>
           </div>
         </div>
 
-        {/* Right Column: Brian Mascot Showcase */}
-        <div className="lg:col-span-6 relative flex flex-col items-center justify-center">
+        {/* Right Column: Brian Mascot Direct Display (Frameless, Scaled-Up, Aesthetic Speech Bubble) */}
+        <div className="lg:col-span-6 relative flex flex-col items-center justify-center pt-2">
           <div className="relative w-full max-w-lg mx-auto flex flex-col items-center">
-            {/* Friendly Speech Bubble */}
-            <div className="relative mb-6 bg-surface-raised p-4 sm:p-5 rounded-2xl border-2 border-border-strong shadow-doodle max-w-md w-full transition-transform hover:scale-[1.01]">
+            {/* Brian's Aesthetic Speech Bubble */}
+            <div className="relative mb-3 sm:mb-4 max-w-md w-full bg-surface-raised p-4 sm:p-5 rounded-3xl border-2 border-border-strong shadow-doodle transition-all hover:-translate-y-0.5" style={{ transform: 'translate(60px, 20px)' }}>
               <p className="font-sans text-base sm:text-lg text-ink font-semibold leading-snug">
-                "Hey there! I'm Brian, your personal cognitive companion. Ready to map how your mind works in 2 minutes?"
+                "Hey there! I'm Brian, your personal friendly Axolotl. Ready to map how your mind works ?"
               </p>
-              <div className="mt-3 flex items-center justify-between font-mono text-xs text-ink-muted">
-                <span className="flex items-center gap-1.5">
+              <div className="mt-3 flex items-center justify-between font-mono text-xs text-ink-muted pt-2 border-t border-border-strong/20">
+                <span className="flex items-center gap-1.5 font-semibold text-ink">
                   <span className="w-2.5 h-2.5 rounded-pill bg-success animate-pulse" />
                   Brian · Personal Cognitive Twin
                 </span>
-                <span className="text-ink font-bold">Online</span>
               </div>
-              {/* Tactical Speech Pointer */}
+              {/* Tactical Speech Pointer pointing down towards Brian */}
               <div
                 className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-t-8 border-t-border-strong"
                 aria-hidden="true"
               />
             </div>
 
-            {/* Mascot Showcase Card */}
-            <div className="relative w-full rounded-3xl bg-surface-raised border-2 border-border-strong p-6 sm:p-8 shadow-doodle-lg flex flex-col items-center justify-center overflow-hidden group">
-              <div className="doodle-tape" />
-              <div className="absolute inset-0 bg-brand/5 rounded-3xl pointer-events-none" />
-
-              {/* Confidence Halo Glow */}
+            {/* Direct Scaled-Up Mascot without Frame */}
+            <div className="relative flex flex-col items-center justify-center w-full">
+              {/* Soft Confidence Glow Halo */}
               <div
-                className="absolute inset-12 rounded-full bg-brand/20 blur-3xl pointer-events-none animate-pulse"
+                className="absolute w-72 h-72 sm:w-96 sm:h-96 rounded-full bg-brand/15 blur-3xl pointer-events-none -z-10 animate-pulse"
                 aria-hidden="true"
               />
 
-              {/* Brian Waving Mascot Image */}
+              {/* Scaled-Up Mascot directly on canvas */}
               <img
                 src={brianWavingImg}
                 alt="Brian the Axolotl mascot waving cheerfully"
-                className="relative z-10 w-full max-w-[320px] sm:max-w-[360px] h-auto object-contain transition-transform duration-300 group-hover:scale-105 drop-shadow-md select-none"
+                style={{ transform: 'translate(100px, 25px)' }}
+                className="w-full max-w-[360px] sm:max-w-[420px] lg:max-w-[480px] h-auto object-contain drop-shadow-xl select-none transition-transform duration-300 hover:scale-105"
               />
 
-              {/* Card Footer Badges */}
-              <div className="relative z-10 mt-6 flex items-center justify-between w-full pt-4 border-t-2 border-dashed border-border-strong/30 font-mono text-xs text-ink-muted">
-                <span className="flex items-center gap-1.5">
-                  <span className="text-brand font-bold text-sm">★</span>
-                  <span>Companion Node Active</span>
-                </span>
-                <span className="text-ink font-semibold">100% Non-Biometric</span>
-              </div>
+              {/* Subtle grounding contact shadow */}
+              <div
+                className="w-48 sm:w-60 h-3 bg-ink/10 rounded-pill blur-sm -mt-2 pointer-events-none select-none"
+                aria-hidden="true"
+              />
             </div>
           </div>
         </div>
@@ -392,143 +242,6 @@ export default function WelcomePage() {
               </div>
             </Card>
           ))}
-        </div>
-      </section>
-
-      {/* =========================================================================
-          INTERACTIVE RADAR PREVIEW & PERSONA LAUNCHERS (Evaluation Suite)
-          ========================================================================= */}
-      <section
-        id="radar-preview"
-        aria-labelledby="radar-preview-heading"
-        className="pt-6 space-y-6"
-      >
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <span className="font-mono text-xs font-bold uppercase tracking-wider text-ink-muted">
-              Interactive Epistemic Visualization
-            </span>
-            <h2
-              id="radar-preview-heading"
-              className="font-display text-2xl sm:text-3xl font-bold text-ink"
-            >
-              Meet your evolving cognitive twin—Live Radar Preview
-            </h2>
-            <p className="text-sm text-ink-muted mt-1">
-              Inspect how confidence intervals (<code className="font-mono">±CI</code>) and hatched low-confidence states render live:
-            </p>
-          </div>
-          <Badge tone="brand" glyph="◈">
-            Active Persona: {activePersona}
-          </Badge>
-        </div>
-
-        {/* Interactive Preview State Switcher Buttons */}
-        <div
-          role="group"
-          aria-label="Hero Brain Twin preview state switcher"
-          className="flex flex-wrap gap-2"
-        >
-          {(
-            [
-              { id: 'calibrated', label: 'Calibrated (84%)' },
-              { id: 'low-confidence', label: 'Low-Conf (Hatched)' },
-              { id: 'partial', label: 'Partial (1 Missing)' },
-              { id: 'loading', label: 'Loading' },
-              { id: 'empty', label: 'Empty (New)' },
-              { id: 'error', label: 'Error' },
-              { id: 'extreme-text', label: 'Extreme Values' },
-            ] as const
-          ).map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              aria-pressed={previewState === tab.id}
-              onClick={() => setPreviewState(tab.id)}
-              className={`focus-ring min-h-10 px-3.5 py-1.5 rounded-pill border-2 border-border-strong text-xs font-bold cursor-pointer transition-colors shadow-doodle-sm ${
-                previewState === tab.id
-                  ? 'bg-brand text-brand-ink'
-                  : 'bg-surface-raised text-ink hover:bg-brand-subtle'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Live Interactive Radar View */}
-        <div className="w-full max-w-xl mx-auto p-4 sm:p-6 bg-surface rounded-2xl border-2 border-border-strong shadow-doodle-lg">
-          <UncertaintyRadar
-            dimensions={activeDimensions}
-            estimates={estimates}
-            title="Preview Radar"
-          />
-        </div>
-
-        {/* Evaluator Persona Launchers Grid */}
-        <div className="space-y-3 pt-2">
-          <div className="flex items-center justify-between">
-            <h3 className="font-display text-lg font-bold text-ink">
-              Evaluator Persona Switcher (Demonstration Data)
-            </h3>
-            <span className="text-xs text-ink-muted font-mono">
-              Test &amp; Verify Archetypes
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {PERSONA_CARDS.map((card) => {
-              const isCurrent = activePersona === card.id
-              return (
-                <Card
-                  key={card.id}
-                  className={`p-5 flex flex-col justify-between gap-4 border-2 border-border-strong shadow-doodle transition-all ${
-                    isCurrent ? 'bg-brand-subtle/50 ring-2 ring-brand' : ''
-                  }`}
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-xs font-bold text-ink">
-                        {card.roleLabel}
-                      </span>
-                      <Badge tone={card.badgeTone} glyph={card.badgeGlyph}>
-                        {card.badgeLabel}
-                      </Badge>
-                    </div>
-                    <h4 className="font-display text-base font-bold text-ink">
-                      {card.name}
-                    </h4>
-                    <p className="text-xs text-ink-muted leading-relaxed">
-                      {card.summary}
-                    </p>
-                  </div>
-
-                  <div className="space-y-2 pt-2 border-t-2 border-dashed border-border-strong/30">
-                    <p className="font-mono text-xs text-ink-muted">
-                      {card.metricsLine}
-                    </p>
-                    <Button
-                      variant={isCurrent ? 'primary' : 'secondary'}
-                      size="sm"
-                      className="w-full text-xs font-bold"
-                      onClick={() => handleSelectPersona(card)}
-                    >
-                      {card.ctaLabel}
-                    </Button>
-                  </div>
-                </Card>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* WhyThis Pedagogical Transparency Panel */}
-        <div className="pt-4">
-          <WhyThisPanel
-            trail={SAMPLE_WHY_THIS_TRAIL}
-            title="Pedagogical Transparency: Why This Next Step?"
-            defaultExpanded={false}
-          />
         </div>
       </section>
 
