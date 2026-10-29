@@ -17,7 +17,7 @@ Find your section and skip the rest.
 **Per-task details that affect your features:**
 - **N-back** sends **two events per trial**, one per stream (`trial_meta.stream` = `position` | `symbol`). `trial_type` (`target`, `lure_minus`, `lure_plus`, …) refers to the active rule's stream. For lure false-alarm rates, filter on `stream` matching the rule's stream.
 - **N-back** `error_burst` counts per stream event, not per trial. Every other screen counts per trial.
-- **Tower**: `score_norm = min(1, l_min / l_user)` when solved, else 0. It is not binary.
+- **Tower**: `score_norm = min(1, l_min / l_user)` when solved, else 0. It is not binary. A problem also ends unsolved `time_limit_ms` (default 60000) after the move-count prediction; then `l_user < 3 × l_min` and `response_time_ms` = planning + limit.
 - **UFOV** runs QUEST+. It estimates a display-duration threshold and does not hold accuracy at 85%; only Relational's staircase targets 85%. Use `trial_meta.shown_ms` (measured, a whole number of frames), not `requested_ms`. `quest_threshold_ms` appears only on the last event of a UFOV task, and is missing if that trial was aborted. You can recompute it from `shown_ms` and correctness.
 - **MST**: `trial_meta.response` can be `none` (timeout).
 - **Timing fields:**
@@ -25,6 +25,12 @@ Find your section and skip the rest.
   - `hesitation_jitter` includes pointer movement, throttled to one sample per 50 ms.
   - `response_time_ms` is capped at 600000.
 - **Voice fields** (`voice_latency_ms`, `vocal_pace_hz`) are absent unless the user opted in. They are only produced on Stroop.
+
+**Scoring formulas** (from `docs/research/2026-10-30-member1-evidence-review.md`):
+- **N-back d′:** apply the log-linear correction to every user, not only to extreme rates (Hautus 1995): `H = (hits + 0.5) / (N_signal + 1)`, `FA = (FAs + 0.5) / (N_noise + 1)`, `d′ = z(H) − z(FA)`. Score lure false alarms (`trial_type` `lure_minus` / `lure_plus`) as a separate FA class.
+- **MST:** `LDI = P("similar" | lure) − P("similar" | foil)`, from `trial_meta.kind` and `trial_meta.response`.
+- **Stroop:** interference = mean RT(incongruent) − mean RT(congruent), on correct trials only, split by `trial_meta.congruent`. Prefer this RT cost over the error cost, pool across sessions, and show uncertainty: single-session reliability is only ICC ≈ .6 (Hedge 2018).
+- **Mental rotation:** the intercept (overall speed) is the main score. The slope over `trial_meta.angle_deg` needs blocked presentation and about 50 trials per condition; treat it as secondary.
 
 **Dimensions:** there are 6, not the README's 4: `processing_speed` (UFOV) and `episodic_memory` (MST) were added. Confirm with Member 4 and tell Member 1 if you want them mapped differently.
 
@@ -50,6 +56,13 @@ Find your section and skip the rest.
 - In React dev mode (StrictMode) the client sends two `GET /v1/tasks/next` on page load. If your endpoint has side effects, such as advancing a schedule or marking a variant as seen in the Bloom filter, make it idempotent per `(user_id, session)`, or dev sessions will skip tasks.
 - **Known open issue:** if `params` is malformed in a way that crashes a screen, the client skips to the next task immediately, with no delay. If every task you serve is broken, each open client will poll your endpoint in a tight loop. Validate `params` against `types.ts` before serving.
 - MST has no `time_limit_ms`. The client uses 5000 ms. Add the field to the contract if you want control over it.
+- Tower takes an optional `time_limit_ms` per problem (client default 60000, the TOL-F limit). Send it if you want a different limit.
+
+**Block designs the research asks for** (`docs/research/2026-10-30-member1-evidence-review.md` §2, row 5):
+- **Stroop:** every block mixes congruent and incongruent trials, so the interference cost can be computed.
+- **MST:** a real block follows the oMST mix, about 20 repeats / 44 lures / 20 foils. The fixture (3 study + 5 test) is a demo.
+- **Mental rotation:** blocked presentation, at least 50 trials per condition, if the angle slope is wanted.
+- **Tower:** a TOL-F series, not a single problem: 2 two-move comprehension and 4 three-move practice items, then 24 test problems (8 each at 4, 5 and 6 minimum moves, in increasing difficulty), 60 s each.
 
 ## Member 4 (Dashboard & Privacy)
 

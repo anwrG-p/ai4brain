@@ -223,6 +223,80 @@ test('keystroke_latency_ms and hesitation_jitter come from keydown/pointerdown c
   expect(pushed[0]).toMatchObject({ keystroke_latency_ms: 100, hesitation_jitter: 50 })
 })
 
+test('the fixture sets a 60 s per-problem limit', () => {
+  expect(params.time_limit_ms).toBe(60000)
+})
+
+test('no limit runs before the prediction; 60 s after it the trial ends unsolved with score 0', () => {
+  const { onDone } = setup({ ...params, time_limit_ms: undefined }) // the default applies
+  advance(120000) // planning time is not limited
+  expect(pushed).toHaveLength(0)
+  predict('5')
+  move(OPT[0])
+  advance(59999)
+  expect(pushed).toHaveLength(0)
+  advance(1)
+  expect(pushed).toHaveLength(1)
+  expect(pushed[0]).toMatchObject({ score_norm: 0, error_flag: true, response_time_ms: 180000 })
+  expect(pushed[0].trial_meta).toEqual({
+    item_id: 't:0',
+    l_min: 5,
+    l_user: 1,
+    predicted_moves: 5,
+    planning_time_ms: 120000,
+    conflict_latency_ms: 0,
+    solved: false,
+  })
+  expect(Object.keys(pushed[0].trial_meta!).length).toBeLessThanOrEqual(16)
+  expect(onDone).toHaveBeenCalledOnce()
+  for (const m of OPT.slice(1)) move(m) // input after the timeout is ignored
+  advance(120000)
+  expect(pushed).toHaveLength(1)
+  expect(onDone).toHaveBeenCalledOnce()
+})
+
+test('a custom time_limit_ms of 5000 times out at 5000', () => {
+  const { onDone } = setup({ ...params, time_limit_ms: 5000 })
+  predict('5')
+  advance(4999)
+  expect(pushed).toHaveLength(0)
+  advance(1)
+  expect(pushed).toHaveLength(1)
+  expect(pushed[0]).toMatchObject({ score_norm: 0, response_time_ms: 5000, trial_meta: { solved: false } })
+  expect(onDone).toHaveBeenCalledOnce()
+})
+
+test('the limit does not fire after the trial finished, was aborted, or the screen unmounted', () => {
+  const solved = setup()
+  predict('5')
+  for (const m of OPT) move(m)
+  advance(60000)
+  expect(pushed).toHaveLength(1)
+  expect(solved.onDone).toHaveBeenCalledOnce()
+  cleanup()
+
+  const aborted = setup()
+  predict('5')
+  let h = true
+  Object.defineProperty(document, 'hidden', { configurable: true, get: () => h })
+  act(() => void document.dispatchEvent(new Event('visibilitychange')))
+  advance(60000)
+  expect(pushed).toHaveLength(1)
+  expect(aborted.onDone).not.toHaveBeenCalled()
+  h = false
+  act(() => void document.dispatchEvent(new Event('visibilitychange')))
+  expect(aborted.onDone).toHaveBeenCalledOnce()
+  cleanup()
+
+  const unmounted = setup()
+  predict('5')
+  cleanup()
+  expect(vi.getTimerCount()).toBe(0)
+  advance(60000)
+  expect(pushed).toHaveLength(1)
+  expect(unmounted.onDone).not.toHaveBeenCalled()
+})
+
 test('peg names give capacity and bottom-to-top order', () => {
   setup()
   expect(peg(0).getAttribute('aria-label')).toBe('Peg 1, holds 3: R, G (top)')

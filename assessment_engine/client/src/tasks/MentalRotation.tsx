@@ -10,7 +10,12 @@ const KEYS: Record<string, Answer> = { f: 'same', j: 'different' }
 // Mental rotation: is the right shape the left one turned (same) or a mirror image (different)?
 export function MentalRotation({ params, recorder, onDone }: TaskProps<RotationParams>) {
   const { trials, time_limit_ms } = params
-  const { i, paused, respond } = useTimedTrials(recorder, trials.length, time_limit_ms, onDone)
+  // angle_deg and mirrored let Member 3 fit the RT-by-angle intercept and slope.
+  const meta = (k: number) => {
+    const x = trials[k]
+    return x && { angle_deg: x.angle_deg, mirrored: x.mirrored }
+  }
+  const { i, paused, respond } = useTimedTrials(recorder, trials.length, time_limit_ms, onDone, meta)
   const t = trials[i]
 
   useEffect(() => {

@@ -61,6 +61,16 @@ test('J on a different trial scores 1, F on a same trial scores 1, J on same sco
   expect(onDone).toHaveBeenCalledOnce()
 })
 
+test('trial_meta carries the trial angle_deg and mirrored flag (also on timeout)', () => {
+  setup(params([same, different]))
+  key('f')
+  advance(7000)
+  expect(pushed.map((e) => e.trial_meta)).toEqual([
+    { item_id: 't:0', angle_deg: 90, mirrored: false },
+    { item_id: 't:1', angle_deg: 180, mirrored: true },
+  ])
+})
+
 test('on-screen buttons answer too; a timeout scores 0 at time_limit_ms', () => {
   setup(params([same, different]))
   act(() => void fireEvent.pointerDown(screen.getByRole('button', { name: /same/i })))

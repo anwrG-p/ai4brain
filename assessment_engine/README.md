@@ -60,7 +60,7 @@ Staircased exercises send `levels: Trial[][]`, easiest first, and the client pic
 | pattern_induction | `matrix` | `{ cells: (Glyph\|null)[9] /* one null */, options: Glyph[], answer: number, time_limit_ms }`, `Glyph = {shape: "circle"\|"square"\|"triangle"\|"diamond", count: 1..3, color, rotation_deg}` |
 | spatial_orientation | `mental_rotation` | `{ trials: {cells: [x,y][], angle_deg, mirrored, answer: "same"\|"different"}[], time_limit_ms }` |
 | pattern_induction | `relational` | `{ n_trials, time_limit_ms, levels: { premises: {a, rel, b}[], question: {a, rel, b}, inverted: boolean, hops: number, answer: boolean }[][] }`. `rel` ∈ `same, opposite, more, less, before, after, contains`; `more`/`less` drawn as ▷/◁; tokens are nonsense strings. When `inverted`, the frame flashes amber and `answer` already accounts for it. |
-| executive_function | `tower` | `{ capacities: number[], start: string[][], goal: string[][], l_min, optimal_moves: [from,to][], counter_intuitive: number[] /* indices into optimal_moves */ }` |
+| executive_function | `tower` | `{ capacities: number[], start: string[][], goal: string[][], l_min, optimal_moves: [from,to][], counter_intuitive: number[] /* indices into optimal_moves */, time_limit_ms? }`. `time_limit_ms` is per problem, counted from the move-count prediction; the client defaults to 60000 (TOL-F). On expiry the trial ends unsolved. |
 | processing_speed | `ufov` | `{ duration_grid_ms: number[], similarity, mask_noise, trials: { central: "A"\|"B", peripheral_dir: 0..7, distractors: {dir, ring}[] }[] }`. `similarity` and `mask_noise` are fixed per block by Member 5. |
 | episodic_memory | `mst` | `{ encode_ms, encode: Poly[], test: { item: Poly, kind: "old"\|"lure"\|"new", delta: number }[] }`, `Poly = {points: [x,y][], edges: [i,j][]}`, perturbation already applied by the generator |
 
@@ -99,6 +99,8 @@ Delivery is at-least-once (a retried or beaconed batch may arrive twice); dedupe
 |---|---|
 | all | `item_id` (`${task_id}:${index}`), plus `level` (number) when staircased |
 | n_back | `trial_type`, `rule`, `stream` (one event **per stream** per trial) |
+| stroop | `congruent` (word names the ink colour) |
+| mental_rotation | `angle_deg` (number), `mirrored` (boolean) |
 | relational | `hops`, `inverted` |
 | tower | `l_min`, `l_user`, `predicted_moves`, `planning_time_ms`, `conflict_latency_ms` (mean pause before moves matching a `counter_intuitive` step, 0 if none), `solved` |
 | ufov | `requested_ms`, `shown_ms` (measured), `frames`, `similarity`, `mask_noise`, `central_ok`, `peripheral_ok` |

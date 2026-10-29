@@ -126,9 +126,9 @@ The README's 4 assessment tests come first, then the brief's 5 training exercise
 | Screen | Dimension | What the user does | Extra telemetry (`trial_meta`) |
 |---|---|---|---|
 | **NBack** | working_memory | Watches a 3×3 grid + a symbol; presses **A** if the position matches n steps back and **L** if the symbol does. Some trials are **lures** (match n−1 or n+1 back) and some **switch the rule** | `trial_type`, `rule`, `stream`; **2 events per trial** (one per stream) |
-| **Stroop** | executive_function | Word "RED" printed in blue → pick the **ink** colour (keys 1–9) | — |
+| **Stroop** | executive_function | Word "RED" printed in blue → pick the **ink** colour (keys 1–9) | `congruent` |
 | **Matrix** | pattern_induction | 3×3 pattern with one gap → pick the missing piece | — |
-| **MentalRotation** | spatial_orientation | Two block shapes: same shape rotated (**F**) or a mirror image (**J**)? | — |
+| **MentalRotation** | spatial_orientation | Two block shapes: same shape rotated (**F**) or a mirror image (**J**)? | `angle_deg`, `mirrored` |
 | **Relational** | pattern_induction | Facts about made-up words ("ZUP is OPPOSITE to KEV") → true/false question; an amber border means the rule is **inverted** | `hops`, `inverted`, `level` |
 | **Tower** | executive_function | Predict the move count first, then move discs to match the goal | `l_min`, `l_user`, `planning_time_ms`, `conflict_latency_ms`, … |
 | **Ufov** | processing_speed | A display flashes very briefly → name the centre letter **and** where the outer target was | `requested_ms`, **`shown_ms`**, `frames`, … |

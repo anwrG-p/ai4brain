@@ -8,7 +8,12 @@ import type { TaskProps } from './TaskRunner'
 // Optional `voice`: an opt-in probe for spoken-answer latency and pacing (numbers only).
 export function Stroop({ params, recorder, onDone, voice }: TaskProps<StroopParams> & { voice?: VoiceSource | null }) {
   const { colors, trials, time_limit_ms } = params
-  const { i, paused, respond } = useTimedTrials(recorder, trials.length, time_limit_ms, onDone, undefined, voice)
+  // congruent: Member 3's interference cost = mean RT(incongruent) - mean RT(congruent).
+  const congruent = (k: number) => {
+    const x = trials[k]
+    return x && { congruent: x.word.toLowerCase() === x.ink.toLowerCase() }
+  }
+  const { i, paused, respond } = useTimedTrials(recorder, trials.length, time_limit_ms, onDone, congruent, voice)
   const t = trials[i]
 
   useEffect(() => {

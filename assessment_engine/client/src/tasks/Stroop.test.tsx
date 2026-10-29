@@ -56,7 +56,14 @@ test('clicking the ink color scores 1, the word color scores 0; RT from onset', 
   expect(pushed).toHaveLength(2)
   expect(pushed[0]).toMatchObject({ trial_index: 0, score_norm: 1, error_flag: false, response_time_ms: 400, keystroke_latency_ms: 400 })
   expect(pushed[1]).toMatchObject({ trial_index: 1, score_norm: 0, error_flag: true, response_time_ms: 250 })
-  expect(pushed[0].trial_meta).toEqual({ item_id: 't:0' })
+  expect(pushed[0].trial_meta).toEqual({ item_id: 't:0', congruent: false })
+})
+
+test('trial_meta.congruent: word RED in blue ink is false, BLUE in blue ink is true (also on timeout)', () => {
+  setup(params([conflict, { word: 'BLUE', ink: 'blue', answer: 'blue' }]))
+  press('blue')
+  advance(3000)
+  expect(pushed.map((e) => e.trial_meta?.congruent)).toEqual([false, true])
 })
 
 test('a timeout scores 0 with response_time_ms === time_limit_ms', () => {
