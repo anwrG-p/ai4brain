@@ -20,6 +20,14 @@ docs/
 │   ├── SEQUENCE_DIAGRAMS.md                  # All 5 Mermaid.js inter-subsystem sequence diagrams
 │   ├── TASKS_AND_DIMENSIONS.md               # 6-skill cognitive tasks, 3-10 dimension registry & biases
 │   └── MEMBER2_HANDOVER.md                   # Member 2 Layer B AI Coach Handover & XAI contract
+├── ux-pipeline/                              # Unified UX Pipeline Hub (Strategy, Tokens, EMILY, Pages)
+│   ├── README.md                             # Master index & navigation guide for the UX pipeline
+│   ├── 01_strategy_and_journey/              # Journey graph, UX transformation plan, and personas
+│   ├── 02_design_system_and_tokens/          # Doodle tokens, OKLCH ramps, and brand identity
+│   ├── 03_affective_computing_and_emily/     # Circumplex model & kinematic interaction engine
+│   ├── 04_contracts_and_architecture/        # TypeScript contracts, decision records, and state
+│   ├── 05_evaluation_and_qa/                 # Rubric matrix, QA logs, and copy safety rules
+│   └── 06_page_specifications/               # All 19 page-level UI/UX specifications
 └── ui/
     ├── README.md                             # Frontend implementation & sprint overview
     ├── JUDGES-UI.md                          # Jury Rubric-to-UI Proof Matrix (All 11 criteria)
@@ -37,6 +45,7 @@ docs/
 - [docs/GLOSSARY.md](GLOSSARY.md): Complete list of approved consumer terms, the 18 forbidden academic/clinical jargon rules, and automated linter specifications (`copyLinter.ts`).
 
 ### 2. Design System & Visual Foundations
+- [docs/ux-pipeline/README.md](ux-pipeline/README.md): **Unified UX Pipeline Directory** bringing together all strategy, tokens, EMILY affective computing, approval protocols, and 19 page specs in one place.
 - [docs/design/DESIGN.md](design/DESIGN.md): The official Doodle (Hand Drawn) specification, OKLCH 10-step ramps, Okabe-Ito colorblind-safe 10-dimension palette, typography pairings (Fredoka / Lexend / JetBrains Mono), and WCAG 2.2 AA contrast proof.
 - [docs/design/UX_TRANSFORMATION_PLAN.md](design/UX_TRANSFORMATION_PLAN.md): Complete 19-page user journey flow, EMILY affective computing model, color psychology matrix, and the 4-tier Human UX Approval Protocol.
 
