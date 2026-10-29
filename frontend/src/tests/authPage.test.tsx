@@ -23,7 +23,7 @@ describe('AuthPage (Stitch BRIAN Cognitive Twin Login & Register in Doodle Style
     useAppStore.getState().resetDemoState()
   })
 
-  it('renders Sign In mode with welcoming Axolotl companion and form fields', async () => {
+  it('renders centered Sign In mode with form fields and security controls', async () => {
     renderAuthPage('/auth')
 
     // Verify Heading & Squiggle
@@ -51,41 +51,33 @@ describe('AuthPage (Stitch BRIAN Cognitive Twin Login & Register in Doodle Style
       screen.getByRole('button', { name: /Resume with Hardware Key \/ Passkey/i }),
     ).toBeInTheDocument()
 
-    // Verify Speech Bubble default
-    expect(screen.getByText(/Ready for your 2-minute morning calibration/i)).toBeInTheDocument()
-
-    // Verify Production Showcase Header & Status Pill
-    expect(screen.getByText(/YOUR COGNITIVE COMPANION/i)).toBeInTheDocument()
-    expect(screen.getByText(/^Ready$/)).toBeInTheDocument()
-    expect(screen.queryByText(/BRIAN STAGING SLOT/i)).not.toBeInTheDocument()
-
-    // Verify Character Stage Status Badge & Reassurance Cards
-    expect(screen.getByText(/Twin Gateway Standing By/i)).toBeInTheDocument()
-    expect(screen.getByText(/12-Day Streak · Protected by Humane Pacing/i)).toBeInTheDocument()
-    expect(screen.getByText(/RAM-Only Cipher/i)).toBeInTheDocument()
-    expect(screen.getByText(/Zero Biometrics/i)).toBeInTheDocument()
+    // Verify Mascot Showcase panel is removed
+    expect(
+      screen.queryByLabelText(/Brian Cognitive Companion Showcase/i),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText(/YOUR COGNITIVE COMPANION/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Twin Gateway Standing By/i)).not.toBeInTheDocument()
   })
 
-  it('interactively updates Brian speech bubble on field focus in Sign In mode', async () => {
+  it('allows user to enter credentials and toggle remember device option', async () => {
     renderAuthPage('/auth')
 
     const emailInput = screen.getByLabelText(/Twin Identifier \/ Email Encrypted Alias/i)
     const passphraseInput = screen.getByLabelText(/Master Passphrase/i)
+    const rememberCheckbox = screen.getByLabelText(/Remember my cognitive twin on this device/i) as HTMLInputElement
 
-    // Focus Email -> Brian perks up
-    fireEvent.focus(emailInput)
-    expect(screen.getByText(/Let's pull up your encrypted twin memory profile/i)).toBeInTheDocument()
+    fireEvent.change(emailInput, { target: { value: 'explorer@sanctuary.test' } })
+    expect(emailInput).toHaveValue('explorer@sanctuary.test')
 
-    // Focus Passphrase -> Brian politely looks away
-    fireEvent.focus(passphraseInput)
-    expect(screen.getByText(/peeking politely away/i)).toBeInTheDocument()
+    fireEvent.change(passphraseInput, { target: { value: 'super-safe-phrase-123' } })
+    expect(passphraseInput).toHaveValue('super-safe-phrase-123')
 
-    // Blur -> Brian returns to welcoming greeting
-    fireEvent.blur(passphraseInput)
-    expect(screen.getByText(/Ready for your 2-minute morning calibration/i)).toBeInTheDocument()
+    expect(rememberCheckbox.checked).toBe(true)
+    fireEvent.click(rememberCheckbox)
+    expect(rememberCheckbox.checked).toBe(false)
   })
 
-  it('renders Create Account mode with preferred name reactivity and streamlined fields', async () => {
+  it('renders Create Account mode with preferred name input and streamlined fields', async () => {
     renderAuthPage('/register')
 
     // Verify Heading
@@ -96,31 +88,20 @@ describe('AuthPage (Stitch BRIAN Cognitive Twin Login & Register in Doodle Style
     const nameInput = screen.getByLabelText(/What should Brian call you\?/i)
     expect(nameInput).toBeInTheDocument()
 
-    // Initial greeting before typing name
-    expect(screen.getByText(/Tell me what to call you/i)).toBeInTheDocument()
-
     // Type preferred name
     fireEvent.change(nameInput, { target: { value: 'Maya' } })
-
-    // Speech bubble updates with user's name
-    expect(screen.getByText(/Oh, hello Maya! That feels wonderfully grounding/i)).toBeInTheDocument()
-
-    // Companion status badge reflects joy
-    expect(screen.getByText(/Sparking Joy with Maya/i)).toBeInTheDocument()
+    expect(nameInput).toHaveValue('Maya')
 
     // Verify Initial Focus Dimension is NOT on the register page
     expect(screen.queryByText(/Initial Focus Dimension/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/Sharpen Focus/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/Daily Mental Calm/i)).not.toBeInTheDocument()
 
-    // Verify Production Showcase Header & Status Pill
-    expect(screen.getByText(/MEET BRIAN/i)).toBeInTheDocument()
-    expect(screen.getByText(/Calibrating/i)).toBeInTheDocument()
-    expect(screen.queryByText(/BRIAN STAGING SLOT/i)).not.toBeInTheDocument()
-
-    // Verify Reassurance Cards & Beta Quote
-    expect(screen.getByText(/Current Vibe: Curious Spark/i)).toBeInTheDocument()
-    expect(screen.getByText(/Arthur K\., Beta Explorer/i)).toBeInTheDocument()
+    // Verify Mascot Showcase panel is NOT rendered
+    expect(
+      screen.queryByLabelText(/Brian Cognitive Companion Showcase/i),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText(/MEET BRIAN/i)).not.toBeInTheDocument()
 
     // Verify Zero biometric tracking note is NOT on the register page
     expect(
