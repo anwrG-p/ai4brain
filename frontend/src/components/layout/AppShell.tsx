@@ -62,6 +62,37 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     { path: '/settings', label: 'You', icon: User },
   ]
 
+  // Team Development Progress Status per page
+  const getPageProgress = (pathname: string) => {
+    if (
+      pathname === '/auth' ||
+      pathname === '/login' ||
+      pathname === '/register' ||
+      pathname === '/sign-in' ||
+      pathname === '/create-account'
+    ) {
+      return {
+        label: 'Nearly Done',
+        badgeClass: 'bg-success-subtle text-ink border-border-strong',
+        dotClass: 'bg-success',
+      }
+    }
+    if (pathname === '/' || pathname === '/dashboard') {
+      return {
+        label: 'In Progress',
+        badgeClass: 'bg-warning-subtle text-ink border-border-strong',
+        dotClass: 'bg-warning animate-pulse',
+      }
+    }
+    return {
+      label: 'Pending',
+      badgeClass: 'bg-surface-raised text-ink-muted border-border-strong',
+      dotClass: 'bg-ink-muted/50',
+    }
+  }
+
+  const pageProgress = getPageProgress(location.pathname)
+
   const isRealOffline = !queueStatus.isOnline
   const showOfflineBanner = simulateOffline || isRealOffline
 
@@ -138,21 +169,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           className="sticky top-0 z-50 w-full h-18 sm:h-20 bg-surface/95 backdrop-blur-md border-b-2 border-border-strong px-4 transition-colors flex items-center"
         >
           <div className="max-w-6xl w-full mx-auto flex items-center justify-between gap-4">
-            {/* Product Brand Mark (Scaled Up) */}
-            <Link
-              to="/"
-              title={`${BRAND_CONFIG.productName} Home`}
-              aria-label={`${BRAND_CONFIG.productName} Home`}
-              className="focus-ring rounded-md flex items-center text-ink no-underline group py-1"
-            >
-              <img
-                src={conceptALockup}
-                alt={BRAND_CONFIG.productName}
-                className={`h-11 sm:h-13 md:h-14 w-auto object-contain transition-transform group-hover:scale-105 ${
-                  theme === 'dark' ? 'brightness-0 invert' : ''
-                }`}
-              />
-            </Link>
+            {/* Product Brand Mark & Team Progress Status Label */}
+            <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+              <Link
+                to="/"
+                title={`${BRAND_CONFIG.productName} Home`}
+                aria-label={`${BRAND_CONFIG.productName} Home`}
+                className="focus-ring rounded-md flex items-center text-ink no-underline group py-1"
+              >
+                <img
+                  src={conceptALockup}
+                  alt={BRAND_CONFIG.productName}
+                  className={`h-11 sm:h-13 md:h-14 w-auto object-contain transition-transform group-hover:scale-105 ${
+                    theme === 'dark' ? 'brightness-0 invert' : ''
+                  }`}
+                />
+              </Link>
+
+              {/* Progress Status Badge for Team Review */}
+              <div
+                data-testid="page-progress-badge"
+                title={`Sprint Progress: ${pageProgress.label}`}
+                aria-label={`Page progress: ${pageProgress.label}`}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-pill font-mono text-xs font-bold border-2 shadow-doodle-sm select-none ${pageProgress.badgeClass}`}
+              >
+                <span className={`w-2 h-2 rounded-full shrink-0 ${pageProgress.dotClass}`} aria-hidden="true" />
+                <span className="hidden sm:inline text-ink-muted font-normal">Progress:</span>
+                <span>{pageProgress.label}</span>
+              </div>
+            </div>
 
             {/* 5 Primary Consumer Destinations Navbar (Desktop) or Skip intro on Welcome first run */}
             {location.pathname === '/' ? (
@@ -250,6 +295,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </header>
+      )}
+
+      {/* On task routes where consumer header is suppressed, maintain progress badge in top left */}
+      {isTaskRoute && (
+        <aside
+          aria-label="Sprint progress status"
+          className="fixed top-3 left-3 z-50 pointer-events-none"
+        >
+          <div
+            data-testid="page-progress-badge"
+            title={`Sprint Progress: ${pageProgress.label}`}
+            aria-label={`Page progress: ${pageProgress.label}`}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-pill font-mono text-xs font-bold border-2 shadow-doodle-sm select-none ${pageProgress.badgeClass}`}
+          >
+            <span className={`w-2 h-2 rounded-full shrink-0 ${pageProgress.dotClass}`} aria-hidden="true" />
+            <span className="hidden sm:inline text-ink-muted font-normal">Progress:</span>
+            <span>{pageProgress.label}</span>
+          </div>
+        </aside>
       )}
 
       {/* Main Content Column */}

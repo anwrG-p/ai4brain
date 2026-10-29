@@ -898,4 +898,34 @@ describe('Wave 1 & Wave 2 Pages & Design System Unit Suite', () => {
     expect(tableRegion).toHaveAttribute('tabIndex', '0')
     expect(screen.getByRole('cell', { name: /Working Memory/i })).toBeInTheDocument()
   })
+
+  it('displays accurate team sprint progress labels across routes (Nearly Done, In Progress, Pending)', async () => {
+    // 1. Auth routes -> Nearly Done
+    window.history.pushState({}, '', '/auth')
+    const { unmount: unmountAuth } = render(<App />)
+    const authBadge = await screen.findByTestId('page-progress-badge')
+    expect(authBadge).toHaveTextContent(/Nearly Done/i)
+    unmountAuth()
+
+    // 2. Welcome route (/) -> In Progress
+    window.history.pushState({}, '', '/')
+    const { unmount: unmountWelcome } = render(<App />)
+    const welcomeBadge = await screen.findByTestId('page-progress-badge')
+    expect(welcomeBadge).toHaveTextContent(/In Progress/i)
+    unmountWelcome()
+
+    // 3. Dashboard route (/dashboard) -> In Progress
+    window.history.pushState({}, '', '/dashboard')
+    const { unmount: unmountDashboard } = render(<App />)
+    const dashboardBadge = await screen.findByTestId('page-progress-badge')
+    expect(dashboardBadge).toHaveTextContent(/In Progress/i)
+    unmountDashboard()
+
+    // 4. Other routes (e.g. /settings) -> Pending
+    window.history.pushState({}, '', '/settings')
+    const { unmount: unmountSettings } = render(<App />)
+    const settingsBadge = await screen.findByTestId('page-progress-badge')
+    expect(settingsBadge).toHaveTextContent(/Pending/i)
+    unmountSettings()
+  })
 });

@@ -231,9 +231,6 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
                       className="w-full px-4 py-3 rounded-md bg-surface text-ink font-sans text-base border-2 border-border-strong focus-ring shadow-doodle-sm placeholder:text-ink-muted/60"
                       required
                     />
-                    <p className="font-mono text-xs text-ink-muted">
-                      Brian will address you by this name across all daily morning check-ins and reflection logs.
-                    </p>
                   </div>
 
                   {/* Field 2: Email */}
