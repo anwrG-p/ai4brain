@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { X, Pause } from 'lucide-react'
 import { getDimensionsByPreset, DIMENSION_PRESETS } from '../config/dimensions'
-import type { DimensionConfig, TaskSchemaType } from '../contracts'
+import type { DimensionConfig, TaskSchemaType } from '../types'
 import {
   buildEstimatesForDimensions,
   SAMPLE_WHY_THIS_TRAIL,
 } from '../services/mocks/fixtures'
-import { useAppStore } from '../store/useAppStore'
-import { WhyThisPanel } from '../components/signature/WhyThisPanel'
-import { NodiCompanion } from '../components/signature/NodiCompanion'
+import { useAppStore } from '../state/useAppStore'
+import { useEmilyStore } from '../state/useEmilyStore'
+import { WhyThisPanel } from '../components/features/coach/WhyThisPanel'
+import { NodiCompanion } from '../components/features/brand/NodiCompanion'
+import { BrianMascot } from '../components/features/brand/BrianMascot'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -605,6 +607,8 @@ function renderStimulusGraphic(trial: TrialStepSpec) {
 
 export default function TaskRunnerPage() {
   const { dimId } = useParams<{ dimId: string }>()
+  const [searchParams] = useSearchParams()
+  const isBaselineMode = searchParams.get('mode') === 'baseline'
   const navigate = useNavigate()
   const {
     theme,
@@ -647,6 +651,8 @@ export default function TaskRunnerPage() {
   const [stage, setStage] = useState<RunnerStage>('running')
   const [activeTrialIdx, setActiveTrialIdx] = useState<number>(1) // 0-based index; 1 = Trial 2 of 4 active
   const [showTelemetryTable, setShowTelemetryTable] = useState<boolean>(false)
+  const currentEmotion = useEmilyStore((s) => s.currentEmotion)
+  const [consecutiveErrors, setConsecutiveErrors] = useState<number>(0)
   const [recordedEvents, setRecordedEvents] = useState<RecordedTrialEvent[]>(
     () => [
       {
@@ -717,6 +723,13 @@ export default function TaskRunnerPage() {
 
       setRecordedEvents((prev) => [newEvent, ...prev])
 
+      const isError = !option.isCorrect
+      const nextConsecutive = isError ? consecutiveErrors + 1 : 0
+      setConsecutiveErrors(nextConsecutive)
+      if (nextConsecutive >= 2) {
+        useEmilyStore.getState().updateTelemetry([], { consecutiveErrors: nextConsecutive })
+      }
+
       if (activeTrialIdx + 1 >= trialSequence.length) {
         setStage('completed')
       } else {
@@ -731,6 +744,7 @@ export default function TaskRunnerPage() {
       currentDim.backendDimensionKey,
       currentTrial,
       trialSequence.length,
+      consecutiveErrors,
     ],
   )
 
@@ -925,6 +939,24 @@ export default function TaskRunnerPage() {
             <span className="sr-only">Zero-Distraction Lock: Mascot Hidden</span>
           </div>
 
+          {/* Subtle Affective Guidance Banner during strain/hesitation */}
+          {currentEmotion === 'frustrated' && (
+            <div
+              role="status"
+              className="py-1 px-3 rounded-pill bg-surface-raised border border-border-strong text-xs font-mono text-ink-muted text-center"
+            >
+              🍃 Steady pace — no penalty for taking your time.
+            </div>
+          )}
+          {currentEmotion === 'hesitant' && (
+            <div
+              role="status"
+              className="py-1 px-3 rounded-pill bg-surface-raised border border-border-strong text-xs font-mono text-ink-muted text-center"
+            >
+              🧭 Take your time — every exploration counts.
+            </div>
+          )}
+
           {/* Response Buttons: [ Old ] 1   [ Similar ] 2   [ New ] 3 */}
           <div
             role="group"
@@ -1003,7 +1035,48 @@ export default function TaskRunnerPage() {
       {/* =========================================================
           STAGE 4: POST-BLOCK SUMMARY ("SHOW WHAT WAS RECORDED" APPEARS HERE)
           ========================================================= */}
-      {stage === 'completed' && (
+      {stage === 'completed' && isBaselineMode ? (
+        <div className="space-y-6 max-w-xl w-full mx-auto py-8">
+          <Card className="p-8 text-center space-y-6 border-2 border-border-strong shadow-doodle-lg">
+            <div className="mx-auto w-32 h-32 flex items-center justify-center">
+              <BrianMascot pose="celebrate" size={110} halo={true} />
+            </div>
+
+            <div className="space-y-2">
+              <Badge tone="reward" glyph="★">
+                Baseline Calibration Complete · Non-Biometric Lock
+              </Badge>
+              <h1 className="font-display text-3xl font-extrabold text-ink tracking-tight">
+                Your Initial Brain Twin Is Calibrated!
+              </h1>
+              <p className="text-sm text-ink-muted max-w-md mx-auto leading-relaxed">
+                Brian mapped your response tempo and visual memory rhythm across 4 distraction-free micro-rounds. Zero guesswork, zero clinical labels.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-xs font-mono-tabular">
+              <div className="rounded-xl border-2 border-border bg-surface-raised p-3">
+                <span className="text-ink-muted block text-xs">Pacing Rhythm</span>
+                <strong className="text-ink text-base font-bold">{meanNormalizedRt} ms</strong>
+              </div>
+              <div className="rounded-xl border-2 border-border bg-surface-raised p-3">
+                <span className="text-ink-muted block text-xs">Tempo Stability</span>
+                <strong className="text-ink text-base font-bold">{meanJitterMs} ms</strong>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <Link
+                to="/reveal"
+                className="w-full py-4 px-6 rounded-xl bg-brand text-brand-ink font-display text-lg font-bold border-2 border-border-strong shadow-doodle hover:shadow-doodle-lg hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 group no-underline text-center"
+              >
+                <span>Reveal My Living Brain Twin</span>
+                <span className="transition-transform group-hover:translate-x-1" aria-hidden="true">→</span>
+              </Link>
+            </div>
+          </Card>
+        </div>
+      ) : stage === 'completed' && (
         <div className="space-y-6 max-w-3xl w-full mx-auto py-4">
           {/* Header */}
           <div className="space-y-2">
@@ -1190,7 +1263,7 @@ export default function TaskRunnerPage() {
           {/* WhyThisPanel */}
           <WhyThisPanel
             trail={SAMPLE_WHY_THIS_TRAIL}
-            title="How This Block Updated Your SAT-JEPA Twin (5-Part Trail)"
+            title="✨ Why Brian Suggests This"
             defaultExpanded
           />
 

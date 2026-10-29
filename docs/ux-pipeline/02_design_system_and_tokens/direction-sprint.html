@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SynapseTwin · CISTAC 1.0 — Design Direction Sprint (3 Style Tiles)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Baloo+2:wght@600;700;800&family=Fredoka:wght@500;600;700&family=JetBrains+Mono:wght@500;600&family=Lexend:wght@400;500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --font-display: 'Fredoka', system-ui, sans-serif;
+      --font-sans: 'Lexend', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+    body[data-font="pairing-1"] {
+      --font-display: 'Fredoka', system-ui, sans-serif;
+      --font-sans: 'Lexend', system-ui, sans-serif;
+    }
+    body[data-font="pairing-2"] {
+      --font-display: 'Baloo 2', system-ui, sans-serif;
+      --font-sans: 'Atkinson Hyperlegible', system-ui, sans-serif;
+    }
+    body[data-font="pairing-3"] {
+      --font-display: 'Sora', system-ui, sans-serif;
+      --font-sans: 'Lexend', system-ui, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: #141224;
+      color: #F8FAFC;
+      line-height: 1.5;
+      padding-block-end: 64px;
+    }
+
+    /* Sprint Control Header */
+    .sprint-bar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(20, 18, 36, 0.95);
+      backdrop-filter: blur(8px);
+      border-block-end: 1px solid #332E54;
+      padding-block: 12px;
+      padding-inline: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .sprint-title {
+      font-family: var(--font-display);
+      font-size: 1.125rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .badge-rec {
+      background: #FFC83D;
+      color: #1F1B3B;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding-block: 2px;
+      padding-inline: 8px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .controls-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+    .control-label {
+      font-size: 0.8125rem;
+      color: #CBD5E1;
+      margin-inline-end: 4px;
+    }
+    .pill-btn {
+      min-height: 40px;
+      padding-block: 6px;
+      padding-inline: 14px;
+      border-radius: 8px;
+      border: 1px solid #475569;
+      background: #1E293B;
+      color: #F8FAFC;
+      font-family: var(--font-sans);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 150ms ease;
+    }
+    .pill-btn:hover {
+      border-color: #94A3B8;
+    }
+    .pill-btn[aria-pressed="true"] {
+      background: #FFC83D;
+      color: #1F1B3B;
+      border-color: #FFC83D;
+      font-weight: 600;
+    }
+    .pill-btn:focus-visible {
+      outline: 3px solid #38BDF8;
+      outline-offset: 2px;
+    }
+
+    /* Grid of 3 Style Tiles */
+    .tiles-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(410px, 1fr));
+      gap: 24px;
+      padding: 24px;
+      max-width: 1600px;
+      margin-inline: auto;
+    }
+
+    /* Tile Base */
+    .style-tile {
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      padding: 24px;
+      transition: transform 200ms ease;
+    }
+    .tile-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      border-block-end: 1px solid var(--t-border);
+      padding-block-end: 16px;
+    }
+    .tile-name {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--t-ink);
+    }
+    .tile-sub {
+      font-size: 0.875rem;
+      color: var(--t-muted);
+      margin-block-start: 4px;
+    }
+
+    /* Direction 1: Playful Lab (Recommended Default) */
+    .tile-playful {
+      --t-canvas: #FFF8EE;
+      --t-surface: #FFFFFF;
+      --t-ink: #1F1B3B;
+      --t-muted: #5B5675;
+      --t-brand: #0F766E;
+      --t-brand-ink: #FFFFFF;
+      --t-reward: #FFC83D;
+      --t-coral: #FF6B6B;
+      --t-border: #8C86A0;
+      --t-radius: 12px;
+      background: var(--t-canvas);
+      color: var(--t-ink);
+      border: 3px solid #FFC83D;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    }
+
+    /* Direction 2: Calm Clarity */
+    .tile-calm {
+      --t-canvas: #F6F8FB;
+      --t-surface: #FFFFFF;
+      --t-ink: #0F172A;
+      --t-muted: #475569;
+      --t-brand: #2F55D4;
+      --t-brand-ink: #FFFFFF;
+      --t-reward: #2DD4BF;
+      --t-coral: #E2E8F0;
+      --t-border: #94A3B8;
+      --t-radius: 10px;
+      background: var(--t-canvas);
+      color: var(--t-ink);
+      border: 1px solid #CBD5E1;
+    }
+
+    /* Direction 3: Night Lab */
+    .tile-night {
+      --t-canvas: #0B1020;
+      --t-surface: #131B33;
+      --t-ink: #E8ECFF;
+      --t-muted: #A3ABCB;
+      --t-brand: #22D3EE;
+      --t-brand-ink: #0B1020;
+      --t-reward: #A3E635;
+      --t-coral: #F472B6;
+      --t-border: #384670;
+      --t-radius: 8px;
+      background: var(--t-canvas);
+      color: var(--t-ink);
+      border: 1px solid #2E3A5C;
+    }
+
+    /* Section Block inside Tile */
+    .fragment-box {
+      background: var(--t-surface);
+      border: 1.5px solid var(--t-border);
+      border-radius: var(--t-radius);
+      padding: 16px;
+    }
+    .tile-playful .fragment-box {
+      border-width: 2px;
+      border-color: #1F1B3B;
+      box-shadow: 0 3px 0 #1F1B3B;
+    }
+    .tile-calm .fragment-box {
+      border-width: 1px;
+      border-color: #CBD5E1;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+    }
+    .tile-night .fragment-box {
+      border-width: 1px;
+      border-color: #2E3C66;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+
+    .section-tag {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--t-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-block-end: 8px;
+      display: block;
+    }
+
+    /* 1. Hero Fragment */
+    .hero-headline {
+      font-family: var(--font-display);
+      font-size: 1.375rem;
+      line-height: 1.2;
+      margin-block-end: 8px;
+      color: var(--t-ink);
+    }
+    .hero-copy {
+      font-size: 0.875rem;
+      color: var(--t-muted);
+      margin-block-end: 14px;
+    }
+
+    /* 2. Tactile Button Set */
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    .ui-btn {
+      min-height: 44px;
+      padding-block: 10px;
+      padding-inline: 16px;
+      border-radius: var(--t-radius);
+      font-family: var(--font-sans);
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: transform 120ms ease, background-color 120ms ease;
+    }
+    .ui-btn:focus-visible {
+      outline: 3px solid var(--t-brand);
+      outline-offset: 2px;
+    }
+    .btn-primary {
+      background: var(--t-brand);
+      color: var(--t-brand-ink);
+      border: 2px solid var(--t-ink);
+    }
+    .tile-playful .btn-primary {
+      box-shadow: 0 3px 0 #1F1B3B;
+    }
+    .tile-playful .btn-primary:active {
+      transform: translateY(2px);
+      box-shadow: 0 1px 0 #1F1B3B;
+    }
+    .tile-calm .btn-primary {
+      border-color: transparent;
+      box-shadow: 0 2px 6px rgba(47, 85, 212, 0.25);
+    }
+    .tile-night .btn-primary {
+      border-color: #22D3EE;
+      box-shadow: 0 0 12px rgba(34, 211, 238, 0.25);
+    }
+
+    .btn-secondary {
+      background: var(--t-surface);
+      color: var(--t-ink);
+      border: 1.5px solid var(--t-border);
+    }
+    .tile-playful .btn-secondary {
+      border: 2px solid #1F1B3B;
+      box-shadow: 0 3px 0 #8C86A0;
+    }
+    .btn-reward {
+      background: var(--t-reward);
+      color: #1F1B3B;
+      border: 2px solid #1F1B3B;
+      font-weight: 700;
+    }
+
+    /* 3. Metric Card + Why This */
+    .metric-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-block-end: 8px;
+    }
+    .metric-val {
+      font-family: var(--font-mono);
+      font-size: 1.375rem;
+      font-weight: 600;
+    }
+    .ci-pill {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      padding-block: 2px;
+      padding-inline: 8px;
+      border-radius: 6px;
+      border: 1px solid var(--t-border);
+      color: var(--t-muted);
+    }
+    .why-box {
+      margin-block-start: 10px;
+      padding: 10px;
+      border-radius: 8px;
+      border-inline-start: 4px solid var(--t-brand);
+      background: var(--t-canvas);
+      font-size: 0.8125rem;
+    }
+
+    /* 4. Mini Chart + Table Toggle */
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-block-end: 10px;
+    }
+    .mini-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+      margin-block-start: 8px;
+    }
+    .mini-table th, .mini-table td {
+      text-align: start;
+      padding: 6px 8px;
+      border-block-end: 1px solid var(--t-border);
+    }
+    .swatch-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-block-start: 8px;
+    }
+    .swatch {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--t-border);
+    }
+  </style>
+</head>
+<body data-font="pairing-1">
+
+  <header class="sprint-bar" role="banner">
+    <div class="sprint-title">
+      <span>SynapseTwin · Design Direction Sprint</span>
+      <span class="badge-rec">Step 1 Gate</span>
+    </div>
+    <div class="controls-group" role="group" aria-label="Typography Pairing Switcher">
+      <span class="control-label">Typography Pairing:</span>
+      <button type="button" class="pill-btn" aria-pressed="true" onclick="setFont('pairing-1', this)">
+        1. Fredoka + Lexend (Recommended)
+      </button>
+      <button type="button" class="pill-btn" aria-pressed="false" onclick="setFont('pairing-2', this)">
+        2. Baloo 2 + Atkinson Hyperlegible
+      </button>
+      <button type="button" class="pill-btn" aria-pressed="false" onclick="setFont('pairing-3', this)">
+        3. Sora + Lexend
+      </button>
+    </div>
+  </header>
+
+  <main class="tiles-grid">
+    <!-- TILE A: PLAYFUL LAB -->
+    <section class="style-tile tile-playful" aria-labelledby="tile-a-title">
+      <div class="tile-header">
+        <div>
+          <h2 id="tile-a-title" class="tile-name">A. Playful Lab ★</h2>
+          <p class="tile-sub">Recommended Default · Warm paper (#FFF8EE), tactile 2px borders, high-trust scientific charts.</p>
+        </div>
+        <span class="badge-rec">Recommended</span>
+      </div>
+
+      <!-- 1. Hero Fragment -->
+      <div class="fragment-box">
+        <span class="section-tag">01 · Hero Fragment</span>
+        <h3 class="hero-headline">Grow your cognitive twin—honestly, one 2-minute session at a time.</h3>
+        <p class="hero-copy">Non-clinical tasks that map your Working Memory, Inhibition Control, and Flexibility with transparent confidence ranges.</p>
+        <div class="btn-row">
+          <button type="button" class="ui-btn btn-primary">Start 2-Min Baseline</button>
+          <button type="button" class="ui-btn btn-secondary">Try a Judge Persona</button>
+        </div>
+      </div>
+
+      <!-- 2. Button Anatomy & Contrast Swatches -->
+      <div class="fragment-box">
+        <span class="section-tag">02 · Tactile Buttons (≥44px) & WCAG Ratios</span>
+        <div class="btn-row">
+          <button type="button" class="ui-btn btn-primary">Primary (5.5:1)</button>
+          <button type="button" class="ui-btn btn-reward">Milestone (10.6:1)</button>
+          <button type="button" class="ui-btn btn-secondary">Secondary (15.6:1)</button>
+        </div>
+        <div class="swatch-row">
+          <span class="swatch" style="background:#FFF8EE;color:#1F1B3B">Paper #FFF8EE · 15.6:1</span>
+          <span class="swatch" style="background:#0F766E;color:#FFFFFF">Teal #0F766E · 5.5:1</span>
+          <span class="swatch" style="background:#FFC83D;color:#1F1B3B">Gold #FFC83D · 10.6:1</span>
+          <span class="swatch" style="background:#FF6B6B;color:#1F1B3B">Coral Fill · 5.9:1</span>
+        </div>
+      </div>
+
+      <!-- 3. Dimension Card + Why This -->
+      <div class="fragment-box">
+        <span class="section-tag">03 · Explainable Dimension Card</span>
+        <div class="metric-top">
+          <strong>● Working Memory (N-Back)</strong>
+          <span class="metric-val">76% <span class="ci-pill">± 5% (CI)</span></span>
+        </div>
+        <p style="font-size:0.8125rem;color:var(--t-muted)">Confidence: High (0.86) · Mean RT: 612 ms · Error burst: 0</p>
+        <div class="why-box">
+          <strong>Why this advice?</strong>
+          <div>• <strong>Data:</strong> Accuracy held at 88% across 2-back spatial switches.</div>
+          <div>• <strong>Inference (Δc):</strong> Ready for 2-back dual-stream interference.</div>
+          <div>• <strong>What changes this:</strong> 2+ error bursts will step back to single-stream.</div>
+        </div>
+      </div>
+
+      <!-- 4. Mini Uncertainty Radar + View as Table -->
+      <div class="fragment-box">
+        <div class="chart-header">
+          <span class="section-tag" style="margin:0">04 · Uncertainty Radar + Hatch Pattern</span>
+          <button type="button" class="ui-btn btn-secondary" style="min-height:36px;padding:4px 10px;font-size:0.75rem" onclick="toggleTable('table-a')">View as Table</button>
+        </div>
+        <svg viewBox="0 0 280 150" width="100%" height="150" role="img" aria-label="Uncertainty Radar sample showing solid high-confidence band and hatched low-confidence band">
+          <defs>
+            <pattern id="hatch-a" width="8" height="8" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+              <line x1="0" y1="0" x2="0" y2="8" stroke="#9E4778" stroke-width="2.5" />
+            </pattern>
+          </defs>
+          <!-- Grid rings -->
+          <polygon points="140,18 235,75 195,138 85,138 45,75" fill="none" stroke="#8C86A0" stroke-dasharray="3,3" />
+          <polygon points="140,45 200,82 175,120 105,120 80,82" fill="none" stroke="#8C86A0" stroke-opacity="0.5" />
+          <!-- Hatched uncertainty band -->
+          <polygon points="140,24 222,76 184,132 94,130 58,74" fill="url(#hatch-a)" fill-opacity="0.35" stroke="#9E4778" stroke-dasharray="4,3" stroke-width="1.5" />
+          <!-- Core polygon -->
+          <polygon points="140,34 210,80 176,124 102,122 72,78" fill="rgba(15, 118, 110, 0.20)" stroke="#0F766E" stroke-width="2.5" />
+          <!-- Shape markers (Colorblind safe) -->
+          <circle cx="140" cy="34" r="5" fill="#0072B2" stroke="#FFFFFF" stroke-width="1.5" />
+          <rect x="205" y="75" width="10" height="10" fill="#C45100" stroke="#FFFFFF" stroke-width="1.5" />
+          <polygon points="176,118 182,129 170,129" fill="#008662" stroke="#FFFFFF" stroke-width="1.5" />
+          <text x="148" y="32" font-size="11" fill="#1F1B3B" font-weight="600">WM 76%±5%</text>
+          <text x="216" y="96" font-size="11" fill="#1F1B3B" font-weight="600">IC 68%±7%</text>
+          <text x="12" y="72" font-size="11" fill="#9E4778" font-weight="600">EP 54%±18% (Low Conf)</text>
+        </svg>
+        <table id="table-a" class="mini-table" hidden>
+          <thead><tr><th>Dimension</th><th>Score</th><th>95% CI</th><th>Confidence</th></tr></thead>
+          <tbody>
+            <tr><td>Working Memory (●)</td><td>76%</td><td>71%–81%</td><td>High (0.86)</td></tr>
+            <tr><td>Inhibition Control (■)</td><td>68%</td><td>61%–75%</td><td>Moderate (0.74)</td></tr>
+            <tr><td>Episodic Separation (◆)</td><td>54%</td><td>36%–72%</td><td>Low (0.48 · Hatched)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TILE B: CALM CLARITY -->
+    <section class="style-tile tile-calm" aria-labelledby="tile-b-title">
+      <div class="tile-header">
+        <div>
+          <h2 id="tile-b-title" class="tile-name">B. Calm Clarity</h2>
+          <p class="tile-sub">Cool neutral canvas (#F6F8FB), soft shadows, cobalt brand accent (#2F55D4), academic restraint.</p>
+        </div>
+      </div>
+
+      <div class="fragment-box">
+        <span class="section-tag">01 · Hero Fragment</span>
+        <h3 class="hero-headline">Grow your cognitive twin—honestly, one 2-minute session at a time.</h3>
+        <p class="hero-copy">Non-clinical tasks that map your Working Memory, Inhibition Control, and Flexibility with transparent confidence ranges.</p>
+        <div class="btn-row">
+          <button type="button" class="ui-btn btn-primary">Start 2-Min Baseline</button>
+          <button type="button" class="ui-btn btn-secondary">Try a Judge Persona</button>
+        </div>
+      </div>
+
+      <div class="fragment-box">
+        <span class="section-tag">02 · Buttons (≥44px) & WCAG Ratios</span>
+        <div class="btn-row">
+          <button type="button" class="ui-btn btn-primary">Primary (6.2:1)</button>
+          <button type="button" class="ui-btn btn-reward">Milestone (9.6:1)</button>
+          <button type="button" class="ui-btn btn-secondary">Secondary (16.8:1)</button>
+        </div>
+        <div class="swatch-row">
+          <span class="swatch" style="background:#F6F8FB;color:#0F172A">Canvas #F6F8FB · 16.8:1</span>
+          <span class="swatch" style="background:#2F55D4;color:#FFFFFF">Cobalt #2F55D4 · 6.2:1</span>
+          <span class="swatch" style="background:#2DD4BF;color:#0F172A">Mint #2DD4BF · 9.6:1</span>
+        </div>
+      </div>
+
+      <div class="fragment-box">
+        <span class="section-tag">03 · Explainable Dimension Card</span>
+        <div class="metric-top">
+          <strong>● Working Memory (N-Back)</strong>
+          <span class="metric-val">76% <span class="ci-pill">± 5% (CI)</span></span>
+        </div>
+        <p style="font-size:0.8125rem;color:var(--t-muted)">Confidence: High (0.86) · Mean RT: 612 ms · Error burst: 0</p>
+        <div class="why-box">
+          <strong>Why this advice?</strong>
+          <div>• <strong>Data:</strong> Accuracy held at 88% across 2-back spatial switches.</div>
+          <div>• <strong>Inference (Δc):</strong> Ready for 2-back dual-stream interference.</div>
+        </div>
+      </div>
+
+      <div class="fragment-box">
+        <div class="chart-header">
+          <span class="section-tag" style="margin:0">04 · Uncertainty Radar</span>
+          <button type="button" class="ui-btn btn-secondary" style="min-height:36px;padding:4px 10px;font-size:0.75rem" onclick="toggleTable('table-b')">View as Table</button>
+        </div>
+        <svg viewBox="0 0 280 150" width="100%" height="150" role="img" aria-label="Calm Clarity Radar chart sample">
+          <polygon points="140,18 235,75 195,138 85,138 45,75" fill="none" stroke="#94A3B8" stroke-dasharray="3,3" />
+          <polygon points="140,34 210,80 176,124 102,122 72,78" fill="rgba(47, 85, 212, 0.16)" stroke="#2F55D4" stroke-width="2.5" />
+          <circle cx="140" cy="34" r="5" fill="#2F55D4" />
+          <text x="148" y="32" font-size="11" fill="#0F172A" font-weight="600">WM 76%±5%</text>
+        </svg>
+        <table id="table-b" class="mini-table" hidden>
+          <thead><tr><th>Dimension</th><th>Score</th><th>95% CI</th></tr></thead>
+          <tbody><tr><td>Working Memory</td><td>76%</td><td>71%–81%</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TILE C: NIGHT LAB -->
+    <section class="style-tile tile-night" aria-labelledby="tile-c-title">
+      <div class="tile-header">
+        <div>
+          <h2 id="tile-c-title" class="tile-name">C. Night Lab (Dark Theme Seed)</h2>
+          <p class="tile-sub">Deep slate (#0B1020), luminous cyan (#22D3EE, 10.5:1) & lime (#A3E635, 12.6:1). Ships as Dark Mode token set.</p>
+        </div>
+      </div>
+
+      <div class="fragment-box">
+        <span class="section-tag">01 · Hero Fragment</span>
+        <h3 class="hero-headline">Grow your cognitive twin—honestly, one 2-minute session at a time.</h3>
+        <p class="hero-copy">Non-clinical tasks that map your Working Memory, Inhibition Control, and Flexibility with transparent confidence ranges.</p>
+        <div class="btn-row">
+          <button type="button" class="ui-btn btn-primary">Start 2-Min Baseline</button>
+          <button type="button" class="ui-btn btn-secondary">Try a Judge Persona</button>
+        </div>
+      </div>
+
+      <div class="fragment-box">
+        <span class="section-tag">02 · Buttons (≥44px) & WCAG Ratios</span>
+        <div class="btn-row">
+          <button type="button" class="ui-btn btn-primary">Primary (10.5:1)</button>
+          <button type="button" class="ui-btn btn-reward">Milestone (12.6:1)</button>
+          <button type="button" class="ui-btn btn-secondary">Secondary (16.1:1)</button>
+        </div>
+        <div class="swatch-row">
+          <span class="swatch" style="background:#0B1020;color:#E8ECFF">Bg #0B1020 · 16.1:1</span>
+          <span class="swatch" style="background:#22D3EE;color:#0B1020">Cyan #22D3EE · 10.5:1</span>
+          <span class="swatch" style="background:#A3E635;color:#0B1020">Lime #A3E635 · 12.6:1</span>
+        </div>
+      </div>
+
+      <div class="fragment-box">
+        <span class="section-tag">03 · Explainable Dimension Card</span>
+        <div class="metric-top">
+          <strong>● Working Memory (N-Back)</strong>
+          <span class="metric-val">76% <span class="ci-pill">± 5% (CI)</span></span>
+        </div>
+        <p style="font-size:0.8125rem;color:var(--t-muted)">Confidence: High (0.86) · Mean RT: 612 ms · Error burst: 0</p>
+        <div class="why-box">
+          <strong>Why this advice?</strong>
+          <div>• <strong>Data:</strong> Accuracy held at 88% across 2-back spatial switches.</div>
+          <div>• <strong>Inference (Δc):</strong> Ready for 2-back dual-stream interference.</div>
+        </div>
+      </div>
+
+      <div class="fragment-box">
+        <div class="chart-header">
+          <span class="section-tag" style="margin:0">04 · Uncertainty Radar</span>
+          <button type="button" class="ui-btn btn-secondary" style="min-height:36px;padding:4px 10px;font-size:0.75rem" onclick="toggleTable('table-c')">View as Table</button>
+        </div>
+        <svg viewBox="0 0 280 150" width="100%" height="150" role="img" aria-label="Night Lab Radar chart sample">
+          <polygon points="140,18 235,75 195,138 85,138 45,75" fill="none" stroke="#384670" stroke-dasharray="3,3" />
+          <polygon points="140,34 210,80 176,124 102,122 72,78" fill="rgba(34, 211, 238, 0.18)" stroke="#22D3EE" stroke-width="2.5" />
+          <circle cx="140" cy="34" r="5" fill="#A3E635" />
+          <text x="148" y="32" font-size="11" fill="#E8ECFF" font-weight="600">WM 76%±5%</text>
+        </svg>
+        <table id="table-c" class="mini-table" hidden>
+          <thead><tr><th>Dimension</th><th>Score</th><th>95% CI</th></tr></thead>
+          <tbody><tr><td>Working Memory</td><td>76%</td><td>71%–81%</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    function setFont(pairing, btn) {
+      document.body.setAttribute('data-font', pairing);
+      document.querySelectorAll('.pill-btn').forEach(b => b.setAttribute('aria-pressed', 'false'));
+      btn.setAttribute('aria-pressed', 'true');
+    }
+    function toggleTable(id) {
+      const el = document.getElementById(id);
+      if (el) el.hidden = !el.hidden;
+    }
+  </script>
+</body>
+</html>

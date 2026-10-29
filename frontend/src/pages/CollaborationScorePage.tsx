@@ -3,13 +3,13 @@ import {
   buildCollaborationScoreForPersona,
   COLLABORATION_LONGITUDINAL_HISTORY,
 } from '../services/mocks/fixtures'
-import { useAppStore, type PersonaId } from '../store/useAppStore'
+import { useAppStore, type PersonaId } from '../state/useAppStore'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { DoodleSquiggle } from '../components/ui/DoodleDecorations'
-import { CollaborationScoreCard } from '../components/signature/CollaborationScoreCard'
-import { Mascot } from '../components/signature/Mascot'
+import { CollaborationScoreCard } from '../components/features/collaboration/CollaborationScoreCard'
+import { Mascot } from '../components/features/brand/Mascot'
 
 interface PersonaOption {
   id: PersonaId

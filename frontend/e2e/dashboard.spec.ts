@@ -14,7 +14,7 @@ test.describe('Page 06: Dashboard (/dashboard) Hero Visual QA & A11y', () => {
     await page.goto('/dashboard', { waitUntil: 'networkidle' })
     await expect(
       page.getByRole('heading', {
-        name: /Good morning|Your evolving cognitive twin/i,
+        name: /Good morning|Your evolving cognitive twin|Welcome back/i,
       }),
     ).toBeVisible()
 
@@ -33,22 +33,7 @@ test.describe('Page 06: Dashboard (/dashboard) Hero Visual QA & A11y', () => {
       fullPage: true,
     })
 
-    // 2. Desktop 1440px — Low-Confidence Hatched (Salma)
-    await openJudgeMode(page)
-    const salmaBtn = page.getByRole('button', { name: /Low-Conf Hatched \(Salma/i })
-    await salmaBtn.click()
-    await expect(salmaBtn).toHaveAttribute('aria-pressed', 'true')
-    await page.waitForTimeout(350)
-
-    const axeHatched = await new AxeBuilder({ page }).analyze()
-    expect(axeHatched.violations).toEqual([])
-
-    await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, '06-dashboard-10dims-hatched-1440.png'),
-      fullPage: true,
-    })
-
-    // 3. Dark Mode (Night Lab) at 1440px + axe-core check
+    // 2. Dark Mode (Night Lab) at 1440px + axe-core check
     await page.getByRole('button', { name: /Dark \(Night Lab\)/i }).first().click()
     await page.waitForTimeout(350)
     const axeDark = await new AxeBuilder({ page }).analyze()
@@ -59,12 +44,8 @@ test.describe('Page 06: Dashboard (/dashboard) Hero Visual QA & A11y', () => {
       fullPage: true,
     })
 
-    // Switch back to Light & 7 Dims Calibrated for Tablet & Mobile captures
+    // Switch back to Light for Tablet & Mobile captures
     await page.getByRole('button', { name: /Light \(Playful Lab\)/i }).first().click()
-    await closeJudgeMode(page)
-    await page
-      .getByRole('button', { name: /Calibrated Twin \(Youssef/i })
-      .click()
     await page.waitForTimeout(350)
 
     // 4. Tablet 768px

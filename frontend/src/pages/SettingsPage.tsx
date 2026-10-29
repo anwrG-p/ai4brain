@@ -4,15 +4,15 @@ import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { DoodleSquiggle } from '../components/ui/DoodleDecorations'
-import { Mascot } from '../components/signature/Mascot'
-import { WhyThisPanel } from '../components/signature/WhyThisPanel'
-import { useAppStore, type TextScale } from '../store/useAppStore'
+import { Mascot } from '../components/features/brand/Mascot'
+import { WhyThisPanel } from '../components/features/coach/WhyThisPanel'
+import { useAppStore, type TextScale } from '../state/useAppStore'
 import {
   DIMENSION_PRESETS,
   getDimensionsByPreset,
   type DimensionPresetKey,
 } from '../config/dimensions'
-import type { WhyThisTrail } from '../contracts'
+import type { WhyThisTrail } from '../types'
 
 const SETTINGS_WHY_TRAIL: WhyThisTrail = {
   id: 'trail-settings-ergonomics',

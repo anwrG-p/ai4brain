@@ -1,4 +1,4 @@
-import type { DimensionConfig } from '../contracts'
+import type { DimensionConfig } from '../types'
 
 // Full 10-dimension pool supporting 3, 6, 7 (Team Default), 8, and 10 dimension presets [DEC-002]
 export const FULL_DIMENSION_POOL: readonly DimensionConfig[] = [
@@ -7,6 +7,7 @@ export const FULL_DIMENSION_POOL: readonly DimensionConfig[] = [
     code: 'WM',
     slotIndex: 1,
     name: 'Working Memory',
+    consumerLabel: 'Memory Sharpness',
     shortDescription: 'Holding and updating spatial or symbolic patterns across active interference.',
     scientificDefinition:
       'Capacity to actively maintain and manipulate transient information across short delays while resisting proactive interference.',
@@ -25,6 +26,7 @@ export const FULL_DIMENSION_POOL: readonly DimensionConfig[] = [
     code: 'IC',
     slotIndex: 2,
     name: 'Inhibition Control',
+    consumerLabel: 'Distraction Shield',
     shortDescription: 'Suppressing prepotent automatic responses when conflicting cues appear.',
     scientificDefinition:
       'Ability to override dominant or automatic motor and attentional impulses in favor of goal-directed responses.',
@@ -43,6 +45,7 @@ export const FULL_DIMENSION_POOL: readonly DimensionConfig[] = [
     code: 'CF',
     slotIndex: 3,
     name: 'Cognitive Flexibility (Set-Shifting)',
+    consumerLabel: 'Mental Stamina',
     shortDescription: 'Adapting smoothly when task rules shift between position, symbol, or parity.',
     scientificDefinition:
       'Efficiency of reconfiguring mental task sets when environmental rules or priorities change unexpectedly.',
@@ -61,6 +64,7 @@ export const FULL_DIMENSION_POOL: readonly DimensionConfig[] = [
     code: 'AN',
     slotIndex: 4,
     name: 'Attention Networks',
+    consumerLabel: 'Focus Consistency',
     shortDescription: 'Sustaining alerting and orienting focus across central and peripheral targets.',
     scientificDefinition:
       'Coordination of alerting, orienting, and selective target detection across competing visual distractors.',
@@ -79,6 +83,7 @@ export const FULL_DIMENSION_POOL: readonly DimensionConfig[] = [
     code: 'PS',
     slotIndex: 5,
     name: 'Divided Perceptual Speed',
+    consumerLabel: 'Wide-Angle Focus',
     shortDescription: 'Rapidly encoding simultaneous central and peripheral visual stimuli.',
     scientificDefinition:
       'Minimum display duration (ms) required to reliably discriminate dual targets under visual masking.',
@@ -97,6 +102,7 @@ export const FULL_DIMENSION_POOL: readonly DimensionConfig[] = [
     code: 'EP',
     slotIndex: 6,
     name: 'Episodic Pattern Separation',
+    consumerLabel: 'Visual Memory Clarity',
     shortDescription: 'Distinguishing previously seen patterns from highly similar visual lures.',
     scientificDefinition:
       'Fidelity of encoding distinct memory traces so overlapping experiences are not confused as identical.',
@@ -115,6 +121,7 @@ export const FULL_DIMENSION_POOL: readonly DimensionConfig[] = [
     code: 'VP',
     slotIndex: 7,
     name: 'Visuospatial Planning & Gf',
+    consumerLabel: 'Spatial Strategy',
     shortDescription: 'Inducing abstract relational rules and planning multi-step spatial moves.',
     scientificDefinition:
       'Fluid relational reasoning, mental rotation, and look-ahead goal planning under move constraints.',
@@ -133,6 +140,7 @@ export const FULL_DIMENSION_POOL: readonly DimensionConfig[] = [
     code: 'SO',
     slotIndex: 8,
     name: 'Mental Spatial Rotation',
+    consumerLabel: 'Mental Rotation',
     shortDescription: 'Rotating 2D/3D geometric structures mentally to judge parity vs reflection.',
     scientificDefinition:
       'Rate and accuracy of mental transformation across angular disparities (0° to 180°).',
@@ -152,6 +160,7 @@ export const FULL_DIMENSION_POOL: readonly DimensionConfig[] = [
     code: 'MC',
     slotIndex: 9,
     name: 'Metacognitive Calibration',
+    consumerLabel: 'Self-Awareness Calibration',
     shortDescription: 'Aligning self-estimated confidence with actual trial performance.',
     scientificDefinition:
       'Correspondence between subjective confidence judgments and objective task accuracy.',
@@ -171,6 +180,7 @@ export const FULL_DIMENSION_POOL: readonly DimensionConfig[] = [
     code: 'SV',
     slotIndex: 10,
     name: 'Sustained Vigilance Stability',
+    consumerLabel: 'Rhythm Stability',
     shortDescription: 'Maintaining consistent response timing across extended blocks.',
     scientificDefinition:
       'Resistance to attentional lapses and reaction-time variability over time-on-task.',
@@ -194,7 +204,7 @@ export const SIX_DIMENSION_PRESET: readonly DimensionConfig[] = [
   { ...FULL_DIMENSION_POOL[4]!, id: 'processing_speed', code: 'PS', slotIndex: 3, name: 'Processing Speed' },
   { ...FULL_DIMENSION_POOL[2]!, id: 'cognitive_flexibility', code: 'CF', slotIndex: 4, name: 'Cognitive Flexibility' },
   { ...FULL_DIMENSION_POOL[1]!, id: 'inhibitory_control', code: 'IC', slotIndex: 5, name: 'Inhibitory Control' },
-  { ...FULL_DIMENSION_POOL[6]!, id: 'reasoning', code: 'RS', slotIndex: 6, name: 'Reasoning' },
+  { ...FULL_DIMENSION_POOL[5]!, id: 'episodic_pattern_separation', code: 'EP', slotIndex: 6, name: 'Episodic Pattern Separation', consumerLabel: 'Visual Memory Clarity' },
 ]
 
 export type DimensionPresetKey = '3' | '6' | '7' | '8' | '10'

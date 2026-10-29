@@ -1,15 +1,15 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { PrivacyCenter } from '../components/signature/PrivacyCenter'
-import { WhyThisPanel } from '../components/signature/WhyThisPanel'
-import { Mascot } from '../components/signature/Mascot'
+import { PrivacyCenter } from '../components/features/privacy/PrivacyCenter'
+import { WhyThisPanel } from '../components/features/coach/WhyThisPanel'
+import { Mascot } from '../components/features/brand/Mascot'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { DoodleSquiggle } from '../components/ui/DoodleDecorations'
-import { useAppStore } from '../store/useAppStore'
+import { useAppStore } from '../state/useAppStore'
 import { MOCK_PRIVACY_AUDIT_LOG } from '../services/mocks/fixtures'
-import type { PrivacyAuditEvent, PurgeCertificate, WhyThisTrail } from '../contracts'
+import type { PrivacyAuditEvent, PurgeCertificate, WhyThisTrail } from '../types'
 
 const PRIVACY_WHY_THIS_TRAIL: WhyThisTrail = {
   id: 'why-privacy-01',
@@ -22,7 +22,7 @@ const PRIVACY_WHY_THIS_TRAIL: WhyThisTrail = {
   inference:
     'Hardware-level software lockout permanently guarantees no camera, microphone, or biometric sensors are ever invoked or accessible.',
   recommendation:
-    'Keeping Historical Snapshots active allows the SAT-JEPA engine to detect learning plateaus and recommend rest days with zero streak penalties.',
+    'Keeping Historical Snapshots active allows your Personal Cognitive Twin to detect learning plateaus and recommend rest days with zero streak penalties.',
   counterfactual:
     'If Core Telemetry were revoked, adaptive staircase latency estimation would be unable to calibrate trial difficulty.',
   sourceModule: 'quest_staircase',

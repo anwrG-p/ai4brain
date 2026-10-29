@@ -1,4 +1,4 @@
-import type { ContrastPairReport } from '../contracts'
+import type { ContrastPairReport } from '../types'
 import { DESIGN_SYSTEM_CONTRAST_PAIRS } from '../styles/token-metadata'
 
 /**

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { evaluateDesignSystemContrast } from '../utils/contrast'
 import { lintCopyText } from '../utils/copyLinter'
 import { getDimensionsByPreset } from '../config/dimensions'
-import { useAppStore } from '../store/useAppStore'
+import { useAppStore } from '../state/useAppStore'
 import { App } from '../App'
 
 describe('Wave 1 & Wave 2 Pages & Design System Unit Suite', () => {
@@ -221,41 +221,28 @@ describe('Wave 1 & Wave 2 Pages & Design System Unit Suite', () => {
     expect(screen.getByText(/SNAP-2026-SALMA-01/i)).toBeInTheDocument()
   })
 
-  it('renders Page 06 Dashboard (/dashboard) and supports trajectory fan table toggle, fatigue heatmap table toggle, and 3-to-10 dimensions', async () => {
+  it('renders Page 06 Dashboard (/dashboard) with classroom lecture stage, Teacher Brian, and Core Balance Insights', async () => {
     window.history.pushState({}, '', '/dashboard')
     render(<App />)
 
     const heading = await screen.findByRole(
       'heading',
       {
-        name: /Good morning/i,
+        name: /Good morning|Welcome back/i,
       },
       { timeout: 5000 },
     )
     expect(heading).toBeInTheDocument()
 
-    fireEvent.click(
-      screen.getByRole('button', { name: /View Trajectory as Table/i }),
-    )
+    expect(screen.getByTestId('brian-teacher-slot')).toBeInTheDocument()
     expect(
-      screen.getByRole('table', {
-        name: /Brain Twin 6-week historical trajectory and 2-week forecast table/i,
-      }),
+      screen.getByRole('link', { name: /Start Today\'s 2-Min Flow/i }),
     ).toBeInTheDocument()
-
-    fireEvent.click(
-      screen.getByRole('button', { name: /View Heatmap as Table/i }),
-    )
-    expect(
-      screen.getByRole('table', {
-        name: /Session Fatigue and Alertness by Time of Day and Day of Week/i,
-      }),
-    ).toBeInTheDocument()
-
-    fireEvent.click(
-      screen.getByRole('button', { name: /Low-Conf Hatched \(Salma/i }),
-    )
-    expect(screen.getByText(/Rest-First Pacing/i)).toBeInTheDocument()
+    // Test clicking a cognitive dimension chip on the interactive radar
+    const wmBtn = screen.getAllByRole('button', { name: /WM/i })[0]!
+    fireEvent.click(wmBtn)
+    expect(screen.getByText(/Working Memory/i)).toBeInTheDocument()
+    expect(screen.getByText(/Core Balance Insights/i)).toBeInTheDocument()
   })
 
   it('renders Page 08 Brain Twin (/brain-twin) with Signature #2 BrainTwinTimeTravel scrubber, snapshot diff table toggle, and manifold trajectory', async () => {
@@ -910,5 +897,35 @@ describe('Wave 1 & Wave 2 Pages & Design System Unit Suite', () => {
     const tableRegion = screen.getByRole('region', { name: /Counterfactual Impact Table/i })
     expect(tableRegion).toHaveAttribute('tabIndex', '0')
     expect(screen.getByRole('cell', { name: /Working Memory/i })).toBeInTheDocument()
+  })
+
+  it('displays accurate team sprint progress labels across routes (Nearly Done, In Progress, Pending)', async () => {
+    // 1. Auth routes -> Nearly Done
+    window.history.pushState({}, '', '/auth')
+    const { unmount: unmountAuth } = render(<App />)
+    const authBadge = await screen.findByTestId('page-progress-badge')
+    expect(authBadge).toHaveTextContent(/Nearly Done/i)
+    unmountAuth()
+
+    // 2. Welcome route (/) -> In Progress
+    window.history.pushState({}, '', '/')
+    const { unmount: unmountWelcome } = render(<App />)
+    const welcomeBadge = await screen.findByTestId('page-progress-badge')
+    expect(welcomeBadge).toHaveTextContent(/In Progress/i)
+    unmountWelcome()
+
+    // 3. Dashboard route (/dashboard) -> In Progress
+    window.history.pushState({}, '', '/dashboard')
+    const { unmount: unmountDashboard } = render(<App />)
+    const dashboardBadge = await screen.findByTestId('page-progress-badge')
+    expect(dashboardBadge).toHaveTextContent(/In Progress/i)
+    unmountDashboard()
+
+    // 4. Other routes (e.g. /settings) -> Pending
+    window.history.pushState({}, '', '/settings')
+    const { unmount: unmountSettings } = render(<App />)
+    const settingsBadge = await screen.findByTestId('page-progress-badge')
+    expect(settingsBadge).toHaveTextContent(/Pending/i)
+    unmountSettings()
   })
 });

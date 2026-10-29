@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { BRAND_CONFIG } from '../config/brand'
 import { getDimensionsByPreset } from '../config/dimensions'
 import {
@@ -7,7 +7,7 @@ import {
   type BaselineModeId,
   type FocusGoalId,
   type PeakWindowId,
-} from '../store/useAppStore'
+} from '../state/useAppStore'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -63,6 +63,7 @@ const PEAK_WINDOWS: readonly {
 ]
 
 export default function OnboardingPage() {
+  const navigate = useNavigate()
   const {
     dimensionPreset,
     simulateOffline,
@@ -123,14 +124,7 @@ export default function OnboardingPage() {
       setActiveStep(2)
       return
     }
-    setViewMode('wizard')
-    setStatusMessage(
-      `✓ Consent receipt ${consentPreferences.consentReceiptId} saved. Ready to launch ${
-        consentPreferences.baselineMode === 'quick-2min'
-          ? '2-Minute Quick Baseline'
-          : 'Standard 5-Minute Calibration'
-      } (${totalBaselineTrials} micro-trials across ${activeDimensions.length} dimensions).`,
-    )
+    navigate('/practice?mode=baseline')
   }
 
   const handleInputCalibrateTap = () => {
@@ -625,7 +619,7 @@ export default function OnboardingPage() {
                             id="switch-history-label"
                             className="font-display text-sm font-bold text-ink"
                           >
-                            Historised Brain Twin Snapshots (SAT-JEPA Timeline)
+                            Historical Cognitive Snapshots (Brain Twin Timeline)
                           </strong>
                           <Badge tone="neutral" glyph="◈">
                             Optional · Default ON

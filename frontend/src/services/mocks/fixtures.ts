@@ -7,8 +7,8 @@ import type {
   HabitContract,
   TrajectoryPoint,
   WhyThisTrail,
-} from '../../contracts'
-import type { PersonaId } from '../../store/useAppStore'
+} from '../../types'
+import type { PersonaId } from '../../state/useAppStore'
 
 /**
  * Generates deterministic, uncertainty-aware dimension estimates for any 3..10 dimension preset
@@ -593,7 +593,7 @@ export function calculateBayesianEta(
 }
 
 
-import type { PrivacyAuditEvent } from '../../contracts'
+import type { PrivacyAuditEvent } from '../../types'
 
 export const MOCK_PRIVACY_AUDIT_LOG: PrivacyAuditEvent[] = [
   {

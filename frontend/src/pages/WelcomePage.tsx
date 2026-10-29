@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { useAppStore } from '../store/useAppStore'
+import { useAppStore } from '../state/useAppStore'
 import { Badge } from '../components/ui/Badge'
 import { Card } from '../components/ui/Card'
 import { DoodleSquiggle, DoodleArrow } from '../components/ui/DoodleDecorations'

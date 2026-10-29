@@ -3,16 +3,16 @@ import {
   SAMPLE_HABIT_CONTRACTS,
   calculateBayesianEta,
 } from '../services/mocks/fixtures'
-import type { HabitContract, GoalObjectiveType, WhyThisTrail } from '../contracts'
-import { useAppStore } from '../store/useAppStore'
+import type { HabitContract, GoalObjectiveType, WhyThisTrail } from '../types'
+import { useAppStore } from '../state/useAppStore'
 import { getDimensionsByPreset } from '../config/dimensions'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { DoodleSquiggle } from '../components/ui/DoodleDecorations'
-import { HabitContractCard } from '../components/goals/HabitContractCard'
-import { WhyThisPanel } from '../components/signature/WhyThisPanel'
-import { Mascot } from '../components/signature/Mascot'
+import { HabitContractCard } from '../components/features/goals/HabitContractCard'
+import { WhyThisPanel } from '../components/features/coach/WhyThisPanel'
+import { Mascot } from '../components/features/brand/Mascot'
 
 type FilterKey = 'all' | 'active' | 'pacing_rest' | 'completed'
 

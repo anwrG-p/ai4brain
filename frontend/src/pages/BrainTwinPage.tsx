@@ -4,10 +4,10 @@ import { X } from 'lucide-react'
 import {
   BrainTwinTimeTravel,
   buildHistoricalSnapshots,
-} from '../components/signature/BrainTwinTimeTravel'
-import { BrianMascot } from '../components/brand/BrianMascot'
-import { UncertaintyRadar } from '../components/signature/UncertaintyRadar'
-import { WhyThisPanel } from '../components/signature/WhyThisPanel'
+} from '../components/features/brain-twin/BrainTwinTimeTravel'
+import { BrianMascot } from '../components/features/brand/BrianMascot'
+import { UncertaintyRadar } from '../components/features/radar/UncertaintyRadar'
+import { WhyThisPanel } from '../components/features/coach/WhyThisPanel'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -17,7 +17,7 @@ import {
   buildEstimatesForDimensions,
   SAMPLE_WHY_THIS_TRAIL,
 } from '../services/mocks/fixtures'
-import { useAppStore, type PersonaId } from '../store/useAppStore'
+import { useAppStore, type PersonaId } from '../state/useAppStore'
 
 type PreviewState =
   | 'live'
@@ -211,7 +211,7 @@ export default function BrainTwinPage() {
             </h1>
             <DoodleSquiggle className="max-w-xs mt-1" />
             <p className="text-base text-ink-muted">
-              Your evolving mental baseline synthesized across 42 days of active micro-sessions. Scrub across 14 historical SAT-JEPA snapshots (<code className="font-mono-tabular">s_t → c_t</code>), compare checkpoints side-by-side, and inspect how your 95% confidence intervals narrow.
+              Your evolving mental baseline synthesized across 42 days of active micro-sessions. Scrub across 14 historical Brain Twin snapshots, compare checkpoints side-by-side, and inspect how your Clarity Range narrows over time.
             </p>
           </div>
 
@@ -320,7 +320,7 @@ export default function BrainTwinPage() {
         >
           <div className="flex items-center justify-between">
             <span className="font-display text-lg font-bold text-ink">
-              Reconstructing 14-Snapshot SAT-JEPA Trajectory (
+              Reconstructing 14-Snapshot Brain Twin Trajectory (
               <code className="font-mono-tabular">s_1 … s_14</code>)…
             </span>
             <Badge tone="info" glyph="◌">

@@ -15,13 +15,20 @@ import {
 } from 'lucide-react'
 import { BRAND_CONFIG } from '../../config/brand'
 import conceptALockup from '../../assets/branding/concept-a-lockup.svg'
-import { useAppStore } from '../../store/useAppStore'
-import { telemetryQueue } from '../../services/telemetryQueue'
+import { useAppStore } from '../../state/useAppStore'
+import { telemetryQueue } from '../../services/telemetry/telemetryQueue'
 import { Badge } from '../ui/Badge'
+import { EmilyMoodPill } from '../common/EmilyMoodPill'
+import { HumanReviewGate } from '../dev/HumanReviewGate'
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const location = useLocation()
-  const isTaskRoute = location.pathname.startsWith('/task')
+  const searchParams = new URLSearchParams(location.search)
+  const isBaselineMode = searchParams.get('mode') === 'baseline'
+  const isTaskRoute =
+    location.pathname.startsWith('/task') ||
+    location.pathname.startsWith('/practice') ||
+    isBaselineMode
   const isAuthRoute =
     location.pathname === '/login' ||
     location.pathname === '/sign-in' ||
@@ -55,6 +62,37 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     { path: '/settings', label: 'You', icon: User },
   ]
 
+  // Team Development Progress Status per page
+  const getPageProgress = (pathname: string) => {
+    if (
+      pathname === '/auth' ||
+      pathname === '/login' ||
+      pathname === '/register' ||
+      pathname === '/sign-in' ||
+      pathname === '/create-account'
+    ) {
+      return {
+        label: 'Nearly Done',
+        badgeClass: 'bg-success-subtle text-ink border-border-strong',
+        dotClass: 'bg-success',
+      }
+    }
+    if (pathname === '/' || pathname === '/dashboard') {
+      return {
+        label: 'In Progress',
+        badgeClass: 'bg-warning-subtle text-ink border-border-strong',
+        dotClass: 'bg-warning animate-pulse',
+      }
+    }
+    return {
+      label: 'Pending',
+      badgeClass: 'bg-surface-raised text-ink-muted border-border-strong',
+      dotClass: 'bg-ink-muted/50',
+    }
+  }
+
+  const pageProgress = getPageProgress(location.pathname)
+
   const isRealOffline = !queueStatus.isOnline
   const showOfflineBanner = simulateOffline || isRealOffline
 
@@ -68,8 +106,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         Skip to main content
       </a>
 
-      {/* Global Robustness Banner (Truth in claims: Real queue status) */}
-      {showOfflineBanner && (
+      {/* Global Robustness Banner (Truth in claims: Real queue status) - suppressed during distraction-free calibration */}
+      {!isBaselineMode && showOfflineBanner && (
         <div
           role="status"
           aria-live="polite"
@@ -93,7 +131,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {simulateLlmDown && (
+      {!isBaselineMode && simulateLlmDown && (
         <div
           role="status"
           aria-live="polite"
@@ -128,15 +166,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {!isTaskRoute && (
         <header
           role="banner"
-          className="sticky top-0 z-40 h-18 sm:h-20 bg-surface/95 backdrop-blur-md border-b-2 border-border-strong px-4 transition-colors flex items-center"
+          className="sticky top-0 z-50 w-full h-18 sm:h-20 bg-surface/95 backdrop-blur-md border-b-2 border-border-strong px-4 transition-colors flex items-center"
         >
           <div className="max-w-6xl w-full mx-auto flex items-center justify-between gap-4">
-            {/* Product Brand Mark (Scaled Up) */}
+            {/* Product Brand Mark */}
             <Link
               to="/"
               title={`${BRAND_CONFIG.productName} Home`}
               aria-label={`${BRAND_CONFIG.productName} Home`}
-              className="focus-ring rounded-md flex items-center text-ink no-underline group py-1"
+              className="focus-ring rounded-md flex items-center text-ink no-underline group py-1 shrink-0"
             >
               <img
                 src={conceptALockup}
@@ -188,6 +226,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 })}
               </nav>
             )}
+
+            {/* EMILY Emotion Atmosphere & Micro-Interaction Rhythm */}
+            <EmilyMoodPill />
 
             {/* Protected Streak Pill matching Stitch */}
             <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-surface-raised border-2 border-border-strong rounded-pill shadow-doodle-sm">
@@ -245,23 +286,41 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Main Content Column */}
       <main
         id="main-content"
-        className={`flex-1 w-full min-w-0 mx-auto px-4 ${
+        className={`relative flex-1 w-full min-w-0 mx-auto px-4 ${
           isTaskRoute
             ? 'max-w-4xl py-2 sm:py-4 flex flex-col justify-between'
             : 'max-w-6xl py-8'
         }`}
       >
+        {/* Team Sprint Progress Badge - positioned in the top-right empty padding area */}
+        <aside
+          aria-label="Sprint progress status"
+          className="absolute top-2 right-4 sm:top-3 sm:right-6 lg:right-8 z-30 pointer-events-none"
+        >
+          <div
+            data-testid="page-progress-badge"
+            title={`Sprint Progress: ${pageProgress.label}`}
+            aria-label={`Page progress: ${pageProgress.label}`}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-pill font-mono text-xs font-bold border-2 shadow-doodle-sm select-none pointer-events-auto ${pageProgress.badgeClass}`}
+          >
+            <span className={`w-2 h-2 rounded-full shrink-0 ${pageProgress.dotClass}`} aria-hidden="true" />
+            <span className="hidden sm:inline text-ink-muted font-normal">Progress: </span>
+            <span>{pageProgress.label}</span>
+          </div>
+        </aside>
+
         {children}
       </main>
 
-      {/* Product Footer with Centered Non-Clinical Disclaimer */}
+      {/* Product Footer with Centered Non-Clinical Disclaimer & Evaluator Controls */}
       {!isTaskRoute && (
         <footer
           role="contentinfo"
           className="border-t-2 border-border-strong bg-surface px-4 py-4 text-xs text-ink-muted"
         >
-          <div className="max-w-6xl mx-auto flex items-center justify-center text-center">
+          <div className="max-w-6xl mx-auto flex flex-col items-center justify-center text-center gap-2">
             <p className="m-0">{BRAND_CONFIG.nonClinicalNotice}</p>
+            <HumanReviewGate />
           </div>
         </footer>
       )}

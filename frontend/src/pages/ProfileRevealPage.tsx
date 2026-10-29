@@ -5,10 +5,10 @@ import {
   buildEstimatesForDimensions,
   SAMPLE_WHY_THIS_TRAIL,
 } from '../services/mocks/fixtures'
-import { useAppStore, type PersonaId } from '../store/useAppStore'
-import { UncertaintyRadar } from '../components/signature/UncertaintyRadar'
-import { WhyThisPanel } from '../components/signature/WhyThisPanel'
-import { Mascot, type MascotState } from '../components/signature/Mascot'
+import { useAppStore, type PersonaId } from '../state/useAppStore'
+import { UncertaintyRadar } from '../components/features/radar/UncertaintyRadar'
+import { WhyThisPanel } from '../components/features/coach/WhyThisPanel'
+import { Mascot, type MascotState } from '../components/features/brand/Mascot'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -230,7 +230,7 @@ export default function ProfileRevealPage() {
               variant="primary"
               onClick={() => navigate('/dashboard')}
             >
-              Open Full Command Dashboard →
+              Enter My Cognitive Space →
             </Button>
             <Button
               variant="secondary"
@@ -248,12 +248,17 @@ export default function ProfileRevealPage() {
           </div>
         </div>
 
-        {/* Persona & Edge-State Switcher Bar */}
-        <div
-          role="group"
-          aria-label="Profile reveal persona and state switcher"
-          className="pt-3 border-t border-border flex flex-wrap items-center justify-between gap-3"
-        >
+        {/* Persona & Edge-State Switcher Bar (Wrapped in Drawer) */}
+        <details data-technical-drawer className="group rounded-md border border-border bg-canvas/60 p-3 text-xs mt-3">
+          <summary className="cursor-pointer font-mono-tabular text-xs font-semibold text-ink-muted hover:text-ink select-none flex items-center justify-between">
+            <span>Developer Diagnostics &amp; Persona Switcher</span>
+            <span className="text-ink-muted group-open:rotate-180 transition-transform">▼</span>
+          </summary>
+          <div
+            role="group"
+            aria-label="Profile reveal persona and state switcher"
+            className="pt-3 border-t border-border flex flex-wrap items-center justify-between gap-3 mt-2"
+          >
           <div className="flex flex-wrap items-center gap-1.5">
             {(
               [
@@ -311,7 +316,8 @@ export default function ProfileRevealPage() {
               ))}
             </div>
           )}
-        </div>
+          </div>
+        </details>
       </Card>
 
       {/* STATE: LOADING SKELETON */}
@@ -323,8 +329,7 @@ export default function ProfileRevealPage() {
         >
           <div className="flex items-center justify-between">
             <span className="font-display text-lg font-bold text-ink">
-              Synthesizing SAT-JEPA Latent Trajectory &amp; 95% Confidence
-              Intervals…
+              Synthesizing Your Personal Cognitive Twin &amp; Clarity Range…
             </span>
             <Badge tone="info" glyph="◌">
               QUEST+ Posterior Convergence
@@ -469,7 +474,7 @@ export default function ProfileRevealPage() {
                 <div className="rounded-md border-2 border-border-strong bg-canvas p-4 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-mono-tabular text-xs font-bold uppercase tracking-wider text-ink-muted">
-                      SAT-JEPA Latent Archetype Discovery
+                      Your Thinking Style
                     </span>
                     <Badge
                       tone={
@@ -487,8 +492,8 @@ export default function ProfileRevealPage() {
 
                   <h3 className="font-display text-2xl font-bold text-ink">
                     {viewState === 'low-confidence'
-                      ? 'Exploratory Fast-Responder (Preliminary Profile)'
-                      : 'Analytical Pattern Builder'}
+                      ? 'The Agile Explorer · Exploratory Fast-Responder (Preliminary Profile)'
+                      : 'The Steady Strategist · Analytical Pattern Builder'}
                   </h3>
 
                   <p className="text-sm text-ink-muted">
@@ -500,7 +505,7 @@ export default function ProfileRevealPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-xs font-mono-tabular">
                     <div className="rounded-sm border border-border bg-surface p-2.5">
                       <span className="text-ink-muted block">
-                        Prototype Vector (Δc)
+                        Weekly Progress Boost
                       </span>
                       <strong className="text-ink">
                         {viewState === 'low-confidence'
@@ -510,7 +515,7 @@ export default function ProfileRevealPage() {
                     </div>
                     <div className="rounded-sm border border-border bg-surface p-2.5">
                       <span className="text-ink-muted block">
-                        Hysteresis Stability
+                        Style Consistency
                       </span>
                       <strong className="text-ink">
                         {viewState === 'low-confidence'
@@ -613,7 +618,7 @@ export default function ProfileRevealPage() {
               {/* Signature #3 WhyThisPanel: First Explainable Micro-Step */}
               <WhyThisPanel
                 trail={SAMPLE_WHY_THIS_TRAIL}
-                title="Your First Explainable AI Coach Step (5-Part Reasoning Trail)"
+                title="✨ Why Brian Suggests This"
                 defaultExpanded
               />
             </div>
@@ -715,7 +720,7 @@ export default function ProfileRevealPage() {
                     to="/dashboard"
                     className="tactile-btn bg-brand text-brand-ink px-4 py-2.5 text-sm font-semibold no-underline inline-flex items-center"
                   >
-                    Continue to Full Dashboard →
+                    Enter My Cognitive Space →
                   </Link>
                   <span className="text-xs font-mono-tabular text-ink-muted">
                     GET /v1/dashboard/profile

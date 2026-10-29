@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, expect, it, beforeEach } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import AuthPage from '../pages/AuthPage'
-import { useAppStore } from '../store/useAppStore'
+import { useAppStore } from '../state/useAppStore'
 
 function renderAuthPage(initialPath = '/auth') {
   return render(
@@ -23,7 +23,7 @@ describe('AuthPage (Stitch BRIAN Cognitive Twin Login & Register in Doodle Style
     useAppStore.getState().resetDemoState()
   })
 
-  it('renders Sign In mode with welcoming Axolotl companion and form fields', async () => {
+  it('renders centered Sign In mode with form fields and security controls', async () => {
     renderAuthPage('/auth')
 
     // Verify Heading & Squiggle
@@ -46,46 +46,43 @@ describe('AuthPage (Stitch BRIAN Cognitive Twin Login & Register in Doodle Style
     })
     expect(submitBtn).toBeInTheDocument()
 
-    // Verify Hardware Key / Passkey button
+    // Verify Hardware Key / Passkey button is removed
     expect(
-      screen.getByRole('button', { name: /Resume with Hardware Key \/ Passkey/i }),
-    ).toBeInTheDocument()
+      screen.queryByRole('button', { name: /Resume with Hardware Key \/ Passkey/i }),
+    ).not.toBeInTheDocument()
 
-    // Verify Speech Bubble default
-    expect(screen.getByText(/Ready for your 2-minute morning calibration/i)).toBeInTheDocument()
+    // Verify subtitle copy is removed
+    expect(
+      screen.queryByText(/Pick up where your cognitive twin left off/i),
+    ).not.toBeInTheDocument()
 
-    // Verify Production Showcase Header & Status Pill
-    expect(screen.getByText(/YOUR COGNITIVE COMPANION/i)).toBeInTheDocument()
-    expect(screen.getByText(/^Ready$/)).toBeInTheDocument()
-    expect(screen.queryByText(/BRIAN STAGING SLOT/i)).not.toBeInTheDocument()
-
-    // Verify Character Stage Status Badge & Reassurance Cards
-    expect(screen.getByText(/Twin Gateway Standing By/i)).toBeInTheDocument()
-    expect(screen.getByText(/12-Day Streak · Protected by Humane Pacing/i)).toBeInTheDocument()
-    expect(screen.getByText(/RAM-Only Cipher/i)).toBeInTheDocument()
-    expect(screen.getByText(/Zero Biometrics/i)).toBeInTheDocument()
+    // Verify Mascot Showcase panel is removed
+    expect(
+      screen.queryByLabelText(/Brian Cognitive Companion Showcase/i),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText(/YOUR COGNITIVE COMPANION/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Twin Gateway Standing By/i)).not.toBeInTheDocument()
   })
 
-  it('interactively updates Brian speech bubble on field focus in Sign In mode', async () => {
+  it('allows user to enter credentials and toggle remember device option', async () => {
     renderAuthPage('/auth')
 
     const emailInput = screen.getByLabelText(/Twin Identifier \/ Email Encrypted Alias/i)
     const passphraseInput = screen.getByLabelText(/Master Passphrase/i)
+    const rememberCheckbox = screen.getByLabelText(/Remember my cognitive twin on this device/i) as HTMLInputElement
 
-    // Focus Email -> Brian perks up
-    fireEvent.focus(emailInput)
-    expect(screen.getByText(/Let's pull up your encrypted twin memory profile/i)).toBeInTheDocument()
+    fireEvent.change(emailInput, { target: { value: 'explorer@sanctuary.test' } })
+    expect(emailInput).toHaveValue('explorer@sanctuary.test')
 
-    // Focus Passphrase -> Brian politely looks away
-    fireEvent.focus(passphraseInput)
-    expect(screen.getByText(/peeking politely away/i)).toBeInTheDocument()
+    fireEvent.change(passphraseInput, { target: { value: 'super-safe-phrase-123' } })
+    expect(passphraseInput).toHaveValue('super-safe-phrase-123')
 
-    // Blur -> Brian returns to welcoming greeting
-    fireEvent.blur(passphraseInput)
-    expect(screen.getByText(/Ready for your 2-minute morning calibration/i)).toBeInTheDocument()
+    expect(rememberCheckbox.checked).toBe(true)
+    fireEvent.click(rememberCheckbox)
+    expect(rememberCheckbox.checked).toBe(false)
   })
 
-  it('renders Create Account mode with preferred name reactivity and streamlined fields', async () => {
+  it('renders Create Account mode with preferred name input and streamlined fields', async () => {
     renderAuthPage('/register')
 
     // Verify Heading
@@ -96,53 +93,58 @@ describe('AuthPage (Stitch BRIAN Cognitive Twin Login & Register in Doodle Style
     const nameInput = screen.getByLabelText(/What should Brian call you\?/i)
     expect(nameInput).toBeInTheDocument()
 
-    // Initial greeting before typing name
-    expect(screen.getByText(/Tell me what to call you/i)).toBeInTheDocument()
-
     // Type preferred name
     fireEvent.change(nameInput, { target: { value: 'Maya' } })
-
-    // Speech bubble updates with user's name
-    expect(screen.getByText(/Oh, hello Maya! That feels wonderfully grounding/i)).toBeInTheDocument()
-
-    // Companion status badge reflects joy
-    expect(screen.getByText(/Sparking Joy with Maya/i)).toBeInTheDocument()
+    expect(nameInput).toHaveValue('Maya')
 
     // Verify Initial Focus Dimension is NOT on the register page
     expect(screen.queryByText(/Initial Focus Dimension/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/Sharpen Focus/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/Daily Mental Calm/i)).not.toBeInTheDocument()
 
-    // Verify Production Showcase Header & Status Pill
-    expect(screen.getByText(/MEET BRIAN/i)).toBeInTheDocument()
-    expect(screen.getByText(/Calibrating/i)).toBeInTheDocument()
-    expect(screen.queryByText(/BRIAN STAGING SLOT/i)).not.toBeInTheDocument()
-
-    // Verify Reassurance Cards & Beta Quote
-    expect(screen.getByText(/Current Vibe: Curious Spark/i)).toBeInTheDocument()
-    expect(screen.getByText(/Arthur K\., Beta Explorer/i)).toBeInTheDocument()
+    // Verify Mascot Showcase panel is NOT rendered
+    expect(
+      screen.queryByLabelText(/Brian Cognitive Companion Showcase/i),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText(/MEET BRIAN/i)).not.toBeInTheDocument()
 
     // Verify Zero biometric tracking note is NOT on the register page
     expect(
       screen.queryByText(/Zero biometric tracking\. Your cognitive metrics/i),
     ).not.toBeInTheDocument()
+
+    // Verify subtitle copy is removed
+    expect(
+      screen.queryByText(/No clinical labels\. No tests to fail/i),
+    ).not.toBeInTheDocument()
   })
 
-  it('updates passphrase robustness indicator without punitive anxiety messaging', async () => {
+  it('displays passphrase robustness meter with clean non-classic phrases on the left (Awaiting your spark -> Easy to scatter -> Resilient shelter -> Reinforced defense -> Impenetrable vault)', async () => {
     renderAuthPage('/register')
 
     const passphraseInput = screen.getByLabelText(/Choose a Master Passphrase/i)
 
-    // Initially ready to form
-    expect(screen.getByText(/Encryption Robustness: Ready to Form/i)).toBeInTheDocument()
+    // Initial state: Level 0 (Awaiting your spark only)
+    expect(screen.getByText(/Awaiting your spark/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Fresh Canvas/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Robustness:/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Solid & Sealed/i)).not.toBeInTheDocument()
 
-    // Typing short passphrase
+    // Level 1: Easy to scatter (short passphrase)
     fireEvent.change(passphraseInput, { target: { value: 'pass' } })
-    expect(screen.getByText(/Encryption Robustness: Gently Forming/i)).toBeInTheDocument()
+    expect(screen.getByText(/Easy to scatter/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Gentle Breeze/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Robustness:/i)).not.toBeInTheDocument()
 
-    // Typing standard passphrase
-    fireEvent.change(passphraseInput, { target: { value: 'gentle-rhythm-12' } })
-    expect(screen.getByText(/Encryption Robustness: Impenetrable Sanctuary/i)).toBeInTheDocument()
+    // Level 3: Reinforced defense (longer with digits/hyphen)
+    fireEvent.change(passphraseInput, { target: { value: 'secure-pass1' } })
+    expect(screen.getByText(/Reinforced defense/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Armored Citadel/i)).not.toBeInTheDocument()
+
+    // Level 4: Impenetrable vault (high entropy passphrase)
+    fireEvent.change(passphraseInput, { target: { value: 'gentle-rhythm-sanctuary-12' } })
+    expect(screen.getByText(/Impenetrable vault/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Cosmic Sanctuary/i)).not.toBeInTheDocument()
   })
 
   it('toggles passphrase visibility between password and text', async () => {

@@ -36,6 +36,11 @@
   --radius-xl: 16px;
   --radius-2xl: 20px;
   --radius-pill: 9999px;
+
+  --color-emotion-accent: var(--color-emotion-accent);
+  --color-emotion-tint: var(--color-emotion-tint);
+  --color-emotion-glow: var(--color-emotion-glow);
+  --color-emotion-badge: var(--color-emotion-badge);
 }
 
 :root,
@@ -97,6 +102,12 @@
   --shadow-hero: 5px 5px 0 #263D5B;
   --bg-hero-gradient: linear-gradient(135deg, #FFFFFF 0%, #FDF0E7 100%);
   --bg-card-gradient: linear-gradient(135deg, #FFFFFF 0%, #FFF5EE 100%);
+
+  /* EMILY Emotion Adaptive Color Tokens (Default: Calm Flow) */
+  --color-emotion-accent: #0D9488;
+  --color-emotion-tint: #F2F9F8;
+  --color-emotion-glow: rgba(13, 148, 136, 0.12);
+  --color-emotion-badge: #0D9488;
 
   /* Typography Families */
   --font-display: 'Delius Swash Caps', 'Delius', cursive, sans-serif;
@@ -201,6 +212,112 @@
   --shadow-hero: 5px 5px 0 #FF8C5A;
   --bg-hero-gradient: linear-gradient(135deg, #1E293B 0%, #172234 100%);
   --bg-card-gradient: linear-gradient(135deg, #1E293B 0%, #223046 100%);
+
+  /* EMILY Dark Emotion Adaptive Color Tokens (Default: Calm Flow) */
+  --color-emotion-accent: #4FD1C5;
+  --color-emotion-tint: #162432;
+  --color-emotion-glow: rgba(79, 209, 197, 0.14);
+  --color-emotion-badge: #4FD1C5;
+}
+
+/* ==========================================================================
+   EMILY Emotion-Adaptive Color Coding (Circumplex Affective Model)
+   Light Mode & Default Fallback
+   ========================================================================== */
+
+:root[data-emotion="calm_flow"],
+[data-theme="light"][data-emotion="calm_flow"],
+html[data-emotion="calm_flow"]:not([data-theme="dark"]) {
+  /* Deep Teal / Sage Green (Parasympathetic balance & clarity) */
+  --color-emotion-accent: #0D9488;
+  --color-emotion-tint: #F2F9F8;
+  --color-emotion-glow: rgba(13, 148, 136, 0.14);
+  --color-emotion-badge: #0D9488;
+}
+
+:root[data-emotion="energized"],
+[data-theme="light"][data-emotion="energized"],
+html[data-emotion="energized"]:not([data-theme="dark"]) {
+  /* Warm Terracotta Amber & Doodle Sky (High self-efficacy) */
+  --color-emotion-accent: #D96B43;
+  --color-emotion-tint: #FDF6F0;
+  --color-emotion-glow: rgba(217, 107, 67, 0.15);
+  --color-emotion-badge: #D96B43;
+}
+
+:root[data-emotion="frustrated"],
+[data-theme="light"][data-emotion="frustrated"],
+html[data-emotion="frustrated"]:not([data-theme="dark"]) {
+  /* Counter-Regulatory Tranquil Eucalyptus Sage (Anti-Red Policy: Never #DC2626) */
+  --color-emotion-accent: #4D9078;
+  --color-emotion-tint: #F1F7F4;
+  --color-emotion-glow: rgba(77, 144, 120, 0.14);
+  --color-emotion-badge: #4D9078;
+}
+
+:root[data-emotion="hesitant"],
+[data-theme="light"][data-emotion="hesitant"],
+html[data-emotion="hesitant"]:not([data-theme="dark"]) {
+  /* Serene Periwinkle & Warm Honey (Cognitive grounding) */
+  --color-emotion-accent: #5A67D8;
+  --color-emotion-tint: #F4F5FC;
+  --color-emotion-glow: rgba(90, 103, 216, 0.14);
+  --color-emotion-badge: #D97706;
+}
+
+:root[data-emotion="fatigued"],
+[data-theme="light"][data-emotion="fatigued"],
+html[data-emotion="fatigued"]:not([data-theme="dark"]) {
+  /* Twilight Indigo & Revitalizing Mint (Circadian recovery) */
+  --color-emotion-accent: #5C6B9C;
+  --color-emotion-tint: #F3F4F8;
+  --color-emotion-glow: rgba(92, 107, 156, 0.14);
+  --color-emotion-badge: #5C6B9C;
+}
+
+/* ==========================================================================
+   EMILY Emotion-Adaptive Color Coding (Dark Mode - Blackboard Sketch)
+   ========================================================================== */
+
+[data-theme="dark"][data-emotion="calm_flow"],
+html[data-theme="dark"][data-emotion="calm_flow"] {
+  --color-emotion-accent: #4FD1C5;
+  --color-emotion-tint: #162432;
+  --color-emotion-glow: rgba(79, 209, 197, 0.16);
+  --color-emotion-badge: #4FD1C5;
+}
+
+[data-theme="dark"][data-emotion="energized"],
+html[data-theme="dark"][data-emotion="energized"] {
+  --color-emotion-accent: #F5A65B;
+  --color-emotion-tint: #2B1D19;
+  --color-emotion-glow: rgba(245, 166, 91, 0.16);
+  --color-emotion-badge: #F5A65B;
+}
+
+[data-theme="dark"][data-emotion="frustrated"],
+html[data-theme="dark"][data-emotion="frustrated"] {
+  /* Counter-Regulatory Soft Mint Sage in Dark Mode (Anti-Red Policy) */
+  --color-emotion-accent: #68D391;
+  --color-emotion-tint: #15271F;
+  --color-emotion-glow: rgba(104, 211, 145, 0.16);
+  --color-emotion-badge: #68D391;
+}
+
+[data-theme="dark"][data-emotion="hesitant"],
+html[data-theme="dark"][data-emotion="hesitant"] {
+  --color-emotion-accent: #90CDF4;
+  --color-emotion-tint: #1A2536;
+  --color-emotion-glow: rgba(144, 205, 244, 0.16);
+  --color-emotion-badge: #FBBF24;
+}
+
+[data-theme="dark"][data-emotion="fatigued"],
+html[data-theme="dark"][data-emotion="fatigued"] {
+  --color-emotion-accent: #B794F4;
+  --color-emotion-tint: #201D33;
+  --color-emotion-glow: rgba(183, 148, 244, 0.16);
+  --color-emotion-badge: #B794F4;
 }
 
 @layer base {
@@ -208,6 +325,51 @@
   *::before,
   *::after {
     box-sizing: border-box;
+  }
+
+  /* =========================================================================
+     Doodle (Hand Drawn) Custom Website Scrollbar
+     ========================================================================= */
+  /* Modern CSS Scrollbar Standard (Firefox, Safari 18+) */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-brand) var(--color-canvas);
+  }
+
+  /* WebKit & Chromium Custom Scrollbar (Chrome, Edge, Safari, Brave) */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background-color: var(--color-canvas);
+    border-left: 1.5px dashed rgba(38, 61, 91, 0.22);
+  }
+
+  [data-theme="dark"] ::-webkit-scrollbar-track {
+    background-color: var(--color-canvas);
+    border-left: 1.5px dashed rgba(255, 140, 90, 0.22);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--color-brand);
+    border-radius: var(--radius-pill);
+    border: 2px solid var(--color-canvas);
+    box-shadow: inset 0 0 0 1px var(--color-border-strong);
+    transition: background-color 0.2s ease;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-brand-hover);
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    background-color: var(--color-secondary);
+  }
+
+  ::-webkit-scrollbar-corner {
+    background-color: var(--color-canvas);
   }
 
   html,
@@ -223,7 +385,8 @@
     line-height: var(--leading-base);
     margin: 0;
     padding: 0;
-    overflow-x: hidden;
+    overflow-x: clip;
+    transition: background-color 0.45s ease, border-color 0.45s ease, box-shadow 0.45s ease;
   }
 
   [data-theme="dark"] html,
@@ -349,6 +512,187 @@
     border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
   }
 
+  /* Classroom Lecture Board (Doodle Aesthetic) */
+  .board-wood-frame {
+    display: flex;
+    flex-direction: column;
+    background-color: #E2B179;
+    background-image: linear-gradient(135deg, #ECC18A 0%, #D4A373 100%);
+    border: 3.5px solid var(--color-border-strong);
+    border-radius: 28px;
+    padding: 16px;
+    box-shadow: 6px 6px 0 var(--color-border-strong);
+    position: relative;
+    transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  [data-theme="dark"] .board-wood-frame {
+    background-color: #6E3F1F;
+    background-image: linear-gradient(135deg, #7D4925 0%, #563016 100%);
+    border-color: #FF8C5A;
+    box-shadow: 6px 6px 0 #FF8C5A;
+  }
+
+  /* Board Canvas: Whiteboard in Light Mode */
+  .board-canvas {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: #FFFFFF;
+    background-image: radial-gradient(rgba(38, 61, 91, 0.08) 1.2px, transparent 1.2px);
+    background-size: 24px 24px;
+    border: 2.5px solid var(--color-border-strong);
+    border-radius: 18px;
+    color: #111827;
+    position: relative;
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+  }
+
+  /* Board Canvas: Chalkboard in Dark Mode */
+  [data-theme="dark"] .board-canvas {
+    background-color: #162621;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1.2px, transparent 1.2px);
+    background-size: 24px 24px;
+    border: 2.5px solid rgba(255, 255, 255, 0.3);
+    border-radius: 18px;
+    color: #F8FAFC;
+  }
+
+  [data-theme="dark"] .board-canvas h1,
+  [data-theme="dark"] .board-canvas h2,
+  [data-theme="dark"] .board-canvas h3,
+  [data-theme="dark"] .board-canvas h4 {
+    color: #FFFFFF;
+  }
+
+  [data-theme="dark"] .board-canvas .text-ink {
+    color: #FFFFFF !important;
+  }
+
+  [data-theme="dark"] .board-canvas .text-ink-muted {
+    color: #CBD5E1 !important;
+  }
+
+  [data-theme="dark"] .board-canvas .tactile-card,
+  [data-theme="dark"] .board-canvas .bg-surface {
+    background-color: rgba(255, 255, 255, 0.06) !important;
+    border-color: rgba(255, 255, 255, 0.22) !important;
+    color: #FFFFFF !important;
+  }
+
+  [data-theme="dark"] .board-canvas .bg-surface-raised {
+    background-color: rgba(255, 255, 255, 0.09) !important;
+    border-color: rgba(255, 255, 255, 0.24) !important;
+    color: #FFFFFF !important;
+  }
+
+  [data-theme="dark"] .board-canvas .border-border-strong {
+    border-color: rgba(255, 255, 255, 0.28) !important;
+  }
+
+  [data-theme="dark"] .board-canvas .border-border {
+    border-color: rgba(255, 255, 255, 0.16) !important;
+  }
+
+  [data-theme="dark"] .board-canvas svg text {
+    fill: #FFFFFF !important;
+    stroke: #162621 !important;
+  }
+
+  /* =========================================================================
+     Classroom Lecture Stage: Wooden Podium (Doodle Aesthetic)
+     ========================================================================= */
+  .wooden-podium {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    user-select: none;
+    pointer-events: none;
+  }
+
+  /* Top Tier: Standing Platform with Beveled Edge */
+  .podium-top-tier {
+    width: 100%;
+    height: 18px;
+    background-color: #ECC18A;
+    background-image: linear-gradient(180deg, #F5D7B0 0%, #ECC18A 55%, #DFAB74 100%);
+    border: 3px solid var(--color-border-strong);
+    border-radius: 8px 8px 0 0;
+    position: relative;
+    z-index: 3;
+  }
+
+  [data-theme="dark"] .podium-top-tier {
+    background-color: #7D4925;
+    background-image: linear-gradient(180deg, #8E532B 0%, #7D4925 55%, #633618 100%);
+    border-color: #FF8C5A;
+  }
+
+  /* Middle Tier: Main Column with Wooden Planks & Inset Bevel */
+  .podium-mid-tier {
+    width: 100%;
+    height: 44px;
+    background-color: #E2B179;
+    background-image: linear-gradient(135deg, #ECC18A 0%, #D4A373 50%, #C89563 100%);
+    border-left: 3px solid var(--color-border-strong);
+    border-right: 3px solid var(--color-border-strong);
+    border-bottom: 2px solid var(--color-border-strong);
+    position: relative;
+    z-index: 2;
+    overflow: hidden;
+  }
+
+  [data-theme="dark"] .podium-mid-tier {
+    background-color: #6E3F1F;
+    background-image: linear-gradient(135deg, #7D4925 0%, #6E3F1F 50%, #563016 100%);
+    border-left-color: #FF8C5A;
+    border-right-color: #FF8C5A;
+    border-bottom-color: #FF8C5A;
+  }
+
+  /* Vertical wood slat grooves on middle tier */
+  .podium-planks-overlay {
+    position: absolute;
+    inset: 0;
+    background-image: repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 46px,
+      rgba(0, 0, 0, 0.08) 46px,
+      rgba(0, 0, 0, 0.08) 48px
+    );
+    pointer-events: none;
+  }
+
+  [data-theme="dark"] .podium-planks-overlay {
+    background-image: repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 46px,
+      rgba(255, 255, 255, 0.06) 46px,
+      rgba(255, 255, 255, 0.06) 48px
+    );
+  }
+
+  /* Base Tier: Sturdy Foundation Plinth (No Drop Shadow) */
+  .podium-base-tier {
+    width: 100%;
+    height: 20px;
+    background-color: #D4A373;
+    background-image: linear-gradient(180deg, #DFAB74 0%, #C89563 60%, #B88553 100%);
+    border: 3.5px solid var(--color-border-strong);
+    border-radius: 0 0 12px 12px;
+    position: relative;
+    z-index: 1;
+  }
+
+  [data-theme="dark"] .podium-base-tier {
+    background-color: #563016;
+    background-image: linear-gradient(180deg, #6E3F1F 0%, #563016 60%, #40200C 100%);
+    border-color: #FF8C5A;
+  }
+
   /* Gentle Floating Idle Animation for Hero Character */
   @keyframes brian-float {
     0%, 100% {
@@ -361,6 +705,53 @@
 
   .animate-brian-float {
     animation: brian-float 3.5s ease-in-out infinite;
+  }
+
+  /* EMILY Emotion-Adaptive Utility Classes */
+  .border-emotion-accent {
+    border-color: var(--color-emotion-accent);
+  }
+  .bg-emotion-tint {
+    background-color: var(--color-emotion-tint);
+  }
+  .text-emotion-accent {
+    color: var(--color-emotion-accent);
+  }
+  .shadow-emotion-glow {
+    box-shadow: 0 0 14px var(--color-emotion-glow);
+  }
+
+  /* =========================================================================
+     Full-Page Slide Deck Presentation & Scrolling Transition Animations
+     ========================================================================= */
+  .slide-stage {
+    scroll-margin-top: 5rem;
+    min-height: calc(100vh - 6rem);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+  }
+
+  .slide-anim-active {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    transition: opacity 650ms cubic-bezier(0.16, 1, 0.3, 1), transform 650ms cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform, opacity;
+  }
+
+  .slide-anim-next {
+    opacity: 0.35;
+    transform: translateY(28px) scale(0.975);
+    transition: opacity 650ms cubic-bezier(0.16, 1, 0.3, 1), transform 650ms cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform, opacity;
+  }
+
+  .slide-anim-prev {
+    opacity: 0.35;
+    transform: translateY(-28px) scale(0.975);
+    transition: opacity 650ms cubic-bezier(0.16, 1, 0.3, 1), transform 650ms cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform, opacity;
   }
 
 }
@@ -377,8 +768,13 @@
   }
   .tactile-btn:active:not(:disabled),
   .tactile-card:hover,
-  .animate-brian-float {
+  .animate-brian-float,
+  .slide-anim-active,
+  .slide-anim-next,
+  .slide-anim-prev {
     transform: none !important;
+    opacity: 1 !important;
+    transition: none !important;
   }
 }
 
@@ -394,8 +790,13 @@
 [data-reduced-motion="true"] .tactile-card:hover,
 [data-timed-trial="true"] .tactile-card:hover,
 [data-reduced-motion="true"] .animate-brian-float,
-[data-timed-trial="true"] .animate-brian-float {
+[data-timed-trial="true"] .animate-brian-float,
+[data-reduced-motion="true"] .slide-anim-active,
+[data-reduced-motion="true"] .slide-anim-next,
+[data-reduced-motion="true"] .slide-anim-prev {
   transform: none !important;
+  opacity: 1 !important;
+  transition: none !important;
 }
 
 /* Accessible text contrast overrides for light theme status & brand text tokens (WCAG 2.1 AA ≥4.5:1) */

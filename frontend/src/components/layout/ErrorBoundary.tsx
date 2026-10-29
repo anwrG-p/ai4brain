@@ -2,7 +2,7 @@ import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
-import { Mascot } from '../signature/Mascot'
+import { Mascot } from '../features/brand/Mascot'
 
 export interface ErrorBoundaryProps {
   children: ReactNode

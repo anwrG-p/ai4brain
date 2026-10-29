@@ -7,6 +7,11 @@ import type { Page } from '@playwright/test'
  */
 export async function openJudgeMode(page: Page) {
   await page.waitForLoadState('domcontentloaded')
+  await page.evaluate(() => {
+    document.querySelectorAll('details[data-technical-drawer]').forEach((el) => {
+      ;(el as HTMLDetailsElement).open = true
+    })
+  })
 }
 
 export async function closeJudgeMode(page: Page) {

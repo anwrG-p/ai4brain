@@ -4,11 +4,11 @@ import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { DoodleSquiggle } from '../components/ui/DoodleDecorations'
-import { Mascot } from '../components/signature/Mascot'
-import { WhyThisPanel } from '../components/signature/WhyThisPanel'
-import { useAppStore } from '../store/useAppStore'
+import { Mascot } from '../components/features/brand/Mascot'
+import { WhyThisPanel } from '../components/features/coach/WhyThisPanel'
+import { useAppStore } from '../state/useAppStore'
 import { getDimensionsByPreset } from '../config/dimensions'
-import type { WhyThisTrail } from '../contracts'
+import type { WhyThisTrail } from '../types'
 
 const LAYER_D_WHY_TRAIL: WhyThisTrail = {
   id: 'trail-layer-d-projections',

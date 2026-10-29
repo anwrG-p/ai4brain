@@ -5,17 +5,13 @@ import {
   Lock,
   Eye,
   EyeOff,
-  Sparkles,
   ArrowRight,
   Key,
   Check,
   X,
-  Flame,
 } from 'lucide-react'
-import { useAppStore } from '../store/useAppStore'
+import { useAppStore } from '../state/useAppStore'
 import { DoodleSquiggle, DoodleArrow } from '../components/ui/DoodleDecorations'
-import brianLoginImg from '../assets/mascot/brian-login.webp'
-import brianRegisterImg from '../assets/mascot/brian-register.webp'
 
 export type AuthMode = 'signin' | 'register'
 
@@ -63,119 +59,67 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [isSandboxModalOpen, setIsSandboxModalOpen] = useState(false)
-  const [avatarBounce, setAvatarBounce] = useState(false)
-  const [activeFinPose, setActiveFinPose] = useState<'normal' | 'wave' | 'cover'>('normal')
 
-  // Dynamic Brian Speech Bubble Content
-  const [brianSpeech, setBrianSpeech] = useState<string>('')
-
-  // Passphrase Strength Calculation (Humane, non-anxious)
-  const getPassphraseStrength = (phrase: string) => {
+  // Passphrase Robustness Evaluation with Non-Classic Natural Metaphors
+  const getPassphraseRobustness = (phrase: string) => {
     const len = phrase.length
     if (len === 0) {
       return {
         level: 0,
-        bars: [false, false, false],
-        label: 'Encryption Robustness: Ready to Form',
-        metric: '256-bit safe cipher',
+        text: 'Awaiting your spark',
+        colorClass: 'bg-transparent',
       }
     }
-    if (len < 6) {
-      return {
-        level: 1,
-        bars: [true, false, false],
-        label: 'Encryption Robustness: Gently Forming',
-        metric: 'Keep going',
-      }
+
+    let score = 0
+    if (len >= 6) score += 1
+    if (len >= 10) score += 1
+    if (len >= 14) score += 1
+
+    const hasMixed = /[a-z]/.test(phrase) && /[A-Z]/.test(phrase)
+    const hasDigitsOrSymbols = /[\d\W]/.test(phrase)
+    const hasSpacesOrHyphens = /[\s_-]/.test(phrase)
+
+    if (hasMixed || hasDigitsOrSymbols || hasSpacesOrHyphens) {
+      score += 1
     }
-    if (len < 12) {
-      return {
-        level: 2,
-        bars: [true, true, false],
-        label: 'Encryption Robustness: Solid & Sealed',
-        metric: 'Standard vault',
-      }
-    }
-    return {
-      level: 3,
-      bars: [true, true, true],
-      label: 'Encryption Robustness: Impenetrable Sanctuary',
-      metric: 'High-entropy cipher',
+
+    const level = Math.max(1, Math.min(4, score))
+
+    switch (level) {
+      case 1:
+        return {
+          level: 1,
+          text: 'Easy to scatter',
+          colorClass: 'bg-warning',
+        }
+      case 2:
+        return {
+          level: 2,
+          text: 'Resilient shelter',
+          colorClass: 'bg-brand',
+        }
+      case 3:
+        return {
+          level: 3,
+          text: 'Reinforced defense',
+          colorClass: 'bg-brand',
+        }
+      case 4:
+      default:
+        return {
+          level: 4,
+          text: 'Impenetrable vault',
+          colorClass: 'bg-success',
+        }
     }
   }
 
-  const passphraseStrength = getPassphraseStrength(passphrase)
+  const passphraseRobustness = getPassphraseRobustness(passphrase)
 
-  // Set initial speech bubble based on mode
-  useEffect(() => {
-    if (mode === 'register') {
-      if (!preferredName.trim()) {
-        setBrianSpeech(
-          "I can't wait to meet you! Tell me what to call you so we can begin your zero-guilt cognitive baseline together.",
-        )
-      } else {
-        setBrianSpeech(
-          `Oh, hello ${preferredName.trim()}! That feels wonderfully grounding. I've already labeled page 1 of our logbook just for us.`,
-        )
-      }
-    } else {
-      setBrianSpeech(
-        "Welcome back! Ready for your 2-minute morning calibration? No pressure if you're taking a rest day—your streak is already safe.",
-      )
-    }
-  }, [mode, preferredName])
-
-  // Handle Preferred Name Change with bounce
+  // Handle Preferred Name Change
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value
-    setPreferredName(val)
-    if (val.trim()) {
-      setAvatarBounce(true)
-      setTimeout(() => setAvatarBounce(false), 220)
-    }
-  }
-
-  // Handle Input Focus in Sign In mode
-  const handleSignInFocus = (field: 'email' | 'password') => {
-    if (field === 'email') {
-      setActiveFinPose('wave')
-      setBrianSpeech(
-        "I see you! Let's pull up your encrypted twin memory profile...",
-      )
-    } else if (field === 'password') {
-      setActiveFinPose('cover')
-      setBrianSpeech(
-        "Don't worry, I'm peeking politely away. Your master key decrypts strictly in your RAM.",
-      )
-    }
-  }
-
-  const handleSignInBlur = () => {
-    setActiveFinPose('normal')
-    setBrianSpeech(
-      "Welcome back! Ready for your 2-minute morning calibration? No pressure if you're taking a rest day—your streak is already safe.",
-    )
-  }
-
-  // Handle Passkey Simulation
-  const handlePasskeyClick = () => {
-    setBrianSpeech(
-      'Hardware FIDO2 challenge requested. Tap your local security key or touch sensor.',
-    )
-    setIsSubmitting(true)
-    setTimeout(() => {
-      setIsSubmitting(false)
-      setSubmitSuccess(true)
-      loginUser({
-        preferredName: 'Arthur (Passkey)',
-        email: 'passkey-sealed@device.local',
-        focusGoal: 'Daily Mental Calm',
-        rememberOnDevice: true,
-      })
-      setTimeout(() => {
-        navigate('/dashboard')
-      }, 700)
-    }, 1100)
+    setPreferredName(e.target.value)
   }
 
   // Form Submit Handler
@@ -189,9 +133,6 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
 
     if (mode === 'register') {
       const cleanName = preferredName.trim() || 'Fellow Explorer'
-      setBrianSpeech(
-        `We are officially paired, ${cleanName}! Opening your gentle baseline console now.`,
-      )
       setTimeout(() => {
         setIsSubmitting(false)
         setSubmitSuccess(true)
@@ -261,154 +202,12 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
       </div>
 
       {/* =========================================================================
-          STAGE: 2-COLUMN SPLIT (Matches Stitch Screen 1 & Screen 2)
+          CENTERED AUTH FORM (Streamlined Doodle Card)
           ========================================================================= */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
-        {/* =======================================================================
-            LEFT COLUMN: Brian Cognitive Companion Character Showcase
-            ======================================================================= */}
-        <aside
-          aria-label="Brian Cognitive Companion Showcase"
-          className="lg:col-span-5 flex flex-col gap-6 order-2 lg:order-1"
-        >
-          {/* Main Companion Production Showcase Card with Tactile Border & Soft Background */}
-          <div className="tactile-card bg-surface-raised p-6 relative rounded-2xl border-2 border-border-strong shadow-doodle-lg space-y-5">
-            <div className="doodle-tape" />
-
-            {/* Production Companion Header */}
-            <div className="flex items-center justify-between pb-3 border-b-2 border-dashed border-border-strong/30">
-              <div className="inline-flex items-center gap-2 bg-surface px-3 py-1 rounded-pill border border-border-strong shadow-doodle-sm">
-                <Sparkles size={14} className="text-brand" aria-hidden="true" />
-                <span className="font-mono text-xs font-bold text-ink uppercase tracking-wider">
-                  {mode === 'register' ? 'MEET BRIAN' : 'YOUR COGNITIVE COMPANION'}
-                </span>
-              </div>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-pill bg-surface text-ink text-xs font-mono font-semibold border border-border-strong">
-                <span className="w-2 h-2 rounded-pill bg-success animate-pulse" aria-hidden="true" />
-                <span>{mode === 'register' ? 'Calibrating' : 'Ready'}</span>
-              </div>
-            </div>
-
-            {/* Brian's Interactive Speech Bubble (Positioned cleanly ABOVE the character stage with pointer aimed at Brian) */}
-            <div
-              role="status"
-              aria-live="polite"
-              className="relative bg-surface p-4 rounded-xl border-2 border-border-strong shadow-doodle-sm space-y-1.5 transition-all"
-            >
-              <div className="flex items-center gap-1.5 text-brand font-mono text-xs font-bold uppercase tracking-wider">
-                <span>💬</span>
-                <span>Brian says:</span>
-              </div>
-              <p className="font-sans text-sm sm:text-base text-ink font-semibold leading-snug">
-                "{brianSpeech}"
-              </p>
-              {/* Tactical Speech Pointer pointing directly down at Brian */}
-              <div
-                className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-border-strong"
-                aria-hidden="true"
-              />
-              <div
-                className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-0 h-0 border-x-7 border-x-transparent border-t-7 border-t-surface"
-                aria-hidden="true"
-              />
-            </div>
-
-            {/* Hero Character Stage (220px-260px, warm backdrop, floating idle animation) */}
-            <div className="relative min-h-60 sm:min-h-64 rounded-2xl bg-surface/70 border-2 border-border-strong/40 p-4 flex flex-col items-center justify-center mb-3">
-              {/* Ambient Glow */}
-              <div
-                className="absolute inset-4 rounded-full bg-brand/10 blur-xl pointer-events-none"
-                aria-hidden="true"
-              />
-
-              {/* Full-Body Axolotl Character with Gentle Floating Animation */}
-              <div
-                className={`relative z-10 flex items-center justify-center animate-brian-float transition-transform duration-200 ${
-                  avatarBounce ? 'scale-105' : 'scale-100'
-                }`}
-              >
-                <img
-                  src={mode === 'register' ? brianRegisterImg : brianLoginImg}
-                  alt={mode === 'register' ? 'Brian the Axolotl with explorer hat and sketchbook' : 'Brian the Axolotl waving warmly'}
-                  className={`h-52 sm:h-56 w-auto max-w-full object-contain select-none drop-shadow-md transition-transform duration-300 ${
-                    activeFinPose === 'cover'
-                      ? 'rotate-6'
-                      : activeFinPose === 'wave'
-                        ? '-rotate-6'
-                        : ''
-                  }`}
-                />
-              </div>
-
-              {/* Dynamic Companion State Badge: Floating pill overlapping the bottom base of the character stage */}
-              <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-20 whitespace-nowrap">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-pill bg-surface text-ink font-mono text-xs font-bold border-2 border-border-strong shadow-doodle-sm">
-                  <span className="text-brand">★</span>
-                  <span>
-                    {mode === 'register'
-                      ? preferredName.trim()
-                        ? `Sparking Joy with ${preferredName.trim()}`
-                        : 'Enthusiastic Inception'
-                      : activeFinPose === 'cover'
-                        ? 'Politely Looking Away'
-                        : 'Twin Gateway Standing By'}
-                  </span>
-                </span>
-              </div>
-            </div>
-
-            {/* Companion Metadata & Guarantees */}
-            {mode === 'register' ? (
-              <div className="space-y-3 pt-2 border-t-2 border-dashed border-border-strong/30">
-                <div className="p-3 bg-surface rounded-xl border border-border-strong/60 space-y-1">
-                  <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-ink">
-                    <span className="text-brand">⚡</span>
-                    <span>Current Vibe: Curious Spark · Unbiased Warmth</span>
-                  </div>
-                  <p className="text-xs text-ink-muted leading-relaxed">
-                    Brian does not report to employers, advertisers, or clinical registries. This is your personal cognitive mirror.
-                  </p>
-                </div>
-
-                <div className="p-3 bg-surface rounded-xl border border-border-strong/60">
-                  <p className="italic text-xs text-ink leading-relaxed">
-                    "Traditional brain training made me feel pressured about failure. Brian made me curious about how my mind works."
-                  </p>
-                  <span className="block mt-1 font-mono text-xs text-ink-muted font-bold text-right">
-                    — Arthur K., Beta Explorer
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3 pt-2 border-t-2 border-dashed border-border-strong/30">
-                <div className="p-3 bg-reward/25 rounded-xl border-2 border-warning shadow-doodle-sm space-y-1">
-                  <div className="flex items-center gap-2 font-mono text-xs font-bold text-ink">
-                    <Flame size={14} className="text-danger" aria-hidden="true" />
-                    <span>12-Day Streak · Protected by Humane Pacing</span>
-                  </div>
-                  <p className="text-xs text-ink-muted leading-relaxed">
-                    Rest day scheduled? Your streak freezes automatically. You never lose progress for resting.
-                  </p>
-                </div>
-
-                <div className="p-3 bg-surface rounded-xl border border-border-strong/60 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck size={16} className="text-success" aria-hidden="true" />
-                    <span className="font-mono text-xs font-bold text-ink">RAM-Only Cipher</span>
-                  </div>
-                  <span className="font-mono text-xs text-ink-muted">Zero Biometrics</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </aside>
-
-        {/* =======================================================================
-            RIGHT COLUMN: Form Section (Create Account OR Sign In)
-            ======================================================================= */}
+      <div className="w-full max-w-xl mx-auto">
         <section
           aria-labelledby="auth-form-title"
-          className="lg:col-span-7 flex flex-col order-1 lg:order-2"
+          className="w-full"
         >
           <div className="tactile-card bg-surface p-6 sm:p-8 rounded-2xl border-2 border-border-strong shadow-doodle-lg relative space-y-6">
             <div className="doodle-tape" />
@@ -427,12 +226,6 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
               <div className="max-w-xs">
                 <DoodleSquiggle className="text-brand" />
               </div>
-
-              <p className="text-sm sm:text-base text-ink-muted leading-relaxed pt-1">
-                {mode === 'register'
-                  ? 'No clinical labels. No tests to fail. Just 2 minutes a day calibrated to your natural rhythm.'
-                  : 'Pick up where your cognitive twin left off. Non-clinical & hardware-sealed.'}
-              </p>
             </div>
 
             {/* Form */}
@@ -459,9 +252,6 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
                       className="w-full px-4 py-3 rounded-md bg-surface text-ink font-sans text-base border-2 border-border-strong focus-ring shadow-doodle-sm placeholder:text-ink-muted/60"
                       required
                     />
-                    <p className="font-mono text-xs text-ink-muted">
-                      Brian will address you by this name across all daily morning check-ins and reflection logs.
-                    </p>
                   </div>
 
                   {/* Field 2: Email */}
@@ -513,25 +303,38 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
                       />
                     </div>
 
-                    {/* Non-Anxious Robustness Meter */}
-                    <div className="pt-1 space-y-1">
+                    {/* Non-Classic Password Robustness Meter */}
+                    <div
+                      data-testid="passphrase-robustness-meter"
+                      className="pt-1.5 space-y-1.5"
+                      aria-live="polite"
+                    >
                       <div className="h-2 w-full rounded-pill bg-surface-raised border border-border-strong/40 flex gap-1 p-0.5">
                         <div
-                          className={`h-full flex-1 rounded-pill transition-colors ${passphraseStrength.bars[0] ? 'bg-brand' : 'bg-transparent'
-                            }`}
+                          className={`h-full flex-1 rounded-pill transition-all duration-300 ${
+                            passphraseRobustness.level >= 1 ? passphraseRobustness.colorClass : 'bg-transparent'
+                          }`}
                         />
                         <div
-                          className={`h-full flex-1 rounded-pill transition-colors ${passphraseStrength.bars[1] ? 'bg-brand' : 'bg-transparent'
-                            }`}
+                          className={`h-full flex-1 rounded-pill transition-all duration-300 ${
+                            passphraseRobustness.level >= 2 ? passphraseRobustness.colorClass : 'bg-transparent'
+                          }`}
                         />
                         <div
-                          className={`h-full flex-1 rounded-pill transition-colors ${passphraseStrength.bars[2] ? 'bg-success' : 'bg-transparent'
-                            }`}
+                          className={`h-full flex-1 rounded-pill transition-all duration-300 ${
+                            passphraseRobustness.level >= 3 ? passphraseRobustness.colorClass : 'bg-transparent'
+                          }`}
+                        />
+                        <div
+                          className={`h-full flex-1 rounded-pill transition-all duration-300 ${
+                            passphraseRobustness.level >= 4 ? passphraseRobustness.colorClass : 'bg-transparent'
+                          }`}
                         />
                       </div>
-                      <div className="flex items-center justify-between font-mono text-xs text-ink-muted">
-                        <span>{passphraseStrength.label}</span>
-                        <span className="font-bold text-ink">{passphraseStrength.metric}</span>
+                      <div className="flex items-center justify-start font-mono text-xs text-ink-muted">
+                        <span className="font-normal text-ink-muted">
+                          {passphraseRobustness.text}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -581,8 +384,6 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      onFocus={() => handleSignInFocus('email')}
-                      onBlur={handleSignInBlur}
                       placeholder="youssef@example.com"
                       className="w-full px-4 py-3 rounded-md bg-surface text-ink font-sans text-base border-2 border-border-strong focus-ring shadow-doodle-sm placeholder:text-ink-muted/60"
                       required
@@ -613,8 +414,6 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
                         type={showPassphrase ? 'text' : 'password'}
                         value={passphrase}
                         onChange={(e) => setPassphrase(e.target.value)}
-                        onFocus={() => handleSignInFocus('password')}
-                        onBlur={handleSignInBlur}
                         placeholder="••••••••••••••••"
                         className="w-full px-4 py-3 rounded-md bg-surface text-ink font-sans text-base border-2 border-border-strong focus-ring shadow-doodle-sm placeholder:text-ink-muted/60 pr-10"
                         required
@@ -690,19 +489,6 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
                     )}
                   </button>
                 </div>
-
-                {/* Alternate Hardware Key Button (Sign In mode) */}
-                {mode === 'signin' && (
-                  <button
-                    type="button"
-                    onClick={handlePasskeyClick}
-                    disabled={isSubmitting}
-                    className="w-full py-3 px-4 rounded-pill font-mono text-xs font-bold bg-surface text-ink hover:bg-surface-raised border-2 border-border-strong shadow-doodle-sm flex items-center justify-center gap-2 cursor-pointer transition-colors"
-                  >
-                    <Key size={14} aria-hidden="true" className="text-brand" />
-                    <span>Resume with Hardware Key / Passkey</span>
-                  </button>
-                )}
               </div>
 
 
@@ -782,7 +568,7 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
                   <span>1. RAM-Only Decryption</span>
                 </div>
                 <p className="text-xs text-ink-muted">
-                  Your passphrase never traverses external networks. Hashed with client-side WebAssembly before local vault decryption.
+                  Your  passphrase never traverses external networks. Hashed with client-side WebAssembly before local vault decryption.
                 </p>
               </div>
 

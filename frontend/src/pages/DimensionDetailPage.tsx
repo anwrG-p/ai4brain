@@ -1,15 +1,15 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ProjectionFanChart } from '../components/signature/ProjectionFanChart'
-import { WhyThisPanel } from '../components/signature/WhyThisPanel'
+import { ProjectionFanChart } from '../components/features/brain-twin/ProjectionFanChart'
+import { WhyThisPanel } from '../components/features/coach/WhyThisPanel'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { DoodleSquiggle } from '../components/ui/DoodleDecorations'
 import { getDimensionsByPreset } from '../config/dimensions'
-import type { DimensionConfig, WhyThisTrail } from '../contracts'
+import type { DimensionConfig, WhyThisTrail } from '../types'
 import { buildEstimatesForDimensions } from '../services/mocks/fixtures'
-import { type PersonaId, useAppStore } from '../store/useAppStore'
+import { type PersonaId, useAppStore } from '../state/useAppStore'
 
 type DimensionDetailPreviewState =
   | 'converged'
@@ -295,7 +295,7 @@ export function DimensionDetailPage() {
       ],
       inference: isHatched
         ? `Because epistemic confidence is ${confPct}% (< 60% threshold), QUEST+ renders ${currentDim.name} with diagonal SVG hatching to prevent over-interpreting early trials.`
-        : `SAT-JEPA differential vector (Δc) confirms stable convergence at Staircase Level ${sessionRows[0]?.staircaseLevel ?? 4} with posterior entropy narrowed to 0.38 bits.`,
+        : `Weekly Progress Boost confirms stable convergence at Staircase Level ${sessionRows[0]?.staircaseLevel ?? 4} with posterior entropy narrowed to 0.38 bits.`,
       recommendation: isHatched
         ? `Complete one 90-second ${currentDim.taskName} micro-block to add 8 calibrated trials and graduate ${currentDim.code} to a solid confidence band.`
         : `Maintain ${currentDim.code} with one weekly Level ${sessionRows[0]?.staircaseLevel ?? 4} block during your morning peak window (09:00–11:30).`,
