@@ -119,20 +119,22 @@ describe('AuthPage (Stitch BRIAN Cognitive Twin Login & Register in Doodle Style
     ).not.toBeInTheDocument()
   })
 
-  it('displays passphrase robustness meter with non-classic natural metaphors (Fresh Canvas -> Gentle Breeze -> Sturdy Outpost -> Armored Citadel -> Cosmic Sanctuary)', async () => {
+  it('displays passphrase robustness meter with non-classic natural metaphors (Awaiting your spark -> Gentle Breeze -> Sturdy Outpost -> Armored Citadel -> Cosmic Sanctuary)', async () => {
     renderAuthPage('/register')
 
     const passphraseInput = screen.getByLabelText(/Choose a Master Passphrase/i)
 
-    // Initial state: Level 0 (Fresh Canvas)
-    expect(screen.getByText(/Fresh Canvas/i)).toBeInTheDocument()
+    // Initial state: Level 0 (Awaiting your spark only, no Robustness: or Fresh Canvas)
     expect(screen.getByText(/Awaiting your spark/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Fresh Canvas/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Robustness:/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/Solid & Sealed/i)).not.toBeInTheDocument()
 
     // Level 1: Gentle Breeze (short passphrase)
     fireEvent.change(passphraseInput, { target: { value: 'pass' } })
     expect(screen.getByText(/Gentle Breeze/i)).toBeInTheDocument()
     expect(screen.getByText(/Easy to scatter/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Robustness:/i)).not.toBeInTheDocument()
 
     // Level 3: Armored Citadel (longer with digits/hyphen)
     fireEvent.change(passphraseInput, { target: { value: 'secure-pass1' } })

@@ -66,7 +66,7 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
     if (len === 0) {
       return {
         level: 0,
-        label: '🌱 Fresh Canvas',
+        label: '',
         subtext: 'Awaiting your spark',
         colorClass: 'bg-transparent',
       }
@@ -337,11 +337,14 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
                         />
                       </div>
                       <div className="flex items-center justify-between font-mono text-xs text-ink-muted">
-                        <span className="font-semibold text-ink flex items-center gap-1.5">
-                          <span className="text-ink-muted font-normal">Robustness:</span>
-                          <span>{passphraseRobustness.label}</span>
-                        </span>
-                        <span className="font-bold text-ink-muted">{passphraseRobustness.subtext}</span>
+                        {passphrase.length === 0 ? (
+                          <span className="text-ink-muted font-normal">Awaiting your spark</span>
+                        ) : (
+                          <>
+                            <span className="font-semibold text-ink">{passphraseRobustness.label}</span>
+                            <span className="font-bold text-ink-muted">{passphraseRobustness.subtext}</span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>

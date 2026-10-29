@@ -379,6 +379,7 @@ export default function DashboardPage() {
                               <div className="my-auto flex items-center justify-center">
                                 {item.completed ? (
                                   <span
+                                    role="img"
                                     className="font-display text-2xl font-bold text-success leading-none select-none"
                                     aria-label={`${item.day}: Completed`}
                                   >
@@ -386,6 +387,7 @@ export default function DashboardPage() {
                                   </span>
                                 ) : item.isRest ? (
                                   <span
+                                    role="img"
                                     className="text-xl select-none"
                                     title="Rest Day"
                                     aria-label={`${item.day}: Rest Day`}
@@ -394,6 +396,7 @@ export default function DashboardPage() {
                                   </span>
                                 ) : (
                                   <span
+                                    role="img"
                                     className="w-4 h-4 rounded-full border border-dashed border-border-strong/40 inline-block opacity-40"
                                     aria-label={`${item.day}: Upcoming`}
                                   />
