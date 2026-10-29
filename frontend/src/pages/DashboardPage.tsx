@@ -128,8 +128,8 @@ export default function DashboardPage() {
   // - boardMinHeight: 'auto' (or e.g. '300px', '380px', '450px' to make taller)
   // =========================================================================
   const boardWidth = '100%'
-  const boardMaxWidth = '100%'
-  const boardMinHeight = 'auto'
+  const boardMaxWidth = '1200px'
+  const boardMinHeight = '500px'
 
   const boardStyle: React.CSSProperties = {
     width: boardWidth,
@@ -274,13 +274,13 @@ export default function DashboardPage() {
                   <div className="board-canvas p-5 sm:p-7 space-y-5">
                     {/* WEEKLY CONTINUITY & RHYTHM (Drawn directly on Classroom Board) */}
                     <div className="space-y-4">
-                      {/* Minimalist Board Header */}
+                      {/* Minimalist Board Header: Greeting & Streak */}
                       <div className="flex items-center gap-2 border-b-2 border-dashed border-border-strong/30 pb-3">
-                        <span className="text-brand text-lg" aria-hidden="true">
-                          🔄
+                        <span className="text-xl" aria-hidden="true">
+                          🔥
                         </span>
                         <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-ink">
-                          Weekly Continuity &amp; Rhythm
+                          Welcome back, {personaDisplayName}! You're on a streak
                         </h2>
                       </div>
 
@@ -289,17 +289,15 @@ export default function DashboardPage() {
                         {WEEK_DAYS.map((item) => (
                           <div
                             key={item.day}
-                            className={`p-2.5 sm:p-3 rounded-xl flex flex-col items-center justify-between text-center min-h-24 transition-colors ${
-                              item.isToday
-                                ? 'border-2 border-dashed border-brand/80 bg-brand/10'
-                                : 'border border-dashed border-border-strong/30 bg-surface/20'
-                            }`}
+                            className={`p-2.5 sm:p-3 rounded-xl flex flex-col items-center justify-between text-center min-h-24 transition-colors ${item.isToday
+                              ? 'border-2 border-dashed border-brand/80 bg-brand/10'
+                              : 'border border-dashed border-border-strong/30 bg-surface/20'
+                              }`}
                           >
                             {/* Hand-drawn Day Name */}
                             <span
-                              className={`font-display text-sm sm:text-base font-bold tracking-wide ${
-                                item.isToday ? 'text-brand' : 'text-ink'
-                              }`}
+                              className={`font-display text-sm sm:text-base font-bold tracking-wide ${item.isToday ? 'text-brand' : 'text-ink'
+                                }`}
                             >
                               {item.day}
                             </span>
@@ -343,22 +341,13 @@ export default function DashboardPage() {
                     </div>
 
                     {/* DAILY SCIENCE BITE (Chalk/Marker Footnote on Board) */}
-                    <div className="pt-3 border-t border-dashed border-border-strong/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs sm:text-sm">
-                      <div className="flex items-center gap-2 text-ink">
-                        <span className="text-brand text-base shrink-0" aria-hidden="true">
-                          📖
-                        </span>
-                        <span>
-                          <strong>Daily Science Bite:</strong> Sleep consolidation strengthens pattern separation without active practice. Enjoy your rest day!
-                        </span>
-                      </div>
-                      <Link
-                        to="/methodology"
-                        className="shrink-0 font-mono text-xs text-brand hover:text-ink underline font-bold flex items-center gap-1"
-                      >
-                        <span>Read 1-min synaptic digest</span>
-                        <span aria-hidden="true">→</span>
-                      </Link>
+                    <div className="pt-3 border-t border-dashed border-border-strong/30 flex items-center gap-2 text-xs sm:text-sm text-ink">
+                      <span className="text-brand text-base shrink-0" aria-hidden="true">
+                        📖
+                      </span>
+                      <span>
+                        <strong>Daily Science Bite:</strong> Sleep consolidation strengthens pattern separation without active practice. Enjoy your rest day!
+                      </span>
                     </div>
                   </div>
                 </section>
