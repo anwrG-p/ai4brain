@@ -106,7 +106,7 @@ describe('EMILY Mood Pill & Designer / Evaluator UX Review Gate Suite', () => {
       render(<HumanReviewGate />)
 
       const triggerBtn = screen.getByRole('button', {
-        name: /Open Evaluator Human UX Review Gate/i,
+        name: /UX Review & Evaluator Controls/i,
       })
       expect(triggerBtn).toBeInTheDocument()
 

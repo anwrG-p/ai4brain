@@ -284,13 +284,13 @@ export function HumanReviewGate({
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          aria-label="Open Evaluator Human UX Review Gate"
+          aria-label="UX Review & Evaluator Controls (Shift + J)"
           className="focus-ring inline-flex items-center gap-2 px-3 py-1.5 rounded-pill border-2 border-border-strong bg-surface text-ink-muted hover:text-ink hover:bg-surface-raised shadow-doodle-sm transition-all text-xs font-mono font-bold cursor-pointer"
           title="Open Evaluator Human UX Review Gate (Shift + J)"
         >
           <ShieldCheck size={14} className="text-brand" aria-hidden="true" />
           <span>⚙️ UX Review & Evaluator Controls</span>
-          <span className="text-ink-muted opacity-60">(Shift + J)</span>
+          <span className="text-ink-muted font-normal">(Shift + J)</span>
         </button>
       </div>
     )

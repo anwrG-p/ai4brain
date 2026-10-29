@@ -512,7 +512,7 @@ export function UncertaintyRadar({
               viewBox={`0 0 ${radarSize} ${radarSize}`}
               style={{ width: `${radarSize}px`, maxWidth: '100%' }}
               className="h-auto overflow-visible select-none"
-              role="img"
+              role={interactive ? 'region' : 'img'}
               aria-label={`${title || 'Cognitive Radar'} across ${dimensions.length} cognitive dimensions`}
               onClick={(e) => {
                 if (e.target === e.currentTarget && interactive && activeSelectedDimId) {
@@ -638,7 +638,7 @@ export function UncertaintyRadar({
                     key={r.dim.id}
                     role={interactive ? 'button' : undefined}
                     tabIndex={interactive ? 0 : undefined}
-                    aria-label={`${r.dim.name}: ${
+                    aria-label={`${r.dim.shortLabel} - ${r.dim.name}: ${
                       r.score !== null ? `${r.score}% ± ${halfBand}%` : 'Unassessed'
                     }`}
                     aria-pressed={interactive ? isSelected : undefined}
