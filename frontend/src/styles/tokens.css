@@ -560,24 +560,24 @@ html[data-theme="dark"][data-emotion="fatigued"] {
   .wooden-podium {
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
+    width: 100%;
     user-select: none;
     pointer-events: none;
   }
 
   /* Top Tier: Standing Platform with Beveled Edge */
   .podium-top-tier {
-    width: 90%;
+    width: 100%;
     height: 18px;
     background-color: #ECC18A;
     background-image: linear-gradient(180deg, #F5D7B0 0%, #ECC18A 55%, #DFAB74 100%);
     border: 3px solid var(--color-border-strong);
-    border-radius: 14px 14px 4px 4px;
+    border-radius: 8px 8px 0 0;
     position: relative;
     z-index: 3;
     display: flex;
     align-items: center;
-    justify-content: center;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
   }
 
@@ -602,8 +602,8 @@ html[data-theme="dark"][data-emotion="fatigued"] {
 
   /* Middle Tier: Main Column with Wooden Planks & Inset Bevel */
   .podium-mid-tier {
-    width: 95%;
-    height: 46px;
+    width: 100%;
+    height: 44px;
     background-color: #E2B179;
     background-image: linear-gradient(135deg, #ECC18A 0%, #D4A373 50%, #C89563 100%);
     border-left: 3px solid var(--color-border-strong);
@@ -632,9 +632,9 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     background-image: repeating-linear-gradient(
       90deg,
       transparent,
-      transparent 38px,
-      rgba(0, 0, 0, 0.08) 38px,
-      rgba(0, 0, 0, 0.08) 40px
+      transparent 46px,
+      rgba(0, 0, 0, 0.08) 46px,
+      rgba(0, 0, 0, 0.08) 48px
     );
     pointer-events: none;
   }
@@ -643,9 +643,9 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     background-image: repeating-linear-gradient(
       90deg,
       transparent,
-      transparent 38px,
-      rgba(255, 255, 255, 0.06) 38px,
-      rgba(255, 255, 255, 0.06) 40px
+      transparent 46px,
+      rgba(255, 255, 255, 0.06) 46px,
+      rgba(255, 255, 255, 0.06) 48px
     );
   }
 
@@ -681,11 +681,11 @@ html[data-theme="dark"][data-emotion="fatigued"] {
   /* Base Tier: Sturdy Foundation Plinth with Doodle Drop Shadow */
   .podium-base-tier {
     width: 100%;
-    height: 22px;
+    height: 20px;
     background-color: #D4A373;
     background-image: linear-gradient(180deg, #DFAB74 0%, #C89563 60%, #B88553 100%);
     border: 3.5px solid var(--color-border-strong);
-    border-radius: 4px 4px 18px 18px;
+    border-radius: 0 0 12px 12px;
     box-shadow: 6px 6px 0 var(--color-border-strong);
     position: relative;
     z-index: 1;
