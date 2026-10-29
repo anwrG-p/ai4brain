@@ -638,9 +638,9 @@ export function UncertaintyRadar({
                     key={r.dim.id}
                     role={interactive ? 'button' : undefined}
                     tabIndex={interactive ? 0 : undefined}
-                    aria-label={`${r.dim.shortLabel} - ${r.dim.name}: ${
-                      r.score !== null ? `${r.score}% ± ${halfBand}%` : 'Unassessed'
-                    }`}
+                    aria-label={`${r.dim.markerGlyph} ${r.dim.code} ${
+                      r.score !== null ? `${r.score}%±${halfBand}` : 'N/A'
+                    } (${r.dim.name})`}
                     aria-pressed={interactive ? isSelected : undefined}
                     onClick={() => interactive && handleSelectDimension(r.dim.id)}
                     onKeyDown={(e) => {
@@ -748,9 +748,6 @@ export function UncertaintyRadar({
                       fontSize={bare ? (isSelected ? '14' : '13') : (isSelected ? '12' : '11')}
                       fontWeight="700"
                     >
-                      <title>{`${r.dim.consumerLabel || r.dim.name}: ${
-                        r.score !== null ? `${r.score}% ± ${halfBand}%` : 'Unassessed'
-                      }`}</title>
                       {`${r.dim.markerGlyph} ${r.dim.code} ${
                         r.score !== null ? `${r.score}%±${halfBand}` : 'N/A'
                       }`}

@@ -119,32 +119,32 @@ describe('AuthPage (Stitch BRIAN Cognitive Twin Login & Register in Doodle Style
     ).not.toBeInTheDocument()
   })
 
-  it('displays passphrase robustness meter with non-classic natural metaphors (Awaiting your spark -> Gentle Breeze -> Sturdy Outpost -> Armored Citadel -> Cosmic Sanctuary)', async () => {
+  it('displays passphrase robustness meter with clean non-classic phrases on the left (Awaiting your spark -> Easy to scatter -> Resilient shelter -> Reinforced defense -> Impenetrable vault)', async () => {
     renderAuthPage('/register')
 
     const passphraseInput = screen.getByLabelText(/Choose a Master Passphrase/i)
 
-    // Initial state: Level 0 (Awaiting your spark only, no Robustness: or Fresh Canvas)
+    // Initial state: Level 0 (Awaiting your spark only)
     expect(screen.getByText(/Awaiting your spark/i)).toBeInTheDocument()
     expect(screen.queryByText(/Fresh Canvas/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/Robustness:/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/Solid & Sealed/i)).not.toBeInTheDocument()
 
-    // Level 1: Gentle Breeze (short passphrase)
+    // Level 1: Easy to scatter (short passphrase)
     fireEvent.change(passphraseInput, { target: { value: 'pass' } })
-    expect(screen.getByText(/Gentle Breeze/i)).toBeInTheDocument()
     expect(screen.getByText(/Easy to scatter/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Gentle Breeze/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/Robustness:/i)).not.toBeInTheDocument()
 
-    // Level 3: Armored Citadel (longer with digits/hyphen)
+    // Level 3: Reinforced defense (longer with digits/hyphen)
     fireEvent.change(passphraseInput, { target: { value: 'secure-pass1' } })
-    expect(screen.getByText(/Armored Citadel/i)).toBeInTheDocument()
     expect(screen.getByText(/Reinforced defense/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Armored Citadel/i)).not.toBeInTheDocument()
 
-    // Level 4: Cosmic Sanctuary (high entropy passphrase)
+    // Level 4: Impenetrable vault (high entropy passphrase)
     fireEvent.change(passphraseInput, { target: { value: 'gentle-rhythm-sanctuary-12' } })
-    expect(screen.getByText(/Cosmic Sanctuary/i)).toBeInTheDocument()
     expect(screen.getByText(/Impenetrable vault/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Cosmic Sanctuary/i)).not.toBeInTheDocument()
   })
 
   it('toggles passphrase visibility between password and text', async () => {

@@ -66,8 +66,7 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
     if (len === 0) {
       return {
         level: 0,
-        label: '',
-        subtext: 'Awaiting your spark',
+        text: 'Awaiting your spark',
         colorClass: 'bg-transparent',
       }
     }
@@ -91,30 +90,26 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
       case 1:
         return {
           level: 1,
-          label: '🍃 Gentle Breeze',
-          subtext: 'Easy to scatter',
+          text: 'Easy to scatter',
           colorClass: 'bg-warning',
         }
       case 2:
         return {
           level: 2,
-          label: '🪵 Sturdy Outpost',
-          subtext: 'Resilient shelter',
+          text: 'Resilient shelter',
           colorClass: 'bg-brand',
         }
       case 3:
         return {
           level: 3,
-          label: '🏰 Armored Citadel',
-          subtext: 'Reinforced defense',
+          text: 'Reinforced defense',
           colorClass: 'bg-brand',
         }
       case 4:
       default:
         return {
           level: 4,
-          label: '🌌 Cosmic Sanctuary',
-          subtext: 'Impenetrable vault',
+          text: 'Impenetrable vault',
           colorClass: 'bg-success',
         }
     }
@@ -336,15 +331,10 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
                           }`}
                         />
                       </div>
-                      <div className="flex items-center justify-between font-mono text-xs text-ink-muted">
-                        {passphrase.length === 0 ? (
-                          <span className="text-ink-muted font-normal">Awaiting your spark</span>
-                        ) : (
-                          <>
-                            <span className="font-semibold text-ink">{passphraseRobustness.label}</span>
-                            <span className="font-bold text-ink-muted">{passphraseRobustness.subtext}</span>
-                          </>
-                        )}
+                      <div className="flex items-center justify-start font-mono text-xs text-ink-muted">
+                        <span className="font-normal text-ink-muted">
+                          {passphraseRobustness.text}
+                        </span>
                       </div>
                     </div>
                   </div>
