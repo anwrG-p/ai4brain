@@ -12,6 +12,7 @@ import { ProjectionFanChart } from '../components/features/brain-twin/Projection
 import { UncertaintyRadar } from '../components/features/radar/UncertaintyRadar'
 import { WhyThisPanel } from '../components/features/coach/WhyThisPanel'
 import { BrianMascot } from '../components/features/brand/BrianMascot'
+import teacherBrianImg from '../assets/mascot/Teacher-Brian.png'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -97,6 +98,22 @@ export default function DashboardPage() {
     if (viewState === 'empty') return '/onboarding'
     return '/task/episodic_pattern_separation'
   }, [viewState])
+
+  // =========================================================================
+  // 🎓 TEACHER BRIAN MANUAL CONTROLS (SCALE & POSITION)
+  // Adjust these 3 values to scale or move Teacher Brian beside the board:
+  // - teacherBrianScale: 1.0 (e.g. 1.2 to enlarge, 0.85 to shrink)
+  // - teacherBrianMoveX: 0   (+ to move RIGHT in px, - to move LEFT in px)
+  // - teacherBrianMoveY: 0   (+ to move DOWN in px,  - to move UP in px)
+  // =========================================================================
+  const teacherBrianScale = 1.0
+  const teacherBrianMoveX = 0
+  const teacherBrianMoveY = 0
+
+  const teacherBrianStyle: React.CSSProperties = {
+    transform: `translate(${teacherBrianMoveX}px, ${teacherBrianMoveY}px) scale(${teacherBrianScale})`,
+    transformOrigin: 'bottom center',
+  }
 
   return (
     <div className="space-y-8 pb-12">
@@ -209,14 +226,19 @@ export default function DashboardPage() {
         viewState === 'partial') && (
         <>
           <div className="flex flex-col lg:flex-row items-stretch lg:items-end gap-6 relative">
-            {/* 1. RESERVED SLOT FOR BRIAN THE AXOLOTL (USER ASSET INJECTION POINT) */}
+            {/* 1. TEACHER BRIAN THE AXOLOTL */}
             <div
               id="brian-teacher-slot"
               data-testid="brian-teacher-slot"
-              className="hidden lg:flex lg:w-72 xl:w-80 shrink-0 flex-col items-center justify-end relative self-end min-h-[500px]"
-              aria-label="Reserved slot for Brian teacher mascot illustration"
+              className="flex w-64 sm:w-72 lg:w-80 shrink-0 flex-col items-center justify-end relative self-center lg:self-end min-h-[350px] lg:min-h-[500px]"
+              aria-label="Teacher Brian mascot illustration"
             >
-              {/* Note: This slot is kept clean and empty as requested. Insert Brian teacher image here. */}
+              <img
+                src={teacherBrianImg}
+                alt="Teacher Brian presenting the classroom performance board"
+                style={teacherBrianStyle}
+                className="w-full h-auto select-none pointer-events-none drop-shadow-md"
+              />
             </div>
 
             {/* 2. THE FLAT CLASSROOM BOARD */}
