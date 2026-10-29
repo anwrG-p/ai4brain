@@ -122,11 +122,20 @@ export default function DashboardPage() {
   const stageMoveX = 0 // Change this number to move Brian & Board horizontally (in px)
 
   // =========================================================================
-  // 🧭 COGNITIVE RADAR GRAPH SIZE CONTROLS
-  // Adjust this value to make the radar bigger or smaller:
-  // e.g. 550, 600, 660, 720 (default 660)
+  // 🧭 COGNITIVE RADAR GRAPH CONTROLS (SIZE & POSITION)
+  // Adjust these values to customize the radar graph:
+  // - radarSize: coordinate diameter (e.g. 550, 600, 660, 720)
+  // - radarMoveDown: positive number moves DOWN (in px), e.g. 20, 40, 60, 100
+  // - radarMoveX: positive moves RIGHT, negative moves LEFT (in px)
   // =========================================================================
   const radarSize = 660
+  const radarMoveDown: number = 40 // Change this number to move the radar DOWN (in px)
+  const radarMoveX: number = 0 // Change this number to move the radar horizontally (in px)
+
+  const radarStyle: React.CSSProperties = {
+    marginTop: `${radarMoveDown}px`,
+    transform: radarMoveX !== 0 ? `translateX(${radarMoveX}px)` : undefined,
+  }
 
   const stageStyle: React.CSSProperties = {
     marginTop: `${stageMoveDown}px`,
@@ -416,7 +425,7 @@ export default function DashboardPage() {
                 ========================================================================= */}
             <div className="space-y-8">
               {/* 1. Cognitive Radar Graph Directly on the Page (Animated & Interactive) */}
-              <div className="w-full min-w-0 py-2">
+              <div className="w-full min-w-0 py-2" style={radarStyle}>
                 <UncertaintyRadar
                   dimensions={activeDimensions}
                   estimates={estimates}

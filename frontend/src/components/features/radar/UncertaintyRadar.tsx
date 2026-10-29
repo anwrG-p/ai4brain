@@ -21,6 +21,8 @@ export interface UncertaintyRadarProps {
   selectedDimensionId?: string | null
   onSelectDimension?: (dimId: string | null) => void
   size?: number
+  className?: string
+  style?: React.CSSProperties
 }
 
 function regularPolygonPoints(
@@ -178,6 +180,8 @@ export function UncertaintyRadar({
   selectedDimensionId,
   onSelectDimension,
   size,
+  className,
+  style,
 }: UncertaintyRadarProps) {
   const [showTable, setShowTable] = useState(defaultShowTable)
   const [internalSelectedDim, setInternalSelectedDim] = useState<string | null>(null)
@@ -256,7 +260,10 @@ export function UncertaintyRadar({
   const rings = [25, 50, 75, 100]
 
   return (
-    <div className={bare ? 'w-full' : 'tactile-card p-5'}>
+    <div
+      style={style}
+      className={`${bare ? 'w-full' : 'tactile-card p-5'} ${className || ''}`.trim()}
+    >
       {/* Header bar only rendered if !bare and (title or showTableToggle or hasAnyLowConfidence) */}
       {!bare && (Boolean(title) || showTableToggle || hasAnyLowConfidence) && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
