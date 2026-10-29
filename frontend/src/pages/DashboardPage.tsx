@@ -96,6 +96,28 @@ export default function DashboardPage() {
   }
 
   // =========================================================================
+  // 🪵 BRIAN'S WOODEN PODIUM MANUAL CONTROLS (SIZE & POSITION)
+  // Adjust these values to position and scale the wooden podium under Brian's feet:
+  // - podiumWidth: width of the wooden podium (in px, e.g. 240, 260, 280, 320)
+  // - podiumMoveY: vertical position (in px, 146px directly meets Brian's feet)
+  // - podiumMoveX: horizontal position (in px, positive = right, negative = left)
+  // - podiumScale: scale multiplier (e.g. 1.0, 1.1)
+  // =========================================================================
+  const podiumWidth: number = 260
+  const podiumMoveY: number = 146 // Change this number to move the podium up/down (in px)
+  const podiumMoveX: number = 0 // Change this number to move the podium left/right (in px)
+  const podiumScale: number = 1.0
+
+  const podiumStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: '100%',
+    width: `${podiumWidth}px`,
+    transform: `translate(${podiumMoveX}px, ${podiumMoveY}px) scale(${podiumScale})`,
+    transformOrigin: 'top center',
+    zIndex: 10,
+  }
+
+  // =========================================================================
   // 📐 CLASSROOM BOARD MANUAL DIMENSIONS (SCALE & SIZE CONTROLS)
   // Adjust these values to change the board's dimensions:
   // - boardWidth: '100%' (or e.g. '800px', '900px', '1000px')
@@ -274,6 +296,36 @@ export default function DashboardPage() {
                   style={teacherBrianStyle}
                   className="w-full h-auto select-none pointer-events-none drop-shadow-md relative z-20"
                 />
+
+                {/* Wooden Lecture Podium under Brian's feet */}
+                <div
+                  id="brian-wooden-podium"
+                  data-testid="brian-wooden-podium"
+                  className="wooden-podium"
+                  style={podiumStyle}
+                  aria-hidden="true"
+                >
+                  {/* Top Tier: Standing platform with foot contact shadows */}
+                  <div className="podium-top-tier">
+                    <div className="flex items-center justify-center gap-12 w-full">
+                      <div className="podium-foot-shadow" />
+                      <div className="podium-foot-shadow" />
+                    </div>
+                  </div>
+
+                  {/* Middle Tier: Main wooden riser with timber grooving and engraved plaque */}
+                  <div className="podium-mid-tier">
+                    <div className="podium-planks-overlay" />
+                    <div className="podium-plaque">
+                      <span>✦</span>
+                      <span>BRIAN</span>
+                      <span>✦</span>
+                    </div>
+                  </div>
+
+                  {/* Base Tier: Sturdy wooden foundation plinth with doodle drop-shadow */}
+                  <div className="podium-base-tier" />
+                </div>
               </div>
 
               {/* 2. THE FLAT CLASSROOM BOARD */}
