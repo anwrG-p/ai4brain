@@ -129,7 +129,7 @@ export default function DashboardPage() {
   // - radarMoveX: positive moves RIGHT, negative moves LEFT (in px)
   // =========================================================================
   const radarSize = 660
-  const radarMoveDown: number = 40 // Change this number to move the radar DOWN (in px)
+  const radarMoveDown: number = 300 // Change this number to move the radar DOWN (in px)
   const radarMoveX: number = 0 // Change this number to move the radar horizontally (in px)
 
   const radarStyle: React.CSSProperties = {

@@ -247,6 +247,136 @@ export function UncertaintyRadar({
   const hasAnyLowConfidence = rows.some((r) => r.isLowConf)
   const selectedRow = rows.find((r) => r.dim.id === activeSelectedDimId)
 
+  const getDimensionCardSide = (row: typeof selectedRow): 'left' | 'right' => {
+    if (!row) return 'left'
+    if (row.dim.code === 'WM' || row.dim.id === 'working_memory') {
+      return 'right'
+    }
+    const [lx] = labelPointAt(row.idx)
+    return lx >= center ? 'right' : 'left'
+  }
+
+  const cardSide = selectedRow ? getDimensionCardSide(selectedRow) : null
+
+  const renderDetailCard = (row: NonNullable<typeof selectedRow>) => (
+    <div className="p-5 sm:p-6 rounded-2xl bg-surface border-2 border-border-strong shadow-doodle space-y-4 text-start relative">
+      {/* Top: Glyph + Code + Close Button */}
+      <div className="flex items-start justify-between gap-3 border-b-2 border-dashed border-border-strong/30 pb-3">
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-2">
+            <span
+              className="text-lg leading-none"
+              style={{ color: row.dim.colorCssVar }}
+              aria-hidden="true"
+            >
+              {row.dim.markerGlyph}
+            </span>
+            <span className="font-mono text-xs font-bold text-ink-muted uppercase tracking-wider">
+              {row.dim.code} · {row.dim.consumerLabel || 'Cognitive Dimension'}
+            </span>
+          </div>
+          <h3 className="font-display text-xl font-bold text-ink tracking-tight m-0">
+            {row.dim.name}
+          </h3>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => handleSelectDimension(null)}
+          aria-label="Close dimension details"
+          className="focus-ring p-1.5 rounded-lg border border-border-strong/40 bg-surface hover:bg-surface-raised text-ink-muted hover:text-ink cursor-pointer transition-colors shadow-xs shrink-0"
+        >
+          <X size={16} aria-hidden="true" />
+        </button>
+      </div>
+
+      {/* Score & Confidence Range Display */}
+      <div className="p-3.5 rounded-xl bg-surface-raised border border-border-strong/30 space-y-2">
+        <div className="flex items-baseline justify-between">
+          <div>
+            <span className="font-display text-3xl font-black text-ink">
+              {row.score !== null ? `${row.score}%` : 'N/A'}
+            </span>
+            <span className="font-mono text-xs text-ink-muted ms-2">
+              {row.score !== null
+                ? `±${Math.round((row.ciUpper - row.ciLower) / 2)}% CI`
+                : 'Uncalibrated'}
+            </span>
+          </div>
+          <Badge
+            tone={row.isLowConf ? 'low-confidence' : 'success'}
+            glyph={row.isLowConf ? '▨' : '●'}
+          >
+            {row.isLowConf ? 'Preliminary (<60%)' : 'Calibrated (95% CI)'}
+          </Badge>
+        </div>
+
+        {/* Horizontal Visual CI Range Scale */}
+        {row.score !== null && (
+          <div className="space-y-1 pt-1">
+            <div className="relative w-full h-3 bg-surface rounded-pill border border-border-strong/40 overflow-hidden">
+              {/* Shaded CI Range */}
+              <div
+                className="absolute h-full bg-brand/25 border-x border-brand"
+                style={{
+                  left: `${row.ciLower}%`,
+                  width: `${Math.max(row.ciUpper - row.ciLower, 4)}%`,
+                }}
+              />
+              {/* Point estimate marker */}
+              <div
+                className="absolute top-0 bottom-0 w-1.5 bg-brand rounded-full shadow-xs"
+                style={{ left: `calc(${row.score}% - 3px)` }}
+              />
+            </div>
+            <div className="flex justify-between text-xs font-mono text-ink-muted">
+              <span>0%</span>
+              <span>
+                Range: {row.ciLower}% – {row.ciUpper}%
+              </span>
+              <span>100%</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Plain-English Cognitive Explanation */}
+      <div className="space-y-1.5 text-xs text-ink">
+        <p className="font-semibold text-ink m-0">
+          {row.dim.shortDescription}
+        </p>
+        {row.dim.scientificDefinition && (
+          <p className="text-ink-muted leading-relaxed m-0 text-xs">
+            {row.dim.scientificDefinition}
+          </p>
+        )}
+      </div>
+
+      {/* Task & Telemetry details */}
+      <div className="pt-2 border-t border-dashed border-border-strong/30 flex items-center justify-between text-xs font-mono text-ink-muted">
+        <span className="truncate max-w-44" title={row.dim.taskName}>
+          {row.dim.taskName}
+        </span>
+        {row.meanRtMs > 0 && (
+          <span className="font-bold text-ink shrink-0">
+            {row.meanRtMs} ms RT
+          </span>
+        )}
+      </div>
+
+      {/* Practice / Deep Dive Button */}
+      <div className="pt-1">
+        <Link
+          to="/task/episodic_pattern_separation"
+          className="tactile-btn w-full py-2.5 px-4 rounded-xl bg-brand text-brand-ink font-display text-sm font-bold border-2 border-border-strong shadow-doodle-sm hover:shadow-doodle no-underline inline-flex items-center justify-center gap-2 text-center transition-all"
+        >
+          <span>Practice {row.dim.code} Flow</span>
+          <span aria-hidden="true">→</span>
+        </Link>
+      </div>
+    </div>
+  )
+
   const outerPoints = rows
     .map((r) => pointAt(r.idx, r.score !== null ? r.ciUpper : 55).join(','))
     .join(' ')
@@ -306,19 +436,33 @@ export function UncertaintyRadar({
       {/* Main Interactive Graph Stage */}
       <div className="w-full flex flex-col items-center justify-center pt-2">
         <div className="w-full flex flex-col lg:flex-row items-center justify-center gap-6 relative">
-          {/* LEFT / CENTER: The Radar SVG Graph (layout animated) */}
+          {/* LEFT: Dimension Detail Info Card (Only for Left-side dimensions) */}
+          <AnimatePresence mode="wait">
+            {interactive && selectedRow && cardSide === 'left' && (
+              <motion.div
+                key={`card-left-${selectedRow.dim.id}`}
+                initial={{ opacity: 0, x: -35, scale: 0.96 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: -35, scale: 0.96 }}
+                transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+                className="w-full sm:w-80 lg:w-80 shrink-0 z-10"
+              >
+                {renderDetailCard(selectedRow)}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* CENTER: The Radar SVG Graph (layout animated, maintaining its exact scale) */}
           <motion.div
             layout
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             className="flex flex-col items-center justify-center shrink-0"
+            style={{ width: `${radarSize}px`, maxWidth: '100%' }}
           >
             <svg
               viewBox={`0 0 ${radarSize} ${radarSize}`}
-              className={
-                bare
-                  ? 'w-full max-w-2xl lg:max-w-3xl h-auto overflow-visible select-none'
-                  : 'w-full max-w-md sm:max-w-lg h-auto overflow-visible select-none'
-              }
+              style={{ width: `${radarSize}px`, maxWidth: '100%' }}
+              className="h-auto overflow-visible select-none"
               role="img"
               aria-label={`${title || 'Cognitive Radar'} across ${dimensions.length} cognitive dimensions`}
             >
@@ -548,133 +692,18 @@ export function UncertaintyRadar({
             </svg>
           </motion.div>
 
-          {/* RIGHT: Dimension Detail Info Card (Animated In / Out on Right) */}
+          {/* RIGHT: Dimension Detail Info Card (For Right-side dimensions & WM) */}
           <AnimatePresence mode="wait">
-            {interactive && selectedRow && (
+            {interactive && selectedRow && cardSide === 'right' && (
               <motion.div
-                key={selectedRow.dim.id}
+                key={`card-right-${selectedRow.dim.id}`}
                 initial={{ opacity: 0, x: 35, scale: 0.96 }}
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 exit={{ opacity: 0, x: 35, scale: 0.96 }}
                 transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-                className="w-full lg:w-88 shrink-0 z-10"
+                className="w-full sm:w-80 lg:w-80 shrink-0 z-10"
               >
-                <div className="p-5 sm:p-6 rounded-2xl bg-surface border-2 border-border-strong shadow-doodle space-y-4 text-start relative">
-                  {/* Top: Glyph + Code + Close Button */}
-                  <div className="flex items-start justify-between gap-3 border-b-2 border-dashed border-border-strong/30 pb-3">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="text-lg leading-none"
-                          style={{ color: selectedRow.dim.colorCssVar }}
-                          aria-hidden="true"
-                        >
-                          {selectedRow.dim.markerGlyph}
-                        </span>
-                        <span className="font-mono text-xs font-bold text-ink-muted uppercase tracking-wider">
-                          {selectedRow.dim.code} · {selectedRow.dim.consumerLabel || 'Cognitive Dimension'}
-                        </span>
-                      </div>
-                      <h3 className="font-display text-xl font-bold text-ink tracking-tight m-0">
-                        {selectedRow.dim.name}
-                      </h3>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleSelectDimension(null)}
-                      aria-label="Close dimension details"
-                      className="focus-ring p-1.5 rounded-lg border border-border-strong/40 bg-surface hover:bg-surface-raised text-ink-muted hover:text-ink cursor-pointer transition-colors shadow-xs shrink-0"
-                    >
-                      <X size={16} aria-hidden="true" />
-                    </button>
-                  </div>
-
-                  {/* Score & Confidence Range Display */}
-                  <div className="p-3.5 rounded-xl bg-surface-raised border border-border-strong/30 space-y-2">
-                    <div className="flex items-baseline justify-between">
-                      <div>
-                        <span className="font-display text-3xl font-black text-ink">
-                          {selectedRow.score !== null ? `${selectedRow.score}%` : 'N/A'}
-                        </span>
-                        <span className="font-mono text-xs text-ink-muted ms-2">
-                          {selectedRow.score !== null
-                            ? `±${Math.round((selectedRow.ciUpper - selectedRow.ciLower) / 2)}% CI`
-                            : 'Uncalibrated'}
-                        </span>
-                      </div>
-                      <Badge
-                        tone={selectedRow.isLowConf ? 'low-confidence' : 'success'}
-                        glyph={selectedRow.isLowConf ? '▨' : '●'}
-                      >
-                        {selectedRow.isLowConf ? 'Preliminary (<60%)' : 'Calibrated (95% CI)'}
-                      </Badge>
-                    </div>
-
-                    {/* Horizontal Visual CI Range Scale */}
-                    {selectedRow.score !== null && (
-                      <div className="space-y-1 pt-1">
-                        <div className="relative w-full h-3 bg-surface rounded-pill border border-border-strong/40 overflow-hidden">
-                          {/* Shaded CI Range */}
-                          <div
-                            className="absolute h-full bg-brand/25 border-x border-brand"
-                            style={{
-                              left: `${selectedRow.ciLower}%`,
-                              width: `${Math.max(selectedRow.ciUpper - selectedRow.ciLower, 4)}%`,
-                            }}
-                          />
-                          {/* Point estimate marker */}
-                          <div
-                            className="absolute top-0 bottom-0 w-1.5 bg-brand rounded-full shadow-xs"
-                            style={{ left: `calc(${selectedRow.score}% - 3px)` }}
-                          />
-                        </div>
-                        <div className="flex justify-between text-xs font-mono text-ink-muted">
-                          <span>0%</span>
-                          <span>
-                            Range: {selectedRow.ciLower}% – {selectedRow.ciUpper}%
-                          </span>
-                          <span>100%</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Plain-English Cognitive Explanation */}
-                  <div className="space-y-1.5 text-xs text-ink">
-                    <p className="font-semibold text-ink m-0">
-                      {selectedRow.dim.shortDescription}
-                    </p>
-                    {selectedRow.dim.scientificDefinition && (
-                      <p className="text-ink-muted leading-relaxed m-0 text-xs">
-                        {selectedRow.dim.scientificDefinition}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Task & Telemetry details */}
-                  <div className="pt-2 border-t border-dashed border-border-strong/30 flex items-center justify-between text-xs font-mono text-ink-muted">
-                    <span className="truncate max-w-44" title={selectedRow.dim.taskName}>
-                      {selectedRow.dim.taskName}
-                    </span>
-                    {selectedRow.meanRtMs > 0 && (
-                      <span className="font-bold text-ink shrink-0">
-                        {selectedRow.meanRtMs} ms RT
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Practice / Deep Dive Button */}
-                  <div className="pt-1">
-                    <Link
-                      to="/task/episodic_pattern_separation"
-                      className="tactile-btn w-full py-2.5 px-4 rounded-xl bg-brand text-brand-ink font-display text-sm font-bold border-2 border-border-strong shadow-doodle-sm hover:shadow-doodle no-underline inline-flex items-center justify-center gap-2 text-center transition-all"
-                    >
-                      <span>Practice {selectedRow.dim.code} Flow</span>
-                      <span aria-hidden="true">→</span>
-                    </Link>
-                  </div>
-                </div>
+                {renderDetailCard(selectedRow)}
               </motion.div>
             )}
           </AnimatePresence>
