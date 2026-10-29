@@ -247,21 +247,13 @@ export default function DashboardPage() {
                     {/* WEEKLY CONTINUITY & RHYTHM (Drawn directly on Classroom Board) */}
                     <div className="space-y-4">
                       {/* Minimalist Board Header */}
-                      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 border-b-2 border-dashed border-border-strong/30 pb-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-brand text-lg" aria-hidden="true">
-                            🔄
-                          </span>
-                          <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-ink">
-                            Weekly Continuity &amp; Rhythm
-                          </h2>
-                          <span className="font-mono text-xs px-2.5 py-0.5 rounded-pill border border-border-strong/40 text-ink-muted bg-surface/30">
-                            Zero-Guilt Streak
-                          </span>
-                        </div>
-                        <p className="font-mono text-xs text-ink-muted italic m-0">
-                          Consistency is about rhythm, not robotic streaks.
-                        </p>
+                      <div className="flex items-center gap-2 border-b-2 border-dashed border-border-strong/30 pb-3">
+                        <span className="text-brand text-lg" aria-hidden="true">
+                          🔄
+                        </span>
+                        <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-ink">
+                          Weekly Continuity &amp; Rhythm
+                        </h2>
                       </div>
 
                       {/* Seven-Day Minimalist Board Columns */}
