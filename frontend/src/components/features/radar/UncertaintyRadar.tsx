@@ -11,6 +11,7 @@ export interface UncertaintyRadarProps {
   subtitle?: string | null
   showSubtitle?: boolean
   defaultShowTable?: boolean
+  showTableToggle?: boolean
   headingLevel?: 'h2' | 'h3'
 }
 
@@ -161,6 +162,7 @@ export function UncertaintyRadar({
   subtitle,
   showSubtitle = true,
   defaultShowTable = false,
+  showTableToggle = true,
   headingLevel = 'h2',
 }: UncertaintyRadarProps) {
   const [showTable, setShowTable] = useState(defaultShowTable)
@@ -251,14 +253,16 @@ export function UncertaintyRadar({
               Hatched = Confidence &lt; 60%
             </Badge>
           )}
-          <Button
-            variant="secondary"
-            size="sm"
-            aria-expanded={showTable}
-            onClick={() => setShowTable((prev) => !prev)}
-          >
-            {showTable ? 'Hide Accessible Table' : 'View as Table'}
-          </Button>
+          {showTableToggle && (
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-expanded={showTable}
+              onClick={() => setShowTable((prev) => !prev)}
+            >
+              {showTable ? 'Hide Accessible Table' : 'View as Table'}
+            </Button>
+          )}
         </div>
       </div>
 

@@ -309,6 +309,7 @@ export default function DashboardPage() {
                         estimates={estimates}
                         title="6-Skill Cognitive Balance"
                         showSubtitle={false}
+                        showTableToggle={false}
                       />
                     </div>
 
