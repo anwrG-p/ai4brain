@@ -238,7 +238,10 @@ describe('Wave 1 & Wave 2 Pages & Design System Unit Suite', () => {
     expect(
       screen.getByRole('link', { name: /Start Today\'s 2-Min Flow/i }),
     ).toBeInTheDocument()
-    expect(screen.getByText(/6-Skill Cognitive Balance/i)).toBeInTheDocument()
+    // Test clicking a cognitive dimension chip on the interactive radar
+    const wmBtn = screen.getByRole('button', { name: /WM/i })
+    fireEvent.click(wmBtn)
+    expect(screen.getByText(/Working Memory/i)).toBeInTheDocument()
     expect(screen.getByText(/Core Balance Insights/i)).toBeInTheDocument()
   })
 

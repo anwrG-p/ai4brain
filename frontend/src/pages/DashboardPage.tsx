@@ -118,7 +118,7 @@ export default function DashboardPage() {
   // - stageMoveDown: positive number moves DOWN (px), e.g. 40, 60, 100
   // - stageMoveX: positive moves RIGHT (px), negative moves LEFT (px)
   // =========================================================================
-  const stageMoveDown = 0 // Change this number to move Brian & Board down together (in px)
+  const stageMoveDown = 80 // Change this number to move Brian & Board down together (in px)
   const stageMoveX = 0 // Change this number to move Brian & Board horizontally (in px)
 
   const stageStyle: React.CSSProperties = {
@@ -360,13 +360,13 @@ export default function DashboardPage() {
                       </Link>
                     </div>
 
-                    {/* DAILY SCIENCE BITE (Chalk/Marker Footnote on Board) */}
+                    {/* DAILY TIP (Chalk/Marker Footnote on Board) */}
                     <div className="mt-auto pt-4 border-t border-dashed border-border-strong/30 flex items-center gap-2 text-xs sm:text-sm text-ink">
                       <span className="text-brand text-base shrink-0" aria-hidden="true">
                         📖
                       </span>
                       <span>
-                        <strong>Daily Science Bite:</strong> Sleep consolidation strengthens pattern separation without active practice. Enjoy your rest day!
+                        <strong>Daily Tip:</strong> Sleep consolidation strengthens pattern separation without active practice. Enjoy your rest day!
                       </span>
                     </div>
                   </div>
@@ -405,15 +405,17 @@ export default function DashboardPage() {
             )}
 
             {/* =========================================================================
-                UNDER THE BOARD: 6-SKILL COGNITIVE BALANCE & CORE BALANCE INSIGHTS
+                UNDER THE BOARD: COGNITIVE RADAR & CORE BALANCE INSIGHTS
                 ========================================================================= */}
-            <div className="space-y-6">
-              {/* 1. 6-Skill Cognitive Balance Radar */}
-              <div className="w-full min-w-0">
+            <div className="space-y-8">
+              {/* 1. Cognitive Radar Graph Directly on the Page (Animated & Interactive) */}
+              <div className="w-full min-w-0 py-2">
                 <UncertaintyRadar
                   dimensions={activeDimensions}
                   estimates={estimates}
-                  title="6-Skill Cognitive Balance"
+                  title=""
+                  bare={true}
+                  interactive={true}
                   showSubtitle={false}
                   showTableToggle={false}
                 />
