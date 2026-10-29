@@ -230,19 +230,17 @@ export default function DashboardPage() {
                   {/* BOARD TOP HEADER: Greeting, Teacher Note, Primary CTA */}
                   <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b-2 border-dashed border-border-strong/30 pb-5">
                     <div className="space-y-1.5 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-pill bg-brand-subtle border border-border-strong text-xs font-mono font-bold text-ink shadow-xs">
-                          <span>✨</span>
-                          <span>
-                            {viewState === 'low-confidence'
-                              ? 'Rest-First Pacing'
-                              : 'Mind Performance Lecture'}
+                      {viewState === 'low-confidence' && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-pill bg-brand-subtle border border-border-strong text-xs font-mono font-bold text-ink shadow-xs">
+                            <span>🌱</span>
+                            <span>Rest-First Pacing</span>
                           </span>
-                        </span>
-                        <span className="text-xs font-mono text-ink-muted">
-                          Non-Clinical Cognitive Space
-                        </span>
-                      </div>
+                          <span className="text-xs font-mono text-ink-muted">
+                            Non-Clinical Cognitive Space
+                          </span>
+                        </div>
+                      )}
 
                       <h1
                         id="dashboard-hero-heading"
