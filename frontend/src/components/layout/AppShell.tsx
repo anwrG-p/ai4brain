@@ -14,12 +14,16 @@ import {
   Cpu,
 } from 'lucide-react'
 import { BRAND_CONFIG } from '../../config/brand'
-import conceptALockup from '../../assets/branding/concept-a-lockup.svg'
 import { useAppStore } from '../../state/useAppStore'
 import { tracker } from '../../features/assessment/telemetry/tracker'
 import { Badge } from '../ui/Badge'
+import { BrianLogo } from '../features/brand/BrianLogo'
 import { EmilyMoodPill } from '../common/EmilyMoodPill'
 import { HumanReviewGate } from '../dev/HumanReviewGate'
+
+// Icon-sized header controls: 44 px targets, colour change only.
+const UTILITY_CONTROL =
+  'focus-ring inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-ink-muted hover:text-ink hover:bg-surface-raised transition-colors'
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const location = useLocation()
@@ -71,24 +75,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       pathname === '/sign-in' ||
       pathname === '/create-account'
     ) {
-      return {
-        label: 'Nearly Done',
-        badgeClass: 'bg-success-subtle text-ink border-border-strong',
-        dotClass: 'bg-success',
-      }
+      return 'Nearly Done'
     }
     if (pathname === '/' || pathname === '/dashboard') {
-      return {
-        label: 'In Progress',
-        badgeClass: 'bg-warning-subtle text-ink border-border-strong',
-        dotClass: 'bg-warning animate-pulse',
-      }
+      return 'In Progress'
     }
-    return {
-      label: 'Pending',
-      badgeClass: 'bg-surface-raised text-ink-muted border-border-strong',
-      dotClass: 'bg-ink-muted/50',
-    }
+    return 'Pending'
   }
 
   const pageProgress = getPageProgress(location.pathname)
@@ -97,11 +89,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const showOfflineBanner = simulateOffline || isRealOffline
 
   return (
-    <div className={`min-h-screen flex flex-col bg-canvas text-ink ${location.pathname === '/' ? 'pb-0' : 'pb-16 md:pb-0'}`}>
+    <div className={`min-h-screen flex flex-col bg-canvas text-ink ${location.pathname === '/' ? 'pb-0' : 'pb-16 lg:pb-0'}`}>
       {/* Skip link for keyboard users (Tab stop 1) */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:start-2 focus:z-50 focus:px-4 focus:py-2 focus:rounded-sm focus:border-2 focus:border-border-strong focus:bg-brand focus:text-brand-ink focus:font-bold focus:shadow-doodle"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:start-2 focus:z-50 focus:px-4 focus:py-2 focus:rounded-md focus:bg-brand focus:text-brand-ink focus:font-semibold"
       >
         Skip to main content
       </a>
@@ -111,7 +103,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div
           role="status"
           aria-live="polite"
-          className="bg-warning-subtle border-b-2 border-border-strong px-4 py-2 text-xs md:text-sm font-bold text-ink flex flex-wrap items-center justify-between gap-2"
+          className="bg-warning-subtle border-b border-border px-4 py-2 text-xs md:text-sm text-ink flex flex-wrap items-center justify-between gap-2"
         >
           <span className="flex items-center gap-1.5">
             <WifiOff size={16} aria-hidden="true" className="text-warning" />
@@ -135,7 +127,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div
           role="status"
           aria-live="polite"
-          className="bg-info-subtle border-b-2 border-border-strong px-4 py-2 text-xs md:text-sm font-bold text-ink flex flex-wrap items-center justify-between gap-2"
+          className="bg-info-subtle border-b border-border px-4 py-2 text-xs md:text-sm text-ink flex flex-wrap items-center justify-between gap-2"
         >
           <span className="flex items-center gap-1.5">
             <Cpu size={16} aria-hidden="true" className="text-brand" />
@@ -149,60 +141,46 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* Global Hand-Ink Wobble and Diagonal Hatch Filter Definitions */}
-      <svg aria-hidden="true" className="absolute w-0 h-0 pointer-events-none">
-        <defs>
-          <filter id="hand-ink" x="-2%" y="-2%" width="104%" height="104%">
-            <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="3" result="noise" />
-            <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.4" xChannelSelector="R" yChannelSelector="G" />
-          </filter>
-          <pattern id="diagonalHatch" width="8" height="8" patternUnits="userSpaceOnUse">
-            <path d="M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2" stroke="var(--color-secondary)" strokeWidth="1.2" strokeOpacity="0.35" />
-          </pattern>
-        </defs>
-      </svg>
-
-      {/* Top Consumer Navigation Header with Doodle Sketch Border */}
+      {/* Top Consumer Navigation Header (64 px, DEC-008) */}
       {!isTaskRoute && (
         <header
           role="banner"
-          className="sticky top-0 z-50 w-full h-18 sm:h-20 bg-surface/95 backdrop-blur-md border-b-2 border-border-strong px-4 transition-colors flex items-center"
+          className="sticky top-0 z-50 w-full h-16 bg-surface border-b border-border px-4 flex items-center"
         >
-          <div className="max-w-6xl w-full mx-auto flex items-center justify-between gap-4">
-            {/* Product Brand Mark */}
+          <div className="max-w-6xl w-full mx-auto flex items-center justify-between gap-2 sm:gap-3">
+            {/* Product Brand Mark: fill is currentColor, so it follows --color-ink in both themes */}
             <Link
               to="/"
               title={`${BRAND_CONFIG.productName} Home`}
               aria-label={`${BRAND_CONFIG.productName} Home`}
-              className="focus-ring rounded-md flex items-center text-ink no-underline group py-1 shrink-0"
+              className="focus-ring rounded-md flex items-center text-ink no-underline shrink-0"
             >
-              <img
-                src={conceptALockup}
-                alt={BRAND_CONFIG.productName}
-                className={`h-11 sm:h-13 md:h-14 w-auto object-contain transition-transform group-hover:scale-105 ${
-                  theme === 'dark' ? 'brightness-0 invert' : ''
-                }`}
+              {/* Symbol only on phones so the header fits 375 px; viewBox cropped to the lockup's ink */}
+              <BrianLogo variant="symbol" size={40} aria-hidden="true" className="sm:hidden" />
+              <BrianLogo
+                variant="lockup"
+                viewBox="112 24 552 208"
+                width={106}
+                height={40}
+                aria-hidden="true"
+                className="max-sm:hidden"
               />
             </Link>
 
-            {/* 5 Primary Consumer Destinations Navbar (Desktop) or Skip intro on Welcome first run */}
+            {/* 5 Primary Consumer Destinations Navbar (lg and up; below that the bottom tabs) or Skip intro on Welcome first run */}
             {location.pathname === '/' ? (
-              <div className="flex-1 flex justify-end items-center mr-2">
+              <div className="flex-1 flex justify-end items-center">
                 <Link
                   to="/dashboard"
-                  className="focus-ring px-3.5 py-1.5 rounded-sm text-xs sm:text-sm font-bold text-ink hover:bg-brand-subtle transition-colors no-underline inline-flex items-center gap-1.5 border-2 border-border-strong shadow-doodle-sm"
+                  className="focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-md border border-border-strong px-3.5 text-sm font-semibold text-ink no-underline hover:bg-surface-raised transition-colors"
                 >
                   <span>Skip intro</span>
                   <span aria-hidden="true">→</span>
                 </Link>
               </div>
             ) : (
-              <nav
-                aria-label="Primary product navigation"
-                className="hidden md:flex items-center gap-1 p-1 rounded-pill bg-surface-raised border-2 border-border-strong shadow-doodle-sm"
-              >
+              <nav aria-label="Primary product navigation" className="hidden lg:flex items-center gap-1">
                 {consumerNavItems.map((item) => {
-                  const Icon = item.icon
                   const isActive =
                     item.path === '/dashboard'
                       ? location.pathname === '/dashboard'
@@ -213,14 +191,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       key={item.path}
                       to={item.path}
                       aria-current={isActive ? 'page' : undefined}
-                      className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-pill text-xs font-bold no-underline transition-all ${
+                      className={`focus-ring rounded-sm px-3 py-2 border-b-2 text-sm font-medium no-underline transition-colors ${
                         isActive
-                          ? 'bg-brand text-brand-ink border border-border-strong shadow-doodle-sm'
-                          : 'text-ink-muted hover:text-ink hover:bg-canvas'
+                          ? 'border-brand text-brand'
+                          : 'border-transparent text-ink-muted hover:text-ink'
                       }`}
                     >
-                      <Icon size={14} aria-hidden="true" />
-                      <span>{item.label}</span>
+                      {item.label}
                     </Link>
                   )
                 })}
@@ -230,22 +207,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {/* EMILY Emotion Atmosphere & Micro-Interaction Rhythm */}
             <EmilyMoodPill />
 
-            {/* Protected Streak Pill matching Stitch */}
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-surface-raised border-2 border-border-strong rounded-pill shadow-doodle-sm">
-              <span className="text-danger text-xs" aria-hidden="true">🔥</span>
-              <span className="font-mono text-xs text-ink font-semibold">12d · Wed Rest</span>
-            </div>
-
-            {/* Utility Controls & Floating Judge Drawer Toggle */}
-            <div className="flex items-center gap-2">
+            {/* Utility Controls */}
+            <div className="flex items-center gap-1">
               {!isAuthRoute && (
                 <Link
                   to="/auth"
                   title={isAuthenticated ? `Signed in as ${userProfile?.preferredName || 'Explorer'}` : 'Sign In to Your Sanctuary'}
                   aria-label={isAuthenticated ? `Profile: ${userProfile?.preferredName || 'Explorer'}` : 'Sign In'}
-                  className="focus-ring px-3 py-1.5 rounded-sm border border-border-strong bg-surface text-ink hover:bg-surface-raised shadow-doodle-sm transition-colors no-underline inline-flex items-center gap-1.5 font-mono text-xs font-bold"
+                  className={`${UTILITY_CONTROL} gap-1.5 px-2.5 text-sm font-medium no-underline`}
                 >
-                  <User size={14} aria-hidden="true" className={isAuthenticated ? 'text-success' : 'text-brand'} />
+                  <User size={18} aria-hidden="true" className={isAuthenticated ? 'text-success' : 'text-brand'} />
                   <span className="hidden sm:inline">
                     {isAuthenticated ? (userProfile?.preferredName || 'Explorer') : 'Sign In'}
                   </span>
@@ -256,27 +227,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 aria-label={theme === 'light' ? 'Switch to Dark (Night Lab)' : 'Switch to Light (Playful Lab)'}
                 title={theme === 'light' ? 'Switch to Dark (Night Lab)' : 'Switch to Light (Playful Lab)'}
                 onClick={toggleTheme}
-                className="focus-ring p-2 rounded-sm border border-border-strong bg-surface text-ink hover:bg-surface-raised shadow-doodle-sm transition-colors cursor-pointer"
+                className={`${UTILITY_CONTROL} cursor-pointer`}
               >
-                {theme === 'light' ? <Moon size={16} aria-hidden="true" /> : <Sun size={16} aria-hidden="true" />}
+                {theme === 'light' ? <Moon size={18} aria-hidden="true" /> : <Sun size={18} aria-hidden="true" />}
               </button>
 
               <Link
                 to="/privacy"
                 title="Privacy Center & Non-Biometric Lock"
                 aria-label="Privacy Center"
-                className="focus-ring p-2 rounded-sm border border-border-strong bg-surface text-ink hover:bg-surface-raised shadow-doodle-sm transition-colors no-underline hidden sm:inline-flex items-center justify-center"
+                className={`${UTILITY_CONTROL} no-underline max-sm:hidden`}
               >
-                <ShieldCheck size={16} aria-hidden="true" />
+                <ShieldCheck size={18} aria-hidden="true" />
               </Link>
 
               <Link
                 to="/settings"
                 title="Settings & Accessibility Controls"
                 aria-label="Settings"
-                className="focus-ring p-2 rounded-sm border border-border-strong bg-surface text-ink hover:bg-surface-raised shadow-doodle-sm transition-colors no-underline hidden sm:inline-flex items-center justify-center"
+                className={`${UTILITY_CONTROL} no-underline max-sm:hidden`}
               >
-                <Settings size={16} aria-hidden="true" />
+                <Settings size={18} aria-hidden="true" />
               </Link>
             </div>
           </div>
@@ -292,31 +263,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             : 'max-w-6xl py-8'
         }`}
       >
-        {/* Team Sprint Progress Badge - positioned in the top-right empty padding area */}
+        {/* Team Sprint Progress Badge - small and muted, in the top-right padding area */}
         <aside
           aria-label="Sprint progress status"
-          className="absolute top-2 right-4 sm:top-3 sm:right-6 lg:right-8 z-30 pointer-events-none"
+          className="absolute top-2 right-4 sm:right-6 lg:right-8 z-30 pointer-events-none"
         >
-          <div
+          <Badge
+            tone="neutral"
             data-testid="page-progress-badge"
-            title={`Sprint Progress: ${pageProgress.label}`}
-            aria-label={`Page progress: ${pageProgress.label}`}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-pill font-mono text-xs font-bold border-2 shadow-doodle-sm select-none pointer-events-auto ${pageProgress.badgeClass}`}
+            title={`Sprint Progress: ${pageProgress}`}
+            aria-label={`Page progress: ${pageProgress}`}
+            className="select-none pointer-events-auto font-medium"
           >
-            <span className={`w-2 h-2 rounded-full shrink-0 ${pageProgress.dotClass}`} aria-hidden="true" />
-            <span className="hidden sm:inline text-ink-muted font-normal">Progress: </span>
-            <span>{pageProgress.label}</span>
-          </div>
+            <span className="hidden sm:inline">Progress: </span>
+            {pageProgress}
+          </Badge>
         </aside>
 
         {children}
       </main>
 
-      {/* Product Footer with Centered Non-Clinical Disclaimer & Evaluator Controls */}
+      {/* Product Footer: one muted non-clinical line plus the evaluator controls */}
       {!isTaskRoute && (
         <footer
           role="contentinfo"
-          className="border-t-2 border-border-strong bg-surface px-4 py-4 text-xs text-ink-muted"
+          className="border-t border-border bg-surface px-4 py-4 text-xs text-ink-muted"
         >
           <div className="max-w-6xl mx-auto flex flex-col items-center justify-center text-center gap-2">
             <p className="m-0">{BRAND_CONFIG.nonClinicalNotice}</p>
@@ -325,11 +296,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </footer>
       )}
 
-      {/* Mobile Bottom Tab Bar */}
+      {/* Mobile Bottom Tab Bar: Lucide icons with labels */}
       {location.pathname !== '/' && !isTaskRoute && !isAuthRoute && (
         <nav
           aria-label="Mobile bottom navigation"
-          className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface/95 backdrop-blur-md border-t-2 border-border-strong flex items-center justify-around py-1.5 px-2"
+          className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t border-border flex items-center justify-around px-2"
         >
           {consumerNavItems.map((item) => {
             const Icon = item.icon
@@ -343,14 +314,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.path}
                 to={item.path}
                 aria-current={isActive ? 'page' : undefined}
-                className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-sm text-xs no-underline transition-all ${
-                  isActive
-                    ? 'text-brand font-bold'
-                    : 'text-ink-muted hover:text-ink'
+                className={`focus-ring flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-sm text-xs no-underline transition-colors ${
+                  isActive ? 'text-brand font-semibold' : 'text-ink-muted hover:text-ink'
                 }`}
               >
-                <Icon size={18} aria-hidden="true" />
-                <span className="text-xs">{item.label}</span>
+                <Icon size={20} aria-hidden="true" />
+                <span>{item.label}</span>
               </Link>
             )
           })}

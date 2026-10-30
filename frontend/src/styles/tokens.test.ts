@@ -51,6 +51,17 @@ describe('tokens.css', () => {
     },
   )
 
+  // Every --color-* hex the contrast script audits must be the one the CSS ships.
+  const metadataColors = DESIGN_SYSTEM_CONTRAST_PAIRS.flatMap((p) => [
+    [p.id, p.theme, p.fgName, p.fgHex] as const,
+    [p.id, p.theme, p.bgName, p.bgHex] as const,
+  ]).filter(([, , name]) => name.startsWith('--color-'))
+
+  it.each(metadataColors)('%s: %s %s matches tokens.css', (_id, theme, name, hex) => {
+    const css = theme === 'light' ? light : dark
+    expect(css.get(name)).toBe(hex.toUpperCase())
+  })
+
   it('keeps @theme colours equal to the light block', () => {
     expect(theme.size).toBeGreaterThanOrEqual(20)
     for (const [name, hex] of theme) {

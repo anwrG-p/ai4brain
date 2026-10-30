@@ -29,6 +29,7 @@ export interface BrianMascotProps {
   pose?: BrianPose
   size?: BrianMascotScale
   scale?: BrianMascotScale
+  /** halo, showHalo, haloColor and animate are kept for API compatibility; Calm & Clean renders no halo. */
   halo?: boolean
   showHalo?: boolean
   haloColor?: 'brand' | 'secondary' | 'reward' | 'accent' | 'tertiary' | 'calm'
@@ -84,9 +85,6 @@ export const BrianMascot: React.FC<BrianMascotProps> = ({
   pose = 'waving',
   size,
   scale,
-  halo,
-  showHalo,
-  haloColor = 'brand',
   statusPip,
   badge,
   badgeTone = 'tertiary',
@@ -95,7 +93,6 @@ export const BrianMascot: React.FC<BrianMascotProps> = ({
   speechTimestamp,
   speechPlacement = 'right',
   className = '',
-  animate = true,
   interactive = true,
   alt,
   onClick,
@@ -105,50 +102,26 @@ export const BrianMascot: React.FC<BrianMascotProps> = ({
   const altText = alt || POSE_ALT_MAP[normalizedPose] || 'Brian the Axolotl mascot'
   const effectiveSize = scale ?? size ?? 'md'
   const pixelSize = typeof effectiveSize === 'number' ? effectiveSize : SIZE_MAP[effectiveSize] || 96
-  const isHaloActive = showHalo ?? halo ?? true
-
-  const haloGlowClass =
-    haloColor === 'secondary' || haloColor === 'calm'
-      ? 'bg-secondary-fixed/40'
-      : haloColor === 'reward'
-      ? 'bg-reward/30'
-      : haloColor === 'tertiary'
-      ? 'bg-success/20'
-      : 'bg-brand/25'
-
   const mascotImage = (
     <div
       className="relative flex items-center justify-center shrink-0 select-none"
       style={{ width: pixelSize, height: pixelSize }}
       onClick={onClick}
     >
-      {/* Confidence Halo Glow */}
-      {isHaloActive && (
-        <div
-          className={`absolute inset-0 rounded-pill ${haloGlowClass} blur-xl pointer-events-none transition-all duration-300 ${
-            animate ? 'animate-pulse' : ''
-          }`}
-          style={{ transform: 'scale(1.15)' }}
-          aria-hidden="true"
-        />
-      )}
-
       {/* Axolotl Mascot Sticker Image */}
       <img
         src={imageSrc}
         alt={altText}
         width={pixelSize}
         height={pixelSize}
-        className={`w-full h-full object-contain relative z-10 transition-transform duration-200 ${
-          interactive ? 'hover:scale-105 active:scale-95 cursor-pointer' : ''
-        }`}
+        className={`w-full h-full object-contain ${interactive ? 'cursor-pointer' : ''}`}
         loading="lazy"
       />
 
       {/* Optional Status Pip */}
       {statusPip && (
         <span
-          className="absolute bottom-1 right-1 w-3 h-3 rounded-full border-2 border-border-strong bg-success shadow-xs z-20"
+          className="absolute bottom-1 right-1 w-3 h-3 rounded-full border border-surface bg-success z-20"
           title={`Status: ${statusPip}`}
         />
       )}
@@ -156,15 +129,14 @@ export const BrianMascot: React.FC<BrianMascotProps> = ({
       {/* Optional Status Pip / Badge */}
       {badge && (
         <span
-          className={`absolute -bottom-1 -right-1 z-20 px-2 py-0.5 rounded-pill border-2 border-border-strong text-xs font-mono font-bold shadow-doodle-sm flex items-center gap-1 ${
+          className={`absolute -bottom-1 -right-1 z-20 px-2 py-0.5 rounded-pill text-xs font-mono font-semibold flex items-center gap-1 ${
             badgeTone === 'secondary'
               ? 'bg-secondary text-canvas'
               : badgeTone === 'reward'
-              ? 'bg-reward text-brand-ink'
+              ? 'bg-reward text-reward-ink'
               : 'bg-success text-brand-ink'
           }`}
         >
-          <span className="w-1.5 h-1.5 rounded-pill bg-current animate-ping" />
           {badge}
         </span>
       )}
@@ -190,27 +162,13 @@ export const BrianMascot: React.FC<BrianMascotProps> = ({
     >
       {mascotImage}
 
-      {/* Tactile Hand-Drawn Speech Bubble */}
-      <div className="relative flex-1 w-full bg-surface-raised rounded-2xl border-2 border-border-strong p-4 sm:p-5 shadow-doodle transition-all hover:shadow-doodle-lg">
-        {/* Tactical Speech Pointer Beak for Desktop (Pointing toward Brian) */}
-        {speechPlacement === 'right' && (
-          <>
-            <div
-              className="hidden sm:block absolute top-7 -left-3 w-0 h-0 border-t-[9px] border-t-transparent border-r-[12px] border-r-border-strong border-b-[9px] border-b-transparent"
-              aria-hidden="true"
-            />
-            <div
-              className="hidden sm:block absolute top-7 -left-[9px] w-0 h-0 border-t-[7px] border-t-transparent border-r-[10px] border-r-surface-raised border-b-[7px] border-b-transparent z-10"
-              aria-hidden="true"
-            />
-          </>
-        )}
-
+      {/* Speech bubble: a plain 1 px-border surface */}
+      <div className="relative flex-1 w-full bg-surface rounded-xl border border-border p-4 sm:p-5">
         {/* Speech Header */}
         {(speechTitle || speechTimestamp) && (
           <div className="flex items-center justify-between gap-2 mb-1.5">
             {speechTitle && (
-              <span className="font-mono text-xs uppercase tracking-wider text-brand font-bold">
+              <span className="text-xs font-semibold text-brand">
                 {speechTitle}
               </span>
             )}

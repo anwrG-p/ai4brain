@@ -354,9 +354,6 @@ export default function DesignSystemPage() {
                       <span className="text-xs font-mono-tabular text-brand-ink font-bold">Solid 45%</span>
                     </div>
                     <div className="h-full w-[35%] bg-warning-subtle rounded-lg ml-1 relative overflow-hidden flex items-center justify-center border border-border-strong">
-                      <svg className="absolute inset-0 w-full h-full opacity-35" aria-hidden="true">
-                        <rect width="100%" height="100%" fill="url(#diagonalHatch)" />
-                      </svg>
                       <span className="text-xs font-mono-tabular text-ink font-bold relative z-10">±16% Float Area</span>
                     </div>
                     <div className="flex-1 text-end pe-2 text-xs font-mono-tabular text-ink-muted">Target ±4%</div>

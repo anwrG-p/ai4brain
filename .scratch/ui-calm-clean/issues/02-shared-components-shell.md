@@ -56,3 +56,34 @@ Spec: `../spec.md` (Components, R1, R3, R5)
 - `npm run qa:checks` is green.
 - Run Playwright on Edge through a scratch config for `welcome`, `taskRunner` and one other spec. Axe must be clean in light and dark.
 - Commit with no AI attribution.
+
+## Comments
+
+**2026-10-30 — Amended palette deltas (implementer, ticket 02).** Applied light `--color-danger` `#B91C1C` (`@theme` and the light block) and dark `--color-border` `#334155`. WCAG 2.1 ratios; ticket 01 values in brackets. Everything still passes; no exercise token was swapped.
+
+| Use | Pair | Light | Dark (unchanged) |
+|---|---|---|---|
+| Stroop red ink | `--color-danger` text on surface | 6.47 (4.83) | 6.41 |
+| Tower disc slot 1 | white label on `#B91C1C` (dark: `#111827` on `#F87171`) | 6.47 (4.83) | 6.41 |
+| Danger Button text | `text-surface` on `bg-danger` | 6.47 (4.83) | 6.41 |
+| `.text-danger` on canvas | danger on `#F8FAFC` / `#0B1120` | 6.18 (6.18, was the `#B91C1C` override) | 6.81 |
+| `.text-danger` on surface-raised | danger on `#F1F5F9` / `#1F2937` | 5.91 (4.41 for the old token) | 5.31 |
+| Danger Badge / Card | danger on danger-subtle | 5.91 | 5.84 |
+
+`.text-danger` no longer needs its light `#B91C1C` override; it is now `var(--color-danger)` in both themes. The `token-metadata.ts` pairs `light-danger-alert` and `light-danger-text-subtle` now name `--color-danger #B91C1C`.
+
+Dark `--color-border` `#334155` is a divider/card edge only: 1.71 on surface, 1.82 on canvas, 1.42 on surface-raised. That's acceptable because it marks no control boundary (the 3:1 control boundary is `--color-border-strong`, 6.92 / 5.72). So it has no metadata pair; the new drift guard in `tokens.test.ts` checks each `--color-*` hex that `token-metadata.ts` audits against the CSS block for its theme.
+
+Badge tones (subtle tinted fill, toned text, no border):
+
+| Tone | Classes | Light | Dark |
+|---|---|---|---|
+| brand / info | brand on brand-subtle | 5.62 | 5.36 |
+| success | success on success-subtle | 4.79 | 8.55 |
+| warning | warning on warning-subtle | 4.84 | 8.73 |
+| danger | danger on danger-subtle | 5.91 | 5.84 |
+| reward | ink on `reward/20` (over surface) | 15.36 | 10.96 |
+| neutral | ink-muted on surface-raised | 6.92 | 5.72 |
+| low-confidence | ink-muted on surface, dashed 1 px border-strong | 7.58 | 6.92 |
+
+Header: logo is `BrianLogo` (currentColor = `--color-ink`): 17.85 light, 16.96 dark on surface. Active nav = brand text + 2 px brand underline (6.29 / 5.95); inactive = ink-muted (7.58 / 6.92).

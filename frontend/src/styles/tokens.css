@@ -25,7 +25,7 @@
   --color-success-subtle: #F0FDF4;
   --color-warning: #B45309;
   --color-warning-subtle: #FFFBEB;
-  --color-danger: #DC2626;
+  --color-danger: #B91C1C;
   --color-danger-subtle: #FEF2F2;
   --color-info: #4F46E5;
   --color-info-subtle: #EEF2FF;
@@ -70,7 +70,7 @@
   --color-success-subtle: #F0FDF4;
   --color-warning: #B45309;
   --color-warning-subtle: #FFFBEB;
-  --color-danger: #DC2626;
+  --color-danger: #B91C1C;
   --color-danger-subtle: #FEF2F2;
   --color-info: #4F46E5;
   --color-info-subtle: #EEF2FF;
@@ -165,7 +165,7 @@
   --color-surface-raised: #1F2937;
   --color-ink: #F8FAFC;
   --color-ink-muted: #94A3B8;
-  --color-border: #1F2937;
+  --color-border: #334155;
   --color-border-strong: #94A3B8;
   --color-brand: #818CF8;
   --color-brand-hover: #A5B4FC;
@@ -592,8 +592,7 @@ html[data-theme="dark"][data-emotion="fatigued"] {
 }
 
 /* Status and brand text (WCAG 2.1 AA >= 4.5:1 on canvas, surface, surface-raised and the
-   matching -subtle fill, both themes; ratios in token-metadata.ts). Light danger uses red-700
-   because --color-danger (#DC2626) is 4.41:1 on surface-raised and danger-subtle. */
+   matching -subtle fill, both themes; ratios in token-metadata.ts). */
 .text-brand {
   color: var(--color-brand) !important;
 }
@@ -607,8 +606,5 @@ html[data-theme="dark"][data-emotion="fatigued"] {
 }
 
 .text-danger {
-  color: #B91C1C !important;
-}
-[data-theme="dark"] .text-danger {
   color: var(--color-danger) !important;
 }
