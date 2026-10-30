@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tracker } from '../features/assessment/telemetry/tracker'
 import type { TelemetryEvent } from '../features/assessment/telemetry/types'
@@ -17,6 +17,16 @@ const renderAt = (url: string) =>
       </Routes>
     </MemoryRouter>,
   )
+
+// Browser Back, as a button inside the router.
+function BackButton() {
+  const navigate = useNavigate()
+  return (
+    <button type="button" onClick={() => navigate(-1)}>
+      browser back
+    </button>
+  )
+}
 
 const event = (over: Partial<TelemetryEvent> = {}): TelemetryEvent => ({
   user_id: 'u',
@@ -121,6 +131,49 @@ describe('TaskRunnerPage mounts the real exercises', () => {
     expect(screen.getByText(/^Telemetry: 51 recorded/)).toBeInTheDocument()
     expect(dataRows()).toHaveLength(50)
     expect(screen.getByText(/latest 50 of 51/i)).toBeInTheDocument()
+  })
+
+  it('the sync line says "dropped" (overflow and rejects alike), and where events are sent', async () => {
+    vi.spyOn(tracker, 'getStatus').mockReturnValue({
+      isOnline: true,
+      queuedCount: 0,
+      droppedCount: 4,
+      maxCapacity: 500,
+    })
+    renderAt('/task/episodic_pattern_separation')
+    await screen.findByRole('region', { name: 'Shape memory' })
+    fireEvent.click(screen.getByRole('button', { name: /Fast-Forward to Summary/i }))
+    expect(screen.getByText(/^Telemetry: 0 recorded · queue empty · 4 dropped$/)).toBeInTheDocument()
+    expect(screen.queryByText(/rejected/i)).toBeNull()
+    expect(screen.getByText(/^Sent to POST \/v1\/telemetry\/event\.$/)).toBeInTheDocument()
+  })
+
+  it('Back to another dimension resets the block, so its summary never shows the old totals', async () => {
+    render(
+      <MemoryRouter
+        future={future}
+        initialEntries={['/task/working_memory', '/task/episodic_pattern_separation']}
+        initialIndex={1}
+      >
+        <BackButton />
+        <Routes>
+          <Route path="/task/:dimId" element={<TaskRunnerPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    await screen.findByRole('region', { name: 'Shape memory' })
+    act(() => {
+      tracker.push(event())
+      tracker.push(event({ trial_index: 1 }))
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Fast-Forward to Summary/i }))
+    expect(screen.getByText(/Accuracy 100% · 640 ms/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'browser back' }))
+    expect(await screen.findByRole('region', { name: 'Memory Sharpness' })).toBeInTheDocument()
+    expect(screen.getByText('Recorded: 0')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Fast-Forward to Summary/i }))
+    expect(screen.getByText('No answers recorded')).toBeInTheDocument()
   })
 
   it('the completed drawer has no card chrome around the WhyThisPanel card', async () => {

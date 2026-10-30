@@ -145,6 +145,16 @@ export default function TaskRunnerPage() {
     setTotals(NO_TOTALS)
     run()
   }, [run])
+  // A new dimension (Back/Forward, the switcher, a link) is a new block: reset while rendering,
+  // so the completed screen can never pair the old block's totals with the new dimension.
+  const [blockDimId, setBlockDimId] = useState(currentDim.id)
+  if (blockDimId !== currentDim.id) {
+    setBlockDimId(currentDim.id)
+    setEvents([])
+    setTotals(NO_TOTALS)
+    setAttempt((a) => a + 1)
+    setStage('running')
+  }
   const handleDone = useCallback(() => setStage('completed'), [])
   const handleError = useCallback((msg: string) => {
     setErrorMsg(msg)
@@ -196,7 +206,8 @@ export default function TaskRunnerPage() {
     status.queuedCount > 0
       ? `${status.queuedCount} waiting to send`
       : 'queue empty',
-    ...(status.droppedCount > 0 ? [`${status.droppedCount} rejected`] : []),
+    // Overflow evictions, invalid events and rejected batches, since this page load.
+    ...(status.droppedCount > 0 ? [`${status.droppedCount} dropped`] : []),
     ...(status.isOnline ? [] : ['offline']),
   ].join(' · ')
 
@@ -396,7 +407,7 @@ export default function TaskRunnerPage() {
                   Recorded events
                 </h2>
                 <p className="text-ink-muted">
-                  Sent via POST /v1/telemetry/event.
+                  Sent to POST /v1/telemetry/event.
                   {totals.n > events.length &&
                     ` Table: latest ${events.length} of ${totals.n}.`}
                 </p>
@@ -629,10 +640,8 @@ export default function TaskRunnerPage() {
                     size="sm"
                     variant={isCurrent ? 'primary' : 'secondary'}
                     aria-pressed={isCurrent}
-                    onClick={() => {
-                      navigate(`/task/${dim.id}`)
-                      startBlock()
-                    }}
+                    // Another dimension resets the block on render; the current one restarts it here.
+                    onClick={() => (isCurrent ? startBlock() : navigate(`/task/${dim.id}`))}
                   >
                     {dim.markerGlyph} {dim.code}
                   </Button>
