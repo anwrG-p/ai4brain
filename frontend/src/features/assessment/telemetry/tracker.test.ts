@@ -360,6 +360,22 @@ describe('Tracker', () => {
     expect(beacon).toHaveBeenCalledTimes(1)
   })
 
+  // sendBeacon returns true when it queues, not when it delivers, and browsers do not check
+  // connectivity: offline, a beacon would wipe the buffer and its storage copy for nothing.
+  test('offline, hidden and pagehide send no beacon and keep buffer and storage', async () => {
+    const beacon = vi.fn((_url: string, _data: Blob) => true)
+    const storage = memStorage()
+    const fetchFn = okFetch()
+    const t = make({ fetchFn, beacon, storage })
+    t.push(full(1))
+    window.dispatchEvent(new Event('offline'))
+    setVisibility('hidden')
+    window.dispatchEvent(new Event('pagehide'))
+    expect(beacon).not.toHaveBeenCalled()
+    expect(t.getStatus().queuedCount).toBe(1)
+    expect(JSON.parse(storage.getItem(KEY) ?? '[]')).toHaveLength(1)
+  })
+
   test('refused beacon keeps events', async () => {
     const fetchFn = okFetch()
     const t = make({ fetchFn, beacon: () => false })

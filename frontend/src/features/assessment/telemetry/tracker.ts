@@ -227,6 +227,9 @@ export class Tracker {
   }
 
   flushBeacon(): void {
+    // sendBeacon returns true once queued, not delivered, and browsers do not check connectivity:
+    // offline it would drop the buffer and its storage copy. Keep them for the next online flush.
+    if (!this.isOnline) return
     // ponytail: without sendBeacon we fall back to a normal flush, which may not survive page unload.
     if (!this.beacon) return void this.flush()
     const kept: TelemetryEvent[] = []
