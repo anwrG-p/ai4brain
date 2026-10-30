@@ -34,28 +34,24 @@ test('unmounting before the skip fires never calls onDone', () => {
   expect(onDone).not.toHaveBeenCalled()
 })
 
-// Ported schemas render their exercise (a labelled region); the rest fall back to the skip.
-// ponytail: ticket 06 adds its four schemas to this map.
+// Every schema renders its exercise (a labelled region); unknown ones fall back to the skip (above).
 const PORTED: Record<string, string> = {
   n_back: 'Memory Sharpness',
   stroop: 'Color naming',
   matrix: 'Pattern puzzle',
   mental_rotation: 'Shape turning',
+  relational: 'Word relations',
+  tower: 'Tower puzzle',
+  ufov: 'Quick look',
+  mst: 'Shape memory',
 }
 
-test.each((fixtures as TaskPayload[]).filter((t) => t.schema_type in PORTED).map((t) => [t.schema_type, t] as const))(
-  '%s renders its exercise',
-  (schemaType, task) => {
-    render(<TaskRunner task={task} recorder={recorderFor(task)} onDone={vi.fn()} />)
-    expect(screen.getByRole('region', { name: PORTED[schemaType] })).toBeInTheDocument()
-    expect(screen.queryByText(/Unsupported task/)).toBeNull()
-  },
-)
+test('every fixture schema has a ported component', () => {
+  expect((fixtures as TaskPayload[]).map((t) => t.schema_type).filter((s) => !(s in PORTED))).toEqual([])
+})
 
-test.each((fixtures as TaskPayload[]).filter((t) => !(t.schema_type in PORTED)).map((t) => [t.schema_type, t] as const))(
-  '%s falls back to the skip until its component is ported',
-  (schemaType, task) => {
-    render(<TaskRunner task={task} recorder={recorderFor(task)} onDone={vi.fn()} />)
-    expect(screen.getByRole('status')).toHaveTextContent(`Unsupported task (${schemaType})`)
-  },
-)
+test.each((fixtures as TaskPayload[]).map((t) => [t.schema_type, t] as const))('%s renders its exercise', (schemaType, task) => {
+  render(<TaskRunner task={task} recorder={recorderFor(task)} onDone={vi.fn()} />)
+  expect(screen.getByRole('region', { name: PORTED[schemaType] })).toBeInTheDocument()
+  expect(screen.queryByText(/Unsupported task/)).toBeNull()
+})

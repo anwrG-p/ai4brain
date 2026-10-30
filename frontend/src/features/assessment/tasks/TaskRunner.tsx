@@ -1,10 +1,24 @@
 import { useEffect } from 'react'
 import type { TrialRecorder } from '../telemetry/tracker'
-import type { MatrixParams, NBackParams, RotationParams, StroopParams, TaskPayload } from '../telemetry/types'
+import type {
+  MatrixParams,
+  MstParams,
+  NBackParams,
+  RelationalParams,
+  RotationParams,
+  StroopParams,
+  TaskPayload,
+  TowerParams,
+  UfovParams,
+} from '../telemetry/types'
 import { Matrix } from './Matrix'
 import { MentalRotation } from './MentalRotation'
+import { Mst } from './Mst'
 import { NBack } from './NBack'
+import { Relational } from './Relational'
 import { Stroop } from './Stroop'
+import { Tower } from './Tower'
+import { Ufov } from './Ufov'
 
 // Every task component takes these props and calls tracker.push(recorder.finish(...)) once per trial.
 export type TaskProps<P> = { params: P; recorder: TrialRecorder; onDone: () => void }
@@ -23,7 +37,14 @@ export function TaskRunner(props: Props) {
       return <Matrix params={task.params as MatrixParams} recorder={recorder} onDone={onDone} />
     case 'mental_rotation':
       return <MentalRotation params={task.params as RotationParams} recorder={recorder} onDone={onDone} />
-    // Ticket 06 adds relational, tower, ufov and mst.
+    case 'relational':
+      return <Relational params={task.params as RelationalParams} recorder={recorder} onDone={onDone} />
+    case 'tower':
+      return <Tower params={task.params as TowerParams} recorder={recorder} onDone={onDone} />
+    case 'ufov':
+      return <Ufov params={task.params as UfovParams} recorder={recorder} onDone={onDone} />
+    case 'mst':
+      return <Mst params={task.params as MstParams} recorder={recorder} onDone={onDone} />
     default:
       return <Unsupported schemaType={task.schema_type} onDone={onDone} />
   }

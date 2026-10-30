@@ -36,3 +36,22 @@ Wire their cases into `TaskRunner.tsx`.
 ## Done when
 
 From `frontend/`: `npx vitest run src/features/assessment`, typecheck and both lints are clean. Commit with no AI attribution.
+
+## Comments
+
+**2026-10-30 — Tower disc palette (implementer).** White label text fails on every `--dim-n` in the dark theme (the dark dims are light: 1.32–2.98:1), so the disc label is painted in `--color-surface` instead: white in light, slate `#1E293B` in dark. WCAG 2.1 contrast of that label on each disc token (text needs ≥ 4.5:1):
+
+| Slot | Disc token | Light value | Label `#FFFFFF` | Dark value | Label `#1E293B` | (white on dark, rejected) |
+|---|---|---|---|---|---|---|
+| 0 | `--dim-1` | `#0072B2` | 5.19 | `#56B4E9` | 6.34 | 2.31 |
+| 1 | `--color-danger` | `#DC2626` | 4.83 | `#F87171` | 5.29 | 2.77 |
+| 2 | `--dim-3` | `#008662` | 4.58 | `#2DD4BF` | 7.86 | 1.86 |
+| 3 | `--dim-8` | `#4F46E5` | 6.29 | `#818CF8` | 4.90 | 2.98 |
+| 4 | `--dim-7` | `#7D7300` | 4.86 | `#F0E442` | 11.06 | 1.32 |
+| 5 | `--dim-2` | `#C45100` | 4.64 | `#FF8C3B` | 6.32 | 2.32 |
+| 6 | `--dim-4` | `#9E4778` | 5.79 | `#E899C8` | 6.84 | 2.14 |
+| 7 | `--color-secondary` | `#263D5B` | 11.05 | `#E7DFD8` | 11.11 | 1.32 |
+
+Hue order mirrors the old hex palette (blue, red, green, purple, yellow, then orange for teal, pink, slate). Rejected: `--dim-5` (4.29 light), `--dim-6` / `--dim-9` (pass, but near-duplicates of `--dim-1` / `--dim-3`), `--dim-10` (passes, near-duplicate of `--dim-4`). Thinnest margins: `--dim-3` 4.58 light, `--dim-8` 4.90 dark.
+
+Other graphics (≥ 3:1): Tower selected peg `ring-brand` over the Card surface 3.21 light / 6.37 dark (plus `aria-pressed` and a `bg-surface-raised` fill); peg base `--color-border-strong` on surface 11.05 / 6.37. Relational inverted-rule border `--color-warning` on surface 3.19 / 8.76 (the "Rule inverted" text carries the meaning). UFOV canvas: `--color-ink` on `--color-surface` 17.74 / 14.63. MST strokes are `currentColor` = `--color-ink` on the Card surface (same ratios). Tower hint uses `.text-danger` (`#B91C1C` override) 6.02 on canvas light, 6.20 dark.
