@@ -113,6 +113,18 @@ function defaultStorage(): StorageLike | null {
   }
 }
 
+// The server answers {"accepted": n}; anything else (HTML, empty, malformed) is no acknowledgement.
+async function acceptedCount(res: Response): Promise<number | null> {
+  try {
+    const body: unknown = await res.json()
+    return typeof body === 'object' && body !== null && 'accepted' in body && typeof body.accepted === 'number'
+      ? body.accepted
+      : null
+  } catch {
+    return null
+  }
+}
+
 // A throwing listener must not break push() (and so the trial loop) or a flush.
 function safely(fn: () => void): void {
   try {
@@ -235,7 +247,9 @@ export class Tracker {
       // rather than block the queue head. 5xx, 408, 429 and network errors retry.
       const rejected =
         res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429
-      settled = res.ok || rejected
+      // A 2xx counts only when the body confirms every event: a static host or SPA fallback that
+      // answers 200 with index.html must not make the tracker drop the batch.
+      settled = rejected || (res.ok && (await acceptedCount(res)) === batch.length)
       // clear() ran meanwhile: the batch is already gone and must not count as dropped.
       if (clears !== this.clears) return
       if (rejected) {

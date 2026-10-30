@@ -190,8 +190,14 @@ function readBlob(b: Blob): Promise<string> {
   })
 }
 
+// The server's reply to a batch it stored: 202 with {"accepted": <batch length>}.
+function accept(init?: RequestInit): Response {
+  const n = (JSON.parse(String(init?.body)) as unknown[]).length
+  return new Response(JSON.stringify({ accepted: n }), { status: 202 })
+}
+
 function okFetch() {
-  return vi.fn(async (_url: string, _init?: RequestInit) => new Response(null, { status: 202 }))
+  return vi.fn(async (_url: string, init?: RequestInit) => accept(init))
 }
 
 function sent(fetchFn: ReturnType<typeof okFetch>, call = 0): number[] {
@@ -386,7 +392,7 @@ describe('Tracker', () => {
 
   test('failed flush keeps events for retry', async () => {
     const fetchFn = vi
-      .fn(async (_url: string, _init?: RequestInit) => new Response(null, { status: 202 }))
+      .fn(async (_url: string, init?: RequestInit) => accept(init))
       .mockRejectedValueOnce(new Error('offline'))
       .mockResolvedValueOnce(new Response(null, { status: 503 }))
     const t = make({ fetchFn, beacon: vi.fn() })
@@ -404,7 +410,7 @@ describe('Tracker', () => {
   test('rejected batch (422) is dropped and logged, later events still sent', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const fetchFn = vi
-      .fn(async (_url: string, _init?: RequestInit) => new Response(null, { status: 202 }))
+      .fn(async (_url: string, init?: RequestInit) => accept(init))
       .mockResolvedValueOnce(new Response(null, { status: 422 }))
     const t = make({ fetchFn, beacon: vi.fn() })
     t.push(full(1))
@@ -418,9 +424,29 @@ describe('Tracker', () => {
     errSpy.mockRestore()
   })
 
+  // A static host or SPA fallback answers 200 with index.html: that is no acknowledgement.
+  test('a 2xx without the matching accepted count keeps the batch for retry', async () => {
+    const replies = [
+      new Response('<!doctype html><html></html>', { status: 200, headers: { 'Content-Type': 'text/html' } }),
+      new Response('{"accepted":1}', { status: 202 }),
+      new Response('{}', { status: 200 }),
+    ]
+    const fetchFn = vi.fn(async (_url: string, init?: RequestInit) => replies.shift() ?? accept(init))
+    const t = make({ fetchFn, beacon: vi.fn() })
+    t.push(full(1))
+    t.push(full(2))
+    for (let i = 0; i < 3; i++) {
+      await t.flush()
+      expect(t.getStatus()).toMatchObject({ queuedCount: 2, droppedCount: 0 })
+    }
+    await t.flush()
+    expect(sent(fetchFn, 3)).toEqual([1, 2])
+    expect(t.getStatus().queuedCount).toBe(0)
+  })
+
   test('408 and 429 are retried', async () => {
     const fetchFn = vi
-      .fn(async (_url: string, _init?: RequestInit) => new Response(null, { status: 202 }))
+      .fn(async (_url: string, init?: RequestInit) => accept(init))
       .mockResolvedValueOnce(new Response(null, { status: 408 }))
       .mockResolvedValueOnce(new Response(null, { status: 429 }))
     const t = make({ fetchFn, beacon: vi.fn() })
@@ -461,7 +487,7 @@ describe('Tracker', () => {
     const p = t.flush()
     await t.flush()
     expect(fetchFn).toHaveBeenCalledTimes(1)
-    resolve(new Response(null, { status: 202 }))
+    resolve(new Response('{"accepted":1}', { status: 202 }))
     await p
     await t.flush()
     expect(fetchFn).toHaveBeenCalledTimes(1)
