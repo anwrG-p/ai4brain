@@ -58,7 +58,7 @@ Exact values. Every text pair must reach ≥ 4.5:1 and every UI or graphic bound
 | `--color-surface-raised` | `#F1F5F9` | `#1F2937` |
 | `--color-ink` | `#0F172A` | `#F8FAFC` |
 | `--color-ink-muted` | `#475569` | `#94A3B8` |
-| `--color-border` (dividers, card edges) | `#E2E8F0` | `#1F2937` |
+| `--color-border` (dividers, card edges) | `#E2E8F0` | `#334155` |
 | `--color-border-strong` (control boundaries, ≥ 3:1) | `#64748B` | `#94A3B8` |
 | `--color-brand` (primary) | `#4F46E5` | `#818CF8` |
 | `--color-brand-hover` | `#4338CA` | `#A5B4FC` |
@@ -70,7 +70,7 @@ Exact values. Every text pair must reach ≥ 4.5:1 and every UI or graphic bound
 | `--color-reward` / `-ink` | `#F59E0B` / `#0F172A` | `#FBBF24` / `#0B1120` |
 | `--color-success` / `-subtle` | `#15803D` / `#F0FDF4` | `#4ADE80` / `#052E16` |
 | `--color-warning` / `-subtle` | `#B45309` / `#FFFBEB` | `#FBBF24` / `#422006` |
-| `--color-danger` / `-subtle` | `#DC2626` / `#FEF2F2` | `#F87171` / `#450A0A` |
+| `--color-danger` / `-subtle` | `#B91C1C` / `#FEF2F2` | `#F87171` / `#450A0A` |
 | `--color-info` / `-subtle` | = brand / `#EEF2FF` | = brand / `#1E1B4B` |
 
 Other colour rules:
