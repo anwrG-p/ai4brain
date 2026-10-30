@@ -70,4 +70,18 @@ describe('UI telemetry goes through the Tracker', () => {
     expect(clear).toHaveBeenCalledOnce()
     expect(screen.getByText(/Purged 3 records/)).toBeInTheDocument()
   })
+
+  it('the privacy purge forgets the anonymous id, so later telemetry is not linked to it', () => {
+    vi.spyOn(tracker, 'clear').mockReturnValue(0)
+    localStorage.setItem('aura_uid', 'old-anonymous-id')
+    render(
+      <MemoryRouter future={future}>
+        <PrivacyPage />
+      </MemoryRouter>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Purge All Data & Telemetry/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /cannot be undone/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Permanently Purge All Data/i }))
+    expect(localStorage.getItem('aura_uid')).toBeNull()
+  })
 })

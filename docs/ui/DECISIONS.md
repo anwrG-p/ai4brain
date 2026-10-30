@@ -92,8 +92,33 @@ Every non-trivial frontend, UX, design-system, and contract decision is recorded
      - Layer 1 (Product Navigation): Clean 64px top bar (`h-16`) on desktop and bottom tab bar on mobile with 5 consumer destinations (`Today`, `Practice`, `Coach`, `Progress`, `You`). Content starts $\le 80\text{px}$ on desktop and $\le 130\text{px}$ on mobile.
      - Layer 2 (Judge Mode): Opt-in right-docked drawer (Shift+J / `?judge=1` / header pill), collapsed by default, containing persona switching, 3-to-10 dimension presets, fault injections, and all 19 deep-links.
      - Self-host `@fontsource/fredoka`, `@fontsource/lexend`, and `@fontsource/jetbrains-mono` with zero runtime external calls.
-     - Implement real 500-event offline `telemetryQueue.ts` with exponential backoff and browser online/offline synchronization.
+     - Implement real 500-event offline `telemetryQueue.ts` with exponential backoff and browser online/offline synchronization. *(Superseded 2026-10-30: `telemetryQueue.ts` was deleted; Member 1's Tracker is now the single telemetry sink. See DEC-009, proposed.)*
      - Design "Nodi", an animated seedling neuron with dendrite leaves for calibrated dimensions and pulsing buds for low-confidence dimensions.
      - Build GitHub Actions CI workflow (`.github/workflows/ui-ci.yml`) to enforce all quality gates.
 - **Choice**: **Option 2**.
 - **Why**: Eliminates cognitive overload, respects learner focus, guarantees 100% offline self-containment, establishes truth-in-claims, and makes dimension generalisation immediately visible on the companion character. All 22 Vitest unit tests and all 19 Playwright E2E specs pass with 0 axe-core accessibility violations.
+
+---
+
+## DEC-009: Member 1's Exercises and Tracker Inside the Task Runner (`features/assessment/`)
+- **Date**: 2026-10-30
+- **Status**: **Proposed** by Member 1. The UI owner accepts or amends it (DEC-001: the UI team owns `frontend/**`).
+- **Context**: `/task/:dimId` showed a scripted mock, and the UI's `telemetryQueue.ts` would have sent an event shape that `POST /v1/telemetry/event` rejects with 422 (it had no callers) (against DEC-002). Member 1's real exercises lived in a separate app, `assessment_engine/client/`. Spec: `.scratch/member1-ui-integration/spec.md`.
+- **Choice** (decided with the user, 2026-10-30):
+  - **D1. No voice in the UI.** The voice toggle and probe are not ported. `voice_opt_in` is always `false`, so the "microphone permanently blocked" copy (DEC-008) stays true. Voice opt-in remains only in the frozen `assessment_engine/client/`.
+  - **D2. The code moves to `frontend/src/features/assessment/`.** Member 1 owns that folder inside the UI app. `assessment_engine/client/` becomes a frozen reference whose README points here. `assessment_engine/api/` stays where it is.
+  - **D3. Member 1's `Tracker` is the single telemetry sink.** It gained the old queue's extras: `localStorage` persistence (`synapsetwin_telemetry_queue_v2`), `subscribe`/`getStatus` for the offline banner's real pending count, and `clear()` for the Privacy purge. `services/telemetry/telemetryQueue.ts` is deleted (DEC-008's queue bullet is superseded). Failed sends retry with the exponential backoff DEC-008 promised: 2 s, doubling to a 60 s cap, each delay shortened by up to 20% jitter, reset on success and when the browser goes back online.
+  - **R3. Pause unmounts.** Any pause (Escape, the pause button, a real or simulated tab blur) unmounts the exercise. Resume starts a fresh task with a new `task_id`. Events already sent stay valid, the interrupted trial is never sent, and `item_id`s never repeat.
+- **Changes outside `features/assessment/`**: `TaskRunnerPage` (mounts `ExerciseHost`; `?schema=` and one "Exercise: …" evaluator button per schema type; real tracker status replaces the hard-coded "202 Accepted" claim), `AppShell` (offline banner reads the Tracker), `PrivacyPage` (purge calls `tracker.clear()` and shows the real count), and the deleted `telemetryQueue.ts`. All DEC-007 selectors are kept.
+- **Why**: Every trial now reaches the server in the contract's shape (end-to-end smoke: all 8 schema types, 0 × 422). One sink means one offline count and one purge path. `qa:checks` and the Playwright task-runner spec (axe, light and dark; no overflow at 375/768 px) stay green.
+- **Open items for the UI owner** (found during the integration; not changed, because they are outside Member 1's folder or locked by DEC-007):
+  1. The DEC-007-locked heading "✓ … confidence interval narrowed!" is shown on every completed screen, even with 0 answers. Nothing backs it, which conflicts with DEC-008 truth-in-claims. Suggestion: render it only when answers were recorded, and relax the DEC-007 selector.
+  2. The Privacy purge certificate lists server artifacts (`data/raw/telemetry/*.jsonl`, snapshots, logs, caches) as `CONFIRMED_PERMANENT`, but the purge only clears the events still pending on this device. Server deletion is Member 4's `DELETE /v1/user/telemetry`.
+  3. The baseline completed screen always says "Your Initial Brain Twin Is Calibrated!", whatever was recorded.
+  4. The task runner's `briefing` stage is unreachable (the page starts in `running`), and its "Keys: shown on each button" line is untrue for Tower, which uses a number field and peg buttons.
+  5. AppShell's absolute "Progress: Pending" team-status badge also shows on the running task screen (the runner adds `pt-8` to keep the pause control clear of it).
+  6. Matrix glyph colours red and green are hard to tell apart with colour-vision deficiency (dark theme ΔE ≈ 9.2). A distractor that differs only by colour needs a second cue (shape or pattern).
+  7. `services/api/apiClient.ts` still has `postTelemetryEvent` and `getNextTask`. Nothing calls them; the Tracker and `features/assessment/tasks/taskSource.ts` replace them. They can be deleted.
+  8. `playwright.config.ts` uses `channel: 'chrome'` outside CI, so `npm run qa:e2e` needs Google Chrome installed. Ticket 08 ran the spec with installed Edge via a scratch config that only changed the channel.
+  9. The task runner's `loading` and `extreme-text` stages are unreachable too (nothing sets them) and make claims nothing backs: "60/120 Hz Sync", "Trial #9,999 · … Posterior Confidence: 99.8%". Suggestion: delete both stages with `briefing` (item 4).
+  10. `docs/ui/QA-log.md` (DEC-008 entry, "Truth-in-Claims Verified") still credits the deleted `telemetryQueue.ts` with idempotency IDs and exponential backoff. The Tracker has the backoff (D3 above) but no idempotency IDs (the contract has no event id field).

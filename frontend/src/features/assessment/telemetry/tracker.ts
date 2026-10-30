@@ -1,5 +1,5 @@
 import { hesitationJitter, nextErrorBurst } from './metrics'
-import { isTelemetryEvent, type Dimension, type TelemetryEvent, type TrialMeta } from './types'
+import { eventProblem, type Dimension, type TelemetryEvent, type TrialMeta } from './types'
 
 type TrialCtx = {
   user_id: string
@@ -10,6 +10,8 @@ type TrialCtx = {
 }
 
 const MAX_RT_MS = 600_000 // server response_time_ms upper bound
+// Into the server's [0, 600000]; NaN or ±Infinity (a broken clock or window) becomes 0.
+const clampRt = (ms: number) => (Number.isFinite(ms) ? Math.min(MAX_RT_MS, Math.max(0, ms)) : 0)
 
 type TrialResult = {
   correct: boolean
@@ -59,7 +61,7 @@ export class TrialRecorder {
       dimension: this.ctx.dimension,
       // Clamped to the server's bounds so one out-of-range value cannot get a whole batch rejected.
       score_norm: Math.min(1, Math.max(0, r.score ?? (r.correct ? 1 : 0))),
-      response_time_ms: Math.min(MAX_RT_MS, r.windowMs ?? this.now() - t.start),
+      response_time_ms: clampRt(r.windowMs ?? this.now() - t.start),
       error_flag: !r.correct,
       error_burst: this.burst,
       hesitation_jitter: hesitationJitter(t.inputs),
@@ -81,7 +83,8 @@ type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
 type TrackerOpts = {
   endpoint?: string
-  flushMs?: number
+  flushMs?: number // base flush period, and the first retry delay before doubling
+  maxBackoffMs?: number
   batchSize?: number
   maxBuffer?: number
   fetchFn?: (url: string, init?: RequestInit) => Promise<Response>
@@ -105,6 +108,18 @@ const OLD_STORAGE_KEY = 'synapsetwin_telemetry_queue'
 function defaultStorage(): StorageLike | null {
   try {
     return typeof localStorage === 'undefined' ? null : localStorage
+  } catch {
+    return null
+  }
+}
+
+// The server answers {"accepted": n}; anything else (HTML, empty, malformed) is no acknowledgement.
+async function acceptedCount(res: Response): Promise<number | null> {
+  try {
+    const body: unknown = await res.json()
+    return typeof body === 'object' && body !== null && 'accepted' in body && typeof body.accepted === 'number'
+      ? body.accepted
+      : null
   } catch {
     return null
   }
@@ -136,7 +151,11 @@ export class Tracker {
   private status: TrackerStatus | null = null
   private listeners = new Set<() => void>()
   private eventListeners = new Set<(e: TelemetryEvent) => void>()
-  private timer: ReturnType<typeof setInterval>
+  private flushMs: number
+  private maxBackoffMs: number
+  private failures = 0 // consecutive failed flushes; drives the retry backoff
+  private timer: ReturnType<typeof setTimeout> | undefined
+  private destroyed = false
   private onPageHide = () => this.flushBeacon()
   // Mobile browsers often discard a backgrounded tab without firing pagehide; hidden is the last reliable signal.
   private onVisibility = () => {
@@ -144,6 +163,7 @@ export class Tracker {
   }
   private onOnline = () => {
     this.isOnline = true
+    this.failures = 0
     this.notify()
     void this.flush()
   }
@@ -163,9 +183,11 @@ export class Tracker {
         ? navigator.sendBeacon.bind(navigator)
         : undefined)
     this.storage = opts.storage === undefined ? defaultStorage() : opts.storage
+    this.flushMs = opts.flushMs ?? 2000
+    this.maxBackoffMs = opts.maxBackoffMs ?? 60_000
     this.store((s) => s.removeItem(OLD_STORAGE_KEY))
     this.add(this.restore())
-    this.timer = setInterval(() => void this.flush(), opts.flushMs ?? 2000)
+    this.schedule()
     if (typeof window !== 'undefined') {
       window.addEventListener('pagehide', this.onPageHide)
       window.addEventListener('online', this.onOnline)
@@ -175,8 +197,22 @@ export class Tracker {
   }
 
   push(e: TelemetryEvent): void {
-    this.add([e])
-    for (const l of this.eventListeners) safely(() => l(e))
+    const [valid] = this.validOnly([e])
+    if (!valid) return this.notify() // dropped and counted; it was never recorded
+    this.add([valid])
+    for (const l of this.eventListeners) safely(() => l(valid))
+  }
+
+  // The server rejects a whole batch over one bad event, so each bad one is dropped alone, logged
+  // and counted, before it can take up to 99 good ones down with it.
+  private validOnly(events: unknown[]): TelemetryEvent[] {
+    return events.filter((e): e is TelemetryEvent => {
+      const problem = eventProblem(e)
+      if (problem === null) return true
+      console.error(`telemetry: dropped an invalid event (${problem})`, e)
+      this.droppedCount++
+      return false
+    })
   }
 
   // Every event, new or restored, enters here: cap, persist, notify, flush at batchSize.
@@ -189,15 +225,18 @@ export class Tracker {
       this.droppedCount += over
     }
     this.changed()
-    if (this.buffer.length >= this.batchSize) void this.flush()
+    // While backing off, the retry timer alone decides when to try again.
+    if (this.buffer.length >= this.batchSize && this.failures === 0) void this.flush()
   }
 
   async flush(): Promise<void> {
-    if (this.inFlight || !this.buffer.length) return
+    if (this.inFlight) return // the running flush reschedules when it settles
+    if (!this.buffer.length) return this.schedule()
     this.inFlight = true
     // Events stay in the buffer until acknowledged, so failures retry and overflow still drops the oldest.
     const batch = this.buffer.slice(0, MAX_PER_REQUEST)
     const clears = this.clears
+    let settled = false // acknowledged or rejected for good: either way, no retry of this batch
     try {
       const res = await this.fetchFn(this.endpoint, {
         method: 'POST',
@@ -208,13 +247,16 @@ export class Tracker {
       // rather than block the queue head. 5xx, 408, 429 and network errors retry.
       const rejected =
         res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429
+      // A 2xx counts only when the body confirms every event: a static host or SPA fallback that
+      // answers 200 with index.html must not make the tracker drop the batch.
+      settled = rejected || (res.ok && (await acceptedCount(res)) === batch.length)
       // clear() ran meanwhile: the batch is already gone and must not count as dropped.
       if (clears !== this.clears) return
       if (rejected) {
         console.error(`telemetry: dropped ${batch.length} events (HTTP ${res.status})`)
         this.droppedCount += batch.length
       }
-      if (res.ok || rejected) {
+      if (settled) {
         const done = new Set(batch)
         this.buffer = this.buffer.filter((e) => !done.has(e))
         this.changed()
@@ -223,10 +265,27 @@ export class Tracker {
       // offline: keep events for the next flush
     } finally {
       this.inFlight = false
+      this.failures = settled ? 0 : this.failures + 1
+      this.schedule()
     }
   }
 
+  // One timer: the base period while healthy; after failures, exponential backoff with jitter
+  // (2 s, 4 s, 8 s … capped at 60 s, each shortened by up to 20%) so a down API is not hammered.
+  private schedule(): void {
+    clearTimeout(this.timer)
+    if (this.destroyed) return
+    const delay =
+      this.failures === 0
+        ? this.flushMs
+        : Math.min(this.maxBackoffMs, this.flushMs * 2 ** this.failures) * (1 - 0.2 * Math.random())
+    this.timer = setTimeout(() => void this.flush(), delay)
+  }
+
   flushBeacon(): void {
+    // sendBeacon returns true once queued, not delivered, and browsers do not check connectivity:
+    // offline it would drop the buffer and its storage copy. Keep them for the next online flush.
+    if (!this.isOnline) return
     // ponytail: without sendBeacon we fall back to a normal flush, which may not survive page unload.
     if (!this.beacon) return void this.flush()
     const kept: TelemetryEvent[] = []
@@ -272,7 +331,8 @@ export class Tracker {
   }
 
   destroy(): void {
-    clearInterval(this.timer)
+    this.destroyed = true
+    clearTimeout(this.timer)
     if (typeof window !== 'undefined') {
       window.removeEventListener('pagehide', this.onPageHide)
       window.removeEventListener('online', this.onOnline)
@@ -305,8 +365,7 @@ export class Tracker {
     if (!raw) return []
     try {
       const parsed: unknown = JSON.parse(raw)
-      // The server rejects a whole batch over one bad event, so anything malformed stays behind.
-      return Array.isArray(parsed) ? parsed.filter(isTelemetryEvent) : []
+      return Array.isArray(parsed) ? this.validOnly(parsed) : []
     } catch {
       return []
     }

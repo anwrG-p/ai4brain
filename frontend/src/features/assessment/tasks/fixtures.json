@@ -1,0 +1,160 @@
+[
+  {
+    "task_id": "mock-nback-1",
+    "dimension": "working_memory",
+    "schema_type": "n_back",
+    "surface_seed": 101,
+    "params": {
+      "n": 2,
+      "stimulus_ms": 500,
+      "interval_ms": 2000,
+      "streams": ["position", "symbol"],
+      "trials": [
+        { "pos": [0, 0], "symbol": "A", "rule": "position", "trial_type": "standard", "answer": { "position": false, "symbol": false } },
+        { "pos": [1, 2], "symbol": "B", "rule": "position", "trial_type": "standard", "answer": { "position": false, "symbol": false } },
+        { "pos": [0, 0], "symbol": "C", "rule": "position", "trial_type": "target", "answer": { "position": true, "symbol": false } },
+        { "pos": [0, 0], "symbol": "C", "rule": "position", "trial_type": "lure_minus", "answer": { "position": false, "symbol": false } },
+        { "pos": [0, 0], "symbol": "C", "rule": "position", "trial_type": "target", "answer": { "position": true, "symbol": true } },
+        { "pos": [1, 1], "symbol": "D", "rule": "symbol", "trial_type": "switch", "answer": { "position": false, "symbol": false } },
+        { "pos": [2, 2], "symbol": "C", "rule": "symbol", "trial_type": "target", "answer": { "position": false, "symbol": true } },
+        { "pos": [1, 1], "symbol": "A", "rule": "symbol", "trial_type": "standard", "answer": { "position": true, "symbol": false } },
+        { "pos": [0, 2], "symbol": "A", "rule": "symbol", "trial_type": "lure_minus", "answer": { "position": false, "symbol": false } },
+        { "pos": [2, 0], "symbol": "C", "rule": "symbol", "trial_type": "lure_plus", "answer": { "position": false, "symbol": false } }
+      ]
+    }
+  },
+  {
+    "task_id": "mock-stroop-1",
+    "dimension": "executive_function",
+    "schema_type": "stroop",
+    "surface_seed": 102,
+    "params": {
+      "colors": ["red", "green", "blue", "yellow"],
+      "time_limit_ms": 3000,
+      "trials": [
+        { "word": "RED", "ink": "blue", "answer": "blue" },
+        { "word": "GREEN", "ink": "green", "answer": "green" },
+        { "word": "YELLOW", "ink": "red", "answer": "red" },
+        { "word": "BLUE", "ink": "yellow", "answer": "yellow" }
+      ]
+    }
+  },
+  {
+    "task_id": "mock-matrix-1",
+    "dimension": "pattern_induction",
+    "schema_type": "matrix",
+    "surface_seed": 103,
+    "params": {
+      "time_limit_ms": 30000,
+      "cells": [
+        { "shape": "circle", "count": 1, "color": "blue", "rotation_deg": 0 },
+        { "shape": "circle", "count": 2, "color": "blue", "rotation_deg": 0 },
+        { "shape": "circle", "count": 3, "color": "blue", "rotation_deg": 0 },
+        { "shape": "square", "count": 1, "color": "green", "rotation_deg": 0 },
+        { "shape": "square", "count": 2, "color": "green", "rotation_deg": 0 },
+        { "shape": "square", "count": 3, "color": "green", "rotation_deg": 0 },
+        { "shape": "triangle", "count": 1, "color": "red", "rotation_deg": 0 },
+        { "shape": "triangle", "count": 2, "color": "red", "rotation_deg": 0 },
+        null
+      ],
+      "options": [
+        { "shape": "triangle", "count": 2, "color": "red", "rotation_deg": 0 },
+        { "shape": "square", "count": 3, "color": "red", "rotation_deg": 0 },
+        { "shape": "triangle", "count": 3, "color": "red", "rotation_deg": 0 },
+        { "shape": "triangle", "count": 3, "color": "green", "rotation_deg": 0 }
+      ],
+      "answer": 2
+    }
+  },
+  {
+    "task_id": "mock-rotation-1",
+    "dimension": "spatial_orientation",
+    "schema_type": "mental_rotation",
+    "surface_seed": 104,
+    "params": {
+      "time_limit_ms": 7000,
+      "trials": [
+        { "cells": [[0, 0], [1, 0], [2, 0], [2, 1]], "angle_deg": 90, "mirrored": false, "answer": "same" },
+        { "cells": [[0, 0], [1, 0], [2, 0], [2, 1]], "angle_deg": 180, "mirrored": true, "answer": "different" },
+        { "cells": [[0, 0], [0, 1], [1, 1], [1, 2], [2, 2]], "angle_deg": 270, "mirrored": false, "answer": "same" }
+      ]
+    }
+  },
+  {
+    "task_id": "mock-relational-1",
+    "dimension": "pattern_induction",
+    "schema_type": "relational",
+    "surface_seed": 105,
+    "params": {
+      "n_trials": 6,
+      "time_limit_ms": 15000,
+      "levels": [
+        [
+          { "premises": [{ "a": "zib", "rel": "same", "b": "vop" }], "question": { "a": "vop", "rel": "same", "b": "zib" }, "inverted": false, "hops": 1, "answer": true },
+          { "premises": [{ "a": "kel", "rel": "more", "b": "dax" }], "question": { "a": "kel", "rel": "less", "b": "dax" }, "inverted": false, "hops": 1, "answer": false }
+        ],
+        [
+          { "premises": [{ "a": "mup", "rel": "before", "b": "fen" }, { "a": "fen", "rel": "before", "b": "tor" }], "question": { "a": "mup", "rel": "before", "b": "tor" }, "inverted": false, "hops": 2, "answer": true },
+          { "premises": [{ "a": "gax", "rel": "opposite", "b": "lin" }, { "a": "lin", "rel": "opposite", "b": "wep" }], "question": { "a": "gax", "rel": "same", "b": "wep" }, "inverted": true, "hops": 2, "answer": false }
+        ],
+        [
+          { "premises": [{ "a": "bor", "rel": "contains", "b": "sil" }, { "a": "sil", "rel": "contains", "b": "nuk" }, { "a": "nuk", "rel": "contains", "b": "pev" }], "question": { "a": "bor", "rel": "contains", "b": "pev" }, "inverted": false, "hops": 3, "answer": true },
+          { "premises": [{ "a": "hiv", "rel": "less", "b": "jom" }, { "a": "jom", "rel": "less", "b": "qat" }, { "a": "qat", "rel": "less", "b": "yor" }], "question": { "a": "yor", "rel": "more", "b": "hiv" }, "inverted": true, "hops": 3, "answer": false }
+        ]
+      ]
+    }
+  },
+  {
+    "task_id": "mock-tower-1",
+    "dimension": "executive_function",
+    "schema_type": "tower",
+    "surface_seed": 106,
+    "params": {
+      "capacities": [3, 2, 1],
+      "start": [["R", "G"], ["B"], []],
+      "goal": [["B"], ["G"], ["R"]],
+      "l_min": 5,
+      "optimal_moves": [[1, 2], [0, 1], [2, 1], [0, 2], [1, 0]],
+      "counter_intuitive": [2],
+      "time_limit_ms": 60000
+    }
+  },
+  {
+    "task_id": "mock-ufov-1",
+    "dimension": "processing_speed",
+    "schema_type": "ufov",
+    "surface_seed": 107,
+    "params": {
+      "duration_grid_ms": [17, 25, 36, 52, 76, 111, 162, 236, 343, 500],
+      "similarity": 0.5,
+      "mask_noise": 0.5,
+      "trials": [
+        { "central": "A", "peripheral_dir": 0, "distractors": [{ "dir": 2, "ring": 1 }, { "dir": 5, "ring": 2 }] },
+        { "central": "B", "peripheral_dir": 3, "distractors": [{ "dir": 1, "ring": 2 }, { "dir": 6, "ring": 1 }] },
+        { "central": "A", "peripheral_dir": 5, "distractors": [{ "dir": 0, "ring": 1 }, { "dir": 3, "ring": 2 }] },
+        { "central": "B", "peripheral_dir": 7, "distractors": [{ "dir": 4, "ring": 1 }, { "dir": 2, "ring": 2 }] }
+      ]
+    }
+  },
+  {
+    "task_id": "mock-mst-1",
+    "dimension": "episodic_memory",
+    "schema_type": "mst",
+    "surface_seed": 108,
+    "params": {
+      "encode_ms": 2000,
+      "encode": [
+        { "points": [[0.1, 0.1], [0.9, 0.2], [0.5, 0.9]], "edges": [[0, 1], [1, 2], [2, 0]] },
+        { "points": [[0.2, 0.2], [0.8, 0.2], [0.8, 0.8], [0.2, 0.8]], "edges": [[0, 1], [1, 2], [2, 3], [3, 0], [0, 2]] },
+        { "points": [[0.5, 0.1], [0.9, 0.5], [0.5, 0.9], [0.1, 0.5], [0.5, 0.5]], "edges": [[0, 4], [1, 4], [2, 4], [3, 4]] }
+      ],
+      "test": [
+        { "item": { "points": [[0.2, 0.2], [0.8, 0.2], [0.8, 0.8], [0.2, 0.8]], "edges": [[0, 1], [1, 2], [2, 3], [3, 0], [0, 2]] }, "kind": "old", "delta": 0 },
+        { "item": { "points": [[0.1, 0.1], [0.9, 0.2], [0.6, 0.75]], "edges": [[0, 1], [1, 2], [2, 0]] }, "kind": "lure", "delta": 0.15 },
+        { "item": { "points": [[0.3, 0.1], [0.7, 0.3], [0.9, 0.9], [0.1, 0.7]], "edges": [[0, 1], [1, 2], [2, 3]] }, "kind": "new", "delta": 0 },
+        { "item": { "points": [[0.5, 0.1], [0.9, 0.5], [0.5, 0.9], [0.1, 0.5], [0.5, 0.5]], "edges": [[0, 4], [1, 4], [2, 4], [3, 4]] }, "kind": "old", "delta": 0 },
+        { "item": { "points": [[0.5, 0.1], [0.9, 0.5], [0.5, 0.9], [0.1, 0.5], [0.3, 0.3]], "edges": [[0, 4], [1, 4], [2, 4], [3, 4]] }, "kind": "lure", "delta": 0.3 }
+      ]
+    }
+  }
+]

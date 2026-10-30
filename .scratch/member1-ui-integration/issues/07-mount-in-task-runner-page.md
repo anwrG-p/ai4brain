@@ -63,6 +63,44 @@ What it does:
 - Leave the static demo stages (`loading`, `error`, `extreme-text`) untouched.
 - Wire `onError` to the real `error` stage with the real message and a retry that bumps `attempt`.
 
+## Declutter (from `docs/research/2026-10-30-ui-simplification-review.md`)
+
+The user asked for a less bulky design. Within this page, apply the following; each rule cites its evidence section.
+
+**Running stage: only what the trial needs (§1.1, §1.2; a validity judgement too).** Visible:
+- the `h1`
+- one progress indicator
+- the pause control
+- the exit link
+- the exercise itself
+- the existing sr-only mascot-lock text
+
+Not visible while a trial runs:
+- EMILY mood banners
+- extra cards around the stimulus
+- decorative doodles
+- explanatory paragraphs
+
+The instruction is the exercise's own single line.
+
+**Briefing: no tutorial deck (§1.5).** At most one short screen: one line saying what to do, the key hints, and Start. No multi-tile explanation.
+
+**Completed screen: lead with the result (§1.3).**
+- One headline line, e.g. "Accuracy 85% · 642 ms", front-loaded.
+- Metrics, the telemetry table and technical cards (QUEST+, confidence detail) go inside one collapsed `<details>` ("Show details"), in line with ADR 0001.
+- Mascot celebrate stays, because it carries state (§1.4).
+- Nothing on this screen is a card inside a card.
+
+**Evaluator / judge controls.** They must not add weight for real users.
+- If a judge-mode toggle already exists (`e2e/testUtils.openJudgeMode`), keep the panel behind it.
+- Otherwise collapse it into a `<details>`.
+- All DEC-007 buttons must stay reachable by the existing tests. Check how `designSystem.test.tsx` reaches them before changing visibility.
+
+**Copy (§1.3):**
+- Cut page copy you touch by about half.
+- Start every line with the information-carrying word.
+- Use an objective tone.
+
 ## Tests
 
 - **`src/tests/designSystem.test.tsx`:** the Page 04 test must pass unchanged. If a mock-specific assertion breaks, update only that assertion, and note it in Comments with the DEC-007 rationale.
