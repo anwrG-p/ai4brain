@@ -71,16 +71,30 @@ export function newId(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-// Anonymous per-browser id. A fresh one per call if storage is unavailable.
+const UID_KEY = 'aura_uid'
+// Used only when storage is unavailable, so the id is still stable for the page load.
+let memoryUserId: string | null = null
+
+// Anonymous per-browser id.
 export function getUserId(): string {
   try {
-    const existing = localStorage.getItem('aura_uid')
+    const existing = localStorage.getItem(UID_KEY)
     // A tampered or legacy value would get every telemetry event rejected, so replace it.
     if (existing && UID.test(existing)) return existing
     const id = newId()
-    localStorage.setItem('aura_uid', id)
+    localStorage.setItem(UID_KEY, id)
     return id
   } catch {
-    return newId()
+    return (memoryUserId ??= newId())
+  }
+}
+
+// Privacy purge: later telemetry gets a new anonymous id, unlinked from the purged one.
+export function forgetUserId(): void {
+  memoryUserId = null
+  try {
+    localStorage.removeItem(UID_KEY)
+  } catch {
+    // storage blocked: nothing was stored
   }
 }

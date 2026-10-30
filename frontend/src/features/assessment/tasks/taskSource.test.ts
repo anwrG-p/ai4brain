@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import fixtures from './fixtures.json'
-import { fetchNextTask, getUserId, newId } from './taskSource'
+import { fetchNextTask, forgetUserId, getUserId, newId } from './taskSource'
 import type {
   MatrixParams,
   MstParams,
@@ -144,8 +144,14 @@ describe('newId', () => {
 describe('getUserId', () => {
   afterEach(() => {
     vi.restoreAllMocks()
+    forgetUserId() // also drops the in-memory fallback id
     localStorage.clear()
   })
+
+  const blockStorage = () =>
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('denied')
+    })
 
   test('is stable across calls via localStorage', () => {
     const id = getUserId()
@@ -178,6 +184,26 @@ describe('getUserId', () => {
       throw new Error('denied')
     })
     expect(getUserId()).toMatch(/^[0-9a-f-]{36}$/)
+  })
+
+  test('without storage, the id stays the same for the page load', () => {
+    blockStorage()
+    const id = getUserId()
+    expect(getUserId()).toBe(id)
+  })
+
+  test('forgetUserId removes the stored id, so the next one is new', () => {
+    const id = getUserId()
+    forgetUserId()
+    expect(localStorage.getItem('aura_uid')).toBeNull()
+    expect(getUserId()).not.toBe(id)
+  })
+
+  test('forgetUserId also drops the in-memory id used without storage', () => {
+    blockStorage()
+    const id = getUserId()
+    forgetUserId()
+    expect(getUserId()).not.toBe(id)
   })
 })
 

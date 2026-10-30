@@ -9,6 +9,7 @@ import { Card } from '../components/ui/Card'
 import { DoodleSquiggle } from '../components/ui/DoodleDecorations'
 import { useAppStore } from '../state/useAppStore'
 import { tracker } from '../features/assessment/telemetry/tracker'
+import { forgetUserId } from '../features/assessment/tasks/taskSource'
 import { MOCK_PRIVACY_AUDIT_LOG } from '../services/mocks/fixtures'
 import type { PrivacyAuditEvent, PurgeCertificate, WhyThisTrail } from '../types'
 
@@ -164,6 +165,7 @@ export default function PrivacyPage() {
     resetDemoState()
     // Drops pending events on this device; server-side deletion is Member 4's route.
     const recordsPurged = tracker.clear()
+    forgetUserId()
 
     const cert: PurgeCertificate = {
       certificateId: `CERT-PURGE-2026-${Math.random()
