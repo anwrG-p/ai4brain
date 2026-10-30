@@ -37,7 +37,7 @@ My job has two halves:
 1. **Execution:** render each exercise Member 5 sends, take the user's answers, and know whether each answer was right.
 2. **Telemetry:** turn every trial into one small, clean, **non-biometric** event and get it to the server reliably, without ever making the UI lag.
 
-Everything I built is in `assessment_engine/`:
+Everything I built is in `assessment_engine/`, except the maintained client, which lives in the UI app:
 
 | Folder | Role |
 |---|---|
@@ -204,7 +204,7 @@ These are listed in full in `README.md` → "Open questions":
 1. **Field names**: the root README spells the event two ways; I used `score_norm / response_time_ms / error_flag / hesitation_jitter`. Member 3 must agree.
 2. **6 dimensions, not 4**: I added `processing_speed` (UFOV) and `episodic_memory` (MST).
 3. **Task JSON format**: Member 5 must produce exactly the `params` shapes in `types.ts`, including the answers.
-4. **Integration with the new UI** (`frontend/`): done. The exercises run at `/task/:dimId`, my Tracker replaced the UI's own telemetry queue, and every trial is accepted by the server (0 × 422 in the end-to-end smoke). Still open: the UI owner has to accept the proposed DEC entry in `docs/ui/DECISIONS.md`, and Member 5 should say whether `GET /v1/tasks/next` takes a `schema_type` filter.
+4. **Integration with the new UI** (`frontend/`): done. The exercises run at `/task/:dimId`, my Tracker replaced the UI's own telemetry queue, and every trial is accepted by the server (0 × 422 in the end-to-end smoke). That smoke used the mock task fixtures only: `GET /v1/tasks/next` does not exist yet, so real generated tasks are untested. Still open: the UI owner has to accept the proposed DEC entry in `docs/ui/DECISIONS.md`, and Member 5 should say whether `GET /v1/tasks/next` takes a `schema_type` filter.
 
 ---
 

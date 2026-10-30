@@ -2,7 +2,8 @@
 
 Browser exercises that produce per-trial telemetry for the brain twin. Eight exercise screens across
 six cognitive dimensions send one event per trial to a small FastAPI endpoint, which appends them to
-`{TELEMETRY_DIR}/{user_id}.jsonl`. Nothing biometric is collected.
+`{TELEMETRY_DIR}/{user_id}.jsonl`. Nothing biometric is collected by the UI (the frozen `client/`
+has an opt-in voice probe; see Privacy below).
 
 The exercises run inside the team UI (`frontend/`, SynapseTwin) at `/task/:dimId`. Their maintained
 code lives in **`frontend/src/features/assessment/`**, a folder Member 1 owns inside the UI app.

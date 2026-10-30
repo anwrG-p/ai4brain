@@ -57,7 +57,7 @@ Find your section and skip the rest.
 **Gotchas:**
 - In React dev mode (StrictMode) the UI sends two `GET /v1/tasks/next` each time an exercise mounts, and keeps only the second reply. If your endpoint has side effects, such as advancing a schedule or marking a variant as seen in the Bloom filter, make it idempotent per `(user_id, session)`, or dev sessions will skip tasks. Production builds send one.
 - **Open question (R2):** the UI page is per dimension (`/task/:dimId`), but real mode ignores the dimension because your generator decides. Should `GET /v1/tasks/next` accept a `schema_type` filter?
-- **Known open issue:** if `params` is malformed in a way that crashes a screen, the client skips to the next task immediately, with no delay. If every task you serve is broken, each open client will poll your endpoint in a tight loop. Validate `params` against `types.ts` before serving.
+- **Known open issue (frozen `client/` only):** if `params` is malformed in a way that crashes a screen, the frozen client skips to the next task immediately, with no delay; if every task you serve is broken, each open frozen client polls your endpoint in a tight loop. The UI does not loop: `SkipOnError` shows an error card, and only the user's Retry fetches again. Either way, validate `params` against `types.ts` before serving.
 - MST has no `time_limit_ms`. The client uses 5000 ms. Add the field to the contract if you want control over it.
 - Tower takes an optional `time_limit_ms` per problem (client default 60000, the TOL-F limit). Send it if you want a different limit.
 

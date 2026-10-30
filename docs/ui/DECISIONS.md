@@ -103,7 +103,7 @@ Every non-trivial frontend, UX, design-system, and contract decision is recorded
 ## DEC-009: Member 1's Exercises and Tracker Inside the Task Runner (`features/assessment/`)
 - **Date**: 2026-10-30
 - **Status**: **Proposed** by Member 1. The UI owner accepts or amends it (DEC-001: the UI team owns `frontend/**`).
-- **Context**: `/task/:dimId` showed a scripted mock, and the UI's `telemetryQueue.ts` sent an event shape that `POST /v1/telemetry/event` rejects with 422 (against DEC-002). Member 1's real exercises lived in a separate app, `assessment_engine/client/`. Spec: `.scratch/member1-ui-integration/spec.md`.
+- **Context**: `/task/:dimId` showed a scripted mock, and the UI's `telemetryQueue.ts` would have sent an event shape that `POST /v1/telemetry/event` rejects with 422 (it had no callers) (against DEC-002). Member 1's real exercises lived in a separate app, `assessment_engine/client/`. Spec: `.scratch/member1-ui-integration/spec.md`.
 - **Choice** (decided with the user, 2026-10-30):
   - **D1. No voice in the UI.** The voice toggle and probe are not ported. `voice_opt_in` is always `false`, so the "microphone permanently blocked" copy (DEC-008) stays true. Voice opt-in remains only in the frozen `assessment_engine/client/`.
   - **D2. The code moves to `frontend/src/features/assessment/`.** Member 1 owns that folder inside the UI app. `assessment_engine/client/` becomes a frozen reference whose README points here. `assessment_engine/api/` stays where it is.
@@ -120,3 +120,5 @@ Every non-trivial frontend, UX, design-system, and contract decision is recorded
   6. Matrix glyph colours red and green are hard to tell apart with colour-vision deficiency (dark theme ΔE ≈ 9.2). A distractor that differs only by colour needs a second cue (shape or pattern).
   7. `services/api/apiClient.ts` still has `postTelemetryEvent` and `getNextTask`. Nothing calls them; the Tracker and `features/assessment/tasks/taskSource.ts` replace them. They can be deleted.
   8. `playwright.config.ts` uses `channel: 'chrome'` outside CI, so `npm run qa:e2e` needs Google Chrome installed. Ticket 08 ran the spec with installed Edge via a scratch config that only changed the channel.
+  9. The task runner's `loading` and `extreme-text` stages are unreachable too (nothing sets them) and make claims nothing backs: "60/120 Hz Sync", "Trial #9,999 · … Posterior Confidence: 99.8%". Suggestion: delete both stages with `briefing` (item 4).
+  10. `docs/ui/QA-log.md` (DEC-008 entry, "Truth-in-Claims Verified") still credits the deleted `telemetryQueue.ts` with idempotency IDs and exponential backoff. The Tracker has the backoff (D3 above) but no idempotency IDs (the contract has no event id field).
