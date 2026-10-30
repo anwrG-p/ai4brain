@@ -15,6 +15,9 @@ type ExerciseHostProps = {
 // One session per page load: every task played until a reload shares it.
 let sessionId: string | null = null
 const getSessionId = () => (sessionId ??= newId())
+// Counts fetches for the whole page load. The page's `attempt` restarts at 0 whenever the page
+// remounts (exit and come back, Back/Forward), so it cannot make mock task ids unique.
+let fetchCount = 0
 
 // Fetches one task, records it with its own TrialRecorder and renders the matching exercise.
 export function ExerciseHost({ schemaType, attempt, onDone, onError }: ExerciseHostProps) {
@@ -30,13 +33,15 @@ export function ExerciseHost({ schemaType, attempt, onDone, onError }: ExerciseH
     let live = true
     setRun(null)
     const userId = getUserId()
+    const run = ++fetchCount
     fetchNextTask(userId, attempt, { schemaType }).then(
       (fetched) => {
         if (!live) return
-        // Mock fixtures reuse one task_id per schema; a session token plus the attempt keeps
-        // task_id and item_id unique per run, across reloads too (R3). Fits the 48-char limit.
+        // Mock fixtures reuse one task_id per schema; a session token plus the page-load fetch
+        // counter keeps task_id and item_id unique per run, across remounts and reloads (R3).
+        // Fits the 48-char limit.
         const task = usingMocks()
-          ? { ...fetched, task_id: `${fetched.task_id}.${getSessionId().slice(0, 8)}.${attempt}` }
+          ? { ...fetched, task_id: `${fetched.task_id}.${getSessionId().slice(0, 8)}.${run}` }
           : fetched
         const recorder = new TrialRecorder({
           user_id: userId,

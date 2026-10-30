@@ -3,10 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { X, Pause } from 'lucide-react'
 import { getDimensionsByPreset, DIMENSION_PRESETS } from '../config/dimensions'
 import type { DimensionConfig, TaskSchemaType } from '../types'
-import {
-  buildEstimatesForDimensions,
-  SAMPLE_WHY_THIS_TRAIL,
-} from '../services/mocks/fixtures'
+import { SAMPLE_WHY_THIS_TRAIL } from '../services/mocks/fixtures'
 import { useAppStore } from '../state/useAppStore'
 import { ExerciseHost } from '../features/assessment/ExerciseHost'
 import { tracker } from '../features/assessment/telemetry/tracker'
@@ -27,7 +24,17 @@ export type RunnerStage =
   | 'error'
   | 'extreme-text'
 
-const MAX_EVENTS = 50
+const MAX_EVENTS = 50 // table rows kept; counts and metrics cover the whole block
+
+// Running sums over every event of the block, so nothing silently caps at MAX_EVENTS.
+type Totals = { n: number; rtSum: number; jitterSum: number; errors: number }
+const NO_TOTALS: Totals = { n: 0, rtSum: 0, jitterSum: 0, errors: 0 }
+const addEvent = (t: Totals, e: TelemetryEvent): Totals => ({
+  n: t.n + 1,
+  rtSum: t.rtSum + e.response_time_ms,
+  jitterSum: t.jitterSum + e.hesitation_jitter,
+  errors: t.errors + (e.error_flag ? 1 : 0),
+})
 
 // Module-level so useSyncExternalStore does not resubscribe on every render.
 const subscribeTracker = (onChange: () => void) => tracker.subscribe(onChange)
@@ -86,7 +93,6 @@ export default function TaskRunnerPage() {
     toggleTheme,
     dimensionPreset,
     setDimensionPreset,
-    activePersona,
   } = useAppStore()
 
   const activeDimensions = useMemo(
@@ -109,30 +115,23 @@ export default function TaskRunnerPage() {
     currentDim.schemaTypes[0] ??
     'n_back'
 
-  const estimates = useMemo(
-    () => buildEstimatesForDimensions(activeDimensions, activePersona),
-    [activeDimensions, activePersona],
-  )
-
-  const currentEstimate = useMemo(
-    () => estimates.find((e) => e.dimensionId === currentDim.id) ?? estimates[0],
-    [estimates, currentDim.id],
-  )
-
   const [stage, setStage] = useState<RunnerStage>('running')
   // Bumped on every (re)start, so ExerciseHost fetches a fresh task (R3).
   const [attempt, setAttempt] = useState(0)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [showTelemetryTable, setShowTelemetryTable] = useState<boolean>(false)
-  // Real events from the tracker (R5), newest first; reset when a new block starts.
+  // Real events from the tracker (R5): the latest MAX_EVENTS for the table, newest first, plus
+  // uncapped block totals. Both reset when a new block starts.
   const [events, setEvents] = useState<TelemetryEvent[]>([])
+  const [totals, setTotals] = useState<Totals>(NO_TOTALS)
   const status = useSyncExternalStore(subscribeTracker, trackerStatus)
 
   useEffect(
     () =>
-      tracker.onEvent((e) =>
-        setEvents((prev) => [e, ...prev].slice(0, MAX_EVENTS)),
-      ),
+      tracker.onEvent((e) => {
+        setEvents((prev) => [e, ...prev].slice(0, MAX_EVENTS))
+        setTotals((t) => addEvent(t, e))
+      }),
     [],
   )
 
@@ -143,6 +142,7 @@ export default function TaskRunnerPage() {
   }, [])
   const startBlock = useCallback(() => {
     setEvents([])
+    setTotals(NO_TOTALS)
     run()
   }, [run])
   const handleDone = useCallback(() => setStage('completed'), [])
@@ -177,18 +177,14 @@ export default function TaskRunnerPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [stage])
 
-  const metrics = useMemo(() => {
-    if (events.length === 0) return null
-    const mean = (f: (e: TelemetryEvent) => number) =>
-      Math.round(events.reduce((acc, e) => acc + f(e), 0) / events.length)
-    return {
-      rtMs: mean((e) => e.response_time_ms),
-      jitterMs: mean((e) => e.hesitation_jitter),
-      accuracyPct: Math.round(
-        (events.filter((e) => !e.error_flag).length / events.length) * 100,
-      ),
-    }
-  }, [events])
+  const metrics =
+    totals.n === 0
+      ? null
+      : {
+          rtMs: Math.round(totals.rtSum / totals.n),
+          jitterMs: Math.round(totals.jitterSum / totals.n),
+          accuracyPct: Math.round(((totals.n - totals.errors) / totals.n) * 100),
+        }
 
   const headline = metrics
     ? `Accuracy ${metrics.accuracyPct}% · ${metrics.rtMs} ms`
@@ -196,21 +192,13 @@ export default function TaskRunnerPage() {
 
   // Honest sync line (R5, DEC-008): straight from the tracker queue.
   const syncLine = [
-    `${events.length} recorded`,
+    `${totals.n} recorded`,
     status.queuedCount > 0
       ? `${status.queuedCount} waiting to send`
       : 'queue empty',
     ...(status.droppedCount > 0 ? [`${status.droppedCount} rejected`] : []),
     ...(status.isOnline ? [] : ['offline']),
   ].join(' · ')
-
-  const initialConfidencePct = Math.round(
-    (currentEstimate?.confidence ?? 0.48) * 100,
-  )
-  const updatedConfidencePct = Math.min(
-    94,
-    initialConfidencePct + events.length * 6,
-  )
 
   return (
     <div className="w-full flex-1 flex flex-col justify-between min-h-[calc(100vh-2rem)]">
@@ -244,7 +232,7 @@ export default function TaskRunnerPage() {
             </Link>
 
             <span className="font-mono-tabular text-xs sm:text-sm font-bold text-ink whitespace-nowrap">
-              Answers: {events.length}
+              Recorded: {totals.n}
             </span>
 
             <button
@@ -302,7 +290,7 @@ export default function TaskRunnerPage() {
               ▶ Resume
             </Button>
             <Button variant="secondary" onClick={() => setStage('completed')}>
-              End block ({events.length} recorded)
+              End block ({totals.n} recorded)
             </Button>
           </div>
         </Card>
@@ -381,16 +369,14 @@ export default function TaskRunnerPage() {
             </Link>
           </div>
 
-          {/* Everything technical stays collapsed (ADR 0001). */}
-          <details
-            data-technical-drawer
-            className="group rounded-md border border-border bg-surface p-3 text-xs"
-          >
+          {/* Everything technical stays collapsed (ADR 0001). No border or padding here: the
+              WhyThisPanel inside is already a card, and cards do not nest. */}
+          <details data-technical-drawer className="group text-xs">
             <summary className="focus-ring cursor-pointer select-none font-semibold text-ink py-1">
               Show details
             </summary>
             <div className="space-y-4 pt-3">
-              <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono-tabular">
+              <dl className="grid grid-cols-3 gap-3 font-mono-tabular">
                 <div>
                   <dt className="text-ink-muted">Mean RT</dt>
                   <dd className="text-ink font-bold">{metrics ? `${metrics.rtMs} ms` : '—'}</dd>
@@ -403,12 +389,6 @@ export default function TaskRunnerPage() {
                   <dt className="text-ink-muted">Jitter</dt>
                   <dd className="text-ink font-bold">{metrics ? `${metrics.jitterMs} ms` : '—'}</dd>
                 </div>
-                <div>
-                  <dt className="text-ink-muted">Confidence (demo model)</dt>
-                  <dd className="text-ink font-bold">
-                    {initialConfidencePct}% → {updatedConfidencePct}%
-                  </dd>
-                </div>
               </dl>
 
               <div className="space-y-1">
@@ -417,6 +397,8 @@ export default function TaskRunnerPage() {
                 </h2>
                 <p className="text-ink-muted">
                   Sent via POST /v1/telemetry/event.
+                  {totals.n > events.length &&
+                    ` Table: latest ${events.length} of ${totals.n}.`}
                 </p>
                 <EventsTable events={events} />
               </div>

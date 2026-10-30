@@ -102,5 +102,36 @@ describe('TaskRunnerPage mounts the real exercises', () => {
     expect(screen.queryByText(/202 Accepted/i)).toBeNull()
     expect(screen.getByText(/Accuracy 50% · 650 ms/)).toBeInTheDocument()
     expect(screen.getByText(/2 waiting to send/i)).toBeInTheDocument()
+    // No made-up confidence number tied to the answer count.
+    expect(screen.queryByText(/\d+% → \d+%/)).toBeNull()
+  })
+
+  it('counts and averages every event of the block, though the table keeps only the latest 50', async () => {
+    renderAt('/task/episodic_pattern_separation')
+    await screen.findByRole('region', { name: 'Shape memory' })
+    act(() => {
+      // 50 correct at 600 ms, then 1 error at 2100 ms: mean RT 32100/51 = 629, accuracy 50/51 = 98%.
+      for (let i = 0; i < 50; i++) tracker.push(event({ trial_index: i, response_time_ms: 600 }))
+      tracker.push(event({ trial_index: 50, error_flag: true, score_norm: 0, response_time_ms: 2100 }))
+    })
+    expect(screen.getByText('Recorded: 51')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Fast-Forward to Summary/i }))
+    expect(screen.getByText(/Accuracy 98% · 629 ms/)).toBeInTheDocument()
+    expect(screen.getByText(/^Telemetry: 51 recorded/)).toBeInTheDocument()
+    expect(dataRows()).toHaveLength(50)
+    expect(screen.getByText(/latest 50 of 51/i)).toBeInTheDocument()
+  })
+
+  it('the completed drawer has no card chrome around the WhyThisPanel card', async () => {
+    renderAt('/task/episodic_pattern_separation')
+    await screen.findByRole('region', { name: 'Shape memory' })
+    fireEvent.click(screen.getByRole('button', { name: /Fast-Forward to Summary/i }))
+    const drawer = screen.getByText('Show details').closest('details')!
+    const panel = drawer.querySelector('.editorial-card, .tactile-card, .hero-card')
+    expect(panel).not.toBeNull()
+    for (let el = panel!.parentElement; el && el !== document.body; el = el.parentElement) {
+      expect(el.className).not.toMatch(/\bborder\b|card/)
+    }
   })
 })
