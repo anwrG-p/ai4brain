@@ -1,3 +1,5 @@
+import type { TaskSchemaType } from '../../../types'
+
 // Mirrors assessment_engine/api/routes/telemetry.py (TelemetryEvent) exactly.
 export type Dimension =
   | 'working_memory'
@@ -93,15 +95,8 @@ export function isTelemetryEvent(x: unknown): x is TelemetryEvent {
   )
 }
 
-export type SchemaType =
-  | 'n_back'
-  | 'stroop'
-  | 'matrix'
-  | 'mental_rotation'
-  | 'relational'
-  | 'tower'
-  | 'ufov'
-  | 'mst'
+// One union for the whole app: the UI's registry type has the same 8 literals.
+export type SchemaType = TaskSchemaType
 
 export type TaskPayload = {
   task_id: string
