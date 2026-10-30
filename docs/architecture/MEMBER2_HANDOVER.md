@@ -3,7 +3,7 @@
 **Branch:** `feature/member2-ai-coach-engine`  
 **Author:** AI Software Engineer on behalf of Member 2  
 **Date:** October 2026  
-**Status:** Complete, Tested, and Verified (15/15 unit tests passing)
+**Status:** Complete, Tested, and Verified (21/21 unit & API tests passing)
 
 ---
 
@@ -16,6 +16,7 @@ Member 2 is responsible for **Layer B** of the AI4Brain platform. This module im
    $$S_{\text{collab}} = \sum_{i=1}^5 w_i(s_t) \cdot V_i, \quad \sum_{i=1}^5 w_i = 1.0$$
    Weights $w_i(s_t)$ dynamically adapt to the user's active GMM cluster archetype ($K=9$).
 4. **Non-Clinical Safety Guardrails (`SafetyGuardrailEngine`):** Lexical and regex post-processors that intercept, sanitize, or reject diagnostic/pathological labeling (e.g., ADHD, autism, dementia, cognitive impairment, deficit, disorder) while reinforcing growth-mindset, neuroplasticity-focused phrasing.
+5. **FastAPI Microservice (`ai_coach.api`):** Production-ready HTTP service exposing chat, collaboration scoring, and safety verification endpoints.
 
 ---
 
@@ -27,6 +28,7 @@ To guarantee 100% interoperability across the codebase, deliverables are availab
 ai4brain/
 ├── ai_coach/
 │   ├── __init__.py                  # Package exports
+│   ├── api.py                       # FastAPI application & REST router
 │   ├── schemas.py                   # Pydantic v2 data models & contracts
 │   ├── safety_guardrails.py         # Non-clinical lexical filters & sanitizer
 │   ├── collaboration_scorer.py      # Dynamic 5-dimension scoring engine
@@ -36,6 +38,8 @@ ai4brain/
 │       ├── system_coach.txt         # Base non-clinical coach prompt
 │       ├── xai_adaptation.txt       # Template for adaptation justifications
 │       └── learning_path.txt        # Template for cognitive skill-building paths
+├── scripts/
+│   └── test_coach_service.py        # Automated verification & interactive CLI chat runner
 ├── src/
 │   └── coach/                       # README-compliant proxy imports
 │       ├── __init__.py
@@ -43,7 +47,8 @@ ai4brain/
 │       ├── collaboration_scorer.py
 │       └── safety_guardrails.py
 └── tests/
-    └── test_coach_module.py         # 15 comprehensive unit tests (all passing)
+    ├── test_coach_module.py         # 15 core engine unit tests
+    └── test_coach_api.py            # 6 FastAPI integration tests
 ```
 
 ---
@@ -129,18 +134,37 @@ result = scorer.calculate_score(dimension_scores, cluster_id=3)
 
 ## 5. Verification & Testing
 
-Run all unit tests using `pytest`:
+### 5.1 Automated Unit & Integration Tests (21/21 Passing)
+Run all unit and API tests with `pytest`:
 ```bash
-python -m pytest tests/test_coach_module.py -v
+python -m pytest tests/test_coach_module.py tests/test_coach_api.py -v
 ```
-All 15 test cases validate:
-* Non-clinical safety guardrail redaction and sanitization.
-* Rejection of diagnostic queries with polite non-clinical disclaimers.
-* Weight sum invariants ($\sum w_i = 1.0$) across all 9 clusters.
-* Correct mathematical calculation of $S_{\text{collab}} \in [0, 100]$.
-* Accurate translation of differential vectors $\Delta c$ into human-readable rationales.
-* End-to-end multi-turn chat handling with fallback generator and custom LLM runner hooks.
-* Backward compatibility for imports via `src.coach.*`.
+
+### 5.2 Automated Service Demonstration Script
+Run the automated diagnostic verification runner:
+```bash
+python scripts/test_coach_service.py
+```
+This runs an end-to-end check of engine initialization, $\Delta c$ prototype delta decoding, dynamic archetype weight shifts, safety filter sanitization, and full conversational turns.
+
+### 5.3 Interactive Terminal Chat Session
+To test chatting with the AI Coach in real-time directly from the CLI:
+```bash
+python scripts/test_coach_service.py --interactive
+```
+
+### 5.4 Starting the FastAPI Microservice
+Start the Member 2 HTTP microservice:
+```bash
+python -m uvicorn ai_coach.api:app --reload --port 8000
+```
+- Interactive OpenAPI / Swagger UI: `http://localhost:8000/docs`
+- Endpoints:
+  - `POST /v1/coach/chat`
+  - `GET /v1/coach/collaboration-score`
+  - `POST /v1/coach/state-event`
+  - `GET /v1/coach/learning-path/{user_id}`
+  - `POST /v1/coach/verify-safety`
 
 ---
 
