@@ -23,6 +23,23 @@ test.each(['red', 'green', 'blue', 'yellow'])('GlyphView paints %s with a token,
   expect(fill).not.toBe('var(--color-ink)')
 })
 
+const fillOf = (color: string) => {
+  const { container, unmount } = render(<GlyphView glyph={{ shape: 'square', count: 1, color, rotation_deg: 0 }} />)
+  const fill = container.querySelector('rect')!.getAttribute('fill')!
+  unmount()
+  return fill
+}
+
+test('the four glyph colour names map to pairwise distinct tokens', () => {
+  const fills = ['red', 'green', 'blue', 'yellow'].map(fillOf)
+  expect(new Set(fills).size).toBe(4)
+})
+
+// --color-reward is 1.55:1 on the light surface; --dim-5 clears WCAG 1.4.11's 3:1 in both themes.
+test('yellow glyphs use --dim-5 for graphical contrast', () => {
+  expect(fillOf('yellow')).toBe('var(--dim-5)')
+})
+
 test('GlyphView maps an unknown colour name to the ink token, keeps the name in the label, and emits no hex', () => {
   const { container } = render(
     <GlyphView glyph={{ shape: 'diamond', count: 3, color: 'chartreuse', rotation_deg: 45 }} />,

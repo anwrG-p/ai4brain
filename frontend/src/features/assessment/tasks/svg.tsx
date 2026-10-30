@@ -9,10 +9,10 @@ const GLYPH_COLORS: Record<string, string> = {
   blue: 'var(--dim-1)',
   red: 'var(--color-danger)',
   green: 'var(--color-success)',
-  yellow: 'var(--color-reward)',
+  yellow: 'var(--dim-5)', // not --color-reward: 1.55:1 on the light surface, below 3:1
 }
 
-export const glyphFill = (name: string) =>
+const glyphFill = (name: string) =>
   Object.hasOwn(GLYPH_COLORS, name) ? GLYPH_COLORS[name]! : 'var(--color-ink)'
 
 function Shape({ shape, cx, cy, r, color }: { shape: Glyph['shape']; cx: number; cy: number; r: number; color: string }) {
