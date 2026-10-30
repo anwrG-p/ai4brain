@@ -81,7 +81,8 @@ type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
 type TrackerOpts = {
   endpoint?: string
-  flushMs?: number
+  flushMs?: number // base flush period, and the first retry delay before doubling
+  maxBackoffMs?: number
   batchSize?: number
   maxBuffer?: number
   fetchFn?: (url: string, init?: RequestInit) => Promise<Response>
@@ -136,7 +137,11 @@ export class Tracker {
   private status: TrackerStatus | null = null
   private listeners = new Set<() => void>()
   private eventListeners = new Set<(e: TelemetryEvent) => void>()
-  private timer: ReturnType<typeof setInterval>
+  private flushMs: number
+  private maxBackoffMs: number
+  private failures = 0 // consecutive failed flushes; drives the retry backoff
+  private timer: ReturnType<typeof setTimeout> | undefined
+  private destroyed = false
   private onPageHide = () => this.flushBeacon()
   // Mobile browsers often discard a backgrounded tab without firing pagehide; hidden is the last reliable signal.
   private onVisibility = () => {
@@ -144,6 +149,7 @@ export class Tracker {
   }
   private onOnline = () => {
     this.isOnline = true
+    this.failures = 0
     this.notify()
     void this.flush()
   }
@@ -163,9 +169,11 @@ export class Tracker {
         ? navigator.sendBeacon.bind(navigator)
         : undefined)
     this.storage = opts.storage === undefined ? defaultStorage() : opts.storage
+    this.flushMs = opts.flushMs ?? 2000
+    this.maxBackoffMs = opts.maxBackoffMs ?? 60_000
     this.store((s) => s.removeItem(OLD_STORAGE_KEY))
     this.add(this.restore())
-    this.timer = setInterval(() => void this.flush(), opts.flushMs ?? 2000)
+    this.schedule()
     if (typeof window !== 'undefined') {
       window.addEventListener('pagehide', this.onPageHide)
       window.addEventListener('online', this.onOnline)
@@ -189,15 +197,18 @@ export class Tracker {
       this.droppedCount += over
     }
     this.changed()
-    if (this.buffer.length >= this.batchSize) void this.flush()
+    // While backing off, the retry timer alone decides when to try again.
+    if (this.buffer.length >= this.batchSize && this.failures === 0) void this.flush()
   }
 
   async flush(): Promise<void> {
-    if (this.inFlight || !this.buffer.length) return
+    if (this.inFlight) return // the running flush reschedules when it settles
+    if (!this.buffer.length) return this.schedule()
     this.inFlight = true
     // Events stay in the buffer until acknowledged, so failures retry and overflow still drops the oldest.
     const batch = this.buffer.slice(0, MAX_PER_REQUEST)
     const clears = this.clears
+    let settled = false // acknowledged or rejected for good: either way, no retry of this batch
     try {
       const res = await this.fetchFn(this.endpoint, {
         method: 'POST',
@@ -208,13 +219,14 @@ export class Tracker {
       // rather than block the queue head. 5xx, 408, 429 and network errors retry.
       const rejected =
         res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429
+      settled = res.ok || rejected
       // clear() ran meanwhile: the batch is already gone and must not count as dropped.
       if (clears !== this.clears) return
       if (rejected) {
         console.error(`telemetry: dropped ${batch.length} events (HTTP ${res.status})`)
         this.droppedCount += batch.length
       }
-      if (res.ok || rejected) {
+      if (settled) {
         const done = new Set(batch)
         this.buffer = this.buffer.filter((e) => !done.has(e))
         this.changed()
@@ -223,7 +235,21 @@ export class Tracker {
       // offline: keep events for the next flush
     } finally {
       this.inFlight = false
+      this.failures = settled ? 0 : this.failures + 1
+      this.schedule()
     }
+  }
+
+  // One timer: the base period while healthy; after failures, exponential backoff with jitter
+  // (2 s, 4 s, 8 s … capped at 60 s, each shortened by up to 20%) so a down API is not hammered.
+  private schedule(): void {
+    clearTimeout(this.timer)
+    if (this.destroyed) return
+    const delay =
+      this.failures === 0
+        ? this.flushMs
+        : Math.min(this.maxBackoffMs, this.flushMs * 2 ** this.failures) * (1 - 0.2 * Math.random())
+    this.timer = setTimeout(() => void this.flush(), delay)
   }
 
   flushBeacon(): void {
@@ -275,7 +301,8 @@ export class Tracker {
   }
 
   destroy(): void {
-    clearInterval(this.timer)
+    this.destroyed = true
+    clearTimeout(this.timer)
     if (typeof window !== 'undefined') {
       window.removeEventListener('pagehide', this.onPageHide)
       window.removeEventListener('online', this.onOnline)

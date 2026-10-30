@@ -250,6 +250,70 @@ describe('Tracker', () => {
     expect(sent(fetchFn)).toEqual([1])
   })
 
+  describe('retry backoff', () => {
+    afterEach(() => vi.restoreAllMocks())
+
+    test('failed flushes back off from 2 s, doubling to a 60 s cap; a success resets it', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0) // no jitter
+      const fetchFn = offlineFetch()
+      const t = make({ fetchFn, beacon: vi.fn() })
+      t.push(full(1))
+      // Each delay is waited out exactly: one ms less sends nothing new.
+      let calls = 0
+      for (const delay of [2000, 4000, 8000, 16000, 32000, 60000, 60000]) {
+        await vi.advanceTimersByTimeAsync(delay - 1)
+        expect(fetchFn).toHaveBeenCalledTimes(calls)
+        await vi.advanceTimersByTimeAsync(1)
+        expect(fetchFn).toHaveBeenCalledTimes(++calls)
+      }
+      fetchFn.mockImplementation(okFetch())
+      await vi.advanceTimersByTimeAsync(60000)
+      expect(fetchFn).toHaveBeenCalledTimes(++calls)
+      expect(t.getStatus().queuedCount).toBe(0)
+      t.push(full(2))
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(fetchFn).toHaveBeenCalledTimes(++calls)
+    })
+
+    test('jitter shortens a retry delay by up to a fifth', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.5)
+      const fetchFn = offlineFetch()
+      const t = make({ fetchFn, beacon: vi.fn() })
+      t.push(full(1))
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(fetchFn).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(3599) // 4000 × (1 − 0.2 × 0.5) = 3600
+      expect(fetchFn).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(fetchFn).toHaveBeenCalledTimes(2)
+    })
+
+    test('going online flushes at once and resets the backoff', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0)
+      const fetchFn = offlineFetch()
+      const t = make({ fetchFn, beacon: vi.fn() })
+      t.push(full(1))
+      await vi.advanceTimersByTimeAsync(2000 + 4000 + 8000 + 16000 + 32000)
+      expect(fetchFn).toHaveBeenCalledTimes(5) // next try would be in 60 s
+      window.dispatchEvent(new Event('online'))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(fetchFn).toHaveBeenCalledTimes(6)
+      await vi.advanceTimersByTimeAsync(4000) // one failure since the reset
+      expect(fetchFn).toHaveBeenCalledTimes(7)
+    })
+
+    test('while backing off, reaching batchSize sends no extra request', async () => {
+      const fetchFn = offlineFetch()
+      const t = make({ fetchFn, beacon: vi.fn() })
+      for (let i = 0; i < 20; i++) t.push(full(i))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(fetchFn).toHaveBeenCalledTimes(1)
+      for (let i = 20; i < 30; i++) t.push(full(i))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(fetchFn).toHaveBeenCalledTimes(1)
+    })
+  })
+
   test('failed flush keeps events for retry', async () => {
     const fetchFn = vi
       .fn(async (_url: string, _init?: RequestInit) => new Response(null, { status: 202 }))
