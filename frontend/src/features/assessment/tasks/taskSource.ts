@@ -36,8 +36,11 @@ function validTask(x: unknown): x is TaskPayload {
 export const usingMocks = () => import.meta.env.VITE_USE_MOCKS !== 'false'
 
 // GET /v1/tasks/next (Member 5). In mock mode it returns the fixture for `schemaType`, else
-// fixtures[seq % length]; `seq` is the caller's task counter, so a repeated call (StrictMode's
-// double effect) gets the same task. Real mode ignores `schemaType`: the generator decides (R2).
+// fixtures[seq % length]; `seq` is the caller's task counter, so in mock mode a repeated call
+// (StrictMode's double effect) gets the same task. Real mode ignores `schemaType`: the generator
+// decides (R2). Real mode has no such guarantee: in dev, StrictMode's double effect sends two GETs
+// and the caller keeps only the second, so the server may hand out (and count) a task nobody sees.
+// Note for Member 5: make /v1/tasks/next idempotent per (user, seq) or tolerate unplayed tasks.
 export async function fetchNextTask(
   userId: string,
   seq = 0,

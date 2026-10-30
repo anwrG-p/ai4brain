@@ -197,6 +197,18 @@ test('the instruction is the non-voice one (voice is not ported)', () => {
   expect(screen.queryByText(/aloud/)).toBeNull()
 })
 
+test('Stroop events carry no voice fields (D1)', () => {
+  setup(params([conflict, conflict]))
+  press('blue')
+  advance(3000) // a timeout event too
+  expect(pushed).toHaveLength(2)
+  for (const e of pushed) {
+    expect(e.voice_opt_in).toBe(false)
+    expect(e).not.toHaveProperty('voice_latency_ms')
+    expect(e).not.toHaveProperty('vocal_pace_hz')
+  }
+})
+
 const HEX_OR_FN = /#[0-9a-fA-F]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\s*\(/
 
 test('the ink palette holds theme tokens only, no raw colour values', () => {

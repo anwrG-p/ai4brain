@@ -33,7 +33,7 @@ export function ExerciseHost({ schemaType, attempt, onDone, onError }: ExerciseH
     let live = true
     setRun(null)
     const userId = getUserId()
-    const run = ++fetchCount
+    const fetchNo = ++fetchCount
     fetchNextTask(userId, attempt, { schemaType }).then(
       (fetched) => {
         if (!live) return
@@ -41,7 +41,7 @@ export function ExerciseHost({ schemaType, attempt, onDone, onError }: ExerciseH
         // counter keeps task_id and item_id unique per run, across remounts and reloads (R3).
         // Fits the 48-char limit.
         const task = usingMocks()
-          ? { ...fetched, task_id: `${fetched.task_id}.${getSessionId().slice(0, 8)}.${run}` }
+          ? { ...fetched, task_id: `${fetched.task_id}.${getSessionId().slice(0, 8)}.${fetchNo}` }
           : fetched
         const recorder = new TrialRecorder({
           user_id: userId,
