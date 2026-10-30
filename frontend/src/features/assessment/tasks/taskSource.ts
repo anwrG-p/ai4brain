@@ -33,7 +33,7 @@ function validTask(x: unknown): x is TaskPayload {
 }
 
 // Read per call (not at module load) so tests can stubEnv; mocks are on unless explicitly 'false'.
-const useMocks = () => import.meta.env.VITE_USE_MOCKS !== 'false'
+export const usingMocks = () => import.meta.env.VITE_USE_MOCKS !== 'false'
 
 // GET /v1/tasks/next (Member 5). In mock mode it returns the fixture for `schemaType`, else
 // fixtures[seq % length]; `seq` is the caller's task counter, so a repeated call (StrictMode's
@@ -43,7 +43,7 @@ export async function fetchNextTask(
   seq = 0,
   opts: { schemaType?: SchemaType; fetchFn?: FetchFn } = {},
 ): Promise<TaskPayload> {
-  if (useMocks()) {
+  if (usingMocks()) {
     const task =
       FIXTURES.find((f) => f.schema_type === opts.schemaType) ?? FIXTURES[seq % FIXTURES.length]
     if (!task) throw new Error(`no task fixture for seq ${seq}`)
