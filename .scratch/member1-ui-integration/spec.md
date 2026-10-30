@@ -1,6 +1,6 @@
 # Spec: integrate Member 1 exercises into the new UI (`frontend/`)
 
-Status: ready-for-agent
+Status: resolved
 Owner: Member 1 (Mazen)
 Date: 2026-10-30
 
