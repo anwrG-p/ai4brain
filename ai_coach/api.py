@@ -11,9 +11,11 @@ Exposes:
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Dict, Optional
 from fastapi import FastAPI, APIRouter, Query, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from ai_coach.agent import AICoachAgent
@@ -185,6 +187,16 @@ def verify_safety(request: SafetyVerifyRequest) -> SafetyVerifyResponse:
 
 
 app.include_router(router)
+
+
+@app.get("/", response_class=HTMLResponse, tags=["Visual Frontend"])
+@app.get("/ui", response_class=HTMLResponse, tags=["Visual Frontend"])
+def serve_visual_frontend():
+    """Serves the standalone Member 2 AI Coach Visual Lab."""
+    frontend_path = Path(__file__).resolve().parent.parent / "coach_frontend" / "index.html"
+    if frontend_path.is_file():
+        return HTMLResponse(content=frontend_path.read_text(encoding="utf-8"))
+    return HTMLResponse("<h1>AI Coach Visual Frontend not found</h1>", status_code=404)
 
 
 @app.get("/health", tags=["Health"])

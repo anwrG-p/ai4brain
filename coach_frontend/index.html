@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI4Brain — Member 2 AI Coach Visual Lab</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            },
+            doodle: {
+              bg: '#fafaf9',
+              card: '#ffffff',
+              border: '#e7e5e4',
+              accent: '#f59e0b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Lexend:wght@300;400;500;600;700&display=swap');
+    body {
+      font-family: 'Lexend', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #f8fafc;
+    }
+    .heading-font {
+      font-family: 'Fredoka', cursive, sans-serif;
+    }
+    .chat-scroll::-webkit-scrollbar {
+      width: 6px;
+    }
+    .chat-scroll::-webkit-scrollbar-thumb {
+      background-color: #cbd5e1;
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="min-h-screen text-slate-800 flex flex-col">
+
+  <!-- TOP NAVIGATION HEADER -->
+  <header class="bg-white border-b border-slate-200 px-6 py-3.5 sticky top-0 z-30 shadow-sm flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-100">
+        <i data-lucide="brain" class="w-5 h-5"></i>
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+          <h1 class="heading-font text-lg font-bold text-slate-900 tracking-wide">AI4Brain</h1>
+          <span class="bg-indigo-50 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-semibold border border-indigo-200">Layer B: Member 2</span>
+        </div>
+        <p class="text-xs text-slate-500">AI Coach Collaboration Engine & Natural-Language Feedback</p>
+      </div>
+    </div>
+
+    <!-- Backend Connection & API Base Indicator -->
+    <div class="flex items-center space-x-4">
+      <div class="flex items-center space-x-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-600">
+        <label for="apiBaseInput" class="font-semibold text-slate-500">API:</label>
+        <input id="apiBaseInput" type="text" value="http://localhost:8000" class="bg-transparent border-none text-xs focus:outline-none w-44 font-mono text-slate-700" />
+      </div>
+
+      <div id="connectionPill" class="flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+        <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+        <span id="connectionText">Checking Backend...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN DASHBOARD CONTENT (3-COLUMN LAYOUT) -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- LEFT COLUMN: MEMBER 3 STATE SIMULATOR (col-span-3) -->
+    <section class="lg:col-span-3 flex flex-col space-y-4">
+      
+      <!-- Archetype Simulation Card -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="layers" class="w-4 h-4 text-indigo-600"></i>
+            <h2 class="text-sm font-bold text-slate-900">Member 3 State Bus</h2>
+          </div>
+          <span id="tierBadge" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+            Practitioner
+          </span>
+        </div>
+        <p class="text-xs text-slate-500 mb-4">Simulate cognitive archetype shifts & prototype differential vectors ($\Delta c$).</p>
+
+        <!-- Cluster Selector (0..8) -->
+        <div class="space-y-1.5 mb-4">
+          <div class="flex justify-between text-xs">
+            <span class="font-medium text-slate-700">GMM Cluster ($k$):</span>
+            <span id="clusterValue" class="font-bold text-indigo-600">Cluster 3</span>
+          </div>
+          <input id="clusterSlider" type="range" min="0" max="8" value="3" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" />
+          <div class="flex justify-between text-[10px] text-slate-400">
+            <span>0 (Explorer)</span>
+            <span>4 (Practitioner)</span>
+            <span>8 (Strategist)</span>
+          </div>
+        </div>
+
+        <!-- Delta Vector Sliders -->
+        <div class="space-y-3 pt-2 border-t border-slate-100">
+          <div class="text-xs font-semibold text-slate-700 flex items-center justify-between">
+            <span>Prototype Deltas ($\Delta c$):</span>
+            <button id="resetDeltasBtn" class="text-[11px] text-indigo-600 hover:underline">Reset</button>
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs text-slate-600 mb-1">
+              <span>Working Memory:</span>
+              <span id="wmVal" class="font-mono text-emerald-600 font-medium">+20%</span>
+            </div>
+            <input id="wmSlider" type="range" min="-50" max="50" value="20" class="w-full h-1 bg-slate-200 rounded appearance-none cursor-pointer accent-emerald-500" />
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs text-slate-600 mb-1">
+              <span>Pattern Induction:</span>
+              <span id="piVal" class="font-mono text-indigo-600 font-medium">+15%</span>
+            </div>
+            <input id="piSlider" type="range" min="-50" max="50" value="15" class="w-full h-1 bg-slate-200 rounded appearance-none cursor-pointer accent-indigo-500" />
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs text-slate-600 mb-1">
+              <span>Executive Function:</span>
+              <span id="efVal" class="font-mono text-amber-600 font-medium">-10%</span>
+            </div>
+            <input id="efSlider" type="range" min="-50" max="50" value="-10" class="w-full h-1 bg-slate-200 rounded appearance-none cursor-pointer accent-amber-500" />
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs text-slate-600 mb-1">
+              <span>Spatial Orientation:</span>
+              <span id="soVal" class="font-mono text-slate-600 font-medium">+5%</span>
+            </div>
+            <input id="soSlider" type="range" min="-50" max="50" value="5" class="w-full h-1 bg-slate-200 rounded appearance-none cursor-pointer accent-slate-500" />
+          </div>
+        </div>
+
+        <button id="emitStateBtn" class="w-full mt-4 bg-slate-900 hover:bg-slate-800 text-white text-xs py-2 px-3 rounded-xl font-medium transition flex items-center justify-center space-x-1.5 shadow-sm">
+          <i data-lucide="radio" class="w-3.5 h-3.5"></i>
+          <span>Emit State Event (POST /state-event)</span>
+        </button>
+      </div>
+
+      <!-- Cognitive Learning Path Card -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex-1 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center space-x-2 mb-2">
+            <i data-lucide="compass" class="w-4 h-4 text-violet-600"></i>
+            <h2 class="text-sm font-bold text-slate-900">Adaptive Curriculum</h2>
+          </div>
+          <p class="text-xs text-slate-500 mb-3">Structured skill-building modules mapped to active archetype.</p>
+          <div id="learningPathContent" class="space-y-2 text-xs">
+            <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+              <span class="font-semibold text-slate-800">1. Working Memory Stabilization</span>
+              <p class="text-[11px] text-slate-500">Dual N-Back sequence stability & chunking heuristics (10m)</p>
+            </div>
+            <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+              <span class="font-semibold text-slate-800">2. Pattern Induction Agility</span>
+              <p class="text-[11px] text-slate-500">Rule-extrapolation across matrix transformations (12m)</p>
+            </div>
+          </div>
+        </div>
+        <button id="refreshCurriculumBtn" class="w-full mt-3 border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs py-1.5 px-3 rounded-xl font-medium transition flex items-center justify-center space-x-1">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          <span>Refresh Curriculum</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- CENTER COLUMN: AI COACH CONVERSATIONAL TERMINAL (col-span-6) -->
+    <section class="lg:col-span-6 flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[580px]">
+      
+      <!-- Chat Header -->
+      <div class="p-3.5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div class="flex items-center space-x-2.5">
+          <div class="relative">
+            <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold shadow-sm">
+              <i data-lucide="bot" class="w-4 h-4"></i>
+            </div>
+            <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full"></span>
+          </div>
+          <div>
+            <h2 class="text-sm font-bold text-slate-900">AI Cognitive Fitness Coach</h2>
+            <div class="flex items-center space-x-1.5 text-[11px] text-slate-500">
+              <span>Online</span>
+              <span>•</span>
+              <span class="text-emerald-600 font-medium flex items-center space-x-1">
+                <i data-lucide="shield-check" class="w-3 h-3"></i>
+                <span>Non-Clinical Guardrails Active</span>
+              </span>
+            </div>
+          </div>
+        </div>
+        <button id="clearChatBtn" class="text-xs text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100">
+          <i data-lucide="trash-2" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Chat History Container -->
+      <div id="chatStream" class="flex-1 p-4 space-y-4 overflow-y-auto chat-scroll">
+        <!-- Initial Welcome Message from Coach -->
+        <div class="flex items-start space-x-3">
+          <div class="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center flex-shrink-0 text-xs">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+          </div>
+          <div class="space-y-2 max-w-[85%]">
+            <div class="bg-slate-100 rounded-2xl rounded-tl-sm p-3.5 text-xs text-slate-800 leading-relaxed shadow-sm">
+              Hello! I'm your <strong>AI Cognitive Fitness Coach</strong>. I observe your real-time challenge telemetry and state transitions to guide your neuroplastic growth. Ask me anything about your task pacing, working memory, or collaboration score!
+            </div>
+            <div class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-[11px] text-indigo-700">
+              <i data-lucide="info" class="w-3 h-3"></i>
+              <span>Grounded in real-time Member 3 state delta ($\Delta c$).</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Suggestion Chips -->
+      <div class="px-4 py-2 border-t border-slate-100 bg-slate-50/50 flex items-center space-x-2 overflow-x-auto no-scrollbar">
+        <span class="text-[11px] font-semibold text-slate-400 flex-shrink-0">Try:</span>
+        <button class="suggestion-chip text-xs bg-white border border-slate-200 hover:border-indigo-400 text-slate-700 px-2.5 py-1 rounded-full flex-shrink-0 transition">
+          Why did the task speed up?
+        </button>
+        <button class="suggestion-chip text-xs bg-white border border-slate-200 hover:border-indigo-400 text-slate-700 px-2.5 py-1 rounded-full flex-shrink-0 transition">
+          How is my collaboration score?
+        </button>
+        <button class="suggestion-chip text-xs bg-white border border-slate-200 hover:border-indigo-400 text-slate-700 px-2.5 py-1 rounded-full flex-shrink-0 transition">
+          Do I have ADHD or a deficit?
+        </button>
+      </div>
+
+      <!-- Chat Input Form -->
+      <form id="chatForm" class="p-3 border-t border-slate-200 bg-white flex items-center space-x-2">
+        <input 
+          id="chatInput" 
+          type="text" 
+          placeholder="Type message to AI Coach (e.g. 'Why did my task get faster?')..." 
+          class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" 
+          autocomplete="off"
+        />
+        <button 
+          type="submit" 
+          id="sendBtn" 
+          class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-4 py-2 text-xs font-medium flex items-center space-x-1.5 transition shadow-sm"
+        >
+          <span>Send</span>
+          <i data-lucide="send" class="w-3 h-3"></i>
+        </button>
+      </form>
+    </section>
+
+    <!-- RIGHT COLUMN: AI COLLABORATION SCORECARD (col-span-3) -->
+    <section class="lg:col-span-3 flex flex-col space-y-4">
+      
+      <!-- Collaboration Score Card -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="award" class="w-4 h-4 text-amber-500"></i>
+            <h2 class="text-sm font-bold text-slate-900">AI Collaboration Index</h2>
+          </div>
+          <button id="refreshScoreBtn" class="text-slate-400 hover:text-slate-600">
+            <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+
+        <!-- Composite Score Gauge -->
+        <div class="flex flex-col items-center justify-center py-3 bg-gradient-to-b from-indigo-50/50 to-transparent rounded-2xl border border-indigo-100/50 mb-4">
+          <span class="text-xs text-slate-500 font-medium">Composite $S_{\text{collab}}$</span>
+          <div class="flex items-baseline space-x-1 mt-0.5">
+            <span id="compositeScore" class="heading-font text-4xl font-extrabold text-indigo-700">82.5</span>
+            <span class="text-xs font-semibold text-slate-400">/ 100</span>
+          </div>
+          <span id="tierLabel" class="mt-1 text-[11px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-100/60 px-2 py-0.5 rounded-full">
+            Practitioner Tier
+          </span>
+        </div>
+
+        <!-- 5 Dimensions Breakdown -->
+        <div class="space-y-2.5">
+          <div class="text-xs font-semibold text-slate-700 flex justify-between">
+            <span>Dimension Breakdown (0-100):</span>
+            <span class="text-[10px] text-slate-400">Score | Weight</span>
+          </div>
+
+          <!-- 1. Clarification -->
+          <div>
+            <div class="flex justify-between text-xs text-slate-600 mb-0.5">
+              <span>Clarification ($V_1$)</span>
+              <span class="font-mono text-[11px]"><strong id="scoreClar">84</strong> <span class="text-slate-400" id="weightClar">(w=0.20)</span></span>
+            </div>
+            <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+              <div id="barClar" class="bg-indigo-500 h-full rounded-full transition-all duration-500" style="width: 84%"></div>
+            </div>
+          </div>
+
+          <!-- 2. Critical Verification -->
+          <div>
+            <div class="flex justify-between text-xs text-slate-600 mb-0.5">
+              <span>Verification ($V_2$)</span>
+              <span class="font-mono text-[11px]"><strong id="scoreVerif">78</strong> <span class="text-slate-400" id="weightVerif">(w=0.20)</span></span>
+            </div>
+            <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+              <div id="barVerif" class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: 78%"></div>
+            </div>
+          </div>
+
+          <!-- 3. Iteration -->
+          <div>
+            <div class="flex justify-between text-xs text-slate-600 mb-0.5">
+              <span>Iteration ($V_3$)</span>
+              <span class="font-mono text-[11px]"><strong id="scoreIter">85</strong> <span class="text-slate-400" id="weightIter">(w=0.20)</span></span>
+            </div>
+            <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+              <div id="barIter" class="bg-blue-500 h-full rounded-full transition-all duration-500" style="width: 85%"></div>
+            </div>
+          </div>
+
+          <!-- 4. Autonomy -->
+          <div>
+            <div class="flex justify-between text-xs text-slate-600 mb-0.5">
+              <span>Autonomy ($V_4$)</span>
+              <span class="font-mono text-[11px]"><strong id="scoreAuto">80</strong> <span class="text-slate-400" id="weightAuto">(w=0.20)</span></span>
+            </div>
+            <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+              <div id="barAuto" class="bg-violet-500 h-full rounded-full transition-all duration-500" style="width: 80%"></div>
+            </div>
+          </div>
+
+          <!-- 5. Responsible Use -->
+          <div>
+            <div class="flex justify-between text-xs text-slate-600 mb-0.5">
+              <span>Responsible Use ($V_5$)</span>
+              <span class="font-mono text-[11px]"><strong id="scoreResp">86</strong> <span class="text-slate-400" id="weightResp">(w=0.20)</span></span>
+            </div>
+            <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+              <div id="barResp" class="bg-teal-500 h-full rounded-full transition-all duration-500" style="width: 86%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Growth Recommendation Callout -->
+        <div class="mt-4 p-3 rounded-xl bg-amber-50/80 border border-amber-200/70 text-xs">
+          <div class="flex items-center space-x-1.5 font-bold text-amber-900 mb-1">
+            <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-600"></i>
+            <span>Growth Target</span>
+          </div>
+          <p id="recommendationText" class="text-amber-800 leading-snug">
+            Challenge initial task prompts and test alternative reasoning pathways during complex sessions.
+          </p>
+        </div>
+      </div>
+
+      <!-- Quick Safety Guardrail Validator -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+        <div class="flex items-center space-x-2 mb-2">
+          <i data-lucide="shield-alert" class="w-4 h-4 text-rose-500"></i>
+          <h2 class="text-sm font-bold text-slate-900">Safety Guardrail Lab</h2>
+        </div>
+        <p class="text-[11px] text-slate-500 mb-2">Test non-clinical regex redaction on medical terminology:</p>
+        <div class="space-y-2">
+          <textarea id="safetyInput" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs focus:outline-none focus:ring-1 focus:ring-rose-500" placeholder="Type: 'This patient has severe ADHD and cognitive deficits...'"></textarea>
+          <button id="testSafetyBtn" class="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs py-1.5 rounded-xl font-medium transition flex items-center justify-center space-x-1">
+            <i data-lucide="filter" class="w-3.5 h-3.5"></i>
+            <span>Sanitize String</span>
+          </button>
+          <div id="safetyResult" class="hidden p-2 rounded-lg bg-slate-50 border border-slate-200 text-[11px] space-y-1">
+            <span class="font-bold text-slate-700">Sanitized Result:</span>
+            <p id="sanitizedText" class="text-slate-600 italic"></p>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- JAVASCRIPT CLIENT LOGIC -->
+  <script>
+    lucide.createIcons();
+
+    // DOM Elements
+    const apiBaseInput = document.getElementById('apiBaseInput');
+    const connectionPill = document.getElementById('connectionPill');
+    const connectionText = document.getElementById('connectionText');
+    const chatStream = document.getElementById('chatStream');
+    const chatForm = document.getElementById('chatForm');
+    const chatInput = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const clearChatBtn = document.getElementById('clearChatBtn');
+
+    // Controls
+    const clusterSlider = document.getElementById('clusterSlider');
+    const clusterValue = document.getElementById('clusterValue');
+    const tierBadge = document.getElementById('tierBadge');
+    const wmSlider = document.getElementById('wmSlider');
+    const piSlider = document.getElementById('piSlider');
+    const efSlider = document.getElementById('efSlider');
+    const soSlider = document.getElementById('soSlider');
+    const wmVal = document.getElementById('wmVal');
+    const piVal = document.getElementById('piVal');
+    const efVal = document.getElementById('efVal');
+    const soVal = document.getElementById('soVal');
+    const emitStateBtn = document.getElementById('emitStateBtn');
+    const resetDeltasBtn = document.getElementById('resetDeltasBtn');
+
+    // Scorecard Elements
+    const compositeScoreEl = document.getElementById('compositeScore');
+    const tierLabelEl = document.getElementById('tierLabel');
+    const recommendationTextEl = document.getElementById('recommendationText');
+    const refreshScoreBtn = document.getElementById('refreshScoreBtn');
+
+    // Safety Lab Elements
+    const safetyInput = document.getElementById('safetyInput');
+    const testSafetyBtn = document.getElementById('testSafetyBtn');
+    const safetyResult = document.getElementById('safetyResult');
+    const sanitizedText = document.getElementById('sanitizedText');
+
+    let currentUserId = "user_pilot_001";
+    let chatHistory = [];
+
+    function getApiBase() {
+      return apiBaseInput.value.replace(/\/+$/, '');
+    }
+
+    // Ping Backend Health
+    async function checkHealth() {
+      try {
+        const res = await fetch(`${getApiBase()}/health`, { signal: AbortSignal.timeout(2000) });
+        if (res.ok) {
+          connectionPill.className = "flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200";
+          connectionPill.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span><span>Connected (:8000)</span>`;
+          return true;
+        }
+      } catch (err) {
+        connectionPill.className = "flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200";
+        connectionPill.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500"></span><span>Backend Offline</span>`;
+      }
+      return false;
+    }
+
+    // Update Slider Labels
+    function updateSliderLabels() {
+      const cluster = parseInt(clusterSlider.value);
+      clusterValue.textContent = `Cluster ${cluster}`;
+      
+      let tier = "Explorer";
+      let badgeCls = "bg-emerald-50 text-emerald-700 border-emerald-200";
+      if (cluster >= 3 && cluster <= 5) {
+        tier = "Practitioner";
+        badgeCls = "bg-blue-50 text-blue-700 border-blue-200";
+      } else if (cluster >= 6) {
+        tier = "Strategist";
+        badgeCls = "bg-violet-50 text-violet-700 border-violet-200";
+      }
+      tierBadge.textContent = tier;
+      tierBadge.className = `text-xs font-semibold px-2 py-0.5 rounded-full border ${badgeCls}`;
+
+      wmVal.textContent = (wmSlider.value >= 0 ? "+" : "") + wmSlider.value + "%";
+      piVal.textContent = (piSlider.value >= 0 ? "+" : "") + piSlider.value + "%";
+      efVal.textContent = (efSlider.value >= 0 ? "+" : "") + efSlider.value + "%";
+      soVal.textContent = (soSlider.value >= 0 ? "+" : "") + soSlider.value + "%";
+    }
+
+    [clusterSlider, wmSlider, piSlider, efSlider, soSlider].forEach(slider => {
+      slider.addEventListener('input', () => {
+        updateSliderLabels();
+        fetchScore();
+      });
+    });
+
+    resetDeltasBtn.addEventListener('click', () => {
+      wmSlider.value = 20;
+      piSlider.value = 15;
+      efSlider.value = -10;
+      soSlider.value = 5;
+      updateSliderLabels();
+    });
+
+    // Fetch and update Collaboration Score from backend
+    async function fetchScore() {
+      const cluster = parseInt(clusterSlider.value);
+      try {
+        const res = await fetch(`${getApiBase()}/v1/coach/collaboration-score?user_id=${encodeURIComponent(currentUserId)}&cluster_id=${cluster}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        compositeScoreEl.textContent = data.composite_score.toFixed(1);
+        tierLabelEl.textContent = `${data.archetype_tier.toUpperCase()} TIER`;
+        recommendationTextEl.textContent = data.growth_recommendation;
+
+        const s = data.dimension_scores;
+        const w = data.dimension_weights;
+
+        document.getElementById('scoreClar').textContent = Math.round(s.clarification);
+        document.getElementById('weightClar').textContent = `(w=${w.clarification.toFixed(2)})`;
+        document.getElementById('barClar').style.width = `${s.clarification}%`;
+
+        document.getElementById('scoreVerif').textContent = Math.round(s.critical_verification);
+        document.getElementById('weightVerif').textContent = `(w=${w.critical_verification.toFixed(2)})`;
+        document.getElementById('barVerif').style.width = `${s.critical_verification}%`;
+
+        document.getElementById('scoreIter').textContent = Math.round(s.iteration);
+        document.getElementById('weightIter').textContent = `(w=${w.iteration.toFixed(2)})`;
+        document.getElementById('barIter').style.width = `${s.iteration}%`;
+
+        document.getElementById('scoreAuto').textContent = Math.round(s.autonomy);
+        document.getElementById('weightAuto').textContent = `(w=${w.autonomy.toFixed(2)})`;
+        document.getElementById('barAuto').style.width = `${s.autonomy}%`;
+
+        document.getElementById('scoreResp').textContent = Math.round(s.responsible_use);
+        document.getElementById('weightResp').textContent = `(w=${w.responsible_use.toFixed(2)})`;
+        document.getElementById('barResp').style.width = `${s.responsible_use}%`;
+      } catch (err) {
+        console.warn("Score fetch offline, waiting for server...");
+      }
+    }
+
+    refreshScoreBtn.addEventListener('click', fetchScore);
+
+    // Emit State Bus Event (Simulate Member 3)
+    emitStateBtn.addEventListener('click', async () => {
+      const cluster = parseInt(clusterSlider.value);
+      const payload = {
+        user_id: currentUserId,
+        transition_occurred: true,
+        active_cluster_id: cluster,
+        delta_vector: {
+          working_memory: parseFloat(wmSlider.value) / 100.0,
+          pattern_induction: parseFloat(piSlider.value) / 100.0,
+          executive_function: parseFloat(efSlider.value) / 100.0,
+          spatial_orientation: parseFloat(soSlider.value) / 100.0,
+        },
+        uncertainty: 0.08
+      };
+
+      try {
+        const res = await fetch(`${getApiBase()}/v1/coach/state-event`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          appendSystemNotification(`State event emitted to coach! Cluster ${cluster} active.`);
+          fetchScore();
+        }
+      } catch (err) {
+        alert("Failed to emit state event. Ensure backend is running on :8000!");
+      }
+    });
+
+    // Chat Message Helpers
+    function appendUserMessage(text) {
+      const msgDiv = document.createElement('div');
+      msgDiv.className = "flex items-start justify-end space-x-2";
+      msgDiv.innerHTML = `
+        <div class="bg-indigo-600 text-white rounded-2xl rounded-tr-sm p-3 text-xs leading-relaxed max-w-[80%] shadow-sm">
+          ${escapeHtml(text)}
+        </div>
+        <div class="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center flex-shrink-0 text-xs font-bold">
+          U
+        </div>
+      `;
+      chatStream.appendChild(msgDiv);
+      chatStream.scrollTop = chatStream.scrollHeight;
+    }
+
+    function appendCoachMessage(replyText, xaiText, actions, safetyMeta) {
+      const msgDiv = document.createElement('div');
+      msgDiv.className = "flex items-start space-x-3";
+
+      let actionPillsHtml = '';
+      if (actions && actions.length > 0) {
+        actionPillsHtml = `
+          <div class="flex flex-wrap gap-1.5 pt-1">
+            ${actions.map(act => `<button class="action-card-btn text-[11px] bg-white border border-slate-200 hover:border-indigo-400 text-slate-700 px-2 py-1 rounded-lg transition">${escapeHtml(act)}</button>`).join('')}
+          </div>
+        `;
+      }
+
+      let xaiPillHtml = '';
+      if (xaiText) {
+        xaiPillHtml = `
+          <div class="inline-flex items-start space-x-1.5 p-2 rounded-xl bg-indigo-50/80 border border-indigo-100 text-[11px] text-indigo-900 leading-snug">
+            <span class="font-bold text-indigo-700">💡 XAI Justification:</span>
+            <span>${escapeHtml(xaiText)}</span>
+          </div>
+        `;
+      }
+
+      let safetyBadge = safetyMeta && safetyMeta.sanitized 
+        ? `<span class="bg-rose-50 text-rose-700 text-[10px] px-2 py-0.5 rounded-full font-medium border border-rose-200">Deficit Terms Sanitized</span>` 
+        : `<span class="bg-emerald-50 text-emerald-700 text-[10px] px-2 py-0.5 rounded-full font-medium border border-emerald-200">Non-Clinical Verified</span>`;
+
+      msgDiv.innerHTML = `
+        <div class="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center flex-shrink-0 text-xs">
+          <i data-lucide="bot" class="w-3.5 h-3.5"></i>
+        </div>
+        <div class="space-y-2 max-w-[85%]">
+          <div class="bg-slate-100 rounded-2xl rounded-tl-sm p-3 text-xs text-slate-800 leading-relaxed shadow-sm whitespace-pre-wrap">
+            ${escapeHtml(replyText)}
+          </div>
+          <div class="flex items-center space-x-2">
+            ${safetyBadge}
+          </div>
+          ${xaiPillHtml}
+          ${actionPillsHtml}
+        </div>
+      `;
+      chatStream.appendChild(msgDiv);
+      lucide.createIcons();
+
+      // Bind action cards
+      msgDiv.querySelectorAll('.action-card-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          chatInput.value = btn.textContent.trim();
+          handleSendMessage();
+        });
+      });
+
+      chatStream.scrollTop = chatStream.scrollHeight;
+    }
+
+    function appendSystemNotification(text) {
+      const notif = document.createElement('div');
+      notif.className = "flex justify-center my-2";
+      notif.innerHTML = `
+        <span class="text-[10px] bg-slate-100 text-slate-500 px-3 py-1 rounded-full border border-slate-200">
+          ${escapeHtml(text)}
+        </span>
+      `;
+      chatStream.appendChild(notif);
+      chatStream.scrollTop = chatStream.scrollHeight;
+    }
+
+    function escapeHtml(str) {
+      return (str || '').replace(/[&<>"']/g, function(m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+      });
+    }
+
+    // Send Message Handler
+    async function handleSendMessage() {
+      const msg = chatInput.value.trim();
+      if (!msg) return;
+
+      appendUserMessage(msg);
+      chatInput.value = "";
+      sendBtn.disabled = true;
+
+      const cluster = parseInt(clusterSlider.value);
+      const reqPayload = {
+        user_id: currentUserId,
+        message: msg,
+        active_cluster_id: cluster,
+        delta_vector: {
+          working_memory: parseFloat(wmSlider.value) / 100.0,
+          pattern_induction: parseFloat(piSlider.value) / 100.0,
+          executive_function: parseFloat(efSlider.value) / 100.0,
+          spatial_orientation: parseFloat(soSlider.value) / 100.0,
+        },
+        chat_history: chatHistory
+      };
+
+      try {
+        const res = await fetch(`${getApiBase()}/v1/coach/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(reqPayload)
+        });
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        chatHistory.push({ role: 'user', content: msg });
+        chatHistory.push({ role: 'assistant', content: data.reply_text });
+
+        appendCoachMessage(data.reply_text, data.xai_explanation, data.suggested_actions, data.safety_metadata);
+
+        if (data.collab_score_snapshot) {
+          compositeScoreEl.textContent = data.collab_score_snapshot.composite_score.toFixed(1);
+          recommendationTextEl.textContent = data.collab_score_snapshot.growth_recommendation;
+        }
+      } catch (err) {
+        appendCoachMessage(
+          `Unable to reach backend at ${getApiBase()}. Please ensure the FastAPI server is running with 'python -m uvicorn ai_coach.api:app --port 8000'.`,
+          "Local connection error",
+          [],
+          { is_safe: true, sanitized: false }
+        );
+      } finally {
+        sendBtn.disabled = false;
+        chatInput.focus();
+      }
+    }
+
+    chatForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      handleSendMessage();
+    });
+
+    clearChatBtn.addEventListener('click', () => {
+      chatStream.innerHTML = '';
+      chatHistory = [];
+      appendSystemNotification("Chat session cleared.");
+    });
+
+    // Suggestion chips
+    document.querySelectorAll('.suggestion-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        chatInput.value = btn.textContent.trim();
+        handleSendMessage();
+      });
+    });
+
+    // Standalone Safety Lab Test
+    testSafetyBtn.addEventListener('click', async () => {
+      const text = safetyInput.value.trim();
+      if (!text) return;
+
+      try {
+        const res = await fetch(`${getApiBase()}/v1/coach/verify-safety`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text })
+        });
+        const data = await res.json();
+        sanitizedText.textContent = data.sanitized_text;
+        safetyResult.classList.remove('hidden');
+      } catch (err) {
+        alert("Safety verify service offline.");
+      }
+    });
+
+    // Refresh Curriculum
+    document.getElementById('refreshCurriculumBtn').addEventListener('click', async () => {
+      const cluster = parseInt(clusterSlider.value);
+      try {
+        const res = await fetch(`${getApiBase()}/v1/coach/learning-path/${currentUserId}?cluster_id=${cluster}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const container = document.getElementById('learningPathContent');
+        container.innerHTML = data.modules.map((m, idx) => `
+          <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+            <span class="font-semibold text-slate-800">${idx + 1}. ${escapeHtml(m.title)}</span>
+            <p class="text-[11px] text-slate-500">${escapeHtml(m.focus)} (${m.target_duration_mins}m)</p>
+          </div>
+        `).join('');
+      } catch (err) {
+        console.warn("Curriculum fetch offline.");
+      }
+    });
+
+    // Auto health check on startup and periodic polling
+    updateSliderLabels();
+    checkHealth().then(ok => {
+      if (ok) fetchScore();
+    });
+    setInterval(checkHealth, 5000);
+  </script>
+</body>
+</html>

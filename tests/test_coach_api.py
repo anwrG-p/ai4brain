@@ -13,6 +13,12 @@ def test_health_check():
     assert res.json() == {"status": "ok", "service": "member2-ai-coach"}
 
 
+def test_visual_frontend_served():
+    res = client.get("/")
+    assert res.status_code == 200
+    assert "<title>AI4Brain — Member 2 AI Coach Visual Lab</title>" in res.text
+
+
 def test_post_coach_chat_endpoint():
     payload = {
         "user_id": "test_user_001",
