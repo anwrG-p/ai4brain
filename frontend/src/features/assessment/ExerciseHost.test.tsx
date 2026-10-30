@@ -62,6 +62,9 @@ test('bumping attempt fetches a fresh task: new task_id and item_id, same sessio
   expect(b.task_id).not.toBe(a.task_id)
   expect(b.trial_meta?.item_id).not.toBe(a.trial_meta?.item_id)
   expect(b.session_id).toBe(a.session_id)
+  // The fixture id carries a session token too, so a reload (new session, attempt 0) never repeats it.
+  expect(a.task_id).toBe(`${stroop.task_id}.${a.session_id.slice(0, 8)}.0`)
+  expect(a.task_id.length).toBeLessThanOrEqual(48) // server task_id limit
 })
 
 test('real mode keeps the generator task_id and reports a failed fetch through onError', async () => {

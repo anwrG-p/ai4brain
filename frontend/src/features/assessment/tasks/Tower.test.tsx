@@ -303,8 +303,20 @@ test('the limit does not fire after the trial finished, was aborted, or the scre
 
 test('peg names give capacity and bottom-to-top order', () => {
   setup()
-  expect(peg(0).getAttribute('aria-label')).toBe('Peg 1, holds 3: R, G (top)')
-  expect(peg(2).getAttribute('aria-label')).toBe('Peg 3, holds 1: empty')
+  expect(peg(0).getAttribute('aria-label')).toBe('Peg 1: R, G (top), holds 3')
+  expect(peg(2).getAttribute('aria-label')).toBe('Peg 3: empty, holds 1')
+})
+
+// WCAG 2.5.3 as axe's label-content-name-mismatch checks it: the visible words, in order, are a
+// contiguous run of the accessible name's words (parentheticals and punctuation dropped).
+const words = (s: string) => s.toLowerCase().replace(/\([^)]*\)/g, ' ').split(/[^a-z0-9]+/).filter(Boolean).join(' ')
+
+test('each peg name contains its visible text', () => {
+  setup()
+  for (const i of [0, 1, 2]) {
+    expect(` ${words(peg(i).getAttribute('aria-label')!)} `).toContain(` ${words(peg(i).textContent!)} `)
+  }
+  expect(words(peg(0).textContent!)).toBe('peg 1 r g')
 })
 
 test('an invalid prediction shows a hint', () => {

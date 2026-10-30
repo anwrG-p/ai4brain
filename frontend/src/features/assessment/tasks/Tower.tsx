@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent } from 'react'
 import { Button } from '../../../components/ui/Button'
 import { Card } from '../../../components/ui/Card'
 import { tracker } from '../telemetry/tracker'
@@ -33,10 +33,15 @@ function Pegs({ stacks, capacities, color }: { stacks: string[][]; capacities: n
       className="m-1 inline-flex flex-col-reverse border-b-4 border-border-strong align-bottom"
       style={{ minHeight: (capacities[i] ?? 0) * 28, minWidth: 56 }}
     >
+      {/* The space is not laid out in the flex column, but keeps the letters separate words in the
+          visible text, so a peg's label can contain it (WCAG 2.5.3). */}
       {s.map((d, k) => (
-        <span key={k} className="m-px rounded-sm px-1.5 py-0.5 text-sm font-bold" style={{ background: color(d), color: DISC_INK }}>
-          {d}
-        </span>
+        <Fragment key={k}>
+          {k > 0 && ' '}
+          <span className="m-px rounded-sm px-1.5 py-0.5 text-sm font-bold" style={{ background: color(d), color: DISC_INK }}>
+            {d}
+          </span>
+        </Fragment>
       ))}
     </span>
   ))
@@ -201,7 +206,8 @@ export function Tower({ params, recorder, onDone }: TaskProps<TowerParams>) {
               size="sm"
               aria-disabled={locked}
               aria-pressed={selected === i}
-              aria-label={`Peg ${i + 1}, holds ${capacities[i]}: ${s.length ? `${s.join(', ')} (top)` : 'empty'}`}
+              // Visible text first ("Peg 1 R G"), so the name contains the label (WCAG 2.5.3, axe label-content-name-mismatch).
+              aria-label={`Peg ${i + 1}: ${s.length ? `${s.join(', ')} (top)` : 'empty'}, holds ${capacities[i]}`}
               // ring-secondary, not ring-brand: brand is the focus outline, so selection must differ from focus.
               className={`aria-disabled:opacity-50 ${selected === i ? 'bg-surface-raised ring-4 ring-secondary' : ''}`}
               data-peg={i}

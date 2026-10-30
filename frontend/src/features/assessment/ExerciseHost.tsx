@@ -33,9 +33,11 @@ export function ExerciseHost({ schemaType, attempt, onDone, onError }: ExerciseH
     fetchNextTask(userId, attempt, { schemaType }).then(
       (fetched) => {
         if (!live) return
-        // Mock fixtures reuse one task_id per schema; the attempt suffix keeps task_id and
-        // item_id unique per run (R3). ponytail: unique within a session, not across reloads.
-        const task = usingMocks() ? { ...fetched, task_id: `${fetched.task_id}.${attempt}` } : fetched
+        // Mock fixtures reuse one task_id per schema; a session token plus the attempt keeps
+        // task_id and item_id unique per run, across reloads too (R3). Fits the 48-char limit.
+        const task = usingMocks()
+          ? { ...fetched, task_id: `${fetched.task_id}.${getSessionId().slice(0, 8)}.${attempt}` }
+          : fetched
         const recorder = new TrialRecorder({
           user_id: userId,
           session_id: getSessionId(),
