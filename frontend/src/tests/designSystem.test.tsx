@@ -10,7 +10,7 @@ describe('Wave 1 & Wave 2 Pages & Design System Unit Suite', () => {
   beforeEach(() => {
     useAppStore.getState().resetDemoState()
   })
-  it('verifies all 21 Light & Dark token pairs pass WCAG 2.1 thresholds', () => {
+  it('verifies all Light & Dark token pairs pass WCAG 2.1 thresholds', () => {
     const reports = evaluateDesignSystemContrast()
     expect(reports.length).toBeGreaterThanOrEqual(20)
     for (const report of reports) {

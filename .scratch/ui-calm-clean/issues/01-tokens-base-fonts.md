@@ -64,3 +64,47 @@ Spec: `../spec.md` (Design system, R4, R6, Constraints)
 - `npm run qa:checks` is green.
 - A quick visual check: the dev server shows Lexend text, a flat background and no offset shadows. Describe it in the report.
 - Commit with no AI attribution.
+
+## Comments
+
+**2026-10-30 — Exercise contrast tables recomputed (implementer, ticket 01).** WCAG 2.1 ratios against the new tokens: light surface `#FFFFFF` (unchanged), dark surface `#111827` (was `#1E293B`), dark ink `#F8FAFC`. Old values from `.scratch/member1-ui-integration/issues/05` and `06` Comments in brackets. **Every value still passes; no exercise token was swapped.** Every dark ratio rose. The only drops are in light, where `--color-secondary` and `--color-border-strong` changed from navy `#263D5B` to slate.
+
+Stroop ink as text on `--color-surface` (≥ 4.5:1):
+
+| Payload | Token | Light | Light ratio | Dark | Dark ratio |
+|---|---|---|---|---|---|
+| red | `--color-danger` | `#DC2626` | 4.83 (4.83) | `#F87171` | 6.41 (5.29) |
+| green | `--dim-3` | `#008662` | 4.58 (4.58) | `#2DD4BF` | 9.53 (7.86) |
+| blue | `--dim-1` | `#0072B2` | 5.19 (5.19) | `#56B4E9` | 7.69 (6.34) |
+| yellow | `--dim-7` | `#7D7300` | 4.86 (4.86) | `#F0E442` | 13.42 (11.06) |
+| (other) | `--color-ink` | `#0F172A` | 17.85 (17.74) | `#F8FAFC` | 16.96 (14.63) |
+
+Tower disc label `DISC_INK = --color-surface` (white light, `#111827` dark) on each disc (≥ 4.5:1):
+
+| Slot | Disc token | Light value | Label `#FFFFFF` | Dark value | Label `#111827` |
+|---|---|---|---|---|---|
+| 0 | `--dim-1` | `#0072B2` | 5.19 (5.19) | `#56B4E9` | 7.69 (6.34) |
+| 1 | `--color-danger` | `#DC2626` | 4.83 (4.83) | `#F87171` | 6.41 (5.29) |
+| 2 | `--dim-3` | `#008662` | 4.58 (4.58) | `#2DD4BF` | 9.53 (7.86) |
+| 3 | `--dim-8` | `#4F46E5` | 6.29 (6.29) | `#818CF8` | 5.95 (4.90) |
+| 4 | `--dim-7` | `#7D7300` | 4.86 (4.86) | `#F0E442` | 13.42 (11.06) |
+| 5 | `--dim-2` | `#C45100` | 4.64 (4.64) | `#FF8C3B` | 7.66 (6.32) |
+| 6 | `--dim-4` | `#9E4778` | 5.79 (5.79) | `#E899C8` | 8.30 (6.84) |
+| 7 | `--color-secondary` | `#334155` (was `#263D5B`) | 10.35 (11.05) | `#CBD5E1` (was `#E7DFD8`) | 11.95 (11.11) |
+
+Graphics (≥ 3:1):
+
+| Element | Pair | Light | Dark |
+|---|---|---|---|
+| Tower selected peg ring (`ring-secondary`) | secondary on surface | 10.35 | 11.95 |
+| same, against its `bg-surface-raised` fill | secondary on surface-raised | 9.45 | 9.89 |
+| Tower peg base / N-back grid stroke | `--color-border-strong` on surface | 4.76 (11.05) | 6.92 (6.37) |
+| same, on surface-raised | border-strong on surface-raised | 4.34 | 5.72 |
+| N-back lit vs unlit cell | `--dim-1` on `--color-surface-raised` | 4.73 (4.64) | 6.36 (5.37) |
+| N-back centre symbol | ink on surface-raised | 16.30 (15.88) | 14.03 (12.39) |
+| Relational inverted-rule border | `--color-warning` on surface | 5.02 (3.19) | 10.63 (8.76) |
+| UFOV canvas / MST strokes | ink on surface | 17.85 (17.74) | 16.96 (14.63) |
+
+Text: Tower hint `.text-danger` (light override `#B91C1C`, dark `--color-danger`) on canvas 6.18 light (`#F8FAFC`), 6.81 dark (`#0B1120`).
+
+Notes: the light disc label never changed (white), so the light disc column is identical; the thinnest margins are still `--dim-3` 4.58 light (Stroop green and Tower slot 2). Light border-strong dropped from 11.05 to 4.76 on surface but stays well above 3:1. Ink on a lit N-back cell alone is still under 3:1 (3.44 light, 2.21 dark), which is why the centre symbol keeps its unlit-colour halo.

@@ -1,37 +1,41 @@
 @import "tailwindcss";
 
+/* Calm & Clean design system (DEC-010, .scratch/ui-calm-clean/spec.md).
+   Every colour is defined twice: here in @theme (Tailwind utilities) and in the
+   :root / [data-theme] blocks below. Keep them in sync; src/styles/tokens.test.ts checks it.
+   Do not add --shadow-* tokens to @theme: it would revive the dead shadow-doodle* utilities. */
 @theme {
-  --color-canvas: #FFF5EE;
+  --color-canvas: #F8FAFC;
   --color-surface: #FFFFFF;
-  --color-surface-raised: #FDF0E7;
-  --color-ink: #111827;
-  --color-ink-muted: #4B5E78;
-  --color-border: #E7DFD8;
-  --color-border-strong: #263D5B;
-  --color-brand: #E86A33;
-  --color-brand-hover: #D55823;
-  --color-brand-subtle: #FDF2EB;
-  --color-brand-ink: #111827;
-  --color-secondary: #263D5B;
-  --color-reward: #FFC83D;
-  --color-reward-ink: #111827;
-  --color-accent: #E86A33;
-  --color-accent-ink: #111827;
-  --color-success: #16A34A;
+  --color-surface-raised: #F1F5F9;
+  --color-ink: #0F172A;
+  --color-ink-muted: #475569;
+  --color-border: #E2E8F0;
+  --color-border-strong: #64748B;
+  --color-brand: #4F46E5;
+  --color-brand-hover: #4338CA;
+  --color-brand-subtle: #EEF2FF;
+  --color-brand-ink: #FFFFFF;
+  --color-secondary: #334155;
+  --color-reward: #F59E0B;
+  --color-reward-ink: #0F172A;
+  --color-accent: #0F766E;
+  --color-accent-ink: #FFFFFF;
+  --color-success: #15803D;
   --color-success-subtle: #F0FDF4;
-  --color-warning: #D97706;
+  --color-warning: #B45309;
   --color-warning-subtle: #FFFBEB;
   --color-danger: #DC2626;
   --color-danger-subtle: #FEF2F2;
-  --color-info: #E86A33;
-  --color-info-subtle: #FDF2EB;
+  --color-info: #4F46E5;
+  --color-info-subtle: #EEF2FF;
 
-  --font-display: 'Delius Swash Caps', 'Delius', cursive, sans-serif;
-  --font-sans: 'Delius', 'Delius Swash Caps', cursive, sans-serif;
+  --font-display: 'Lexend', system-ui, sans-serif;
+  --font-sans: 'Lexend', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-  --radius-sm: 4px;
-  --radius-md: 8px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
   --radius-lg: 12px;
   --radius-xl: 16px;
   --radius-2xl: 20px;
@@ -45,31 +49,31 @@
 
 :root,
 [data-theme="light"] {
-  /* Doodle (Hand Drawn) Design System Semantic Color Roles */
-  --color-canvas: #FFF5EE;
+  /* Calm & Clean semantic colour roles (light) */
+  --color-canvas: #F8FAFC;
   --color-surface: #FFFFFF;
-  --color-surface-raised: #FDF0E7;
-  --color-ink: #111827;
-  --color-ink-muted: #4B5E78;
-  --color-border: #E7DFD8;
-  --color-border-strong: #263D5B;
-  --color-brand: #E86A33;
-  --color-brand-hover: #D55823;
-  --color-brand-subtle: #FDF2EB;
-  --color-brand-ink: #111827;
-  --color-secondary: #263D5B;
-  --color-reward: #FFC83D;
-  --color-reward-ink: #111827;
-  --color-accent: #E86A33;
-  --color-accent-ink: #111827;
-  --color-success: #16A34A;
+  --color-surface-raised: #F1F5F9;
+  --color-ink: #0F172A;
+  --color-ink-muted: #475569;
+  --color-border: #E2E8F0;
+  --color-border-strong: #64748B;
+  --color-brand: #4F46E5;
+  --color-brand-hover: #4338CA;
+  --color-brand-subtle: #EEF2FF;
+  --color-brand-ink: #FFFFFF;
+  --color-secondary: #334155;
+  --color-reward: #F59E0B;
+  --color-reward-ink: #0F172A;
+  --color-accent: #0F766E;
+  --color-accent-ink: #FFFFFF;
+  --color-success: #15803D;
   --color-success-subtle: #F0FDF4;
-  --color-warning: #D97706;
+  --color-warning: #B45309;
   --color-warning-subtle: #FFFBEB;
   --color-danger: #DC2626;
   --color-danger-subtle: #FEF2F2;
-  --color-info: #E86A33;
-  --color-info-subtle: #FDF2EB;
+  --color-info: #4F46E5;
+  --color-info-subtle: #EEF2FF;
 
   /* Okabe-Ito WCAG >= 3:1 Dimension Palette (3 to 10 Dimensions) */
   --dim-1: #0072B2;
@@ -84,24 +88,21 @@
   --dim-10: #831843;
 
   /* Uncertainty Tokens */
-  --uncertainty-band-fill: rgba(232, 106, 51, 0.20);
+  --uncertainty-band-fill: rgba(79, 70, 229, 0.18);
   --uncertainty-low-stroke: #9E4778;
-  --uncertainty-low-tint: #FDF2EB;
+  --uncertainty-low-tint: #EEF2FF;
 
-  /* Hand-Drawn Sketch Borders & Hard Offset Shadows */
-  --border-card-subtle: #263D5B;
-  --border-card-hover: #263D5B;
-  --shadow-doodle: 3px 3px 0 #263D5B;
-  --shadow-doodle-sm: 2px 2px 0 #263D5B;
-  --shadow-doodle-lg: 4px 4px 0 #263D5B;
-  --shadow-tactile: 3px 3px 0 #263D5B;
-  --shadow-tactile-active: 1px 1px 0 #263D5B;
-  --shadow-card: 4px 4px 0 #263D5B;
-  --shadow-soft: 3px 3px 0 #263D5B;
-  --shadow-soft-hover: 4px 4px 0 #263D5B;
-  --shadow-hero: 5px 5px 0 #263D5B;
-  --bg-hero-gradient: linear-gradient(135deg, #FFFFFF 0%, #FDF0E7 100%);
-  --bg-card-gradient: linear-gradient(135deg, #FFFFFF 0%, #FFF5EE 100%);
+  /* One soft elevation for cards and popovers. The legacy names all carry it. */
+  --shadow-elevation: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.06);
+  --shadow-doodle: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.06);
+  --shadow-doodle-sm: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.06);
+  --shadow-doodle-lg: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.06);
+  --shadow-tactile: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.06);
+  --shadow-tactile-active: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.06);
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.06);
+  --shadow-soft: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.06);
+  --shadow-soft-hover: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.06);
+  --shadow-hero: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.06);
 
   /* EMILY Emotion Adaptive Color Tokens (Default: Calm Flow) */
   --color-emotion-accent: #0D9488;
@@ -110,25 +111,25 @@
   --color-emotion-badge: #0D9488;
 
   /* Typography Families */
-  --font-display: 'Delius Swash Caps', 'Delius', cursive, sans-serif;
-  --font-sans: 'Delius', 'Delius Swash Caps', cursive, sans-serif;
+  --font-display: 'Lexend', system-ui, sans-serif;
+  --font-sans: 'Lexend', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-  /* Typography Scale (Doodle 14/16/18/24/32/40 px) */
+  /* Typography Scale (12 / 14 / 16 / 18 / 20 / 24 / 32 px) */
   --text-xs: 0.75rem;
   --leading-xs: 1rem;
   --text-sm: 0.875rem;
   --leading-sm: 1.25rem;
   --text-base: 1rem;
-  --leading-base: 1.5rem;
+  --leading-base: 1.6;
   --text-lg: 1.125rem;
   --leading-lg: 1.75rem;
-  --text-xl: 1.375rem;
+  --text-xl: 1.25rem;
   --leading-xl: 1.75rem;
-  --text-2xl: 1.75rem;
-  --leading-2xl: 2.25rem;
-  --text-3xl: 2.25rem;
-  --leading-3xl: 2.75rem;
+  --text-2xl: 1.5rem;
+  --leading-2xl: 2rem;
+  --text-3xl: 2rem;
+  --leading-3xl: 2.5rem;
 
   /* 4px Base Spacing Scale */
   --space-1: 0.25rem;
@@ -142,46 +143,47 @@
   --space-12: 3rem;
   --space-16: 4rem;
 
-  /* Radius Scale */
-  --radius-sm: 4px;
-  --radius-md: 8px;
+  /* Radius Scale (cards xl, buttons md) */
+  --radius-sm: 6px;
+  --radius-md: 10px;
   --radius-lg: 12px;
+  --radius-xl: 16px;
   --radius-pill: 9999px;
 
-  /* Motion Scale */
-  --duration-fast: 120ms;
+  /* Motion Scale (hover and press 150–200 ms) */
+  --duration-fast: 150ms;
   --duration-base: 200ms;
-  --duration-slow: 320ms;
+  --duration-slow: 300ms;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 [data-theme="dark"] {
-  /* Blackboard Sketch (Dark Theme) */
-  --color-canvas: #131B2E;
-  --color-surface: #1E293B;
-  --color-surface-raised: #27354A;
-  --color-ink: #FFFFFF;
-  --color-ink-muted: #CBD5E1;
-  --color-border: #3B4D68;
-  --color-border-strong: #FF8C5A;
-  --color-brand: #FF8C5A;
-  --color-brand-hover: #FFA47A;
-  --color-brand-subtle: #2D1A14;
-  --color-brand-ink: #131B2E;
-  --color-secondary: #E7DFD8;
-  --color-reward: #FFC83D;
-  --color-reward-ink: #131B2E;
-  --color-accent: #FF8C5A;
-  --color-accent-ink: #131B2E;
+  /* Calm & Clean semantic colour roles (dark) */
+  --color-canvas: #0B1120;
+  --color-surface: #111827;
+  --color-surface-raised: #1F2937;
+  --color-ink: #F8FAFC;
+  --color-ink-muted: #94A3B8;
+  --color-border: #1F2937;
+  --color-border-strong: #94A3B8;
+  --color-brand: #818CF8;
+  --color-brand-hover: #A5B4FC;
+  --color-brand-subtle: #1E1B4B;
+  --color-brand-ink: #0B1120;
+  --color-secondary: #CBD5E1;
+  --color-reward: #FBBF24;
+  --color-reward-ink: #0B1120;
+  --color-accent: #2DD4BF;
+  --color-accent-ink: #0B1120;
   --color-success: #4ADE80;
-  --color-success-subtle: #0F2E1E;
+  --color-success-subtle: #052E16;
   --color-warning: #FBBF24;
-  --color-warning-subtle: #332409;
+  --color-warning-subtle: #422006;
   --color-danger: #F87171;
-  --color-danger-subtle: #381418;
-  --color-info: #FF8C5A;
-  --color-info-subtle: #2D1A14;
+  --color-danger-subtle: #450A0A;
+  --color-info: #818CF8;
+  --color-info-subtle: #1E1B4B;
 
   /* Okabe-Ito Dark Theme Dimension Palette */
   --dim-1: #56B4E9;
@@ -195,23 +197,21 @@
   --dim-9: #34D399;
   --dim-10: #F472B6;
 
-  --uncertainty-band-fill: rgba(255, 140, 90, 0.22);
+  --uncertainty-band-fill: rgba(129, 140, 248, 0.22);
   --uncertainty-low-stroke: #F472B6;
-  --uncertainty-low-tint: #2D1A14;
+  --uncertainty-low-tint: #1E1B4B;
 
-  --border-card-subtle: #FF8C5A;
-  --border-card-hover: #FFA47A;
-  --shadow-doodle: 3px 3px 0 #FF8C5A;
-  --shadow-doodle-sm: 2px 2px 0 #FF8C5A;
-  --shadow-doodle-lg: 4px 4px 0 #FF8C5A;
-  --shadow-tactile: 3px 3px 0 #FF8C5A;
-  --shadow-tactile-active: 1px 1px 0 #FF8C5A;
-  --shadow-card: 4px 4px 0 #FF8C5A;
-  --shadow-soft: 3px 3px 0 #FF8C5A;
-  --shadow-soft-hover: 4px 4px 0 #FFA47A;
-  --shadow-hero: 5px 5px 0 #FF8C5A;
-  --bg-hero-gradient: linear-gradient(135deg, #1E293B 0%, #172234 100%);
-  --bg-card-gradient: linear-gradient(135deg, #1E293B 0%, #223046 100%);
+  /* Dark theme: a 1 px border only, no shadow */
+  --shadow-elevation: none;
+  --shadow-doodle: none;
+  --shadow-doodle-sm: none;
+  --shadow-doodle-lg: none;
+  --shadow-tactile: none;
+  --shadow-tactile-active: none;
+  --shadow-card: none;
+  --shadow-soft: none;
+  --shadow-soft-hover: none;
+  --shadow-hero: none;
 
   /* EMILY Dark Emotion Adaptive Color Tokens (Default: Calm Flow) */
   --color-emotion-accent: #4FD1C5;
@@ -238,7 +238,7 @@ html[data-emotion="calm_flow"]:not([data-theme="dark"]) {
 :root[data-emotion="energized"],
 [data-theme="light"][data-emotion="energized"],
 html[data-emotion="energized"]:not([data-theme="dark"]) {
-  /* Warm Terracotta Amber & Doodle Sky (High self-efficacy) */
+  /* Warm Terracotta Amber (High self-efficacy) */
   --color-emotion-accent: #D96B43;
   --color-emotion-tint: #FDF6F0;
   --color-emotion-glow: rgba(217, 107, 67, 0.15);
@@ -276,7 +276,7 @@ html[data-emotion="fatigued"]:not([data-theme="dark"]) {
 }
 
 /* ==========================================================================
-   EMILY Emotion-Adaptive Color Coding (Dark Mode - Blackboard Sketch)
+   EMILY Emotion-Adaptive Color Coding (Dark Mode)
    ========================================================================== */
 
 [data-theme="dark"][data-emotion="calm_flow"],
@@ -327,71 +327,43 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     box-sizing: border-box;
   }
 
-  /* =========================================================================
-     Doodle (Hand Drawn) Custom Website Scrollbar
-     ========================================================================= */
-  /* Modern CSS Scrollbar Standard (Firefox, Safari 18+) */
+  /* Quiet scrollbar: thin slate thumb on the plain canvas */
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--color-brand) var(--color-canvas);
+    scrollbar-color: var(--color-border-strong) var(--color-canvas);
   }
 
-  /* WebKit & Chromium Custom Scrollbar (Chrome, Edge, Safari, Brave) */
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
   }
 
-  ::-webkit-scrollbar-track {
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
     background-color: var(--color-canvas);
-    border-left: 1.5px dashed rgba(38, 61, 91, 0.22);
-  }
-
-  [data-theme="dark"] ::-webkit-scrollbar-track {
-    background-color: var(--color-canvas);
-    border-left: 1.5px dashed rgba(255, 140, 90, 0.22);
   }
 
   ::-webkit-scrollbar-thumb {
-    background-color: var(--color-brand);
+    background-color: var(--color-border-strong);
     border-radius: var(--radius-pill);
     border: 2px solid var(--color-canvas);
-    box-shadow: inset 0 0 0 1px var(--color-border-strong);
-    transition: background-color 0.2s ease;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background-color: var(--color-brand-hover);
-  }
-
-  ::-webkit-scrollbar-thumb:active {
     background-color: var(--color-secondary);
-  }
-
-  ::-webkit-scrollbar-corner {
-    background-color: var(--color-canvas);
   }
 
   html,
   body {
     background-color: var(--color-canvas);
-    /* Subtle sketchbook / whiteboard dot grid background */
-    background-image: radial-gradient(rgba(38, 61, 91, 0.09) 0.8px, transparent 0.8px);
-    background-size: 24px 24px;
-    background-position: 0 0;
     color: var(--color-ink);
     font-family: var(--font-sans);
     font-size: var(--text-base);
-    line-height: var(--leading-base);
+    line-height: 1.6;
     margin: 0;
     padding: 0;
     overflow-x: clip;
-    transition: background-color 0.45s ease, border-color 0.45s ease, box-shadow 0.45s ease;
-  }
-
-  [data-theme="dark"] html,
-  [data-theme="dark"] body {
-    background-image: radial-gradient(rgba(255, 140, 90, 0.12) 0.8px, transparent 0.8px);
+    transition: background-color var(--duration-base) ease, color var(--duration-base) ease;
   }
 
   h1,
@@ -399,7 +371,8 @@ html[data-theme="dark"][data-emotion="fatigued"] {
   h3,
   h4 {
     font-family: var(--font-display);
-    letter-spacing: -0.01em;
+    font-weight: 600;
+    letter-spacing: normal;
   }
 }
 
@@ -413,195 +386,78 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     font-variant-numeric: tabular-nums;
   }
 
-  /* Doodle Hand-Drawn Card Primitives */
+  /* Card primitives: 1 px border, radius xl, the soft elevation, no movement */
   .tactile-card {
     background-color: var(--color-surface);
-    border: 2px solid var(--color-border-strong);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-doodle);
-    transition: transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
-  }
-
-  .tactile-card:hover {
-    transform: translate(-1px, -1px);
-    box-shadow: var(--shadow-doodle-lg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-elevation);
+    transition: border-color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
   }
 
   .editorial-card {
-    background: var(--bg-card-gradient);
-    border: 2px solid var(--color-border-strong);
-    border-radius: var(--radius-md);
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
     padding: 1.5rem;
-    box-shadow: var(--shadow-doodle);
-    transition: transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
-  }
-
-  .editorial-card:hover {
-    box-shadow: var(--shadow-doodle-lg);
+    box-shadow: var(--shadow-elevation);
+    transition: border-color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
   }
 
   .hero-card {
-    background: var(--bg-hero-gradient);
-    border: 2.5px solid var(--color-border-strong);
-    border-radius: var(--radius-md);
-    padding: 1.5rem;
-    box-shadow: var(--shadow-hero);
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    padding: 2rem;
+    box-shadow: var(--shadow-elevation);
     position: relative;
   }
 
-  .glass-dock {
-    background: color-mix(in srgb, var(--color-surface) 96%, transparent);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 2px solid var(--color-border-strong);
-    box-shadow: var(--shadow-hero);
-    border-radius: var(--radius-md);
-  }
-
-  /* Doodle Buttons with Hand-Drawn Hard Offset Shadow & Tactile Press */
+  /* Buttons: 1 px boundary, colour change only, no offset shadow or press translate */
   .tactile-btn {
-    min-height: 2.75rem;
-    min-width: 2.75rem;
+    min-height: 44px;
+    min-width: 44px;
     border-radius: var(--radius-md);
-    border: 2px solid var(--color-border-strong);
-    box-shadow: var(--shadow-tactile);
-    transition-property: transform, background-color, box-shadow, border-color;
+    border: 1px solid var(--color-border-strong);
+    transition-property: background-color, border-color, color, opacity;
     transition-duration: var(--duration-fast);
     transition-timing-function: var(--ease-out);
-    font-family: var(--font-display);
-    letter-spacing: 0.01em;
-  }
-
-  .tactile-btn:hover:not(:disabled) {
-    transform: translate(-1px, -1px);
-    box-shadow: var(--shadow-doodle-lg);
-  }
-
-  .tactile-btn:active:not(:disabled) {
-    transform: translate(2px, 2px);
-    box-shadow: var(--shadow-tactile-active);
+    font-family: var(--font-sans);
   }
 
   .tactile-btn:focus-visible,
   .focus-ring:focus-visible {
-    outline: 3px solid var(--color-brand);
+    outline: 2px solid var(--color-brand);
     outline-offset: 2px;
   }
 
-  /* Doodle Sketch Utilities */
+  /* ponytail: neutralized until tickets 03/06 remove the remaining <div className="doodle-tape" /> usages */
   .doodle-tape {
-    position: absolute;
-    top: -8px;
-    left: 20px;
-    width: 60px;
-    height: 16px;
-    background-color: rgba(255, 200, 61, 0.45);
-    border: 1px dashed rgba(38, 61, 91, 0.4);
-    transform: rotate(-3deg);
-    pointer-events: none;
+    display: none;
   }
 
-  .doodle-highlight {
-    background: linear-gradient(104deg, rgba(232, 106, 51, 0) 0%, rgba(232, 106, 51, 0.22) 3%, rgba(232, 106, 51, 0.22) 97%, rgba(232, 106, 51, 0) 100%);
-    padding: 0 4px;
-    border-radius: 2px;
-  }
-
-  .doodle-wobble-border {
-    border: 2px solid var(--color-border-strong);
-    border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
-  }
-
-  /* Classroom Lecture Board (Doodle Aesthetic) */
+  /* Board and podium: plain flat surfaces (ticket 06 removes their usage) */
   .board-wood-frame {
     display: flex;
     flex-direction: column;
-    background-color: #E2B179;
-    background-image: linear-gradient(135deg, #ECC18A 0%, #D4A373 100%);
-    border: 3.5px solid var(--color-border-strong);
-    border-radius: 28px;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
     padding: 16px;
-    box-shadow: 6px 6px 0 var(--color-border-strong);
     position: relative;
-    transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
   }
 
-  [data-theme="dark"] .board-wood-frame {
-    background-color: #6E3F1F;
-    background-image: linear-gradient(135deg, #7D4925 0%, #563016 100%);
-    border-color: #FF8C5A;
-    box-shadow: 6px 6px 0 #FF8C5A;
-  }
-
-  /* Board Canvas: Whiteboard in Light Mode */
   .board-canvas {
     flex: 1;
     display: flex;
     flex-direction: column;
-    background-color: #FFFFFF;
-    background-image: radial-gradient(rgba(38, 61, 91, 0.08) 1.2px, transparent 1.2px);
-    background-size: 24px 24px;
-    border: 2.5px solid var(--color-border-strong);
-    border-radius: 18px;
-    color: #111827;
+    background-color: var(--color-canvas);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    color: var(--color-ink);
     position: relative;
-    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
   }
 
-  /* Board Canvas: Chalkboard in Dark Mode */
-  [data-theme="dark"] .board-canvas {
-    background-color: #162621;
-    background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1.2px, transparent 1.2px);
-    background-size: 24px 24px;
-    border: 2.5px solid rgba(255, 255, 255, 0.3);
-    border-radius: 18px;
-    color: #F8FAFC;
-  }
-
-  [data-theme="dark"] .board-canvas h1,
-  [data-theme="dark"] .board-canvas h2,
-  [data-theme="dark"] .board-canvas h3,
-  [data-theme="dark"] .board-canvas h4 {
-    color: #FFFFFF;
-  }
-
-  [data-theme="dark"] .board-canvas .text-ink {
-    color: #FFFFFF !important;
-  }
-
-  [data-theme="dark"] .board-canvas .text-ink-muted {
-    color: #CBD5E1 !important;
-  }
-
-  [data-theme="dark"] .board-canvas .tactile-card,
-  [data-theme="dark"] .board-canvas .bg-surface {
-    background-color: rgba(255, 255, 255, 0.06) !important;
-    border-color: rgba(255, 255, 255, 0.22) !important;
-    color: #FFFFFF !important;
-  }
-
-  [data-theme="dark"] .board-canvas .bg-surface-raised {
-    background-color: rgba(255, 255, 255, 0.09) !important;
-    border-color: rgba(255, 255, 255, 0.24) !important;
-    color: #FFFFFF !important;
-  }
-
-  [data-theme="dark"] .board-canvas .border-border-strong {
-    border-color: rgba(255, 255, 255, 0.28) !important;
-  }
-
-  [data-theme="dark"] .board-canvas .border-border {
-    border-color: rgba(255, 255, 255, 0.16) !important;
-  }
-
-  [data-theme="dark"] .board-canvas svg text {
-    fill: #FFFFFF !important;
-    stroke: #162621 !important;
-  }
-
-  /* =========================================================================
-     Classroom Lecture Stage: Wooden Podium (Doodle Aesthetic)
-     ========================================================================= */
   .wooden-podium {
     display: flex;
     flex-direction: column;
@@ -611,100 +467,39 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     pointer-events: none;
   }
 
-  /* Top Tier: Standing Platform with Beveled Edge */
-  .podium-top-tier {
+  .podium-top-tier,
+  .podium-mid-tier,
+  .podium-base-tier {
     width: 100%;
-    height: 18px;
-    background-color: #ECC18A;
-    background-image: linear-gradient(180deg, #F5D7B0 0%, #ECC18A 55%, #DFAB74 100%);
-    border: 3px solid var(--color-border-strong);
-    border-radius: 8px 8px 0 0;
+    background-color: var(--color-surface-raised);
+    border: 1px solid var(--color-border);
     position: relative;
+  }
+
+  .podium-top-tier {
+    height: 18px;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
     z-index: 3;
   }
 
-  [data-theme="dark"] .podium-top-tier {
-    background-color: #7D4925;
-    background-image: linear-gradient(180deg, #8E532B 0%, #7D4925 55%, #633618 100%);
-    border-color: #FF8C5A;
-  }
-
-  /* Middle Tier: Main Column with Wooden Planks & Inset Bevel */
   .podium-mid-tier {
-    width: 100%;
     height: 44px;
-    background-color: #E2B179;
-    background-image: linear-gradient(135deg, #ECC18A 0%, #D4A373 50%, #C89563 100%);
-    border-left: 3px solid var(--color-border-strong);
-    border-right: 3px solid var(--color-border-strong);
-    border-bottom: 2px solid var(--color-border-strong);
-    position: relative;
+    border-top: 0;
+    border-bottom: 0;
     z-index: 2;
     overflow: hidden;
   }
 
-  [data-theme="dark"] .podium-mid-tier {
-    background-color: #6E3F1F;
-    background-image: linear-gradient(135deg, #7D4925 0%, #6E3F1F 50%, #563016 100%);
-    border-left-color: #FF8C5A;
-    border-right-color: #FF8C5A;
-    border-bottom-color: #FF8C5A;
-  }
-
-  /* Vertical wood slat grooves on middle tier */
   .podium-planks-overlay {
     position: absolute;
     inset: 0;
-    background-image: repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 46px,
-      rgba(0, 0, 0, 0.08) 46px,
-      rgba(0, 0, 0, 0.08) 48px
-    );
     pointer-events: none;
   }
 
-  [data-theme="dark"] .podium-planks-overlay {
-    background-image: repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 46px,
-      rgba(255, 255, 255, 0.06) 46px,
-      rgba(255, 255, 255, 0.06) 48px
-    );
-  }
-
-  /* Base Tier: Sturdy Foundation Plinth (No Drop Shadow) */
   .podium-base-tier {
-    width: 100%;
     height: 20px;
-    background-color: #D4A373;
-    background-image: linear-gradient(180deg, #DFAB74 0%, #C89563 60%, #B88553 100%);
-    border: 3.5px solid var(--color-border-strong);
-    border-radius: 0 0 12px 12px;
-    position: relative;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
     z-index: 1;
-  }
-
-  [data-theme="dark"] .podium-base-tier {
-    background-color: #563016;
-    background-image: linear-gradient(180deg, #6E3F1F 0%, #563016 60%, #40200C 100%);
-    border-color: #FF8C5A;
-  }
-
-  /* Gentle Floating Idle Animation for Hero Character */
-  @keyframes brian-float {
-    0%, 100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-5px);
-    }
-  }
-
-  .animate-brian-float {
-    animation: brian-float 3.5s ease-in-out infinite;
   }
 
   /* EMILY Emotion-Adaptive Utility Classes */
@@ -768,7 +563,6 @@ html[data-theme="dark"][data-emotion="fatigued"] {
   }
   .tactile-btn:active:not(:disabled),
   .tactile-card:hover,
-  .animate-brian-float,
   .slide-anim-active,
   .slide-anim-next,
   .slide-anim-prev {
@@ -789,8 +583,6 @@ html[data-theme="dark"][data-emotion="fatigued"] {
 [data-timed-trial="true"] .tactile-btn:active:not(:disabled),
 [data-reduced-motion="true"] .tactile-card:hover,
 [data-timed-trial="true"] .tactile-card:hover,
-[data-reduced-motion="true"] .animate-brian-float,
-[data-timed-trial="true"] .animate-brian-float,
 [data-reduced-motion="true"] .slide-anim-active,
 [data-reduced-motion="true"] .slide-anim-next,
 [data-reduced-motion="true"] .slide-anim-prev {
@@ -799,25 +591,18 @@ html[data-theme="dark"][data-emotion="fatigued"] {
   transition: none !important;
 }
 
-/* Accessible text contrast overrides for light theme status & brand text tokens (WCAG 2.1 AA ≥4.5:1) */
+/* Status and brand text (WCAG 2.1 AA >= 4.5:1 on canvas, surface, surface-raised and the
+   matching -subtle fill, both themes; ratios in token-metadata.ts). Light danger uses red-700
+   because --color-danger (#DC2626) is 4.41:1 on surface-raised and danger-subtle. */
 .text-brand {
-  color: #C2410C !important;
-}
-[data-theme="dark"] .text-brand {
   color: var(--color-brand) !important;
 }
 
 .text-warning {
-  color: #92400E !important;
-}
-[data-theme="dark"] .text-warning {
   color: var(--color-warning) !important;
 }
 
 .text-success {
-  color: #166534 !important;
-}
-[data-theme="dark"] .text-success {
   color: var(--color-success) !important;
 }
 
@@ -827,4 +612,3 @@ html[data-theme="dark"][data-emotion="fatigued"] {
 [data-theme="dark"] .text-danger {
   color: var(--color-danger) !important;
 }
-

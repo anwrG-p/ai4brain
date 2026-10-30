@@ -893,10 +893,10 @@ export default function DesignSystemPage() {
         <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="rounded-md border-2 border-border-strong bg-surface-raised p-4">
             <span className="font-mono-tabular text-xs font-semibold uppercase text-ink-muted">
-              --font-display · Delius Swash Caps (SIL OFL)
+              --font-display · Lexend 600 (SIL OFL)
             </span>
             <p className="font-display text-2xl font-bold mt-2">
-              Hand-Drawn Headings with Swash Capitals
+              Calm, Readable Headings
             </p>
             <p className="text-xs text-ink-muted mt-2">
               Used for page titles, celebration milestones, and mascot voice
@@ -906,14 +906,14 @@ export default function DesignSystemPage() {
 
           <div className="rounded-md border-2 border-border-strong bg-surface-raised p-4">
             <span className="font-mono-tabular text-xs font-semibold uppercase text-ink-muted">
-              --font-sans · Delius (SIL OFL)
+              --font-sans · Lexend 400 (SIL OFL)
             </span>
             <p className="text-base font-medium mt-2">
-              Handwritten body text bringing sketch warmth to instructions
-              during cognitive task instructions and explainability panels.
+              Body text for task instructions and explainability panels,
+              designed to reduce visual crowding.
             </p>
             <p className="text-xs text-ink-muted mt-2">
-              16 px base size (`1rem`) with `1.5` line-height (`24 px`).
+              16 px base size (`1rem`) with `1.6` line-height.
             </p>
           </div>
 
