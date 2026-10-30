@@ -112,6 +112,7 @@ export function NBack({ params, recorder, onDone }: TaskProps<NBackParams>) {
       }
     }
     window.addEventListener('keydown', onKey)
+    // Standalone safety net: inside the UI the page unmounts the exercise on hidden first (R3).
     document.addEventListener('visibilitychange', onVis)
     return () => {
       window.removeEventListener('keydown', onKey)

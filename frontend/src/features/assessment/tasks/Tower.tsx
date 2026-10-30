@@ -83,6 +83,7 @@ export function Tower({ params, recorder, onDone }: TaskProps<TowerParams>) {
         onDone()
       }
     }
+    // Standalone safety net: inside the UI the page unmounts the exercise on hidden first (R3).
     document.addEventListener('visibilitychange', onVis)
     return () => document.removeEventListener('visibilitychange', onVis)
   }, [recorder, onDone])

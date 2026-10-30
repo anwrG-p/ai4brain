@@ -33,6 +33,7 @@ function Encoding({ items, ms, onEnd }: { items: Poly[]; ms: number; onEnd: () =
 
   useEffect(() => {
     const onVis = () => setHidden(document.hidden)
+    // Standalone safety net: inside the UI the page unmounts the exercise on hidden first (R3).
     document.addEventListener('visibilitychange', onVis)
     return () => document.removeEventListener('visibilitychange', onVis)
   }, [])

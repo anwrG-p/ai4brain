@@ -246,6 +246,7 @@ export function Ufov({ params, recorder, onDone, raf = defaultRaf }: TaskProps<U
         setI((x) => (x >= trials.length ? x : nextValid(trials, x + 1)))
       }
     }
+    // Standalone safety net: inside the UI the page unmounts the exercise on hidden first (R3).
     document.addEventListener('visibilitychange', onVis)
     return () => document.removeEventListener('visibilitychange', onVis)
   }, [recorder, trials])

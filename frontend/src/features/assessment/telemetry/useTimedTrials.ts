@@ -80,6 +80,7 @@ export function useTimedTrials(
         setI((x) => x + 1)
       }
     }
+    // Standalone safety net: inside the UI the page unmounts the exercise on hidden first (R3).
     document.addEventListener('visibilitychange', onVis)
     return () => document.removeEventListener('visibilitychange', onVis)
   }, [recorder])
