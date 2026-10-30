@@ -116,6 +116,10 @@ test('the selected peg shows aria-pressed', () => {
   predict('5')
   press(0)
   expect(peg(0).getAttribute('aria-pressed')).toBe('true')
+  // Not ring-brand: that is the focus outline colour, so selection and focus would look the same.
+  // --color-secondary is 11:1 on the card surface in both themes.
+  expect(peg(0).className).toContain('ring-secondary')
+  expect(peg(0).className).not.toContain('ring-brand')
   press(0)
   expect(peg(0).getAttribute('aria-pressed')).toBe('false')
 })

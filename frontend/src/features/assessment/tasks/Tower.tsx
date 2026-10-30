@@ -202,7 +202,8 @@ export function Tower({ params, recorder, onDone }: TaskProps<TowerParams>) {
               aria-disabled={locked}
               aria-pressed={selected === i}
               aria-label={`Peg ${i + 1}, holds ${capacities[i]}: ${s.length ? `${s.join(', ')} (top)` : 'empty'}`}
-              className={`items-end aria-disabled:opacity-50 ${selected === i ? 'bg-surface-raised ring-4 ring-brand' : ''}`}
+              // ring-secondary, not ring-brand: brand is the focus outline, so selection must differ from focus.
+              className={`aria-disabled:opacity-50 ${selected === i ? 'bg-surface-raised ring-4 ring-secondary' : ''}`}
               data-peg={i}
               // Native click covers pointer and Enter/Space once each; a held key's auto-repeat is suppressed.
               onClick={pressPeg}

@@ -46,8 +46,9 @@ const PORTED: Record<string, string> = {
   mst: 'Shape memory',
 }
 
-test('every fixture schema has a ported component', () => {
-  expect((fixtures as TaskPayload[]).map((t) => t.schema_type).filter((s) => !(s in PORTED))).toEqual([])
+test('the fixture schemas and the ported components are the same set', () => {
+  const fixtureSchemas = (fixtures as TaskPayload[]).map((t) => t.schema_type)
+  expect(new Set(fixtureSchemas)).toEqual(new Set(Object.keys(PORTED)))
 })
 
 test.each((fixtures as TaskPayload[]).map((t) => [t.schema_type, t] as const))('%s renders its exercise', (schemaType, task) => {
