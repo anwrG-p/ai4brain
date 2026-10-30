@@ -42,7 +42,8 @@ Everything I built is in `assessment_engine/`:
 | Folder | Role |
 |---|---|
 | `api/` | Python **FastAPI** server that **receives** telemetry and saves it |
-| `client/` | **React + TypeScript** browser app (Vite) with the 8 exercises |
+| `frontend/src/features/assessment/` (repo root) | **The maintained client**: the 8 exercises, the tracker and the task source, running inside the team UI (SynapseTwin) at `/task/:dimId` |
+| `client/` | **Frozen reference**: the original standalone React + TypeScript app (Vite). Only it has the voice opt-in |
 | `README.md` | Contracts + run commands |
 | `HANDOVER.md` | Notes for teammates' agents |
 
@@ -52,7 +53,7 @@ Everything I built is in `assessment_engine/`:
 
 Following a single answer through the system is the fastest way to understand the code:
 
-1. **`App.tsx`** asks `taskSource.ts` for the next task (`GET /v1/tasks/next`, or a built-in fixture in mock mode).
+1. **`ExerciseHost.tsx`** (mounted by the UI's `TaskRunnerPage`) asks `taskSource.ts` for the next task (`GET /v1/tasks/next`, or a built-in fixture in mock mode). In the frozen `client/`, `App.tsx` plays this role.
 2. **`TaskRunner.tsx`** looks at `schema_type` (e.g. `"stroop"`) and mounts the matching screen (`Stroop.tsx`).
 3. The screen calls **`recorder.start(i)`** when the stimulus appears. That moment is time zero.
 4. While the user thinks, **`useInputCapture`** quietly records every key press, mouse press and (throttled) mouse movement into the recorder. That data becomes *hesitation* and *keystroke latency*.
@@ -81,7 +82,9 @@ The 22 tests live in `api/tests/test_telemetry.py`. Each "hostile input" case ha
 
 ---
 
-## 4. The client (`client/src/`)
+## 4. The client (`frontend/src/features/assessment/`)
+
+The paths below are relative to `frontend/src/features/assessment/`, the maintained copy inside the team UI. The frozen `client/src/` has the same layout, plus `App.tsx` (its own session loop) and `voice/`.
 
 ### 4.1 Telemetry core: `telemetry/`
 
@@ -111,13 +114,15 @@ The 22 tests live in `api/tests/test_telemetry.py`. Each "hostile input" case ha
 - **It uses `sendBeacon` on `pagehide` and when the page becomes hidden.** The browser delivers these even while the tab is closing.
 - **A rejected batch (4xx) is dropped, not retried forever.** One broken event would otherwise block every event behind it. Network errors, 5xx, 408 and 429 are retried.
 - Duplicates can happen (a beacon while a normal send is in flight), so Member 3 dedupes on `(session_id, item_id, stream)`.
+- **In the UI it is the single telemetry sink.** The buffer is mirrored to `localStorage`, so pending events survive a reload. `subscribe`/`getStatus` feed the offline banner its real pending count, and the Privacy page's purge calls `tracker.clear()`. The UI's old `telemetryQueue.ts` was deleted.
 
-### 4.2 Getting tasks: `tasks/taskSource.ts`, `TaskRunner.tsx`, `App.tsx`
+### 4.2 Getting tasks: `tasks/taskSource.ts`, `TaskRunner.tsx`, `ExerciseHost.tsx`
 
 - `fetchNextTask` calls Member 5's API and **validates** the reply: a known `schema_type`, one of the 6 dimensions, and a `task_id` of at most 48 characters. Anything invalid shows a "try again" screen instead of sending events that the server would reject.
-- **Mock mode** (`VITE_MOCK_TASKS=1`) plays the 8 examples in `fixtures.json` in order. Use it while Member 5's API doesn't exist.
+- **Mock mode** is the UI default (`VITE_USE_MOCKS` unset; set it to `false` for real tasks). The page picks the fixture: the dimension's first exercise, or the one named by `?schema=<schema_type>`. Use it while Member 5's API doesn't exist. (The frozen `client/` uses `VITE_MOCK_TASKS=1` and plays the fixtures in order.)
 - `getUserId` creates an anonymous random ID kept in the browser (no login yet).
-- `App.tsx` wraps each exercise in an error boundary (`SkipOnError`): a broken task is skipped instead of blanking the app.
+- `ExerciseHost.tsx` fetches one task, gives it its own `TrialRecorder` (with the payload's `dimension`, never the UI registry's), and wraps the exercise in an error boundary (`SkipOnError`): a broken task shows the page's retry screen instead of blanking the app.
+- **Pause = unmount.** Escape, the pause button or a tab blur unmounts the exercise; the unfinished trial is never sent. Resume fetches a fresh task with a new `task_id`, so `item_id`s never repeat.
 
 ### 4.3 The 8 exercises: `tasks/*.tsx`
 
@@ -145,7 +150,10 @@ Two different tools, used for two different goals:
 
 **Why UFOV timing is special.** A screen only changes on a refresh (every 16.7 ms at 60 Hz, 8.3 ms at 120 Hz). Asking for 50 ms really means "show for N whole frames". So UFOV logs **`shown_ms`** (what was actually on screen, measured from `requestAnimationFrame` timestamps), and QUEST+ learns from `shown_ms`, not from the requested value.
 
-### 4.5 Voice opt-in: `voice/`
+### 4.5 Voice opt-in: `voice/` (frozen `client/` only)
+
+Voice is **not shipped in the UI** (decision D1): the UI never asks for the microphone and always sends `voice_opt_in: false`. What follows describes the frozen `client/`.
+
 
 - **`VoiceToggle.tsx`**: off by default and off again on every page load. Turning it on asks for the microphone; if refused, it switches back off and says why.
 - **`voiceProbe.ts`**: listens to the mic **only to measure loudness**. It notes the moment speech starts, then derives *voice latency* (how fast you start speaking) and *vocal pace*. **No recording and no audio kept**: a test scans the file and fails if it ever contains `MediaRecorder`, `fetch(`, `sendBeacon`, `XMLHttpRequest` or `WebSocket`. The mic is released when you switch it off or leave the app.
@@ -175,15 +183,17 @@ cd assessment_engine\api
 .\.venv\Scripts\python -m uvicorn main:app --port 8000     # docs: http://localhost:8000/docs
 .\.venv\Scripts\python -m pytest -q                          # 22 tests
 
-# Client (terminal 2)
-cd assessment_engine\client
-$env:VITE_MOCK_TASKS = "1"; npm run dev                      # http://localhost:5173
-npx vitest run        # 171 tests
-npm run build         # type-check + build
-npx oxlint            # lint
+# UI (terminal 2): mock tasks are the default
+cd frontend
+npm run dev                                                  # http://localhost:5173 (or the next free port)
+# open /task/inhibition_control, or /task/visuospatial_planning_gf?schema=tower
+npm run qa:checks     # lint:tokens, lint:copy, check:contrast, vitest, build
+npm run qa:e2e        # Playwright; its config uses the Chrome channel, so Chrome must be installed
 ```
 
 To see the data your answers produce, open `data\raw\telemetry\<id>.jsonl` at the repo root after playing a few trials.
+
+The frozen `client/` still runs on its own (`cd assessment_engine\client; $env:VITE_MOCK_TASKS = "1"; npm run dev`), but it is no longer maintained.
 
 ---
 
@@ -194,7 +204,7 @@ These are listed in full in `README.md` → "Open questions":
 1. **Field names**: the root README spells the event two ways; I used `score_norm / response_time_ms / error_flag / hesitation_jitter`. Member 3 must agree.
 2. **6 dimensions, not 4**: I added `processing_speed` (UFOV) and `episodic_memory` (MST).
 3. **Task JSON format**: Member 5 must produce exactly the `params` shapes in `types.ts`, including the answers.
-4. **Integration with the new UI** (`frontend/`): it has its own task runner and its own telemetry queue. That queue's event shape would be **rejected by my server**, so porting my exercises into it is the next job.
+4. **Integration with the new UI** (`frontend/`): done. The exercises run at `/task/:dimId`, my Tracker replaced the UI's own telemetry queue, and every trial is accepted by the server (0 × 422 in the end-to-end smoke). Still open: the UI owner has to accept the proposed DEC entry in `docs/ui/DECISIONS.md`, and Member 5 should say whether `GET /v1/tasks/next` takes a `schema_type` filter.
 
 ---
 
