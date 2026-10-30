@@ -8,6 +8,7 @@ import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { DoodleSquiggle } from '../components/ui/DoodleDecorations'
 import { useAppStore } from '../state/useAppStore'
+import { tracker } from '../features/assessment/telemetry/tracker'
 import { MOCK_PRIVACY_AUDIT_LOG } from '../services/mocks/fixtures'
 import type { PrivacyAuditEvent, PurgeCertificate, WhyThisTrail } from '../types'
 
@@ -161,6 +162,8 @@ export default function PrivacyPage() {
   // GDPR Article 17: Right to Erasure confirmation
   const handleConfirmPurge = () => {
     resetDemoState()
+    // Drops pending events on this device; server-side deletion is Member 4's route.
+    const recordsPurged = tracker.clear()
 
     const cert: PurgeCertificate = {
       certificateId: `CERT-PURGE-2026-${Math.random()
@@ -169,7 +172,7 @@ export default function PrivacyPage() {
         .toUpperCase()}`,
       timestampIso: new Date().toISOString(),
       userHash: 'ANON_USER_SALT_8F4A',
-      recordsPurged: 0,
+      recordsPurged,
       storagePurged: [
         'data/raw/telemetry/*.jsonl',
         'sat_jepa_latent_snapshots',

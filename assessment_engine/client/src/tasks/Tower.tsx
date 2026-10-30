@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent } from 'react'
 import { tracker } from '../telemetry/tracker'
 import { useInputCapture } from '../telemetry/useInputCapture'
 import type { TowerParams } from '../telemetry/types'
@@ -25,9 +25,13 @@ function Pegs({ stacks, capacities, color }: { stacks: string[][]; capacities: n
 
 // Tower-of-London planning: one trial (index 0). Pegs stay locked until a move count is predicted;
 // the time to that is planning_time_ms. A move is source peg then destination peg. The trial ends on
-// reaching the goal or after 3 × l_min moves. A hidden page aborts it; visible again ends the task.
+// reaching the goal, after 3 × l_min moves, or time_limit_ms after the prediction (unsolved).
+// A hidden page aborts it; visible again ends the task.
 export function Tower({ params, recorder, onDone }: TaskProps<TowerParams>) {
   const { capacities, start, goal, l_min, optimal_moves, counter_intuitive } = params
+  // ponytail: TOL-F's 60 s per problem, counted from the prediction (planning is its own phase and
+  // has no limit); no on-screen countdown.
+  const limit = params.time_limit_ms ?? 60000
   const [stacks, setStacks] = useState(start)
   const [selected, setSelected] = useState<number | null>(null)
   const [predicted, setPredicted] = useState<number | null>(null)
@@ -59,6 +63,43 @@ export function Tower({ params, recorder, onDone }: TaskProps<TowerParams>) {
     return () => document.removeEventListener('visibilitychange', onVis)
   }, [recorder, onDone])
   useInputCapture(recorder, live)
+
+  // One event, then onDone. A timeout passes windowMs (elapsed since onset) and solved false.
+  const end = (solved: boolean, windowMs?: number) => {
+    over.current = true
+    setLive(false)
+    const c = conflicts.current
+    const l_user = moveTimes.current.length
+    tracker.push(
+      recorder.finish({
+        correct: solved && l_user === l_min,
+        score: solved ? Math.min(1, l_min / l_user) : 0,
+        windowMs,
+        meta: {
+          l_min,
+          l_user,
+          predicted_moves: predicted ?? 0,
+          planning_time_ms: planned.current - t0.current,
+          conflict_latency_ms: c.length ? c.reduce((a, b) => a + b, 0) / c.length : 0,
+          solved,
+        },
+      }),
+    )
+    onDone()
+  }
+  const endRef = useRef(end)
+  useLayoutEffect(() => {
+    endRef.current = end
+  })
+
+  // The limit runs from the prediction while the trial is live; finishing, aborting or unmounting clears it.
+  useEffect(() => {
+    if (predicted === null || !live) return
+    const id = setTimeout(() => {
+      if (!over.current) endRef.current(false, performance.now() - t0.current)
+    }, planned.current + limit - performance.now())
+    return () => clearTimeout(id)
+  }, [predicted, live, limit])
 
   // Disc colour by first appearance in start, then goal.
   const ids = [...new Set([...start.flat(), ...goal.flat()])]
@@ -96,26 +137,7 @@ export function Tower({ params, recorder, onDone }: TaskProps<TowerParams>) {
     const opt = optimal_moves[m]
     if (opt && opt[0] === from && opt[1] === i && counter_intuitive.includes(m)) conflicts.current.push(times[m] - (m ? times[m - 1] : planned.current))
     const solved = same(next, goal)
-    const l_user = times.length
-    if (!solved && l_user < 3 * l_min) return
-    over.current = true
-    setLive(false)
-    const c = conflicts.current
-    tracker.push(
-      recorder.finish({
-        correct: solved && l_user === l_min,
-        score: solved ? Math.min(1, l_min / l_user) : 0,
-        meta: {
-          l_min,
-          l_user,
-          predicted_moves: predicted,
-          planning_time_ms: planned.current - t0.current,
-          conflict_latency_ms: c.length ? c.reduce((a, b) => a + b, 0) / c.length : 0,
-          solved,
-        },
-      }),
-    )
-    onDone()
+    if (solved || times.length >= 3 * l_min) end(solved)
   }
 
   const locked = predicted === null

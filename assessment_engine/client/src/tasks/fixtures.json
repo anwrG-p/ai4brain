@@ -115,7 +115,8 @@
       "goal": [["B"], ["G"], ["R"]],
       "l_min": 5,
       "optimal_moves": [[1, 2], [0, 1], [2, 1], [0, 2], [1, 0]],
-      "counter_intuitive": [2]
+      "counter_intuitive": [2],
+      "time_limit_ms": 60000
     }
   },
   {

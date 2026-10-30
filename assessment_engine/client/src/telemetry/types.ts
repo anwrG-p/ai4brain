@@ -115,6 +115,7 @@ export type TowerParams = {
   l_min: number
   optimal_moves: [number, number][]
   counter_intuitive: number[] // indices into optimal_moves
+  time_limit_ms?: number // per problem, from the prediction submit; client default 60000 (TOL-F)
 }
 
 export type UfovParams = {
