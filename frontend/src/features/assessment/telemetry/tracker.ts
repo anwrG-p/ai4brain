@@ -1,5 +1,5 @@
 import { hesitationJitter, nextErrorBurst } from './metrics'
-import { isTelemetryEvent, type Dimension, type TelemetryEvent, type TrialMeta } from './types'
+import { eventProblem, type Dimension, type TelemetryEvent, type TrialMeta } from './types'
 
 type TrialCtx = {
   user_id: string
@@ -10,6 +10,8 @@ type TrialCtx = {
 }
 
 const MAX_RT_MS = 600_000 // server response_time_ms upper bound
+// Into the server's [0, 600000]; NaN or ±Infinity (a broken clock or window) becomes 0.
+const clampRt = (ms: number) => (Number.isFinite(ms) ? Math.min(MAX_RT_MS, Math.max(0, ms)) : 0)
 
 type TrialResult = {
   correct: boolean
@@ -59,7 +61,7 @@ export class TrialRecorder {
       dimension: this.ctx.dimension,
       // Clamped to the server's bounds so one out-of-range value cannot get a whole batch rejected.
       score_norm: Math.min(1, Math.max(0, r.score ?? (r.correct ? 1 : 0))),
-      response_time_ms: Math.min(MAX_RT_MS, r.windowMs ?? this.now() - t.start),
+      response_time_ms: clampRt(r.windowMs ?? this.now() - t.start),
       error_flag: !r.correct,
       error_burst: this.burst,
       hesitation_jitter: hesitationJitter(t.inputs),
@@ -183,8 +185,22 @@ export class Tracker {
   }
 
   push(e: TelemetryEvent): void {
-    this.add([e])
-    for (const l of this.eventListeners) safely(() => l(e))
+    const [valid] = this.validOnly([e])
+    if (!valid) return this.notify() // dropped and counted; it was never recorded
+    this.add([valid])
+    for (const l of this.eventListeners) safely(() => l(valid))
+  }
+
+  // The server rejects a whole batch over one bad event, so each bad one is dropped alone, logged
+  // and counted, before it can take up to 99 good ones down with it.
+  private validOnly(events: unknown[]): TelemetryEvent[] {
+    return events.filter((e): e is TelemetryEvent => {
+      const problem = eventProblem(e)
+      if (problem === null) return true
+      console.error(`telemetry: dropped an invalid event (${problem})`, e)
+      this.droppedCount++
+      return false
+    })
   }
 
   // Every event, new or restored, enters here: cap, persist, notify, flush at batchSize.
@@ -335,8 +351,7 @@ export class Tracker {
     if (!raw) return []
     try {
       const parsed: unknown = JSON.parse(raw)
-      // The server rejects a whole batch over one bad event, so anything malformed stays behind.
-      return Array.isArray(parsed) ? parsed.filter(isTelemetryEvent) : []
+      return Array.isArray(parsed) ? this.validOnly(parsed) : []
     } catch {
       return []
     }

@@ -64,36 +64,60 @@ const EVENT_KEYS: ReadonlySet<string> = new Set(
   } satisfies Record<keyof TelemetryEvent, true>),
 )
 
+// The server's rules (allow_inf_nan=False, so every number must be finite).
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
-const isOptNum = (v: unknown) => v === undefined || v === null || isNum(v)
-// The server's MetaValue: string, int, float or bool.
-const isMetaValue = (v: unknown) => typeof v === 'string' || typeof v === 'boolean' || isNum(v)
+const inRange = (v: unknown, min: number, max = Infinity) => isNum(v) && v >= min && v <= max
+const isCount = (v: unknown) => Number.isInteger(v) && (v as number) >= 0
+const isOptNonNeg = (v: unknown) => v === undefined || v === null || inRange(v, 0)
+const ID = /^[A-Za-z0-9_-]{1,64}$/
+const META_KEY = /^[a-z0-9_]{1,32}$/
+// ISO 8601 as Date.toISOString writes it (offset optional); Date.parse alone accepts far more.
+const ISO_TS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/
+// The server's MetaValue: a string of at most 64 chars, int, float or bool.
+const isMetaValue = (v: unknown) =>
+  (typeof v === 'string' && v.length <= 64) || typeof v === 'boolean' || isNum(v)
+const isId = (v: unknown) => typeof v === 'string' && ID.test(v)
 
-// Shape check for events read back from storage (types only; the server still checks ranges).
-export function isTelemetryEvent(x: unknown): x is TelemetryEvent {
-  if (typeof x !== 'object' || x === null || Array.isArray(x)) return false
-  const e = x as Record<string, unknown>
-  const meta = e.trial_meta
-  return (
-    Object.keys(e).every((k) => EVENT_KEYS.has(k)) &&
-    ['user_id', 'session_id', 'task_id', 'client_ts'].every((k) => typeof e[k] === 'string') &&
-    ['trial_index', 'score_norm', 'response_time_ms', 'error_burst', 'hesitation_jitter'].every((k) =>
-      isNum(e[k]),
-    ) &&
-    typeof e.error_flag === 'boolean' &&
-    typeof e.dimension === 'string' &&
-    DIMENSIONS.has(e.dimension) &&
-    isOptNum(e.keystroke_latency_ms) &&
-    isOptNum(e.voice_latency_ms) &&
-    isOptNum(e.vocal_pace_hz) &&
-    (e.voice_opt_in === undefined || typeof e.voice_opt_in === 'boolean') &&
-    (meta === undefined ||
-      (typeof meta === 'object' &&
-        meta !== null &&
-        !Array.isArray(meta) &&
-        Object.values(meta).every(isMetaValue)))
-  )
+function isMeta(meta: unknown): boolean {
+  if (meta === undefined) return true
+  if (typeof meta !== 'object' || meta === null || Array.isArray(meta)) return false
+  const entries = Object.entries(meta)
+  return entries.length <= 16 && entries.every(([k, v]) => META_KEY.test(k) && isMetaValue(v))
 }
+
+// The first rule of assessment_engine/api/routes/telemetry.py that `x` breaks, or null when the
+// server would accept it. Checked on push and on restore, because the server rejects a whole
+// batch over one bad event.
+// ponytail: JS string length counts UTF-16 units, Python counts code points, so astral characters
+// make the 48/64-char checks a little stricter than the server; never looser.
+export function eventProblem(x: unknown): string | null {
+  if (typeof x !== 'object' || x === null || Array.isArray(x)) return 'not an object'
+  const e = x as Record<string, unknown>
+  const extra = Object.keys(e).find((k) => !EVENT_KEYS.has(k))
+  if (extra !== undefined) return `unknown field ${extra}`
+  if (!isId(e.user_id)) return 'user_id'
+  if (!isId(e.session_id)) return 'session_id'
+  if (typeof e.task_id !== 'string' || e.task_id.length < 1 || e.task_id.length > 48) return 'task_id'
+  if (!isCount(e.trial_index)) return 'trial_index'
+  if (typeof e.dimension !== 'string' || !DIMENSIONS.has(e.dimension)) return 'dimension'
+  if (!inRange(e.score_norm, 0, 1)) return 'score_norm'
+  if (!inRange(e.response_time_ms, 0, 600_000)) return 'response_time_ms'
+  if (typeof e.error_flag !== 'boolean') return 'error_flag'
+  if (!isCount(e.error_burst)) return 'error_burst'
+  if (!inRange(e.hesitation_jitter, 0)) return 'hesitation_jitter'
+  if (!isOptNonNeg(e.keystroke_latency_ms)) return 'keystroke_latency_ms'
+  if (!isMeta(e.trial_meta)) return 'trial_meta'
+  if (e.voice_opt_in !== undefined && typeof e.voice_opt_in !== 'boolean') return 'voice_opt_in'
+  if (!isOptNonNeg(e.voice_latency_ms)) return 'voice_latency_ms'
+  if (!isOptNonNeg(e.vocal_pace_hz)) return 'vocal_pace_hz'
+  const hasVoice = (e.voice_latency_ms ?? null) !== null || (e.vocal_pace_hz ?? null) !== null
+  if (hasVoice && e.voice_opt_in !== true) return 'voice fields require voice_opt_in'
+  if (typeof e.client_ts !== 'string' || !ISO_TS.test(e.client_ts) || Number.isNaN(Date.parse(e.client_ts)))
+    return 'client_ts'
+  return null
+}
+
+export const isTelemetryEvent = (x: unknown): x is TelemetryEvent => eventProblem(x) === null
 
 // One union for the whole app: the UI's registry type has the same 8 literals.
 export type SchemaType = TaskSchemaType
