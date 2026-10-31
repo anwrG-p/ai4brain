@@ -457,11 +457,19 @@ def reads_french(user_text: str) -> bool:
     return bool(_FRENCH_HINTS.search(normalise_user_text(user_text)))
 
 
-_FIXED_CRISIS_NORMALISED = frozenset(normalise_user_text(t) for t in _FIXED_CRISIS_REPLIES)
+# Whole replies and each of their bubbles: a client may send a multi-bubble reply back as one
+# transcript turn or as one turn per bubble (bubbles are separated by a blank line).
+_FIXED_CRISIS_NORMALISED = frozenset(
+    normalise_user_text(part)
+    for t in _FIXED_CRISIS_REPLIES
+    for part in (t, *t.split("\n\n"))
+    if part.strip()
+)
 
 
 def is_fixed_crisis_reply(text: str) -> bool:
-    """True for one of Loti's fixed crisis replies or signposts (backend or frontend copy).
+    """True for one of Loti's fixed crisis replies or signposts (backend or frontend copy), whole
+    or any single bubble of one.
 
     The coach uses it to keep these lines, and the user turn they answered, out of the LLM window:
     an emergency line with no context would only confuse the LLM, and the turn it answered may be

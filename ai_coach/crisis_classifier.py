@@ -14,9 +14,12 @@ Verdicts and routing:
 - Gemini's own filter blocks the classifier call: treated as `low`. A block on a message the
   classifier was asked to read is itself a risk signal; a calm signpost costs less than a miss.
 
-FAIL CLOSED: a timeout, an HTTP or transport error, a reply that is not exactly
-{"risk": "none"|"low"|"high", "reason": str} raises ClassifierError. The agent then does not call
-the coach LLM and sends the scripted offline reply (reply_source offline_after_classifier_error).
+- `none` with a reason the keyword crisis gate flags: promoted to `low`.
+
+FAIL CLOSED: a timeout, an HTTP or transport error, a reply that is not exactly one
+{"reason": str, "risk": "none"|"low"|"high"} object (duplicate keys included) raises
+ClassifierError. The agent then does not call the coach LLM; it sends the health signpost if the
+message raises health, else the scripted offline reply (offline_after_classifier_error).
 
 The `reason` is for evaluation only. It may quote the user, so it is never logged, stored or sent.
 """
@@ -28,7 +31,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, Optional
 
-from ai_coach.llm_gemini import GeminiBlocked, GeminiRunner
+from ai_coach.llm_gemini import GeminiBlocked, GeminiError, GeminiRunner
+from ai_coach.safety_guardrails import crisis_check
 
 MAX_REASON_CHARS = 300
 
@@ -60,17 +64,18 @@ ordinary stress; jokes.
 When unsure between "none" and "low", answer "low". When unsure between "low" and "high", answer
 "high".
 
-Reply with JSON only: {"risk": "none" | "low" | "high", "reason": "<at most 12 words>"}.
+Reply with JSON only, the reason first: {"reason": "<at most 12 words>", "risk": "none" | "low" | "high"}.
 Do not quote the user in the reason."""
 
+# The reason comes first, so the model states what it read before it commits to a rating.
 RESPONSE_SCHEMA = {
     "type": "OBJECT",
     "properties": {
-        "risk": {"type": "STRING", "enum": ["none", "low", "high"]},
         "reason": {"type": "STRING"},
+        "risk": {"type": "STRING", "enum": ["none", "low", "high"]},
     },
-    "required": ["risk", "reason"],
-    "propertyOrdering": ["risk", "reason"],
+    "required": ["reason", "risk"],
+    "propertyOrdering": ["reason", "risk"],
 }
 
 
@@ -107,22 +112,47 @@ def build_payload(message: str, previous: Optional[str] = None, loti_said: Optio
     )
 
 
+class _DuplicateKey(ValueError):
+    pass
+
+
+def _no_duplicate_keys(pairs):
+    keys = [k for k, _ in pairs]
+    if len(keys) != len(set(keys)):
+        # '{"risk": "high", "risk": "none"}' would otherwise silently keep the last one.
+        raise _DuplicateKey("duplicate key")
+    return dict(pairs)
+
+
 def parse_verdict(raw: object) -> Verdict:
-    """Strict: a JSON object with exactly `risk` (none|low|high) and `reason` (a string)."""
+    """Strict: one JSON object with exactly `reason` (a short string) and `risk` (none|low|high).
+
+    Duplicate keys are rejected. A reason the keyword crisis gate flags promotes a `none` verdict
+    to `low`: the model named a crisis and still rated it none.
+    """
     if not isinstance(raw, str):
         raise ClassifierError("reply is not text")
+    data: object = None
+    failure: Optional[str] = None
     try:
-        data = json.loads(raw)
+        data = json.loads(raw, object_pairs_hook=_no_duplicate_keys)
+    except _DuplicateKey:
+        failure = "reply has a duplicate key"
     except ValueError:
-        raise ClassifierError("reply is not JSON") from None
+        failure = "reply is not JSON"
+    if failure is not None:  # raised outside the except: nothing chained
+        raise ClassifierError(failure)
     if not isinstance(data, dict) or set(data) != {"risk", "reason"}:
-        raise ClassifierError("reply is not {risk, reason}")
+        raise ClassifierError("reply is not {reason, risk}")
     risk, reason = data["risk"], data["reason"]
     if not isinstance(risk, str) or risk not in {r.value for r in Risk}:
         raise ClassifierError("risk is not none|low|high")
     if not isinstance(reason, str) or len(reason) > MAX_REASON_CHARS:
         raise ClassifierError("reason is not a short string")
-    return Verdict(Risk(risk), reason)
+    verdict = Verdict(Risk(risk), reason)
+    if verdict.risk is Risk.NONE and crisis_check(reason).hit:
+        return Verdict(Risk.LOW, reason)
+    return verdict
 
 
 class CrisisClassifier:
@@ -147,10 +177,17 @@ class CrisisClassifier:
     def classify(
         self, message: str, previous: Optional[str] = None, loti_said: Optional[str] = None
     ) -> Verdict:
+        raw: object = None
+        failure: Optional[str] = None
         try:
             raw = self._complete(SYSTEM_PROMPT, build_payload(message, previous, loti_said))
         except GeminiBlocked:
             return Verdict(Risk.LOW, "provider safety filter blocked the message")
+        except GeminiError as exc:
+            # GeminiError messages are safe by construction ("HTTP 429", "deadline exceeded").
+            failure = f"GeminiError: {exc}"
         except Exception as exc:  # noqa: BLE001 - every failure must fail closed
-            raise ClassifierError(type(exc).__name__) from None
+            failure = type(exc).__name__  # other messages may echo the request: the type only
+        if failure is not None:  # raised outside the except: nothing chained
+            raise ClassifierError(failure)
         return parse_verdict(raw)

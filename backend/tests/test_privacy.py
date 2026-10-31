@@ -81,7 +81,7 @@ def test_export_streams_the_users_jsonl(client, tmp_path):
     r = client.get(EXPORT, params={"user_id": "u1"})
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("application/x-ndjson")
-    assert "u1-telemetry.jsonl" in r.headers["content-disposition"]
+    assert "u1-my-data.jsonl" in r.headers["content-disposition"]
     assert r.content == (tmp_path / "u1.jsonl").read_bytes()
     rows = [json.loads(line) for line in r.text.splitlines()]
     assert [row["trial_index"] for row in rows] == [0, 1]
@@ -121,7 +121,7 @@ def test_delete_and_export_ignore_the_case_of_the_id(client, tmp_path, asked):
     ingest(client, 1, user_id="u1")
     r = client.get(EXPORT, params={"user_id": asked})
     assert r.status_code == 200 and len(r.text.splitlines()) == 3
-    assert "u1-telemetry.jsonl" in r.headers["content-disposition"]
+    assert "u1-my-data.jsonl" in r.headers["content-disposition"]
     r = client.delete(DELETE, params={"user_id": asked})
     assert r.json() == {"deleted_events": 3, "deleted_chat_turns": 0, "deleted_files": 1}
     assert sorted(p.name for p in tmp_path.iterdir()) == [".lock"]

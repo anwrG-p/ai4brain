@@ -9,21 +9,27 @@ Order of a chat turn:
       coach LLM is not called and the scripted offline reply goes out;
    c. the health signpost, when the current message raises health.
    On a hit the LLM is never called. Earlier user turns that trip the crisis check, and fixed
-   crisis replies with the user turn they answered, are redacted from the LLM payload, and the
-   chat carries on.
+   crisis replies (whole or any bubble) with the user turn they answered, are redacted from the LLM
+   payload, and the chat carries on. With a classifier configured, the LLM sees only the user turns
+   that classifier read this request (the current one and the previous one); older user turns
+   stay out, since they may never have had a verdict.
 2. AI Collaboration Score and the XAI adaptation reason (Member 3's Δc).
 3. Loti's reply: the LLM if one is configured, else the deterministic offline reply. An LLM error
    is logged, counted and answered with the offline reply; nothing fails silently.
 4. Output guardrail: a reply that trips banned_terms.json is withheld whole and the offline reply
-   goes out instead.
+   goes out instead (offline_after_lint). Then the shape and number checks (research 7.3): at most
+   3 bubbles; a bubble over 12 words keeps its leading whole sentences, or the reply is withheld;
+   a number (digits or a spelled-out word) not found in the turns the user saw withholds the
+   reply (offline_after_check).
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from collections import Counter
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from ai_coach.collaboration_scorer import CollaborationScorer
 from ai_coach.crisis_classifier import ClassifierError, CrisisClassifier, Risk
@@ -59,9 +65,64 @@ BUBBLE_SEPARATOR = "\n\n"
 HISTORY_WINDOW = 8
 
 
+MAX_BUBBLES = 3
+
+
 def split_bubbles(text: str) -> List[str]:
     """Split a reply into its speech bubbles (blank-line separated)."""
     return [b.strip() for b in text.split(BUBBLE_SEPARATOR) if b.strip()]
+
+
+_SENTENCE_END = re.compile(r"(?<=[.!?…])\s+")
+
+
+def fit_bubbles(text: str) -> Optional[str]:
+    """The reply in Loti's shape, or None when it cannot be made to fit.
+
+    At most MAX_BUBBLES bubbles. A bubble over MAX_BUBBLE_WORDS words keeps its leading whole
+    sentences that fit; if not even its first sentence fits, the reply is rejected (no mid-sentence
+    cuts: a half sentence can change the meaning).
+    """
+    bubbles = split_bubbles(text)
+    if not bubbles or len(bubbles) > MAX_BUBBLES:
+        return None
+    out = []
+    for bubble in bubbles:
+        kept: List[str] = []
+        for sentence in _SENTENCE_END.split(bubble):
+            if len(" ".join([*kept, sentence]).split()) > MAX_BUBBLE_WORDS:
+                break
+            kept.append(sentence)
+        if not kept:
+            return None
+        out.append(" ".join(kept))
+    return BUBBLE_SEPARATOR.join(out)
+
+
+# Spelled-out numbers the check also catches (English and French). Left out on purpose: one / un /
+# une (pronouns and articles: "try that one") and neuf (also "new").
+_NUMBER_WORDS = {
+    **dict(zip(
+        "two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen "
+        "sixteen seventeen eighteen nineteen twenty".split(), range(2, 21))),
+    "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70, "eighty": 80,
+    "ninety": 90, "hundred": 100, "thousand": 1000,
+    **dict(zip(
+        "deux trois quatre cinq six sept huit".split(), range(2, 9))),
+    "dix": 10, "onze": 11, "douze": 12, "treize": 13, "quatorze": 14, "quinze": 15, "seize": 16,
+    "vingt": 20, "trente": 30, "quarante": 40, "cinquante": 50, "soixante": 60, "cent": 100,
+    "mille": 1000,
+}
+_DIGITS = re.compile(r"\d+(?:[.,]\d+)?")
+
+
+def numbers_in(text: str) -> Set[str]:
+    """Every number in `text`, normalised ("20%" and "twenty" -> "20", "1,5" -> "1.5")."""
+    found = {f"{float(d.replace(',', '.')):g}" for d in _DIGITS.findall(text)}
+    for word in re.findall(r"[a-zà-ÿ]+", text.lower()):
+        if word in _NUMBER_WORDS:
+            found.add(f"{_NUMBER_WORDS[word]:g}")
+    return found
 
 
 def _load_prompt_template(filename: str, fallback_default: str = "") -> str:
@@ -126,10 +187,20 @@ class AICoachAgent:
         # 1. Input gates on the user's words as written. On a hit nothing reaches the LLM. Older
         #    turns that hit are redacted from the LLM payload instead, so one false hit cannot lock
         #    the coach for the whole window.
-        gated, llm_allowed = self._gate_user_text(request.chat_history, request.message)
+        gated, llm_allowed, classified = self._gate_user_text(request.chat_history, request.message)
         if gated is not None:
             return gated
-        llm_window = self._redact_crisis_turns(session_history[-HISTORY_WINDOW:])
+        window = session_history[-HISTORY_WINDOW:]
+        if classified is not None:
+            # R14: with a classifier, the LLM sees only user turns this request's classifier read
+            # (the current message, and the previous one when it was context). An older user turn
+            # may never have had a verdict (its classifier call failed closed), so it stays out.
+            keep = {id(session_history[-1])} | {id(m) for m in classified}
+            dropped = sum(1 for m in window if m.role == ChatMessageRole.USER and id(m) not in keep)
+            if dropped:
+                self.reply_source_counts["unclassified_history_turn"] += dropped
+            window = [m for m in window if m.role != ChatMessageRole.USER or id(m) in keep]
+        llm_window = self._redact_crisis_turns(window)
 
         cluster_id = request.active_cluster_id if request.active_cluster_id is not None else 4
         delta_vec = request.delta_vector or {}
@@ -172,14 +243,16 @@ class AICoachAgent:
 
     def _gate_user_text(
         self, history: List[ChatMessage], message: str
-    ) -> Tuple[Optional[CoachingResponse], bool]:
-        """(fixed reply or None, whether the coach LLM may be called).
+    ) -> Tuple[Optional[CoachingResponse], bool, Optional[List[ChatMessage]]]:
+        """(fixed reply or None, whether the coach LLM may be called, the history turns the
+        classifier read as context; None when no classifier is configured).
 
         Keyword gate: the crisis reply when the CURRENT message hits, or the previous user turn
         joined with it. The join catches a phrase split across the last two turns ("I want to" /
         "end it all"). Older turns never trigger the reply; `_redact_crisis_turns` keeps them from
         the LLM. Then the backup classifier. Then the health signpost, which looks at the current
         message only, so health mentioned earlier does not lock the chat into the doctor reply.
+        The signpost also runs when the classifier failed: it is deterministic, and a fixed reply.
         """
         prev_idx = next(
             (i for i in range(len(history) - 1, -1, -1) if history[i].role == ChatMessageRole.USER),
@@ -194,8 +267,10 @@ class AICoachAgent:
         for text in candidates:
             crisis = self.guardrail.crisis_check(text)
             if crisis.hit:
-                return self._fixed_reply(crisis.reply or "", ReplySource.CRISIS), False
+                return self._fixed_reply(crisis.reply or "", ReplySource.CRISIS), False, None
 
+        classified: Optional[List[ChatMessage]] = None
+        llm_allowed = True
         if self.crisis_classifier is not None:
             # Context for split phrases, but never a turn that already got a crisis reply (same
             # reason as the join above), and never a crisis reply itself.
@@ -203,34 +278,39 @@ class AICoachAgent:
                 m.role == ChatMessageRole.ASSISTANT and is_fixed_crisis_reply(m.content)
                 for m in history[prev_idx + 1 : prev_idx + 2]
             )
+            context_turn = history[prev_idx] if prev_idx is not None and not answered else None
             loti_said = next(
                 (m.content for m in reversed(history) if m.role == ChatMessageRole.ASSISTANT), None
             )
             if loti_said is not None and is_fixed_crisis_reply(loti_said):
                 loti_said = None
+            classified = [context_turn] if context_turn is not None else []
             try:
                 verdict = self.crisis_classifier.classify(
-                    message, previous=None if answered else previous, loti_said=loti_said
+                    message,
+                    previous=context_turn.content if context_turn is not None else None,
+                    loti_said=loti_said,
                 )
             except ClassifierError as exc:
                 self.reply_source_counts["classifier_error"] += 1
-                # ClassifierError messages are fixed strings or a type name: no user text, and
-                # never the classifier's reason.
+                # ClassifierError messages are fixed strings, a GeminiError status or a type name:
+                # no user text, and never the classifier's reason.
                 logger.warning("coach crisis classifier failed (%s); failing closed, LLM not called", exc)
-                return None, False
+                verdict = None
+                llm_allowed = False
             french = reads_french(message)
-            if verdict.risk is Risk.HIGH:
+            if verdict is not None and verdict.risk is Risk.HIGH:
                 self.reply_source_counts["classifier_high"] += 1
                 reply = CRISIS_REPLY_FR if french else CRISIS_REPLY_EN
-                return self._fixed_reply(reply, ReplySource.CRISIS), False
-            if verdict.risk is Risk.LOW:
+                return self._fixed_reply(reply, ReplySource.CRISIS), False, classified
+            if verdict is not None and verdict.risk is Risk.LOW:
                 reply = CRISIS_SIGNPOST_FR if french else CRISIS_SIGNPOST_EN
-                return self._fixed_reply(reply, ReplySource.CRISIS_SIGNPOST), False
+                return self._fixed_reply(reply, ReplySource.CRISIS_SIGNPOST), False, classified
 
         signpost = self.guardrail.health_signpost(message)
         if signpost.hit:
-            return self._fixed_reply(signpost.reply or "", ReplySource.HEALTH_SIGNPOST), False
-        return None, True
+            return self._fixed_reply(signpost.reply or "", ReplySource.HEALTH_SIGNPOST), False, classified
+        return None, llm_allowed, classified
 
     def _redact_crisis_turns(self, window: List[ChatMessage]) -> List[ChatMessage]:
         """Drop earlier USER turns that trip the crisis check, alone or joined with the next USER turn.
@@ -330,12 +410,27 @@ class AICoachAgent:
         safe_reply, meta = self.guardrail.sanitize(raw_reply, fallback=offline_reply)
         if meta.sanitized:
             self.reply_source_counts[ReplySource.OFFLINE_AFTER_LINT.value] += 1
+            # Rule categories only: the matched words may echo what the user wrote.
             logger.warning(
-                "coach LLM reply withheld (banned terms: %s); sending the offline reply",
-                ", ".join(meta.clinical_terms_detected),
+                "coach LLM reply withheld (banned-term rules: %s); sending the offline reply",
+                ", ".join(sorted({v.rule_category for v in meta.violations})),
             )
             return safe_reply, meta, ReplySource.OFFLINE_AFTER_LINT
-        return safe_reply, meta, ReplySource.LLM
+
+        # Shape and numbers (research 7.3). Allowed numbers are the ones in the turns the user saw;
+        # the system prompt's rule numbers and the internal XAI block (cluster index, sigma) are not.
+        allowed = numbers_in(" ".join(m.content for m in history))
+        fitted = fit_bubbles(safe_reply)
+        problem = None
+        if fitted is None:
+            problem = "bubbles"
+        elif numbers_in(fitted) - allowed:
+            problem = "numbers"
+        if problem is not None:
+            self.reply_source_counts[ReplySource.OFFLINE_AFTER_CHECK.value] += 1
+            logger.warning("coach LLM reply withheld (%s check); sending the offline reply", problem)
+            return offline_reply, self.guardrail.check_safety(offline_reply), ReplySource.OFFLINE_AFTER_CHECK
+        return fitted, meta, ReplySource.LLM
 
     def _generate_offline_coaching_response(
         self,

@@ -52,6 +52,6 @@ def export_telemetry(user_id: UserId) -> Response:
         data,
         media_type="application/x-ndjson",
         headers={
-            "Content-Disposition": f'attachment; filename="{user_id.lower()}-telemetry.jsonl"'
+            "Content-Disposition": f'attachment; filename="{user_id.lower()}-my-data.jsonl"'
         },
     )

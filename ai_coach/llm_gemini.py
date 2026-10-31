@@ -3,10 +3,14 @@
 - `GEMINI_API_KEY` unset or blank: `GeminiRunner.from_env()` returns None, and the coach stays on
   its scripted offline replies. Nothing here is required to run the app.
 - `GEMINI_MODEL` overrides the model id (default `gemini-2.5-flash`).
-- Every call has a 3 s timeout (httpx applies it to connect, write and read separately).
-- No user text and no key ever reach a log line or an exception message: errors carry the HTTP
-  status or the error type only, and are raised `from None` so no chained exception holds the
-  request. The key travels in the `x-goog-api-key` header, never in the URL.
+- Time: each call waits at most min(3 s, time left before `deadline`). The wait is a hard one: the
+  HTTP call runs on a worker thread, and when the wait ends the caller gets GeminiError
+  ("deadline exceeded") at once while the late reply is dropped. The chat route passes one
+  deadline for the whole turn (classifier + coach), see ai_coach/api.py TURN_DEADLINE_S.
+- No user text and no key ever reach a log line, an exception message or an exception chain:
+  errors carry the HTTP status or an exception type name, and are raised outside any `except`
+  block, so no httpx exception (whose request holds the key header) is ever attached. The key
+  travels in the `x-goog-api-key` header, never in the URL.
 
 `GeminiRunner(messages)` is the agent's `llm_callable`: a list of {"role", "content"} dicts with
 roles system / user / assistant, in order. `generate()` is the lower-level call the crisis
@@ -16,7 +20,10 @@ classifier uses for strict JSON.
 from __future__ import annotations
 
 import os
+import time
 from collections.abc import Mapping
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
@@ -34,6 +41,9 @@ _HARM_CATEGORIES = (
     "HARM_CATEGORY_DANGEROUS_CONTENT",
 )
 _BLOCKED_FINISH = {"SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII"}
+# Calls run here so a wait can end on time. A call that outlives its wait finishes within its
+# own httpx timeout (<= 3 s) and its result is dropped.
+_POOL = ThreadPoolExecutor(max_workers=8, thread_name_prefix="gemini")
 
 
 class GeminiError(Exception):
@@ -86,10 +96,10 @@ class GeminiRunner:
 
     # -- the agent's llm_callable ---------------------------------------------------------------
 
-    def __call__(self, messages: List[Dict[str, str]]) -> str:
+    def __call__(self, messages: List[Dict[str, str]], deadline: Optional[float] = None) -> str:
         system = "\n\n".join(m["content"] for m in messages if m["role"] == "system")
         turns = [m for m in messages if m["role"] != "system"]
-        return self.generate(system, to_contents(turns))
+        return self.generate(system, to_contents(turns), deadline=deadline)
 
     # -- the call ---------------------------------------------------------------------------------
 
@@ -101,16 +111,21 @@ class GeminiRunner:
         json_schema: Optional[Dict[str, Any]] = None,
         relax_safety: bool = False,
         temperature: float = 0.4,
+        deadline: Optional[float] = None,
     ) -> str:
         """One generateContent call; returns the reply text. Raises GeminiError / GeminiBlocked.
 
+        `deadline` is a time.monotonic() value; the call never waits past it.
         `relax_safety` turns Gemini's own content filter off. Only the crisis classifier sets it:
         it must be able to read a message about self-harm to route it, and it only emits JSON.
         """
+        wait = self.timeout_s if deadline is None else min(self.timeout_s, deadline - time.monotonic())
+        if wait <= 0:
+            raise GeminiError("deadline exceeded")
         config: Dict[str, Any] = {
             "temperature": temperature,
             "maxOutputTokens": MAX_OUTPUT_TOKENS,
-            # No thinking: it costs seconds the 3 s budget does not have.
+            # No thinking: it costs seconds the turn deadline does not have.
             "thinkingConfig": {"thinkingBudget": 0},
         }
         if json_schema is not None:
@@ -123,21 +138,40 @@ class GeminiRunner:
             body["safetySettings"] = [
                 {"category": c, "threshold": "BLOCK_NONE"} for c in _HARM_CATEGORIES
             ]
+
+        future = _POOL.submit(self._post, body, wait)
+        failure: Optional[str] = None
+        response: Optional[httpx.Response] = None
         try:
-            r = self._client.post(
-                API_URL.format(model=self.model),
-                headers={"x-goog-api-key": self._api_key},
-                json=body,
-            )
-        except httpx.HTTPError as exc:
-            raise GeminiError(type(exc).__name__) from None
-        if r.status_code != 200:
-            raise GeminiError(f"HTTP {r.status_code}") from None
+            response = future.result(timeout=wait)
+        except FutureTimeout:
+            failure = "deadline exceeded"
+        except Exception as exc:  # noqa: BLE001 - httpx errors, a closed client: the type name only
+            failure = type(exc).__name__
+        # Raised here, outside the except blocks: nothing is chained, so no httpx request (with
+        # its key header) or user text travels with the error.
+        if failure is not None or response is None:
+            raise GeminiError(failure or "no response")
+        if deadline is not None and time.monotonic() > deadline:
+            raise GeminiError("deadline exceeded")
+        if response.status_code != 200:
+            raise GeminiError(f"HTTP {response.status_code}")
+        data: Any = None
         try:
-            data = r.json()
+            data = response.json()
         except ValueError:
-            raise GeminiError("response is not JSON") from None
+            failure = "response is not JSON"
+        if failure is not None:
+            raise GeminiError(failure)
         return reply_text(data)
+
+    def _post(self, body: Dict[str, Any], wait: float) -> httpx.Response:
+        return self._client.post(
+            API_URL.format(model=self.model),
+            headers={"x-goog-api-key": self._api_key},
+            json=body,
+            timeout=httpx.Timeout(wait),
+        )
 
 
 def to_contents(turns: List[Dict[str, str]]) -> List[Dict[str, Any]]:

@@ -112,10 +112,50 @@ def test_failures_raise_gemini_error_without_user_text_or_key(handler, message):
     with pytest.raises(GeminiError) as exc:
         runner_with(handler)([{"role": "user", "content": SECRET}])
     assert str(exc.value) == message
-    # No chained exception carries the request (and so the user's text) along.
-    assert exc.value.__cause__ is None
-    assert exc.value.__context__ is None or exc.value.__suppress_context__
+    # Nothing chained: no httpx request (key header, user text) travels with the error.
+    assert exc.value.__cause__ is None and exc.value.__context__ is None
     assert SECRET not in str(exc.value) and KEY not in str(exc.value)
+
+
+def test_the_deadline_is_a_hard_wait(monkeypatch):
+    import time
+
+    calls = []
+
+    def slow(request):
+        calls.append(request)
+        time.sleep(0.5)
+        return ok("late")
+
+    runner = runner_with(slow)
+    start = time.monotonic()
+    with pytest.raises(GeminiError, match="deadline exceeded") as exc:
+        runner([{"role": "user", "content": SECRET}], deadline=time.monotonic() + 0.1)
+    assert time.monotonic() - start < 0.4
+    assert exc.value.__context__ is None
+
+
+def test_a_passed_deadline_sends_nothing():
+    import time
+
+    calls = []
+    runner = runner_with(lambda r: calls.append(r) or ok("x"))
+    with pytest.raises(GeminiError, match="deadline exceeded"):
+        runner.generate("s", [], deadline=time.monotonic() - 1)
+    assert calls == []
+
+
+def test_each_call_waits_at_most_the_time_left():
+    import time
+
+    seen = {}
+
+    def handler(request):
+        seen["timeout"] = request.extensions["timeout"]
+        return ok("x")
+
+    runner_with(handler).generate("s", [], deadline=time.monotonic() + 1.0)
+    assert 0 < seen["timeout"]["read"] <= 1.0
 
 
 @pytest.mark.parametrize(

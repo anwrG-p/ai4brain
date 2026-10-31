@@ -36,8 +36,12 @@ def append_exchange(
     reply_source: str,
     directory: Optional[Path] = None,
     received_at: Optional[datetime] = None,
+    lock_timeout: Optional[float] = None,
 ) -> int:
-    """Append the user's turn and Loti's reply under the store lock. Raises LockTimeout if busy."""
+    """Append the user's turn and Loti's reply under the store lock.
+
+    Raises LockTimeout if the lock stays busy past `lock_timeout` (default: the store's 10 s).
+    """
     key = user_key(user_id)
     directory = directory or coach_dir()
     stamp = (received_at or datetime.now(timezone.utc)).isoformat()
@@ -46,7 +50,7 @@ def append_exchange(
         {**base, "from": "you", "kind": kind, "text": user_text},
         {**base, "from": "loti", "reply_source": reply_source, "text": reply_text},
     ]
-    with telemetry_lock(directory):
+    with telemetry_lock(directory, timeout=lock_timeout):
         with open(directory / f"{key}.jsonl", "a", encoding="utf-8") as f:
             for row in rows:
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")

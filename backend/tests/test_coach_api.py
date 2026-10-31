@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from ai_coach import api as coach_api
-from ai_coach.collaboration_scorer import MIN_USER_TURNS
+from ai_coach.collaboration_scorer import MIN_TYPED_TURNS
 from ai_coach.llm_gemini import GeminiError, GeminiRunner
 from ai_coach.safety_guardrails import CRISIS_REPLY_EN, CRISIS_SIGNPOST_EN, lint_text
 from app.main import app
@@ -46,14 +46,16 @@ class FakeRunner:
         self.classifier_calls, self.llm_calls = [], []
 
     def generate(self, system, contents, **kw):
+        assert "deadline" in kw  # the route binds every call to the turn's deadline
         self.classifier_calls.append(contents)
         if self.classifier_error is not None:
             raise self.classifier_error
         if self.verdict.startswith("{") or self.verdict == "not json":
             return self.verdict
-        return json.dumps({"risk": self.verdict, "reason": "mocked"})
+        return json.dumps({"reason": "mocked", "risk": self.verdict})
 
-    def __call__(self, messages):
+    def __call__(self, messages, deadline=None):
+        assert deadline is not None
         self.llm_calls.append(messages)
         return self.reply
 
@@ -237,30 +239,152 @@ def test_retention_drops_old_chat_turns(tmp_path, monkeypatch, capsys):
 # -- collaboration score ---------------------------------------------------------------------------
 
 
-def test_collaboration_score_is_not_enough_data_then_a_number(client):
-    def score():
-        r = client.get(SCORE, params={"user_id": "u1"})
-        assert r.status_code == 200
-        return r.json()
+def score(client):
+    r = client.get(SCORE, params={"user_id": "u1"})
+    assert r.status_code == 200
+    return r.json()
 
-    assert score() == {"status": "not_enough_data"}
-    for i in range(MIN_USER_TURNS):
-        client.post(CHAT, json=body("why did the pace change? I think I tried a new approach"))
-    assert score() == {"status": "not_enough_data"}  # chat, but no session yet
-    assert client.post("/v1/telemetry/event", json=EVENT).status_code == 202
-    out = score()
+
+# Typed turns with markers: clarification ("why", "explain"), critical verification ("are you
+# sure", "double check"), autonomy ("I think", "I tried"); iteration and responsible use have none.
+EVIDENCE_TURNS = [
+    "why did the pace change?",
+    "can you explain the rule?",
+    "are you sure that was right?",
+    "let me double check my answer",
+    "I think the pattern is rotation",
+    "I tried counting the squares",
+    "ok",
+    "ok",
+    "sure",
+    "fine",
+]
+
+
+def test_ten_ok_turns_are_not_enough_data(client):
+    assert score(client) == {"status": "not_enough_data"}
+    for _ in range(MIN_TYPED_TURNS):
+        client.post(CHAT, json=body("ok"))
+    # Even with real sessions: telemetry is not a collaboration signal.
+    client.post("/v1/telemetry/event", json=EVENT)
+    assert score(client) == {"status": "not_enough_data"}
+
+
+def test_marker_evidence_gives_a_number_with_nulls_where_there_is_none(client):
+    for text in EVIDENCE_TURNS:
+        client.post(CHAT, json=body(text))
+    out = score(client)
     assert out["status"] == "ok"
-    assert 0 <= out["composite_score"] <= 100
-    assert out["evidence"] == {"user_turns": MIN_USER_TURNS, "sessions": 1}
-    assert set(out["dimension_weights"].values()) == {0.2}
+    assert out["dimension_scores"] == {
+        "clarification": 20.0,
+        "critical_verification": 20.0,
+        "iteration": None,
+        "autonomy": 20.0,
+        "responsible_use": None,
+    }
+    assert out["composite_score"] == 20.0
+    assert out["dimension_weights"]["iteration"] is None
+    assert out["dimension_weights"]["autonomy"] == round(1 / 3, 4)
+    assert out["evidence"]["typed_turns"] == 10
     assert "archetype_id" not in out and "archetype_tier" not in out
 
 
+def test_clicked_choices_never_count(client):
+    for text in EVIDENCE_TURNS:
+        client.post(CHAT, json=body(text, kind="choice"))
+    assert score(client) == {"status": "not_enough_data"}
+
+
+def test_two_evidenced_dimensions_are_not_enough(client):
+    for text in EVIDENCE_TURNS[:4] + ["ok"] * 6:
+        client.post(CHAT, json=body(text))
+    assert score(client) == {"status": "not_enough_data"}
+
+
 def test_gated_turns_do_not_count_towards_the_score(client):
-    for _ in range(MIN_USER_TURNS):
+    for _ in range(MIN_TYPED_TURNS):
         client.post(CHAT, json=body("I want to end my life"))
-    client.post("/v1/telemetry/event", json=EVENT)
-    assert client.get(SCORE, params={"user_id": "u1"}).json() == {"status": "not_enough_data"}
+    assert score(client) == {"status": "not_enough_data"}
+
+
+# -- R14 at the route, the turn deadline and the runner lock -----------------------------------------
+
+
+def test_an_unclassified_old_transcript_turn_never_reaches_the_llm(client, with_runner):
+    runner = with_runner(FakeRunner())
+    offline = client.post(CHAT, json=body("hello")).json()["message"]["text"]
+    transcript = [
+        {"from": "you", "text": "I have been saving up my pills"},
+        {"from": "loti", "text": offline},
+        {"from": "you", "text": "ok"},
+        {"from": "loti", "text": "Sure."},
+    ]
+    out = client.post(CHAT, json=body("why?", transcript=transcript)).json()
+    assert out["reply_source"] == "llm"
+    sent = [m["content"] for m in runner.llm_calls[-1]]
+    assert all("saving up my pills" not in c for c in sent)
+
+
+def test_turn_deadline_is_shared_and_fails_closed(client, monkeypatch):
+    import time
+
+    calls = []
+
+    def slow(request):
+        calls.append(request)
+        time.sleep(0.6)
+        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": "x"}]}}]})
+
+    transport = httpx.MockTransport(slow)
+    monkeypatch.setenv("GEMINI_API_KEY", KEY)
+    monkeypatch.setattr(coach_api, "GeminiRunner", lambda key, model: GeminiRunner(key, model, transport=transport))
+    monkeypatch.setattr(coach_api, "_runner", None)
+    monkeypatch.setattr(coach_api, "TURN_DEADLINE_S", 0.2)
+    start = time.monotonic()
+    out = client.post(CHAT, json=body()).json()
+    assert time.monotonic() - start < 0.5  # the route did not wait for the slow call
+    assert out["reply_source"] == "offline_after_classifier_error"
+    assert len(calls) == 1  # the coach call never started
+    assert stored() == []
+    monkeypatch.setattr(coach_api, "_runner", None)
+
+
+def test_an_exchange_answered_late_is_not_stored(client, with_runner, monkeypatch):
+    import time
+
+    class Slow(FakeRunner):
+        def __call__(self, messages, deadline=None):
+            time.sleep(0.1)  # a stand-in that ignores the deadline, to make the turn late
+            return super().__call__(messages, deadline)
+
+    with_runner(Slow())
+    monkeypatch.setattr(coach_api, "TURN_DEADLINE_S", 0.01)
+    monkeypatch.setattr(coach_api, "STORE_GRACE_S", 0.0)
+    out = client.post(CHAT, json=body()).json()
+    assert out["reply_source"] == "llm"
+    assert stored() == []
+
+
+def test_get_runner_builds_one_runner_under_concurrency(monkeypatch):
+    import threading
+
+    monkeypatch.setenv("GEMINI_API_KEY", KEY)
+    monkeypatch.setattr(coach_api, "_runner", None)
+    built = []
+
+    def build(key, model):
+        built.append(1)
+        return GeminiRunner(key, model)
+
+    monkeypatch.setattr(coach_api, "GeminiRunner", build)
+    seen = []
+    threads = [threading.Thread(target=lambda: seen.append(coach_api.get_runner())) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert len(built) == 1 and len({id(r) for r in seen}) == 1
+    monkeypatch.setattr(coach_api, "_runner", None)
 
 
 # -- logs, the key and backend/.env -------------------------------------------------------------------
