@@ -1,4 +1,6 @@
 import React from 'react'
+import { Loti, type LotiPose } from '../characters/Loti'
+import type { CharacterSize } from '../characters/shared'
 
 export type BrianPose =
   | 'waving'
@@ -47,38 +49,37 @@ export interface BrianMascotProps {
   onClick?: () => void
 }
 
-const POSE_IMAGE_MAP: Record<string, string> = {
-  waving: '/mascot/brian-waving.png',
-  hello: '/mascot/brian-waving.png',
-  idle: '/mascot/brian-waving.png',
-  celebrating: '/mascot/brian-celebrating.png',
-  celebrate: '/mascot/brian-celebrating.png',
-  mentor: '/mascot/brian-mentor.png',
-  thinking: '/mascot/brian-mentor.png',
-  sleepy: '/mascot/brian-sleepy.png',
-  rest: '/mascot/brian-sleepy.png',
-  explorer: '/mascot/brian-explorer.png',
-  curious: '/mascot/brian-explorer.png',
+/* ponytail: compatibility shim. The axolotl PNGs are retired; every BrianMascot now draws Loti.
+   Pages still calling it are rebuilt in tickets 08/09, which delete this file. */
+const POSE_TO_LOTI: Record<BrianPose, LotiPose> = {
+  waving: 'wave',
+  hello: 'wave',
+  idle: 'idle',
+  celebrating: 'happy',
+  celebrate: 'happy',
+  mentor: 'think',
+  thinking: 'think',
+  sleepy: 'idle',
+  rest: 'idle',
+  explorer: 'think',
+  curious: 'think',
 }
 
-const POSE_ALT_MAP: Record<string, string> = {
-  waving: 'Cute friendly pink and sky-blue axolotl mascot named Brian waving cheerfully with one fin hand',
-  celebrating: 'Cute ecstatic celebratory axolotl mascot named Brian jumping for joy with floating confetti and victory celebration',
-  mentor: 'Cute pink and sky-blue axolotl mentor Brian wearing small nerdy glasses, pointing with a teacher pointer stick',
-  sleepy: 'Cute sleepy cozy axolotl mascot Brian curled up wearing a little nightcap with a soft crescent moon pillow',
-  explorer: 'Cute pink and sky-blue axolotl mascot Brian holding an oversized explorer magnifying glass and compass examining clues',
+const NAMED_SIZE: Record<string, CharacterSize> = {
+  hero: 'xl',
+  telemetry: 'lg',
+  badge: 'sm',
+  xs: 'sm',
+  sm: 'sm',
+  md: 'md',
+  lg: 'lg',
+  xl: 'xl',
+  '2xl': 'xl',
 }
 
-const SIZE_MAP: Record<string, number> = {
-  hero: 192,
-  telemetry: 144,
-  badge: 40,
-  xs: 32,
-  sm: 48,
-  md: 96,
-  lg: 144,
-  xl: 192,
-  '2xl': 240,
+function toLotiSize(size: BrianMascotScale): CharacterSize {
+  if (typeof size !== 'number') return NAMED_SIZE[size] ?? 'md'
+  return size <= 64 ? 'sm' : size <= 112 ? 'md' : size <= 160 ? 'lg' : 'xl'
 }
 
 export const BrianMascot: React.FC<BrianMascotProps> = ({
@@ -97,26 +98,12 @@ export const BrianMascot: React.FC<BrianMascotProps> = ({
   alt,
   onClick,
 }) => {
-  const normalizedPose = POSE_IMAGE_MAP[pose] ? pose : 'waving'
-  const imageSrc = POSE_IMAGE_MAP[normalizedPose] || '/mascot/brian-waving.png'
-  const altText = alt || POSE_ALT_MAP[normalizedPose] || 'Brian the Axolotl mascot'
-  const effectiveSize = scale ?? size ?? 'md'
-  const pixelSize = typeof effectiveSize === 'number' ? effectiveSize : SIZE_MAP[effectiveSize] || 96
   const mascotImage = (
     <div
-      className="relative flex items-center justify-center shrink-0 select-none"
-      style={{ width: pixelSize, height: pixelSize }}
+      className={`relative flex items-center justify-center shrink-0 select-none ${interactive && onClick ? 'cursor-pointer' : ''}`}
       onClick={onClick}
     >
-      {/* Axolotl Mascot Sticker Image */}
-      <img
-        src={imageSrc}
-        alt={altText}
-        width={pixelSize}
-        height={pixelSize}
-        className={`w-full h-full object-contain ${interactive ? 'cursor-pointer' : ''}`}
-        loading="lazy"
-      />
+      <Loti pose={POSE_TO_LOTI[pose] ?? 'idle'} size={toLotiSize(scale ?? size ?? 'md')} title={alt} />
 
       {/* Optional Status Pip */}
       {statusPip && (

@@ -127,6 +127,34 @@
 
   /* Clay depth: characters, illustrations and at most the primary CTA (anti-slop rule 9). */
   --clay: 0 12px 28px rgb(30 111 168 / 0.16), inset 0 2px 6px rgb(255 255 255 / 0.7), inset 0 -4px 10px rgb(15 34 51 / 0.1);
+  /* --clay's outer shadow as a filter, for SVG characters (the inner highlight is drawn in the SVG). */
+  --clay-drop: drop-shadow(0 6px 10px rgb(30 111 168 / 0.16));
+
+  /* Character clay (Loti, Dolphin, Momo; components/features/characters). Graphics only, never text.
+     Each ramp is lit (-hi), mid, shaded (-lo) for one key light from the top-left. The sky ramp centres
+     on --color-brand-vivid, softened for matte clay; the coral mid is --color-accent. Faces stay navy in both themes. */
+  --char-sky-hi: #BFE3FA;
+  --char-sky: #4DA6E2;
+  --char-sky-lo: #2479BC;
+  --char-coral-hi: #FFD3C4;
+  --char-coral: #F2876B;
+  --char-coral-lo: #D2654A;
+  --char-pale-hi: #E4F3FD;
+  --char-pale: #9FD1F2;
+  --char-pale-lo: #5FA7DA;
+  --char-peach-hi: #FFE6DC;
+  --char-peach: #FFB59C;
+  --char-peach-lo: #EA8A6E;
+  --char-mist-hi: #E6EDF2;
+  --char-mist: #B2C2CF;
+  --char-mist-lo: #8297A9;
+  --char-amber-hi: #FCE8C4;
+  --char-amber: #EFBD72;
+  --char-amber-lo: #CB9147;
+  --char-face: #0F2233;
+  --char-glint: #FFFFFF;
+  --char-shadow: #1D4F78;
+  --char-shadow-alpha: 0.28;
 
   /* EMILY Emotion Adaptive Color Tokens (Default: Calm Flow) */
   --color-emotion-accent: #0D9488;
@@ -248,6 +276,12 @@
   --shadow-hero: none;
 
   --clay: 0 12px 28px rgb(0 0 0 / 0.35), inset 0 2px 6px rgb(255 255 255 / 0.14), inset 0 -4px 10px rgb(0 0 0 / 0.3);
+  --clay-drop: drop-shadow(0 6px 12px rgb(0 0 0 / 0.4));
+  --char-sky-lo: #2272B0;
+  --char-pale-lo: #6AAFE0;
+  --char-mist-lo: #8C9FB0;
+  --char-shadow: #000000;
+  --char-shadow-alpha: 0.55;
 
   /* EMILY Dark Emotion Adaptive Color Tokens (Default: Calm Flow) */
   --color-emotion-accent: #4FD1C5;
@@ -680,4 +714,118 @@ html[data-theme="dark"][data-emotion="fatigued"] {
 
 .text-danger {
   color: var(--color-danger) !important;
+}
+
+/* Characters (ticket 02): still when idle; motion only on an event (anti-slop rule 10).
+   Every class plays once or a few times and stops. Ease-out on enter, ease-in on the way down. */
+.char-figure {
+  filter: var(--clay-drop);
+  overflow: visible;
+}
+
+@keyframes char-talk {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.4); }
+}
+.char-anim-talk {
+  animation: char-talk 340ms var(--ease-in-out) 6;
+}
+
+@keyframes char-pulse {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+.char-anim-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: char-pulse 900ms var(--ease-out) 1;
+}
+
+@keyframes char-wave {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(14deg); }
+  70% { transform: rotate(-8deg); }
+}
+.char-anim-wave {
+  animation: char-wave 640ms var(--ease-in-out) 3;
+}
+
+@keyframes char-appear {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: scale(1); }
+}
+.char-anim-think > * {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: char-appear 360ms var(--ease-out) both;
+}
+.char-anim-think > :nth-child(2) { animation-delay: 120ms; }
+.char-anim-think > :nth-child(3) { animation-delay: 240ms; }
+
+@keyframes char-swim-in {
+  from { opacity: 0; transform: translateX(-70px) rotate(-6deg); }
+  40% { opacity: 1; }
+  to { opacity: 1; transform: translateX(0) rotate(0deg); }
+}
+.char-anim-swim-in {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: char-swim-in 900ms var(--ease-out) 1 both;
+}
+
+@keyframes char-hop {
+  0% { transform: translateY(0); animation-timing-function: var(--ease-out); }
+  45% { transform: translateY(-22px) rotate(-4deg); animation-timing-function: var(--ease-in); }
+  100% { transform: translateY(0); }
+}
+.char-anim-hop {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: char-hop 720ms 1 both;
+}
+
+@keyframes char-hop-shadow {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  45% { transform: scale(0.7); opacity: 0.5; }
+}
+.char-anim-hop-shadow {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: char-hop-shadow 720ms var(--ease-in-out) 1 both;
+}
+
+@keyframes char-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.char-anim-fade-in {
+  animation: char-fade-in 900ms var(--ease-out) 1 both;
+}
+
+@keyframes char-mood {
+  0% { transform: scale(1, 1); }
+  30% { transform: scale(1.06, 0.92); }
+  65% { transform: scale(0.97, 1.04); }
+  100% { transform: scale(1, 1); }
+}
+.char-anim-mood {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: char-mood 560ms var(--ease-out) 1;
+}
+
+/* characters: motion lock */
+@media (prefers-reduced-motion: reduce) {
+  [class*="char-anim-"],
+  [class*="char-anim-"] > * {
+    animation: none !important;
+  }
+}
+
+[data-reduced-motion="true"] [class*="char-anim-"],
+[data-reduced-motion="true"] [class*="char-anim-"] > *,
+[data-timed-trial="true"] [class*="char-anim-"],
+[data-timed-trial="true"] [class*="char-anim-"] > * {
+  animation: none !important;
 }

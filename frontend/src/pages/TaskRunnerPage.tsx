@@ -9,7 +9,7 @@ import { ExerciseHost } from '../features/assessment/ExerciseHost'
 import { tracker } from '../features/assessment/telemetry/tracker'
 import type { TelemetryEvent } from '../features/assessment/telemetry/types'
 import { WhyThisPanel } from '../components/features/coach/WhyThisPanel'
-import { NodiCompanion } from '../components/features/brand/NodiCompanion'
+import { Mascot } from '../components/features/brand/Mascot'
 import { BrianMascot } from '../components/features/brand/BrianMascot'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
@@ -360,7 +360,7 @@ export default function TaskRunnerPage() {
             </p>
           </div>
 
-          <NodiCompanion size="md" state="celebrate" />
+          <Mascot size="md" state="celebrate" />
 
           <div className="flex flex-wrap items-center gap-3">
             <Button variant="primary" onClick={startBlock}>
