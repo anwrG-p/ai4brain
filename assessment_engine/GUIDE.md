@@ -181,7 +181,7 @@ Voice is **not shipped in the UI** (decision D1): the UI never asks for the micr
 # API (terminal 1)
 cd assessment_engine\api
 .\.venv\Scripts\python -m uvicorn main:app --port 8000     # docs: http://localhost:8000/docs
-.\.venv\Scripts\python -m pytest -q                          # 22 tests
+.\.venv\Scripts\python -m pytest -q                          # API tests
 
 # UI (terminal 2): mock tasks are the default
 cd frontend

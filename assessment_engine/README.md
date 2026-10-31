@@ -25,9 +25,12 @@ API (Python 3.13):
 
 ```bash
 cd assessment_engine/api
-python -m venv .venv && .venv/Scripts/pip install -r requirements.txt   # .venv/bin/pip on macOS/Linux
+python -m venv .venv && .venv/Scripts/pip install -r ../../requirements.txt   # whole Python workspace; .venv/bin/pip on macOS/Linux
 .venv/Scripts/python -m uvicorn main:app --port 8000
 ```
+
+`main.py` mounts one router per module (`routes/telemetry.py`, `routes/privacy.py`, `routes/auth.py`,
+`dynamic_cache/api.py`, `ai_coach/api.py`, `brain_twin_jepa/api.py`). New routes go in the module's router, not in `main.py`.
 
 Events go to the repo-root `data/raw/telemetry/` (gitignored), whatever the working directory.
 Set `TELEMETRY_DIR` to override it, e.g. a scratch folder for testing.
@@ -53,7 +56,8 @@ PowerShell: `$env:VITE_USE_MOCKS='false'; npm run dev` and `$env:TELEMETRY_DIR='
 Tests and checks:
 
 ```bash
-cd assessment_engine/api && .venv/Scripts/python -m pytest
+cd assessment_engine/api && .venv/Scripts/python -m pytest   # API suite
+assessment_engine/api/.venv/Scripts/python -m pytest        # from the repo root: every Python suite (root pytest.ini)
 cd frontend && npm run qa:checks    # lint:tokens, lint:copy, check:contrast, vitest, build
 cd frontend && npm run qa:e2e       # Playwright; its config uses the Chrome channel, so Chrome must be installed
 ```
