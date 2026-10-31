@@ -203,28 +203,17 @@ describe('Wave 1 & Wave 2 Pages & Design System Unit Suite', () => {
     expect(screen.getByText(/SNAP-2026-SALMA-01/i)).toBeInTheDocument()
   })
 
-  it('renders Page 06 Dashboard (/dashboard) with classroom lecture stage, Teacher Brian, and Core Balance Insights', async () => {
+  it('renders Page 06 Home (/dashboard): the greeting, Momo, one primary action and the radar (ticket 08)', async () => {
     window.history.pushState({}, '', '/dashboard')
     render(<App />)
 
-    const heading = await screen.findByRole(
-      'heading',
-      {
-        name: /Good morning|Welcome back/i,
-      },
-      { timeout: 5000 },
-    )
-    expect(heading).toBeInTheDocument()
-
-    expect(screen.getByTestId('brian-teacher-slot')).toBeInTheDocument()
-    expect(
-      screen.getByRole('link', { name: /Start Today\'s 2-Min Flow/i }),
-    ).toBeInTheDocument()
-    // Test clicking a cognitive dimension chip on the interactive radar
-    const wmBtn = screen.getAllByRole('button', { name: /WM/i })[0]!
-    fireEvent.click(wmBtn)
-    expect(screen.getByText(/Working Memory/i)).toBeInTheDocument()
-    expect(screen.getByText(/Core Balance Insights/i)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Hi, there' }, { timeout: 5000 })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /Momo/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: "Start today's session" })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Your five skills' })).toBeInTheDocument()
+    // The old classroom board, podium and Teacher Brian are gone.
+    expect(screen.queryByTestId('brian-teacher-slot')).toBeNull()
+    expect(screen.queryByTestId('brian-wooden-podium')).toBeNull()
   })
 
   it('renders Page 08 Brain Twin (/brain-twin) with Signature #2 BrainTwinTimeTravel scrubber, snapshot diff table toggle, and manifold trajectory', async () => {

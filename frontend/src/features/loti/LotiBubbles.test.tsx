@@ -170,3 +170,30 @@ describe('LotiBubbles', () => {
     expect(container).toBeEmptyDOMElement()
   })
 })
+
+describe('LotiBubbles, collapsed (Home: one clickable line)', () => {
+  function renderCollapsed() {
+    return render(
+      <MemoryRouter initialEntries={['/home']} future={future}>
+        <LotiBubbles context={dayCtx} collapsed />
+      </MemoryRouter>,
+    )
+  }
+
+  it('shows Loti and only the line, as one button; no chips until it is clicked', () => {
+    renderCollapsed()
+    expect(screen.getAllByRole('img', { name: /loti/i })).toHaveLength(1)
+    expect(screen.getAllByRole('button')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'How was your day?' })).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: /reply to loti/i })).toBeNull()
+  })
+
+  it('clicking the line opens the talk on the same bubble, focus on its first chip', async () => {
+    const user = userEvent.setup()
+    renderCollapsed()
+    await user.click(screen.getByRole('button', { name: 'How was your day?' }))
+    expect(screen.getByText('How was your day?').closest('[aria-live="polite"]')).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Great' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Not now' })).toBeInTheDocument()
+  })
+})

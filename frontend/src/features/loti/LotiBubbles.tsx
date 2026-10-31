@@ -14,6 +14,8 @@ export interface LotiBubblesProps {
   brain?: LotiBrain
   /** Overrides the default side effects (navigate, set a goal). */
   onAction?: ((action: LotiAction) => void) | undefined
+  /** Starts as one clickable line (Home): the talk opens when the line is clicked. */
+  collapsed?: boolean
   className?: string
 }
 
@@ -24,12 +26,13 @@ type Paused = 'dismissed' | 'ended' | null
    same bubble. When a talk ends without leaving the page, a quiet "Talk to Loti" button keeps
    focus off <body> and starts a new talk. ponytail: the paused bubble lives in component state,
    so it resumes on this page only. Lift it into a store if pages need to continue across routes. */
-export function LotiBubbles({ context, brain = scriptedBrain, onAction, className = '' }: LotiBubblesProps) {
+export function LotiBubbles({ context, brain = scriptedBrain, onAction, collapsed = false, className = '' }: LotiBubblesProps) {
   const runDefault = useLotiActions()
   const run = onAction ?? runDefault
   // ponytail: the opening is read once per mount; a context change mid-talk does not restart it.
   const [message, setMessage] = useState<LotiMessage | null>(() => brain.opening(context))
   const [paused, setPaused] = useState<Paused>(null)
+  const [closed, setClosed] = useState(collapsed)
   const [turn, setTurn] = useState(0)
   const [talking, setTalking] = useState(true)
   const focusNext = useRef<'chips' | 'resume' | null>(null)
@@ -85,6 +88,27 @@ export function LotiBubbles({ context, brain = scriptedBrain, onAction, classNam
   }
 
   if (!message) return null
+
+  // Collapsed: Loti and the line only, the whole bubble one button (Dashboard doc: "text bubbles you
+  // can click on to start a convo"). Opening it replays the bubble with its chips.
+  if (closed) {
+    return (
+      <section aria-label="Loti" className={`flex items-end gap-3 ${className}`}>
+        <Loti key={turn} size="sm" pose={talking ? 'talk' : (message.pose ?? 'idle')} className="shrink-0" />
+        <button
+          type="button"
+          onClick={() => {
+            setClosed(false)
+            enter(message)
+          }}
+          className="tactile-card focus-ring inline-flex max-w-md cursor-pointer items-center gap-3 px-4 py-3 text-left font-sans text-base text-ink hover:border-border-strong"
+        >
+          {message.text}
+          <MessageCircle size={16} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0 text-brand" />
+        </button>
+      </section>
+    )
+  }
 
   const pick = (choice: LotiChoice) => {
     const next = brain.respond(message.id, choice.id, context)

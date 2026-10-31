@@ -59,9 +59,9 @@ describe('tokens.css palette', () => {
   )
 
   it('ships the brand v2 sky canvas, surface and ink', () => {
-    expect(light.get('--color-canvas')).toBe('#FFF5EE')
+    expect(light.get('--color-canvas')).toBe('#FFFFFF')
     expect(light.get('--color-ink')).toBe('#0F2233')
-    expect(dark.get('--color-canvas')).toBe('#131B2E')
+    expect(dark.get('--color-canvas')).toBe('#162621')
     expect(dark.get('--color-surface')).toBe('#122130')
     expect(light.get('--color-accent')).toBe('#F2876B')
   })
@@ -121,8 +121,8 @@ describe('tokens.css palette', () => {
 
 describe('tokens.css shape and elevation', () => {
   // Anti-slop rules 1, 2 and 9: gradients only inside the clay token, never backdrop blur.
-  // The one exception is the body's sketchbook dot grid (a dot pattern, not a colour wash).
-  const DOT_GRID = /background-image: radial-gradient\(color-mix\(.*\) 0\.8px, transparent 0\.8px\);/
+  // The one exception is the classroom board's dot grid on #root (a dot pattern, not a colour wash).
+  const DOT_GRID = /background-image: radial-gradient\(color-mix\(.*\) 1\.2px, transparent 1\.2px\);/
   it('has no gradient outside the clay token and the dot grid, and no backdrop-filter', () => {
     const offending = tokensCss
       .split('\n')

@@ -52,7 +52,6 @@ describe('projection', () => {
     expect(projection(history, { now })!.optimal).toHaveLength(31)
     const p = projection(history, { now, days: 90 })!
     expect(p.optimal).toHaveLength(91)
-    expect(p.decay).toHaveLength(91)
     expect(p.optimal[90]!.at).toBe(now.getTime() + 90 * DAY)
   })
 
@@ -66,21 +65,13 @@ describe('projection', () => {
     expect(s.at(-1)!).toBeGreaterThan(80)
   })
 
-  it('keeps the decay series below the optimal one', () => {
-    const p = projection(history, { now, days: 90 })!
-    for (let k = 1; k < p.decay.length; k++) {
-      expect(p.decay[k]!.score).toBeLessThan(p.optimal[k]!.score)
-      expect(p.decay[k]!.score).toBeLessThanOrEqual(p.decay[k - 1]!.score)
-    }
-    expect(p.decay[0]!.score).toBe(p.optimal[0]!.score)
-  })
-
-  it('applies the idle penalty after the grace days, and floors at 0', () => {
-    const late = new Date(t0 + 6 * DAY + 12 * DAY) // 12 idle days, 10 past the 2-day grace
-    const p = projection(history, { now: late, lambda: 0.5 })!
-    expect(p.optimal[0]!.score).toBeCloseTo(58 - 0.5 * 10, 10)
-    const fast = projection(history, { now, lambda: 10 })!
-    expect(fast.decay.at(-1)!.score).toBe(0)
+  // User decision (2026-10-31): no idle-decay line and no idle penalty; no evidence, and it reads as guilt.
+  it('starts at the latest score however long the gap, and has no decay series', () => {
+    const late = new Date(t0 + 6 * DAY + 40 * DAY) // 40 idle days
+    const p = projection(history, { now: late })!
+    expect(p.optimal[0]!.score).toBeCloseTo(58, 10)
+    expect(p).not.toHaveProperty('decay')
+    expect(p).not.toHaveProperty('lambda')
   })
 
   it('uses the fallback alpha with fewer than 3 points and raises Tmax to the best score', () => {

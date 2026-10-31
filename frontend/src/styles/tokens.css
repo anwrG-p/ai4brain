@@ -7,7 +7,8 @@
    Do not add --shadow-* tokens to @theme: it would revive the dead shadow-doodle* utilities.
    No purple, no gradients, no backdrop blur (anti-slop rules 1, 2, 9; tokens.test.ts checks them). */
 @theme {
-  --color-canvas: #FFF5EE;
+  --color-canvas: #FFFFFF;
+  --color-wood: #E2B179;
   --color-surface: #FFFFFF;
   --color-surface-raised: #E8F3FB;
   --color-ink: #0F2233;
@@ -60,7 +61,8 @@
      use --color-accent-strong. --color-reward is the coral milestone fill.
      Never put coral text on a brand-subtle chip: accent-strong on brand-subtle is 4.42:1 (light).
      Never use brand-vivid or the coral fill as text (tokens.test.ts scans src for it). */
-  --color-canvas: #FFF5EE;
+  --color-canvas: #FFFFFF;
+  --color-wood: #E2B179;
   --color-surface: #FFFFFF;
   --color-surface-raised: #E8F3FB;
   --color-ink: #0F2233;
@@ -111,6 +113,23 @@
      (CIEDE2000 25.7 vs the coral fill, 10.2 vs accent-strong). 5.88:1 on surface. Anti-Red is
      about mood colour, not this stimulus. */
   --color-stroop-red: #C8102E;
+
+  /* Home: the board (--color-canvas, #root) takes a faint tint from Momo's mood; calm keeps the plain
+     board, and the wood frame never changes. Never red. Text on them is audited in token-metadata.ts. */
+  --color-canvas-happy: #FFF7F2;
+  --color-canvas-tired: #F5F7F9;
+  --color-canvas-frustrated: #FFF8EC;
+  --color-canvas-focused: #F1F8FD;
+
+  /* Past-results heatmap, low to high: pale sky, warm grey, peach, coral, deep coral. Lightness falls
+     as the score rises (higher = warmer and stronger). Never blue-to-red, never purple. Light steps
+     sit below 3:1 on surface, so every cell and legend swatch carries a --color-border-strong edge
+     (PastResults.tsx) and the value as text. */
+  --color-heat-0: #D3E8F7;
+  --color-heat-1: #DCD3CC;
+  --color-heat-2: #F2B39C;
+  --color-heat-3: #DB7A59;
+  --color-heat-4: #B94A2F;
 
   /* Uncertainty Tokens: a 15% band in the sky hue */
   --uncertainty-band-fill: rgba(43, 143, 214, 0.15);
@@ -223,7 +242,8 @@
 
 [data-theme="dark"] {
   /* Brand v2 semantic colour roles (dark) */
-  --color-canvas: #131B2E;
+  --color-canvas: #162621;
+  --color-wood: #6E3F1F;
   --color-surface: #122130;
   --color-surface-raised: #1A2D40;
   --color-ink: #F2F8FC;
@@ -269,6 +289,17 @@
   --dim-10: #F472B6;
   /* Stroop red (dark): 5.39:1 on surface; dark danger #F28B9E reads rose. */
   --color-stroop-red: #FF5C5C;
+
+  --color-canvas-happy: #202622;
+  --color-canvas-tired: #19221F;
+  --color-canvas-frustrated: #212719;
+  --color-canvas-focused: #132529;
+
+  --color-heat-0: #1E4A68;
+  --color-heat-1: #46555F;
+  --color-heat-2: #86675B;
+  --color-heat-3: #CC8169;
+  --color-heat-4: #FF9F86;
 
   --uncertainty-band-fill: rgba(124, 196, 242, 0.15);
   --uncertainty-low-stroke: #A9C1D6;
@@ -437,10 +468,6 @@ html[data-theme="dark"][data-emotion="fatigued"] {
   html,
   body {
     background-color: var(--color-canvas);
-    /* The first design's sketchbook dot grid (user, 2026-10-31: "make it like the first one").
-       Static, so it never moves behind a stimulus. */
-    background-image: radial-gradient(color-mix(in srgb, var(--color-ink) 9%, transparent) 0.8px, transparent 0.8px);
-    background-size: 24px 24px;
     color: var(--color-ink);
     font-family: var(--font-sans);
     font-size: var(--text-base);
@@ -521,72 +548,6 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     display: none;
   }
 
-  /* Board and podium: plain flat surfaces (ticket 06 removes their usage) */
-  .board-wood-frame {
-    display: flex;
-    flex-direction: column;
-    background-color: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-xl);
-    padding: 16px;
-    position: relative;
-  }
-
-  .board-canvas {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    background-color: var(--color-canvas);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    color: var(--color-ink);
-    position: relative;
-  }
-
-  .wooden-podium {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    width: 100%;
-    user-select: none;
-    pointer-events: none;
-  }
-
-  .podium-top-tier,
-  .podium-mid-tier,
-  .podium-base-tier {
-    width: 100%;
-    background-color: var(--color-surface-raised);
-    border: 1px solid var(--color-border);
-    position: relative;
-  }
-
-  .podium-top-tier {
-    height: 18px;
-    border-radius: var(--radius-md) var(--radius-md) 0 0;
-    z-index: 3;
-  }
-
-  .podium-mid-tier {
-    height: 44px;
-    border-top: 0;
-    border-bottom: 0;
-    z-index: 2;
-    overflow: hidden;
-  }
-
-  .podium-planks-overlay {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-  }
-
-  .podium-base-tier {
-    height: 20px;
-    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-    z-index: 1;
-  }
-
   /* EMILY Emotion-Adaptive Utility Classes */
   .border-emotion-accent {
     border-color: var(--color-emotion-accent);
@@ -600,40 +561,6 @@ html[data-theme="dark"][data-emotion="fatigued"] {
   .shadow-emotion-glow {
     box-shadow: 0 0 14px var(--color-emotion-glow);
   }
-
-  /* =========================================================================
-     Full-Page Slide Deck Presentation & Scrolling Transition Animations
-     ========================================================================= */
-  .slide-stage {
-    scroll-margin-top: 5rem;
-    min-height: calc(100vh - 6rem);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    position: relative;
-  }
-
-  .slide-anim-active {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    transition: opacity 650ms cubic-bezier(0.16, 1, 0.3, 1), transform 650ms cubic-bezier(0.16, 1, 0.3, 1);
-    will-change: transform, opacity;
-  }
-
-  .slide-anim-next {
-    opacity: 0.35;
-    transform: translateY(28px) scale(0.975);
-    transition: opacity 650ms cubic-bezier(0.16, 1, 0.3, 1), transform 650ms cubic-bezier(0.16, 1, 0.3, 1);
-    will-change: transform, opacity;
-  }
-
-  .slide-anim-prev {
-    opacity: 0.35;
-    transform: translateY(-28px) scale(0.975);
-    transition: opacity 650ms cubic-bezier(0.16, 1, 0.3, 1), transform 650ms cubic-bezier(0.16, 1, 0.3, 1);
-    will-change: transform, opacity;
-  }
-
 }
 
 /* Reduced Motion & Timed-Trial Zero-Distraction Lock */
@@ -647,10 +574,7 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     scroll-behavior: auto !important;
   }
   .tactile-btn:active:not(:disabled),
-  .tactile-card:hover,
-  .slide-anim-active,
-  .slide-anim-next,
-  .slide-anim-prev {
+  .tactile-card:hover {
     transform: none !important;
     opacity: 1 !important;
     transition: none !important;
@@ -667,10 +591,7 @@ html[data-theme="dark"][data-emotion="fatigued"] {
 [data-reduced-motion="true"] .tactile-btn:active:not(:disabled),
 [data-timed-trial="true"] .tactile-btn:active:not(:disabled),
 [data-reduced-motion="true"] .tactile-card:hover,
-[data-timed-trial="true"] .tactile-card:hover,
-[data-reduced-motion="true"] .slide-anim-active,
-[data-reduced-motion="true"] .slide-anim-next,
-[data-reduced-motion="true"] .slide-anim-prev {
+[data-timed-trial="true"] .tactile-card:hover {
   transform: none !important;
   opacity: 1 !important;
   transition: none !important;
@@ -1055,6 +976,22 @@ html[data-theme="dark"][data-emotion="fatigued"] {
   animation: anim-demo-move 3200ms var(--ease-in-out) infinite;
 }
 
+/* Home (ticket 08): the three blocks fade up in sequence (60 ms apart, all in by 360 ms) and the
+   radar's shape grows from its centre once. Momo's mood squash is the character's own (char-anim-mood). */
+.anim-enter {
+  animation: anim-fade-up 240ms var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+
+@keyframes anim-radar-grow {
+  from { opacity: 0; transform: scale(0); }
+  to { opacity: 1; transform: none; }
+}
+.anim-radar-grow {
+  transform-box: view-box;
+  animation: anim-radar-grow 400ms var(--ease-out) 120ms both;
+}
+
 /* motion pass: lock */
 @media (prefers-reduced-motion: reduce) {
   [class*="anim-"] {
@@ -1072,7 +1009,49 @@ html[data-theme="dark"][data-emotion="fatigued"] {
   transform: none !important;
 }
 
-/* Dark: the first design's warm dots on navy. */
-[data-theme="dark"] body {
-  background-image: radial-gradient(color-mix(in srgb, var(--color-accent) 12%, transparent) 0.8px, transparent 0.8px);
+/* Classroom board (user, 2026-10-31: "make the platform bg like the first one" → the classroom board).
+   The page is a wooden frame; the app sits on the board inside it: a dotted whiteboard in light,
+   a chalkboard in dark (--color-canvas is the board surface). Flat wood, no gradient. Static, so
+   nothing moves behind a stimulus. */
+body {
+  background-color: var(--color-wood);
+  padding: var(--space-2);
 }
+
+@media (min-width: 640px) {
+  body {
+    padding: var(--space-4);
+  }
+}
+
+#root {
+  min-height: calc(100dvh - 2 * var(--space-2));
+  background-color: var(--color-canvas);
+  background-image: radial-gradient(color-mix(in srgb, var(--color-ink) 9%, transparent) 1.2px, transparent 1.2px);
+  background-size: 24px 24px;
+  border: 2.5px solid var(--color-border-strong);
+  border-radius: var(--radius-xl);
+}
+
+@media (min-width: 640px) {
+  #root {
+    min-height: calc(100dvh - 2 * var(--space-4));
+  }
+}
+
+[data-theme="dark"] #root {
+  border-color: color-mix(in srgb, var(--color-ink) 30%, transparent);
+}
+
+/* Home: Momo's mood tints the board (the canvas inside the wood frame) while the dashboard is
+   mounted (DashboardPage puts .mood-tint-<mood> on its root). Calm is the plain board. */
+:root:has(.mood-tint-happy) { --color-canvas: var(--color-canvas-happy); }
+:root:has(.mood-tint-tired) { --color-canvas: var(--color-canvas-tired); }
+:root:has(.mood-tint-frustrated) { --color-canvas: var(--color-canvas-frustrated); }
+:root:has(.mood-tint-focused) { --color-canvas: var(--color-canvas-focused); }
+
+.heat-0 { background-color: var(--color-heat-0); }
+.heat-1 { background-color: var(--color-heat-1); }
+.heat-2 { background-color: var(--color-heat-2); }
+.heat-3 { background-color: var(--color-heat-3); }
+.heat-4 { background-color: var(--color-heat-4); }
