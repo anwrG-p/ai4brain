@@ -1,4 +1,4 @@
-import { useCallback, useId, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
 import { EMOTION_TO_MOOD, Loti, MomoFromStore } from '../components/features/characters'
@@ -6,17 +6,18 @@ import { useCharacterMotion } from '../components/features/characters/shared'
 import { Button } from '../components/ui/Button'
 import {
   currentPillars,
-  goalLevel,
+  goalLines,
   improvedPillars,
   sessionPath,
   sessionsThisWeek,
   unifiedHistory,
   weakestPillar,
+  type GoalLine,
 } from '../features/insights/dashboard'
 import { hasGoalsForYear, useGoalsStore } from '../features/insights/goals'
 import { PastResults } from '../features/insights/PastResults'
 import { PillarRadar, REAL_IMPROVEMENT } from '../features/insights/PillarRadar'
-import { PILLAR_IDS, PILLAR_LABELS, type PillarId, type PillarScore } from '../features/insights/pillars'
+import { PILLAR_LABELS, type PillarId, type PillarScore } from '../features/insights/pillars'
 import { ProgressCurve } from '../features/insights/ProgressCurve'
 import { useSessionStore } from '../features/insights/sessionStore'
 import { LotiBubbles, scriptedBrain, useLotiActions, type LotiAction, type LotiBrain } from '../features/loti'
@@ -47,6 +48,8 @@ export default function DashboardPage() {
   const sessions = useSessionStore((s) => s.sessions)
   const goalYear = useGoalsStore((s) => s.year)
   const goals = useGoalsStore((s) => s.goals)
+  const bases = useGoalsStore((s) => s.bases)
+  const setBase = useGoalsStore((s) => s.setBase)
   const mood = EMOTION_TO_MOOD[useEmilyStore((s) => s.currentEmotion)]
   const name = useAppStore((s) => s.userProfile?.preferredName)
   // ponytail: "now" is read once per visit; the page does not tick over midnight.
@@ -56,8 +59,14 @@ export default function DashboardPage() {
   const improved = useMemo(() => improvedPillars(sessions), [sessions])
   const history = useMemo(() => unifiedHistory(sessions), [sessions])
   const weakest = weakestPillar(pillars)
-  const goal = goalLevel({ year: goalYear, goals }, sessions, now)
+  const goalList = useMemo(() => goalLines({ year: goalYear, goals, bases }, pillars, now), [goalYear, goals, bases, pillars, now])
+  const goalLevels = Object.fromEntries(goalList.flatMap((g) => (g.goal === null ? [] : [[g.pillar, g.goal]])))
   const start = sessionPath(weakest)
+
+  // A goal set before its pillar was measured starts from the pillar's first score.
+  useEffect(() => {
+    for (const g of goalList) if (g.base === null && g.current !== null) setBase(g.pillar, g.current)
+  }, [goalList, setBase])
 
   // Loti's "let's train" goes where the primary action goes (its own pillar if it names one).
   const onLoti = useCallback(
@@ -107,7 +116,7 @@ export default function DashboardPage() {
           <h2 id="home-skills" className="font-display text-xl font-bold text-ink">
             Your five skills
           </h2>
-          <PillarRadar scores={pillars} improved={improved} tableToggle grow={motion} className="mx-auto mt-2 max-w-md" />
+          <PillarRadar scores={pillars} improved={improved} goals={goalLevels} tableToggle grow={motion} className="mx-auto mt-2 max-w-md" />
         </section>
       </div>
 
@@ -115,12 +124,12 @@ export default function DashboardPage() {
         <h2 id="home-progress" className="mb-3 font-display text-xl font-bold text-ink">
           Your progress
         </h2>
-        <ProgressCurve history={history} now={now} goal={goal} />
+        <ProgressCurve history={history} now={now} />
       </section>
 
       <Explore>
         <Why weakest={weakest} pillars={pillars} improved={improved.length > 0} />
-        <Goals goals={goals} current={goalYear === now.getFullYear()} context={context} />
+        <Goals lines={goalList} context={context} onAction={onLoti} />
         <ExploreBlock title="Past results" className="md:col-span-2">
           <PastResults sessions={sessions} />
         </ExploreBlock>
@@ -190,16 +199,39 @@ function Why({ weakest, pillars, improved }: { weakest: PillarId | undefined; pi
   )
 }
 
-function Goals({ goals, current, context }: { goals: Partial<Record<PillarId, number>>; current: boolean; context: Parameters<typeof LotiBubbles>[0]['context'] }) {
+/* Each goal against its own pillar, from the score it had when the goal was set (ticket 08 review):
+   "Deep Memory 52 → goal 62". Never shown as met when set; only its own pillar can meet it. */
+function goalText(g: GoalLine): string {
+  const label = PILLAR_LABELS[g.pillar]
+  if (g.goal === null) return `${label}: +${g.target}, from your first score`
+  return `${label} ${round(g.current ?? g.base!)} → goal ${round(g.goal)}${g.reached ? ' · reached' : ''}`
+}
+
+function Goals({
+  lines,
+  context,
+  onAction,
+}: {
+  lines: GoalLine[]
+  context: Parameters<typeof LotiBubbles>[0]['context']
+  onAction: (action: LotiAction) => void
+}) {
   const [talk, setTalk] = useState(false)
-  const set = current ? PILLAR_IDS.filter((p) => goals[p] !== undefined) : []
   return (
     <ExploreBlock title="Goals">
-      <p className="text-base text-ink">
-        {set.length ? `This year: ${set.map((p) => `${PILLAR_LABELS[p]} +${goals[p]}`).join(', ')}.` : 'No goal yet this year.'}
-      </p>
+      {lines.length ? (
+        <ul aria-label="Your goals this year" className="m-0 list-none space-y-1 p-0 text-base text-ink">
+          {lines.map((g) => (
+            <li key={g.pillar} className="tabular-nums">
+              {goalText(g)}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-base text-ink">No goal yet this year.</p>
+      )}
       {talk ? (
-        <LotiBubbles brain={goalBrain} context={context} className="mt-3" />
+        <LotiBubbles brain={goalBrain} context={context} onAction={onAction} className="mt-3" />
       ) : (
         <button
           type="button"

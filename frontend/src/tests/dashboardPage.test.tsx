@@ -228,17 +228,38 @@ describe('Home (/dashboard)', () => {
     expect(screen.getByText(/is your lowest score right now/)).toBeInTheDocument()
   })
 
-  it('sets a goal from "Further explore", and the curve shows it as one thin marker', async () => {
-    seed(sessions(3))
+  // Review fix: each goal shows against its own pillar, from the score it had when the goal was set,
+  // so it can never look met on the day it is set; the overall curve has no goal marker.
+  it('sets a goal from "Further explore": shown against its own pillar, from today’s score, never met at once', async () => {
+    seed(sessions(3)) // Deep Memory's latest score: 48
     renderHome()
-    expect(document.querySelector('[data-goal]')).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Further explore my training' }))
     await userEvent.click(screen.getByRole('button', { name: 'Set a goal' }))
     await userEvent.click(screen.getByRole('button', { name: 'Deep Memory' }))
     await userEvent.click(screen.getByRole('button', { name: 'Steady (+10)' }))
-    expect(useGoalsStore.getState().goals).toEqual({ memory: 10 })
-    expect(screen.getByText('This year: Deep Memory +10.')).toBeInTheDocument()
-    expect(document.querySelectorAll('line[data-goal]')).toHaveLength(1)
+    expect(useGoalsStore.getState()).toMatchObject({ goals: { memory: 10 }, bases: { memory: 48 } })
+    const goals = screen.getByRole('list', { name: 'Your goals this year' })
+    expect(within(goals).getByRole('listitem')).toHaveTextContent(/^Deep Memory 48 → goal 58$/)
+    expect(goals.textContent).not.toMatch(/reached/i)
+    // One line in "View as table", and nothing on the overall curve.
+    expect(screen.getByRole('row', { name: /^Deep Memory 48 · likely \d+–\d+ · goal 58$/ })).toBeInTheDocument()
+    expect(document.querySelector('[data-goal]')).toBeNull()
+  })
+
+  it('a goal set before its pillar was measured takes its start from the first score, then is reached only by that pillar', () => {
+    useGoalsStore.setState({ year: 2026, goals: { memory: 10 }, bases: {} })
+    seed(sessions(3))
+    const { unmount } = renderHome()
+    expect(useGoalsStore.getState().bases).toEqual({ memory: 48 })
+    fireEvent.click(screen.getByRole('button', { name: 'Further explore my training' }))
+    expect(screen.getByText(/^Deep Memory 48 → goal 58$/)).toBeInTheDocument()
+    unmount()
+    const later = sessions(4)
+    later[3]!.inputs.MST_LDI = { score: 60, trials: 40 }
+    seed(later)
+    renderHome()
+    fireEvent.click(screen.getByRole('button', { name: 'Further explore my training' }))
+    expect(screen.getByText(/^Deep Memory 60 → goal 58 · reached$/)).toBeInTheDocument()
   })
 
   it('motion: the blocks enter in sequence and the radar grows once; none with reduced motion', () => {

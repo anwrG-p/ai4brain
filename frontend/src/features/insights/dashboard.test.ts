@@ -4,7 +4,7 @@ import {
   curveWindow,
   currentPillars,
   exerciseWeeks,
-  goalLevel,
+  goalLines,
   improvedPillars,
   sessionPath,
   sessionsThisWeek,
@@ -89,21 +89,33 @@ describe('sessionsThisWeek', () => {
   })
 })
 
-describe('goalLevel', () => {
-  it('is the year\'s first unified score plus the targets spread over the measured pillars', () => {
-    const sessions = [rec('a', 20, full(40)), rec('b', 1, full(50))]
-    // 5 pillars measured, goals +10 and +15: 40 + 25 / 5 = 45.
-    expect(goalLevel({ year: 2026, goals: { memory: 10, focus: 15 } }, sessions, NOW)).toBeCloseTo(45)
+describe('goalLines (each goal against its own pillar)', () => {
+  const scored = (memory: number, focus = 50) => {
+    const t = full(focus)
+    t.MST_LDI = { score: memory, trials: 40 }
+    return currentPillars([rec('a', 1, t)])
+  }
+  const stored = (bases: Record<string, number>) => ({ year: 2026, goals: { memory: 10 }, bases })
+
+  it('is never met at the moment it is set: goal = base + target, current = base', () => {
+    expect(goalLines(stored({ memory: 52 }), scored(52), NOW)).toEqual([
+      { pillar: 'memory', target: 10, base: 52, goal: 62, current: 52, reached: false },
+    ])
   })
 
-  it('is null without goals for this year or without sessions', () => {
-    expect(goalLevel({ year: 2025, goals: { memory: 10 } }, [rec('a', 1, full(40))], NOW)).toBeNull()
-    expect(goalLevel({ year: 2026, goals: {} }, [rec('a', 1, full(40))], NOW)).toBeNull()
-    expect(goalLevel({ year: 2026, goals: { memory: 10 } }, [], NOW)).toBeNull()
+  it('is reached only by its own pillar', () => {
+    expect(goalLines(stored({ memory: 52 }), scored(63), NOW)[0]).toMatchObject({ goal: 62, reached: true })
+    // Another skill rising does not meet a Deep Memory goal.
+    expect(goalLines(stored({ memory: 52 }), scored(52, 95), NOW)[0]).toMatchObject({ reached: false })
   })
 
-  it('never goes above 100', () => {
-    expect(goalLevel({ year: 2026, goals: { memory: 100, focus: 100, agility: 100 } }, [rec('a', 1, full(90))], NOW)).toBe(100)
+  it('caps the goal at 100 and needs a rise above the base to count as reached', () => {
+    expect(goalLines(stored({ memory: 100 }), scored(100), NOW)[0]).toMatchObject({ goal: 100, reached: false })
+  })
+
+  it('has no goal level without a base, and nothing for another year', () => {
+    expect(goalLines(stored({}), scored(52), NOW)[0]).toMatchObject({ base: null, goal: null, current: 52, reached: false })
+    expect(goalLines({ ...stored({ memory: 52 }), year: 2025 }, scored(52), NOW)).toEqual([])
   })
 })
 

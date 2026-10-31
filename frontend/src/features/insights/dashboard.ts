@@ -1,6 +1,6 @@
 import { EXERCISE_NAME } from '../assessment/names'
 import type { SchemaType } from '../assessment/telemetry/types'
-import type { Goals } from './goals'
+import type { StoredGoals } from './goals'
 import { PILLAR_IDS, pillarScores, unifiedScore, type InputId, type PillarId, type PillarScore } from './pillars'
 import { isRealImprovement } from './projection'
 import type { SessionRecord } from './sessionStore'
@@ -66,25 +66,33 @@ export function sessionsThisWeek(sessions: readonly SessionRecord[], now: Date):
   return sessions.filter((s) => Date.parse(s.at) >= from && Date.parse(s.at) <= now.getTime()).length
 }
 
-/** The goal as a level on the unified score: the year's first unified score, plus the points the
-    user wants to gain on each pillar spread over the measured pillars (the unified score is their
-    mean). Null without goals for this year or without a scored session. */
-export function goalLevel(
-  stored: { year: number | null; goals: Goals },
-  sessions: readonly SessionRecord[],
-  now: Date,
-): number | null {
-  const targets = Object.values(stored.goals).filter((t): t is number => typeof t === 'number')
-  if (stored.year !== now.getFullYear() || !targets.length) return null
-  const year = byTime(sessions).filter((s) => new Date(s.at).getFullYear() === now.getFullYear())
-  for (const s of year.length ? year : byTime(sessions)) {
-    const p = pillarScores(s.inputs)
-    const base = unifiedScore(p)
-    if (base === null) continue
-    const measured = PILLAR_IDS.filter((id) => p[id].score !== null).length
-    return Math.min(100, base + targets.reduce((a, b) => a + b, 0) / measured)
-  }
-  return null
+export type GoalLine = {
+  pillar: PillarId
+  /** Points to gain this year. */
+  target: number
+  /** The pillar's score when the goal was set, or null when it was not measured yet. */
+  base: number | null
+  /** base + target (at most 100), or null without a base. */
+  goal: number | null
+  /** The pillar's latest score, or null. */
+  current: number | null
+  reached: boolean
+}
+
+/** Each of this year's goals against its own pillar: "Deep Memory 52 -> goal 62". A goal is never
+    met when it is set (current = base < goal), and only its own pillar can meet it: reaching needs
+    current >= goal and a rise above the base (so a goal capped at 100 from 100 is not met at once). */
+export function goalLines(stored: StoredGoals, pillars: Pillars, now: Date): GoalLine[] {
+  if (stored.year !== now.getFullYear()) return []
+  return PILLAR_IDS.flatMap((pillar) => {
+    const target = stored.goals[pillar]
+    if (target === undefined) return []
+    const base = stored.bases[pillar] ?? null
+    const goal = base === null ? null : Math.min(100, base + target)
+    const current = pillars[pillar].score
+    const reached = goal !== null && current !== null && base !== null && current >= goal && current > base
+    return [{ pillar, target, base, goal, current, reached }]
+  })
 }
 
 const MIN_PAST_DAYS = 21

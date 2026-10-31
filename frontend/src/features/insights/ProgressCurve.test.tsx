@@ -12,7 +12,7 @@ const legendItems = () => within(screen.getByRole('list', { name: 'Line styles' 
    the 3rd session; no "If you pause" line and no idle decay. */
 describe('ProgressCurve', () => {
   it('shows Loti\'s empty-state line, and no chart, before the first session', () => {
-    const { container } = render(<ProgressCurve history={[]} now={NOW} goal={null} />)
+    const { container } = render(<ProgressCurve history={[]} now={NOW} />)
     expect(screen.getByText(CURVE_EMPTY)).toBeInTheDocument()
     expect(screen.getByRole('img', { name: /Loti/ })).toBeInTheDocument()
     expect(container.querySelector('[data-line]')).toBeNull()
@@ -21,7 +21,7 @@ describe('ProgressCurve', () => {
   it('before the 3rd session: the real points only, no projection, a one-item legend', () => {
     expect(PROJECT_FROM).toBe(3)
     for (const h of [hist(40), hist(40, 44)]) {
-      const { container, unmount } = render(<ProgressCurve history={h} now={NOW} goal={null} />)
+      const { container, unmount } = render(<ProgressCurve history={h} now={NOW} />)
       expect(container.querySelector('[data-line="actual"]')).not.toBeNull()
       expect(container.querySelectorAll('[data-session]')).toHaveLength(h.length)
       expect(container.querySelector('[data-line="keep"]')).toBeNull()
@@ -32,7 +32,7 @@ describe('ProgressCurve', () => {
   })
 
   it('from the 3rd session: the solid real line and one dashed "If you keep training" line; no dotted line', () => {
-    const { container } = render(<ProgressCurve history={hist(40, 44, 47)} now={NOW} goal={null} />)
+    const { container } = render(<ProgressCurve history={hist(40, 44, 47)} now={NOW} />)
     const actual = container.querySelector('[data-line="actual"]')!
     expect(actual).not.toHaveAttribute('stroke-dasharray')
     expect(actual.getAttribute('d')).toMatch(/C/) // monotone: a smooth cubic, not straight segments
@@ -47,38 +47,35 @@ describe('ProgressCurve', () => {
   })
 
   it('has no confidence band and no toggle', () => {
-    const { container } = render(<ProgressCurve history={hist(40, 44, 47)} now={NOW} goal={null} />)
+    const { container } = render(<ProgressCurve history={hist(40, 44, 47)} now={NOW} />)
     expect(container.querySelector('[data-uncertainty-band]')).toBeNull()
     expect(screen.queryByRole('button')).toBeNull()
   })
 
-  it('shows a goal as one thin horizontal marker', () => {
-    const { container, rerender } = render(<ProgressCurve history={hist(40, 44)} now={NOW} goal={null} />)
+  // Review fix: a per-pillar goal on the overall curve could look met on the day it is set, or be met
+  // by another skill. Goals show against their own pillar instead (Home, "Further explore" and the table).
+  it('has no goal marker', () => {
+    const { container } = render(<ProgressCurve history={hist(40, 44, 47)} now={NOW} />)
     expect(container.querySelector('[data-goal]')).toBeNull()
-    rerender(<ProgressCurve history={hist(40, 44)} now={NOW} goal={60} />)
-    const goal = container.querySelector('line[data-goal]')!
-    expect(goal.getAttribute('y1')).toBe(goal.getAttribute('y2'))
-    expect(Number(goal.getAttribute('stroke-width'))).toBeLessThanOrEqual(1.5)
-    expect(container.querySelector('svg')!.textContent).toContain('Your goal')
+    expect(container.textContent).not.toMatch(/goal/i)
   })
 
-  it('marks in coral only the session where the change first became real (RCI >= 1.96)', () => {
-    const coral = (c: HTMLElement) => c.querySelectorAll('[class*="accent"]')
-    const { container, rerender } = render(<ProgressCurve history={hist(40, 44, 47)} now={NOW} goal={null} />)
-    expect(coral(container)).toHaveLength(0)
-    rerender(<ProgressCurve history={hist(40, 45, 55, 60)} now={NOW} goal={null} />)
-    const marks = container.querySelectorAll('[data-milestone]')
-    expect(marks).toHaveLength(1)
-    expect(marks[0]).toHaveClass('fill-accent-strong')
-    expect(coral(container)).toHaveLength(1)
+  // Review fix: the coral milestone applied pillar-level RCI settings to the overall score; removed.
+  it('has no coral mark: every session dot is sky', () => {
+    const { container } = render(<ProgressCurve history={hist(40, 45, 55, 60)} now={NOW} />)
+    expect(container.querySelectorAll('[class*="accent"]')).toHaveLength(0)
+    expect(container.querySelector('[data-milestone]')).toBeNull()
+    const dots = container.querySelectorAll('[data-session]')
+    expect(dots).toHaveLength(4)
+    for (const d of dots) expect(d).toHaveClass('fill-brand-vivid')
   })
 
   it('summarises the chart for screen readers', () => {
-    const { rerender } = render(<ProgressCurve history={hist(41, 50, 55)} now={NOW} goal={null} />)
+    const { rerender } = render(<ProgressCurve history={hist(41, 50, 55)} now={NOW} />)
     const summary = screen.getByText(/Your score went from 41 to 55 over 3 sessions\./)
     expect(summary).toHaveClass('sr-only')
     expect(summary.textContent).toMatch(/If you keep training, about \d+ by \d+ \w+\.$/)
-    rerender(<ProgressCurve history={hist(41)} now={NOW} goal={null} />)
+    rerender(<ProgressCurve history={hist(41)} now={NOW} />)
     expect(screen.getByText('Your score: 41 after 1 session.')).toHaveClass('sr-only')
   })
 })

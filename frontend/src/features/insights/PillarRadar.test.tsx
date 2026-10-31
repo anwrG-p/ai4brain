@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { NOT_MEASURED, PillarRadar } from './PillarRadar'
+import { NOT_MEASURED, PillarRadar, radarGeometry } from './PillarRadar'
 import { pillarScores, type PillarId, type PillarScore } from './pillars'
 
 const score = (s: number | null): PillarScore => ({ score: s, uncertainty: 10, coverage: s === null ? 0 : 1, proxies: [] })
@@ -82,5 +82,32 @@ describe('PillarRadar', () => {
     expect(container.querySelector('svg')).toHaveClass('blur-md')
     expect(screen.queryByRole('table')).toBeNull()
     expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  it('adds each goal to its pillar’s table row only (never on the radar)', () => {
+    const { container } = render(<PillarRadar scores={SOME} goals={{ memory: 85 }} />)
+    expect(screen.getByRole('row', { name: 'Deep Memory 75 · likely 65–85 · goal 85' })).toBeInTheDocument()
+    expect(screen.getByRole('row', { name: 'Focus & Strategy 62 · likely 52–72' })).toBeInTheDocument()
+    expect(container.querySelector('svg')!.textContent).not.toMatch(/goal/i)
+  })
+
+  // Review fix: below ~325 px the tagged side labels needed more room than the SVG had, so it was
+  // scaled down (letterboxed, labels under 14 px). The layout must always fit its width.
+  it.each([260, 280, 300, 320, 325, 343, 400, 448])('fits %i px without scaling: labels stay inside the SVG', (w) => {
+    for (const improved of [[], ['agility', 'visual'], ['focus', 'agility', 'impulse', 'memory', 'visual']] as PillarId[][]) {
+      const g = radarGeometry(w, new Set(improved))
+      expect(g.needed, `${w} px, ${improved.join(',')}`).toBeLessThanOrEqual(w)
+    }
+  })
+
+  it('drops the side tags (kept in the table) only when the width cannot hold them', () => {
+    const both = new Set<PillarId>(['agility', 'visual'])
+    expect(radarGeometry(300, both).sideTags).toBe(false)
+    expect(radarGeometry(343, both).sideTags).toBe(true)
+  })
+
+  it('never letterboxes: the SVG keeps its aspect ratio when the box is narrower', () => {
+    const { container } = render(<PillarRadar scores={SOME} />)
+    expect(container.querySelector('svg')).toHaveClass('h-auto')
   })
 })
