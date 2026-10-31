@@ -3,6 +3,8 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppShell } from '../components/layout/AppShell'
 import { tracker } from '../features/assessment/telemetry/tracker'
+import { GOALS_KEY, useGoalsStore } from '../features/insights/goals'
+import { SESSIONS_KEY, useSessionStore } from '../features/insights/sessionStore'
 import PrivacyPage from '../pages/PrivacyPage'
 import { useAppStore } from '../state/useAppStore'
 
@@ -83,5 +85,23 @@ describe('UI telemetry goes through the Tracker', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: /cannot be undone/i }))
     fireEvent.click(screen.getByRole('button', { name: /Permanently Purge All Data/i }))
     expect(localStorage.getItem('aura_uid')).toBeNull()
+  })
+
+  it('the privacy purge clears the local sessions and goals', () => {
+    vi.spyOn(tracker, 'clear').mockReturnValue(0)
+    useSessionStore.getState().addSession({ id: 's1', at: '2026-10-31T10:00:00Z', inputs: { MST_LDI: { score: 60, trials: 20 } } })
+    useGoalsStore.getState().setGoal('memory', 10)
+    render(
+      <MemoryRouter future={future}>
+        <PrivacyPage />
+      </MemoryRouter>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Purge All Data & Telemetry/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /cannot be undone/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Permanently Purge All Data/i }))
+    expect(useSessionStore.getState().sessions).toEqual([])
+    expect(useGoalsStore.getState().goals).toEqual({})
+    expect(localStorage.getItem(SESSIONS_KEY)).toBeNull()
+    expect(localStorage.getItem(GOALS_KEY)).toBeNull()
   })
 })

@@ -10,6 +10,8 @@ import { DoodleSquiggle } from '../components/ui/DoodleDecorations'
 import { useAppStore } from '../state/useAppStore'
 import { tracker } from '../features/assessment/telemetry/tracker'
 import { forgetUserId } from '../features/assessment/tasks/taskSource'
+import { useGoalsStore } from '../features/insights/goals'
+import { useSessionStore } from '../features/insights/sessionStore'
 import { MOCK_PRIVACY_AUDIT_LOG } from '../services/mocks/fixtures'
 import type { PrivacyAuditEvent, PurgeCertificate, WhyThisTrail } from '../types'
 
@@ -166,6 +168,9 @@ export default function PrivacyPage() {
     // Drops pending events on this device; server-side deletion is Member 4's route.
     const recordsPurged = tracker.clear()
     forgetUserId()
+    // The dashboard's local data: completed sessions and yearly goals.
+    useSessionStore.getState().clearSessions()
+    useGoalsStore.getState().clearGoals()
 
     const cert: PurgeCertificate = {
       certificateId: `CERT-PURGE-2026-${Math.random()

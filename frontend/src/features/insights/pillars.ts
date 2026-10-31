@@ -1,6 +1,7 @@
+import { getDimensionsByPreset, type DimensionPresetKey } from '../../config/dimensions'
 import type { TaskSchemaType } from '../../types'
 
-/** The five pillars (spec "Five pillars"). Ticket 04 extends this file with the weights and math. */
+/** The five pillars (spec "Five pillars"). */
 export const PILLAR_IDS = ['focus', 'agility', 'impulse', 'memory', 'visual'] as const
 export type PillarId = (typeof PILLAR_IDS)[number]
 
@@ -13,17 +14,146 @@ export const PILLAR_LABELS: Record<PillarId, string> = {
   visual: 'Visual Radar',
 }
 
-/** The exercise that practises each pillar most directly, after the doc's main input per pillar:
-    focus <- OTS planning (tower), agility <- DCCS switch cost (n-back), impulse <- SST proxy
-    (stroop), memory <- MST LDI (mst), visual <- UFOV SOA (ufov). */
-export const PILLAR_PRACTICE: Record<PillarId, TaskSchemaType> = {
-  focus: 'tower',
-  agility: 'n_back',
-  impulse: 'stroop',
-  memory: 'mst',
-  visual: 'ufov',
-}
-
 export function isPillarId(value: unknown): value is PillarId {
   return typeof value === 'string' && (PILLAR_IDS as readonly string[]).includes(value)
+}
+
+/* ---------------------------------------------------------------------------------------------
+   The doc's model ("Rou7 zebda cognitive intelligence", RADAR SCORES). Input names are the doc's.
+   Every input is a 0-100 score; taskScores.ts derives them from telemetry events:
+
+   OSPAN                 n-back d' (log-linear correction, Hautus 1995), d' 0 -> 0, d' 4 -> 100
+   OTS_Planning          tower: 0.8 * share solved in minimum moves + 0.2 * planning speed on those
+   OTS_Execution         tower: mean of l_min / l_user (0 when unsolved)
+   FluidMatrices         mean of matrix accuracy and relational accuracy weighted by hops
+   ANT_Conflict          Stroop RT cost (incongruent - congruent, correct trials), 0 ms -> 100, 300 ms -> 0
+   DCCS_SwitchCost       n-back accuracy on switch trials vs the rest, cost 0 -> 100, cost 0.5 -> 0
+   ErrorRecovery         accuracy on the trial right after an error, all exercises
+   SST_SSRT              PROXY: Stroop incongruent accuracy (no stop-signal task exists)
+   DDM_Caution           omitted: no source
+   PAL_FirstTrialMemory  omitted: no source
+   MST_LDI               P(similar | lure) - P(similar | new), clamped to 0..1
+   UFOV_SOA              QUEST threshold, 17 ms -> 100, 500 ms -> 0
+   ANT_Orienting         UFOV peripheral accuracy
+   --------------------------------------------------------------------------------------------- */
+
+export const INPUT_IDS = [
+  'OSPAN',
+  'OTS_Planning',
+  'OTS_Execution',
+  'FluidMatrices',
+  'ANT_Conflict',
+  'DCCS_SwitchCost',
+  'ErrorRecovery',
+  'SST_SSRT',
+  'DDM_Caution',
+  'PAL_FirstTrialMemory',
+  'MST_LDI',
+  'UFOV_SOA',
+  'ANT_Orienting',
+] as const
+export type InputId = (typeof INPUT_IDS)[number]
+
+export function isInputId(value: unknown): value is InputId {
+  return typeof value === 'string' && (INPUT_IDS as readonly string[]).includes(value)
+}
+
+/** One input: a 0-100 score, the trials behind it, and whether it stands in for the doc's measure. */
+export type InputScore = { score: number; trials: number; proxy?: true }
+export type TaskScores = Partial<Record<InputId, InputScore>>
+
+/** The doc's weights, verbatim. Each pillar sums to 1. */
+export const PILLAR_WEIGHTS: Record<PillarId, Partial<Record<InputId, number>>> = {
+  focus: { OSPAN: 0.45, OTS_Planning: 0.3, FluidMatrices: 0.25 },
+  agility: { ANT_Conflict: 0.4, DCCS_SwitchCost: 0.4, ErrorRecovery: 0.2 },
+  impulse: { SST_SSRT: 0.5, OTS_Execution: 0.3, DDM_Caution: 0.2 },
+  memory: { MST_LDI: 0.55, PAL_FirstTrialMemory: 0.45 },
+  visual: { UFOV_SOA: 0.5, ANT_Orienting: 0.5 },
+}
+
+export type PillarScore = {
+  /** 0-100, or null when coverage is below MIN_COVERAGE. */
+  score: number | null
+  /** Half-width of a ~95% band, in score points (0-50). */
+  uncertainty: number
+  /** Share of the pillar's weight that had data (0-1). */
+  coverage: number
+  /** Inputs used that only stand in for the doc's measure. */
+  proxies: InputId[]
+}
+
+export const MIN_COVERAGE = 0.3
+const MAX_UNCERTAINTY = 50
+
+/** Scores every pillar from the inputs that are there, renormalising the weights over them.
+    Uncertainty: each input's standard error is taken as the worst-case binomial one, 50 / sqrt(trials)
+    points; they combine with the renormalised weights, and the result is divided by coverage, so the
+    band widens both as trials drop and as inputs go missing. 1.96 x that, capped at 50.
+    ponytail: worst-case binomial SE, not a fitted measurement model; Member 3's profile can replace it. */
+export function pillarScores(inputs: TaskScores): Record<PillarId, PillarScore> {
+  const out = {} as Record<PillarId, PillarScore>
+  for (const pillar of PILLAR_IDS) {
+    let coverage = 0
+    let sum = 0
+    const used: [number, InputScore][] = []
+    const proxies: InputId[] = []
+    for (const [id, w] of Object.entries(PILLAR_WEIGHTS[pillar]) as [InputId, number][]) {
+      const input = inputs[id]
+      if (!input) continue
+      coverage += w
+      sum += w * input.score
+      used.push([w, input])
+      if (input.proxy) proxies.push(id)
+    }
+    let uncertainty = MAX_UNCERTAINTY
+    if (coverage > 0 && used.every(([, i]) => i.trials > 0)) {
+      const variance = used.reduce((v, [w, i]) => v + (w / coverage) ** 2 * (2500 / i.trials), 0)
+      uncertainty = Math.min(MAX_UNCERTAINTY, (1.96 * Math.sqrt(variance)) / coverage)
+    }
+    out[pillar] = { score: coverage >= MIN_COVERAGE ? sum / coverage : null, uncertainty, coverage, proxies }
+  }
+  return out
+}
+
+/** The overall score: the plain mean of the pillars that have a score (the doc gives no weights
+    across pillars), or null when none has. */
+export function unifiedScore(pillars: Record<PillarId, PillarScore>): number | null {
+  const scores = PILLAR_IDS.map((p) => pillars[p].score).filter((s): s is number => s !== null)
+  return scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null
+}
+
+/* Training: which exercise practises each pillar. Schemas in order of preference, after the doc's
+   inputs (focus: tower then the reasoning tasks, then n-back for OSPAN; agility: n-back switches,
+   Stroop, Logic Web; impulse: Stroop, then tower execution). The first schema some dimension of the
+   ACTIVE preset offers wins; `prefer` breaks ties between dimensions sharing that schema. */
+const PILLAR_PRACTICE: Record<PillarId, { schemas: readonly TaskSchemaType[]; prefer?: readonly string[] }> = {
+  focus: { schemas: ['tower', 'relational', 'matrix', 'n_back'] },
+  agility: { schemas: ['n_back', 'stroop', 'relational'], prefer: ['cognitive_flexibility'] },
+  // Both spellings: the 6-dimension preset renames inhibition_control.
+  impulse: { schemas: ['stroop', 'tower'], prefer: ['inhibition_control', 'inhibitory_control'] },
+  memory: { schemas: ['mst'] },
+  visual: { schemas: ['ufov'] },
+}
+
+export type Training = { dimId: string; schema: TaskSchemaType }
+
+/** The dimension of the active preset that has `schema` (preferring the ids in `prefer`), or null. */
+export function dimensionFor(
+  schema: TaskSchemaType,
+  preset: DimensionPresetKey = '7',
+  prefer: readonly string[] = [],
+): Training | null {
+  const dims = getDimensionsByPreset(preset).filter((d) => d.schemaTypes.includes(schema))
+  const dim = dims.find((d) => prefer.includes(d.id)) ?? dims[0]
+  return dim ? { dimId: dim.id, schema } : null
+}
+
+/** Where to practise a pillar under the active preset, or null when the preset has no fitting exercise. */
+export function pillarTraining(pillar: PillarId, preset: DimensionPresetKey = '7'): Training | null {
+  const { schemas, prefer } = PILLAR_PRACTICE[pillar]
+  for (const schema of schemas) {
+    const t = dimensionFor(schema, preset, prefer)
+    if (t) return t
+  }
+  return null
 }

@@ -1,27 +1,32 @@
 import { useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FULL_DIMENSION_POOL } from '../../config/dimensions'
+import type { DimensionPresetKey } from '../../config/dimensions'
+import { useAppStore } from '../../state/useAppStore'
 import { useGoalsStore } from '../insights/goals'
-import { PILLAR_PRACTICE } from '../insights/pillars'
+import { dimensionFor, pillarTraining } from '../insights/pillars'
 import type { LotiAction } from './types'
 
-/** Where a train action goes: the exercise for its schema type, else for its pillar.
+/** Where a train action goes under the active preset: the exercise for its schema type when the
+    preset has it, else the pillar's exercise, else the assessment hub.
     Ticket 09 may send these to /train?pillar= once the Train page exists. */
-export function trainPath(action: Extract<LotiAction, { kind: 'train' }>): string {
-  const schema = action.schemaType ?? (action.pillar ? PILLAR_PRACTICE[action.pillar] : undefined)
-  const dim = schema && FULL_DIMENSION_POOL.find((d) => d.schemaTypes.includes(schema))
-  return dim && schema ? `/task/${dim.id}?schema=${schema}` : '/assessment'
+export function trainPath(action: Extract<LotiAction, { kind: 'train' }>, preset: DimensionPresetKey = '7'): string {
+  const t =
+    (action.schemaType && dimensionFor(action.schemaType, preset)) ||
+    (action.pillar && pillarTraining(action.pillar, preset)) ||
+    null
+  return t ? `/task/${t.dimId}?schema=${t.schema}` : '/assessment'
 }
 
 /** Runs Loti's side effects. Reply actions are the brain's business and do nothing here. */
 export function useLotiActions(): (action: LotiAction) => void {
   const navigate = useNavigate()
   const setGoal = useGoalsStore((s) => s.setGoal)
+  const preset = useAppStore((s) => s.dimensionPreset)
   return useCallback(
     (action: LotiAction) => {
       switch (action.kind) {
         case 'train':
-          navigate(trainPath(action))
+          navigate(trainPath(action, preset))
           break
         case 'navigate':
           navigate(action.to)
@@ -33,6 +38,6 @@ export function useLotiActions(): (action: LotiAction) => void {
           break
       }
     },
-    [navigate, setGoal],
+    [navigate, setGoal, preset],
   )
 }
