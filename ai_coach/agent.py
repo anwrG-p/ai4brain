@@ -1,9 +1,9 @@
 """Loti's conversational runner (Member 2).
 
 Order of a chat turn:
-1. Input gates on every USER turn the LLM would see (each turn, then all of them joined): crisis
-   check, then health signpost. A hit sends a fixed reply and the LLM is never called. The user's
-   text is never rewritten.
+1. Input gates. The crisis check runs on every USER turn the LLM would see (each turn, then all of
+   them joined); the health signpost runs on the current message only. A hit sends a fixed reply
+   and the LLM is never called. The user's text is never rewritten.
 2. AI Collaboration Score and the XAI adaptation reason (Member 3's Δc).
 3. Loti's reply: the LLM if one is configured, else the deterministic offline reply. An LLM error
    is logged, counted and answered with the offline reply; nothing fails silently.
@@ -105,7 +105,7 @@ class AICoachAgent:
 
         # 1. Input gates on every piece of user text the LLM would see, as written. On a hit
         #    nothing reaches the LLM.
-        gated = self._gate_user_text(session_history[-HISTORY_WINDOW:])
+        gated = self._gate_user_text(session_history[-HISTORY_WINDOW:], request.message)
         if gated is not None:
             return gated
 
@@ -147,22 +147,22 @@ class AICoachAgent:
             reply_source=source,
         )
 
-    def _gate_user_text(self, window: List[ChatMessage]) -> Optional[CoachingResponse]:
-        """Run both gates over each USER turn in the LLM window, then over those turns joined.
+    def _gate_user_text(self, window: List[ChatMessage], message: str) -> Optional[CoachingResponse]:
+        """Crisis check over the LLM window, then the health signpost on the current message only.
 
-        Joining catches a phrase split across turns ("I want to" / "end it all"). The current
-        message is the last turn, so its result wins the reply language. Crisis beats signpost.
+        The crisis check runs on each USER turn in the window, then on those turns joined, so a
+        phrase split across turns ("I want to" / "end it all") is caught. The current message is
+        checked first, so its language sets the reply. The health signpost looks at the current
+        message only: health mentioned earlier must not lock the chat into the doctor reply.
         """
         user_turns = [m.content for m in window if m.role == ChatMessageRole.USER]
-        texts = list(reversed(user_turns)) + [" ".join(user_turns)]
-        for gate, source in (
-            (self.guardrail.crisis_check, ReplySource.CRISIS),
-            (self.guardrail.health_signpost, ReplySource.HEALTH_SIGNPOST),
-        ):
-            for text in texts:
-                result = gate(text)
-                if result.hit:
-                    return self._fixed_reply(result.reply or "", source)
+        for text in list(reversed(user_turns)) + [" ".join(user_turns)]:
+            crisis = self.guardrail.crisis_check(text)
+            if crisis.hit:
+                return self._fixed_reply(crisis.reply or "", ReplySource.CRISIS)
+        signpost = self.guardrail.health_signpost(message)
+        if signpost.hit:
+            return self._fixed_reply(signpost.reply or "", ReplySource.HEALTH_SIGNPOST)
         return None
 
     def _fixed_reply(self, text: str, source: ReplySource) -> CoachingResponse:

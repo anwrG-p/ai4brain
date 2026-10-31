@@ -16,6 +16,13 @@ Two separate parts. Neither one ever rewrites or euphemises what the user wrote.
    - `health_signpost(text)`: the user raises a diagnosis, a condition or a symptom. A hit returns
      "I can't assess health. A doctor can." instead of an LLM reply.
    Both return `GateResult(hit, reply)`, the shape of the frontend seam `crisisGate(text) => { hit, reply? }`.
+
+THE KEYWORD CRISIS GATE IS A FLOOR, NOT A CLASSIFIER. It catches the listed phrasings and an
+intent x harm composition of them, but recall on wording it has never seen is low: on three held-out
+sets of 20 phrasings, each written before the patterns it was measured against, it caught 14, 8 and
+5 (70%, 40%, 25%). An LLM-based backup classifier, run on every user message alongside this gate, is
+REQUIRED before any LLM path is enabled for users (research area 7, improvement 1). Until then the
+LLM path stays off, as it is by default in the frontend (VITE_LOTI_COACH).
 """
 
 from __future__ import annotations
@@ -173,12 +180,41 @@ CRISIS_REPLY_FR = (
 # - Let through, as everyday idioms with no self-reference: "this task is killing me", "I'm dying
 #   to…", "I could kill for a coffee", "dead tired", "ça me tue", "mort de fatigue", "me tuer à la
 #   tâche", "j'en peux plus de ce chrono", "going to die of boredom", "je vais crever de chaud".
+#   Also "je vais mourir d'ennui", "mort de rire", "dying to beat my score", "en finir avec ces
+#   matrices" (exercise nouns are excluded after "en finir").
 # - Known false hits we accept: "I hurt myself playing football", "cutting myself a slice of cake",
-#   "caffeine overdose", "I can't go on to the next level", "kms" meaning kilometres (in a coach
-#   chat it is far more often self-harm slang).
+#   "caffeine overdose", "I can't go on to the next level", "ugh I want to die, this level is so
+#   hard", "kms" meaning kilometres (in a coach chat it is far more often self-harm slang).
 _EXERCISE_NOUNS = (
     r"(?:exercices?|exos?|niveaux?|parties?|jeux?|tests?|taches?|series?|rounds?|sessions?|"
-    r"chronos?|questions?|epreuves?|quiz)"
+    r"chronos?|questions?|epreuves?|quiz|matrices?|grilles?)"
+)
+
+# Intent x harm composition. Any intent, up to three filler words, then any harm, so new wording
+# ("I'm going to end things tonight", "j'ai envie de me jeter sous un train") is caught without
+# listing every phrase. Idioms of exaggeration are cut off by negative lookaheads.
+_FILLER = r"(?: \w+){0,3}?"
+_EN_INTENT = (
+    r"(?:want(?:s|ed)? to|wanna|going to|gonna|plan(?:s|ned|ning)? (?:to|on)|a plan to|"
+    r"thinking (?:about|of)|think(?:s)? about|thought (?:about|of)|ready to|about to|decided to|"
+    r"trying to|try to|wish i could|will|ill|might|keep thinking about)"
+)
+_EN_HARM = (
+    r"(?:die(?! (?:of|from) (?:boredom|laughter|laughing|embarrassment|shame|cringe))|dying|"
+    r"be(?:ing)? (?:dead|gone)|end(?:ing)? (?:myself|things|it|it all|everything|my life)|"
+    r"jump(?:ing)? (?:off|from|in front of)|(?:never|not) wak(?:e|ing) up|"
+    r"(?:go|going) to sleep forever|sleep forever|disappear(?:ing)?(?! from (?:the|this) (?:screen|list))|"
+    r"(?:kill|hurt|harm|cut|hang)(?:ing)? myself|take my (?:own )?life|taking my (?:own )?life)"
+)
+_FR_INTENT = (
+    r"(?:veux|voudrais|vais|envie de|envie d|pense a|pense|pensais a|penser a|compte|"
+    r"prefere|prefererais|aimerais|ai pense a|vais aller)"
+)
+_FR_HARM = (
+    r"(?:mourir(?! (?:dennui|de rire|de faim|de soif|de honte|de froid|de chaud|de fatigue|de peur))|"
+    r"crever(?! (?:de chaud|de faim|de soif|de froid|dennui))|me tuer(?! a la tache)|me jeter|"
+    r"me pendre|partir pour (?:toujours|de bon)|(?:ne )?plus (?:jamais )?me reveiller|"
+    r"ne (?:jamais|pas) me reveiller|disparaitre|me faire du mal|sauter (?:du|dun|par|sous|de))"
 )
 _CRISIS_PHRASES: Tuple[Tuple[str, Optional[str]], ...] = (
     (r"\bsu?i?cid\w*|\bsuicd\w*", None),
@@ -221,6 +257,74 @@ _CRISIS_PHRASES: Tuple[Tuple[str, Optional[str]], ...] = (
     (r"\bplus (?:de|aucune) raisons? de vivre\b", "fr"),
     (r"\bidees noires\b", "fr"),
     (r"\bpas en securite\b", "fr"),
+    # Composition (see _EN_INTENT / _FR_INTENT above).
+    (rf"\b{_EN_INTENT}{_FILLER} {_EN_HARM}\b", "en"),
+    (rf"\b{_FR_INTENT}{_FILLER} {_FR_HARM}\b", "fr"),
+    # Standalone forms that need no intent word.
+    (r"\bend myself\b", "en"),
+    (r"\b(?:cant|can ?not|can t) (?:keep|go on|continue) (?:living|like this)\b", "en"),
+    (r"\b(?:cant|can ?not|can t) live like this\b", "en"),
+    (r"\bif i (?:was|were) (?:gone|dead)\b|\bif i (?:wasnt|werent|was not|were not) (?:here|around|alive)\b", "en"),
+    (r"\b(?:better|happier|easier) (?:off )?without me\b", "en"),
+    (r"\b(?:slit|cut|slash)\w* (?:my )?wrists?\b", "en"),
+    (r"\b(?:ouvert|ouvrir|ouvre|coupe|couper|taillade)\w* (?:les|mes) veines\b", "fr"),
+    (r"\bla vie (?:na|n a) plus (?:de|aucun) sens\b|\bplus (?:de|aucun) sens a (?:ma |la )?vie\b", "fr"),
+    # Categories, written generally rather than as single phrases.
+    # Pointlessness of living.
+    (r"\bpoint (?:of|in|to) (?:living|life|being alive|going on|carrying on|existing)\b", "en"),
+    (r"\ba quoi bon (?:vivre|continuer a vivre|exister|rester en vie)\b", "fr"),
+    # Burden; others better off or indifferent.
+    (r"\b(?:im|i am) (?:a|such a|just a|only a) burden\b", "en"),
+    (r"\b(?:nobody|no one|noone|no body) would (?:miss|notice|care)\b", "en"),
+    (r"\bif i (?:died|disappeared|killed myself|wasnt alive)\b", "en"),
+    (
+        r"\bun fardeau\b|\b(?:fardeau|poids) pour (?:tout le monde|les autres|ma famille|mes proches|toi|vous|eux)\b",
+        "fr",
+    ),
+    (r"\bpersonne ne (?:me regretterait|remarquerait|sen rendrait compte|me pleurerait)\b", "fr"),
+    (r"\bsi je (?:mourais|disparaissais|netais plus la|me tuais)\b", "fr"),
+    # Farewells.
+    (r"\b(?:goodbye|suicide|farewell) (?:note|letter|message|video)\b", "en"),
+    (r"\b(?:saying|say|said) (?:goodbye|my goodbyes) to (?:everyone|everybody|my family|you all|all of you)\b", "en"),
+    (
+        r"\b(?:lettre|mot|message) dadieu\b|\bfaire mes adieux\b|"
+        r"\b(?:dire|dites|dis) adieu a (?:ma famille|tout le monde|mes proches|vous|toi|mes parents|mes amis)\b",
+        "fr",
+    ),
+    # No strength or will left to live.
+    (r"\b(?:no|lost the|lost my|no more) (?:will|strength|reason|energy) to (?:live|go on)\b", "en"),
+    (r"\bplus (?:la force|le courage|lenvie|la volonte) de vivre\b", "fr"),
+    # Putting an end to everything.
+    (r"\bput an end to (?:it all|everything|my life|myself)\b", "en"),
+    (r"\bmettre fin a (?:tout|mon existence|mes souffrances)\b", "fr"),
+    # Not wanting to exist.
+    (
+        r"\b(?:stop|cease|quit) (?:existing|being alive|living)\b|"
+        r"\b(?:dont|do not|no longer) want to (?:exist|be around)\b|\b(?:want|wish|prefer|rather) (?:to )?not exist\b",
+        "en",
+    ),
+    (r"\b(?:ne )?plus exister\b|\bsupporte plus (?:de vivre|la vie|ma vie|detre en vie)\b", "fr"),
+    # Means: a quantity of pills or medication.
+    (
+        r"\b(?:took|take|taking|swallow\w*) (?:a bunch of|all (?:of )?(?:my|the)|a lot of|too many|"
+        r"loads of|the whole (?:bottle|box|pack) of|a handful of) (?:pills|meds|tablets|medication|sleeping pills)\b",
+        "en",
+    ),
+    (
+        r"\b(?:aval\w*|prendre|pris|prends) (?:toutes? (?:mes|les)|la boite de|une boite de|plein de|trop de|"
+        r"toute la boite de) (?:pilules|medicaments|cachets|comprimes|somniferes)\b",
+        "fr",
+    ),
+    # Looking up methods.
+    (r"\b(?:ways|how|methods?) to (?:die|kill myself|end it|end my life)\b", "en"),
+    (r"\b(?:comment|facons? de|moyens? de|methodes? pour) (?:me tuer|mourir|en finir|me suicider)\b", "fr"),
+    # Wishing never to have been born.
+    (r"\bnever (?:been|be|was|were) born\b", "en"),
+    (r"\bjamais (?:etre )?naitre\b|\b(?:jamais|pas) ete (?:ne|nee)\b", "fr"),
+    # Wanting the pain or everything to stop for good; a bare "end it" with a time.
+    (r"\b(?:pain|everything|it all|it|this|the hurt) to (?:stop|end) (?:forever|for good)\b", "en"),
+    (r"\bend it (?:tonight|today|tomorrow|soon|now|this week|for good)\b|\bthe night i end it\b", "en"),
+    (r"\b(?:tout )?arreter pour (?:toujours|de bon)\b|\bm?endormir pour (?:toujours|de bon)\b", "fr"),
 )
 _CRISIS_PATTERNS: Tuple[Tuple[Pattern[str], Optional[str]], ...] = tuple(
     (re.compile(rx), lang) for rx, lang in _CRISIS_PHRASES

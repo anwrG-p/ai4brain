@@ -106,6 +106,14 @@ class XAIExplainer:
         safe_rationale, _ = self.safety_guardrail.sanitize(rationale, fallback=NEUTRAL_RATIONALE)
         return safe_rationale
 
+    def describe_shift(self, delta: float) -> str:
+        """Exercise-level word for one Δc entry: more challenge, more support, or steady."""
+        if delta >= self.significance_threshold:
+            return "steadier, so a little more challenge"
+        if delta <= -self.significance_threshold:
+            return "harder lately, so a little more support"
+        return "steady, no change"
+
     def format_xai_prompt_context(
         self,
         event: Optional[StateBusEvent] = None,
@@ -123,13 +131,13 @@ class XAIExplainer:
             "### EXPLAINABILITY CONTEXT (MEMBER 3 LATENT STATE):",
             f"- Active Cognitive Archetype Index: Cluster {active_k}",
             f"- State Estimation Uncertainty (sigma): {uncertainty:.3f}",
-            "- Prototype Differential Vector (Δc):",
+            "- What changed per dimension (direction only; never quote numbers for these):",
         ]
 
+        # Direction words, not percentages: the LLM must not repeat an unbacked "+20%" to the user.
         if deltas:
             for dim, delta in deltas.items():
-                sign = "+" if delta >= 0 else ""
-                lines.append(f"  * {dim}: {sign}{delta * 100:.1f}%")
+                lines.append(f"  * {dim}: {self.describe_shift(delta)}")
         else:
             lines.append("  * (No active differential shift)")
 

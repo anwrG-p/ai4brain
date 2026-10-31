@@ -1,13 +1,13 @@
 [ADAPTATION EVENT]
 The next task changed. What the model saw:
 - Active group: {{ active_cluster_id }}
-- Shifts:
+- Shifts (direction only, from XAIExplainer.describe_shift):
 {% for dim, delta in delta_vector.items() %}
-  * {{ dim }}: {{ "%+.1f"|format(delta * 100) }}%
+  * {{ dim }}: {{ describe_shift(delta) }}
 {% endfor %}
 - Reason: {{ rationale }}
 
 Guidance for Loti:
 Say what changed and why, in one bubble of at most 12 words.
-Use only the numbers above. Talk about the exercise, never about the brain.
+Never quote a number or a percentage. Talk about the exercise, never about the brain.
 Example: "Rounds got a bit faster. Your last few were steady."
