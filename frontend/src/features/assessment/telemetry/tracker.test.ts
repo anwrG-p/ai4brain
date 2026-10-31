@@ -959,6 +959,17 @@ describe('Tracker', () => {
         expect(sent(fetchFn)).toEqual([1])
       })
 
+      test('pending → granted: subscribers hear it and getStatus() is not stale', () => {
+        const storage = memStorage({}, null)
+        const t = make({ fetchFn: okFetch(), beacon: vi.fn(), storage })
+        expect(t.getStatus().consent).toBe('pending') // caches the snapshot
+        const heard = vi.fn()
+        t.subscribe(heard)
+        otherTab(storage, 'granted')
+        expect(heard).toHaveBeenCalled()
+        expect(t.getStatus().consent).toBe('granted')
+      })
+
       test('other keys are ignored, and destroy removes the listener', () => {
         const storage = memStorage()
         const t = make({ fetchFn: okFetch(), beacon: vi.fn(), storage })

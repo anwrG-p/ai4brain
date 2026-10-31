@@ -137,6 +137,20 @@ describe('taskScores', () => {
     expect(s.SST_SSRT).toMatchObject({ trials: 3, proxy: true })
   })
 
+  it('caps a negative Stroop cost at 100 before the accuracy gate', () => {
+    const dim = 'executive_function'
+    // Incongruent faster than congruent (cost -300 ms): the RT term is 1 at most, so the gate still
+    // scales it: (4/5 - 0.25) / 0.75 x 100, never 1 - (-300 / 300) = 2 times the gate.
+    const events = [
+      ev({ congruent: true }, { dim, rt: 900 }),
+      ev({ congruent: true }, { dim, rt: 900 }),
+      ev({ congruent: false }, { dim, rt: 600 }),
+      ev({ congruent: false }, { dim, rt: 600 }),
+      ev({ congruent: false }, { dim, rt: 2000, ok: false }),
+    ]
+    expect(taskScores(events).ANT_Conflict?.score).toBeCloseTo((100 * (0.8 - 0.25)) / 0.75, 6)
+  })
+
   it('leaves out an input it cannot compute', () => {
     const s = taskScores([ev({ congruent: true }, { dim: 'executive_function' })])
     expect(s.ANT_Conflict).toBeUndefined()

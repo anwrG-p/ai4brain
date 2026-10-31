@@ -106,7 +106,8 @@ export function taskScores(events: readonly TelemetryEvent[]): TaskScores {
   const gate = st.length ? stroopGate(st) : 0
   if (incOk.length && conOk.length) {
     const cost = mean(incOk.map((e) => e.response_time_ms)) - mean(conOk.map((e) => e.response_time_ms))
-    out.ANT_Conflict = input((1 - cost / STROOP_COST_MAX_MS) * gate, incOk.length + conOk.length)
+    // The RT term is clamped before the gate: a negative cost must not lift a guesser above the gate.
+    out.ANT_Conflict = input(clamp01(1 - cost / STROOP_COST_MAX_MS) * gate, incOk.length + conOk.length)
   } else if (st.length && gate === 0) {
     out.ANT_Conflict = input(0, st.length) // no cost to measure, and nothing above chance either
   }

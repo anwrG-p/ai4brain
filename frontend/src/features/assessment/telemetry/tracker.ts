@@ -197,7 +197,10 @@ export class Tracker {
     if (next === this.consent) return
     this.consent = next
     this.schedule()
-    if (next === 'granted') return void this.flush()
+    if (next === 'granted') {
+      this.notify() // getStatus() and subscribers see the new consent
+      return void this.flush()
+    }
     this.clear() // denied, or pending after a purge: drop what this tab held
   }
 
