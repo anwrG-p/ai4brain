@@ -17,6 +17,8 @@ export interface LotiBubblesProps {
   onAction?: ((action: LotiAction) => void) | undefined
   /** Start from the session talk's open question (one started on another page) instead of a fresh opening. */
   resume?: boolean
+  /** Starts as one clickable line (Home): the talk opens when the line is clicked. */
+  collapsed?: boolean
   className?: string
 }
 
@@ -27,7 +29,7 @@ type Paused = 'dismissed' | 'ended' | null
    same bubble. When a talk ends without leaving the page, a quiet "Talk to Loti" button keeps
    focus off <body> and starts a new talk. Every pick is recorded in the session talk
    (lotiSession), so /coach continues it; "Not now" stays local to this page. */
-export function LotiBubbles({ context, brain = scriptedBrain, onAction, resume = false, className = '' }: LotiBubblesProps) {
+export function LotiBubbles({ context, brain = scriptedBrain, onAction, resume = false, collapsed = false, className = '' }: LotiBubblesProps) {
   const runDefault = useLotiActions()
   const run = onAction ?? runDefault
   const record = useLotiSession((s) => s.record)
@@ -36,6 +38,7 @@ export function LotiBubbles({ context, brain = scriptedBrain, onAction, resume =
     () => (resume ? useLotiSession.getState().current : null) ?? brain.opening(context),
   )
   const [paused, setPaused] = useState<Paused>(null)
+  const [closed, setClosed] = useState(collapsed)
   const [turn, setTurn] = useState(0)
   const [talking, setTalking] = useState(true)
   const focusNext = useRef<'chips' | 'resume' | null>(null)
@@ -91,6 +94,27 @@ export function LotiBubbles({ context, brain = scriptedBrain, onAction, resume =
   }
 
   if (!message) return null
+
+  // Collapsed: Loti and the line only, the whole bubble one button (Dashboard doc: "text bubbles you
+  // can click on to start a convo"). Opening it replays the bubble with its chips.
+  if (closed) {
+    return (
+      <section aria-label="Loti" className={`flex items-end gap-3 ${className}`}>
+        <Loti key={turn} size="sm" pose={talking ? 'talk' : (message.pose ?? 'idle')} className="shrink-0" />
+        <button
+          type="button"
+          onClick={() => {
+            setClosed(false)
+            enter(message)
+          }}
+          className="tactile-card focus-ring inline-flex max-w-md cursor-pointer items-center gap-3 px-4 py-3 text-left font-sans text-base text-ink hover:border-border-strong"
+        >
+          {message.text}
+          <MessageCircle size={16} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0 text-brand" />
+        </button>
+      </section>
+    )
+  }
 
   const pick = (choice: LotiChoice) => {
     const next = brain.respond(message.id, choice.id, context)

@@ -1,21 +1,19 @@
 /* The doc's projection model ("Rou7 zebda", DASHBOARD PROJECTIONS): exponential approach to a
-   ceiling, a decay penalty when idle, and an RCI gate before calling a change real.
+   ceiling, and an RCI gate before calling a change real.
 
-     T(t) = Tmax - (Tmax - T0) * e^(-alpha * N) - lambda * dt_idle
+     T(t) = Tmax - (Tmax - T0) * e^(-alpha * N)
 
-   N is the number of sessions since T0 and dt_idle the idle days. Scores are on the 0-100 pillar
-   scale. Defaults (assumptions to tune against Member 3's data, not evidence):
+   N is the number of sessions since T0. Scores are on the 0-100 pillar scale.
+   The doc's idle-decay term (- lambda * dt_idle) and its "Synaptic Decay" curve are left out by the
+   user's decision (2026-10-31): there is no evidence for the rate, and it reads as a guilt penalty.
+   Defaults (assumptions to tune against Member 3's data, not evidence):
    - Tmax = 90: a ceiling below 100, since timed tasks have a physiological limit; raised to the best
      score seen when the user is already above it.
-   - lambda = 0.1 points per idle day (about 3 points per idle month), counted after a 2-day grace,
-     which is the gap 4 sessions a week leave.
    - alpha falls back to 0.05 per session with fewer than 3 points (about 60% of the gap closed in
      30 days at 4 sessions a week), and is clamped to 0.01-0.3. */
 
 const DAY_MS = 86_400_000
 export const DEFAULT_TMAX = 90
-export const DEFAULT_LAMBDA = 0.1
-export const GRACE_DAYS = 2
 export const SESSIONS_PER_WEEK = 4
 export const FALLBACK_ALPHA = 0.05
 const ALPHA_MIN = 0.01
@@ -41,25 +39,20 @@ export type ProjectionPoint = { day: number; at: number; score: number }
 export type Projection = {
   alpha: number
   tmax: number
-  lambda: number
   /** Training 4 sessions a week from now. */
   optimal: ProjectionPoint[]
-  /** No training from now. */
-  decay: ProjectionPoint[]
 }
 
 export type ProjectionOptions = {
   now?: Date
   days?: 30 | 90
   tmax?: number
-  lambda?: number
 }
 
-/** Daily points from today (day 0) for `days` days, or null without history. Both series start at
-    the latest score less the idle penalty so far. Because the exponential has no memory, re-basing
-    T0 to that score and counting N from today is the same curve as the doc's formula.
-    `optimal` counts 4/7 of a session per day (a smooth expected count) and no idle time; `decay`
-    keeps N and adds the idle days. Both are clamped to 0..Tmax. */
+/** Daily points from today (day 0) for `days` days, or null without history. The series starts at the
+    latest score: because the exponential has no memory, re-basing T0 to it and counting N from today
+    is the same curve as the doc's formula. It counts 4/7 of a session per day (a smooth expected
+    count) and is clamped to 0..Tmax. */
 export function projection(
   history: readonly { at: string | number; score: number }[],
   opts: ProjectionOptions = {},
@@ -68,25 +61,18 @@ export function projection(
   const sorted = [...history].sort((x, y) => new Date(x.at).getTime() - new Date(y.at).getTime())
   const scores = sorted.map((h) => h.score)
   const tmax = Math.max(opts.tmax ?? DEFAULT_TMAX, ...scores)
-  const lambda = opts.lambda ?? DEFAULT_LAMBDA
   const alpha = fitAlpha(scores, tmax)
   const now = (opts.now ?? new Date()).getTime()
   const days = opts.days ?? 30
-  const last = sorted[sorted.length - 1]!
-  const idleNow = Math.max(0, (now - new Date(last.at).getTime()) / DAY_MS)
-  const penalty = (idleDays: number) => lambda * Math.max(0, idleDays - GRACE_DAYS)
-  const start = Math.max(0, last.score - penalty(idleNow))
+  const start = sorted[sorted.length - 1]!.score
   const clamp = (x: number) => Math.min(tmax, Math.max(0, x))
 
   const optimal: ProjectionPoint[] = []
-  const decay: ProjectionPoint[] = []
   for (let day = 0; day <= days; day++) {
-    const at = now + day * DAY_MS
     const n = (day * SESSIONS_PER_WEEK) / 7
-    optimal.push({ day, at, score: clamp(start + (tmax - start) * (1 - Math.exp(-alpha * n))) })
-    decay.push({ day, at, score: clamp(last.score - penalty(idleNow + day)) })
+    optimal.push({ day, at: now + day * DAY_MS, score: clamp(start + (tmax - start) * (1 - Math.exp(-alpha * n))) })
   }
-  return { alpha, tmax, lambda, optimal, decay }
+  return { alpha, tmax, optimal }
 }
 
 /** Reliable Change Index (Jacobson & Truax 1991): (current - baseline) / SEdiff, with

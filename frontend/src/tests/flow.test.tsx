@@ -242,7 +242,7 @@ describe('/results', () => {
     expect(radar()).toHaveAttribute('data-blurred', 'false')
     // The real scores: measured pillars show a number, the others "Not measured yet", never a fake value.
     const table = screen.getByRole('table', { name: 'Your five skills, out of 100' })
-    expect(within(table).getByRole('row', { name: 'Focus & Strategy 100' })).toBeInTheDocument()
+    expect(within(table).getByRole('row', { name: /^Focus & Strategy 100 · likely \d+–100$/ })).toBeInTheDocument()
     expect(within(table).getByRole('row', { name: 'Mental Agility Not measured yet' })).toBeInTheDocument()
   })
 
