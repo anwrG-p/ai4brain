@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode 
 import { MessageCircle } from 'lucide-react'
 import { Loti, type CharacterSize, type LotiPose } from '../../components/features/characters'
 import { Button } from '../../components/ui/Button'
+import { useLotiSession } from './lotiSession'
 import { scriptedBrain } from './scriptedBrain'
 import { useLotiActions } from './useLotiActions'
 import type { LotiAction, LotiBrain, LotiChoice, LotiContext, LotiMessage } from './types'
@@ -14,6 +15,8 @@ export interface LotiBubblesProps {
   brain?: LotiBrain
   /** Overrides the default side effects (navigate, set a goal). */
   onAction?: ((action: LotiAction) => void) | undefined
+  /** Start from the session talk's open question (one started on another page) instead of a fresh opening. */
+  resume?: boolean
   className?: string
 }
 
@@ -22,13 +25,16 @@ type Paused = 'dismissed' | 'ended' | null
 
 /* One bubble at a time beside a small Loti. "Not now" cuts Loti off; the talk resumes from the
    same bubble. When a talk ends without leaving the page, a quiet "Talk to Loti" button keeps
-   focus off <body> and starts a new talk. ponytail: the paused bubble lives in component state,
-   so it resumes on this page only. Lift it into a store if pages need to continue across routes. */
-export function LotiBubbles({ context, brain = scriptedBrain, onAction, className = '' }: LotiBubblesProps) {
+   focus off <body> and starts a new talk. Every pick is recorded in the session talk
+   (lotiSession), so /coach continues it; "Not now" stays local to this page. */
+export function LotiBubbles({ context, brain = scriptedBrain, onAction, resume = false, className = '' }: LotiBubblesProps) {
   const runDefault = useLotiActions()
   const run = onAction ?? runDefault
+  const record = useLotiSession((s) => s.record)
   // ponytail: the opening is read once per mount; a context change mid-talk does not restart it.
-  const [message, setMessage] = useState<LotiMessage | null>(() => brain.opening(context))
+  const [message, setMessage] = useState<LotiMessage | null>(
+    () => (resume ? useLotiSession.getState().current : null) ?? brain.opening(context),
+  )
   const [paused, setPaused] = useState<Paused>(null)
   const [turn, setTurn] = useState(0)
   const [talking, setTalking] = useState(true)
@@ -68,14 +74,14 @@ export function LotiBubbles({ context, brain = scriptedBrain, onAction, classNam
   }
 
   if (paused) {
-    const resume = () => enter(paused === 'dismissed' ? message : brain.opening(context))
+    const carryOn = () => enter(paused === 'dismissed' ? message : brain.opening(context))
     return (
       <div className={className}>
         <Button
           ref={resumeRef}
           variant="ghost"
           size="sm"
-          onClick={resume}
+          onClick={carryOn}
           leftIcon={<MessageCircle size={16} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" />}
         >
           {paused === 'dismissed' ? 'Continue with Loti' : 'Talk to Loti'}
@@ -88,6 +94,7 @@ export function LotiBubbles({ context, brain = scriptedBrain, onAction, classNam
 
   const pick = (choice: LotiChoice) => {
     const next = brain.respond(message.id, choice.id, context)
+    record(message, choice, next)
     if (choice.action && choice.action.kind !== 'reply') run(choice.action)
     enter(next)
   }

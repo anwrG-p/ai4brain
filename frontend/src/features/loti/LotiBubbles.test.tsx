@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useGoalsStore } from '../insights/goals'
 import { LotiBubbles, TALK_MS } from './LotiBubbles'
+import { useLotiSession } from './lotiSession'
 import type { LotiContext } from './types'
 
 const future = { v7_startTransition: true, v7_relativeSplatPath: true }
@@ -29,7 +30,9 @@ function renderBubbles(context: LotiContext = dayCtx, onAction?: Parameters<type
 afterEach(() => {
   vi.useRealTimers()
   useGoalsStore.getState().clearGoals()
+  useLotiSession.getState().clear()
   localStorage.clear()
+  sessionStorage.clear()
 })
 
 describe('LotiBubbles', () => {
@@ -168,5 +171,36 @@ describe('LotiBubbles', () => {
       </MemoryRouter>,
     )
     expect(container).toBeEmptyDOMElement()
+  })
+
+  it('records each pick into the session talk, so /coach can continue it', async () => {
+    const user = userEvent.setup()
+    renderBubbles()
+    await user.click(screen.getByRole('button', { name: 'Great' }))
+    expect(useLotiSession.getState().turns).toEqual([
+      { from: 'loti', text: 'How was your day?' },
+      { from: 'you', text: 'Great' },
+    ])
+    expect(useLotiSession.getState().current?.id).toBe('day-great')
+  })
+
+  it('"Not now" records nothing', async () => {
+    const user = userEvent.setup()
+    renderBubbles()
+    await user.click(screen.getByRole('button', { name: 'Not now' }))
+    expect(useLotiSession.getState().turns).toEqual([])
+  })
+
+  it('opens fresh by default, and with resume picks up the open question of the session talk', () => {
+    useLotiSession.getState().begin({ id: 'day-okay', text: 'Thanks for telling me. A short session can help. Try one?', choices: [{ id: 'yes', label: "Yes, let's try one" }] })
+    const first = renderBubbles()
+    expect(screen.getByText('How was your day?')).toBeInTheDocument()
+    first.unmount()
+    render(
+      <MemoryRouter future={future}>
+        <LotiBubbles context={dayCtx} resume />
+      </MemoryRouter>,
+    )
+    expect(screen.getByText(/thanks for telling me/i)).toBeInTheDocument()
   })
 })
