@@ -207,9 +207,11 @@
 ---
 
 ## 12. Verification & Screenshots
-- **1440px Desktop (Playful Lab)**: [`16-judge-mode-1440.png`](../screenshots/16-judge-mode-1440.png)
-- **Seeded Persona Active (Salma)**: [`16-judge-mode-persona.png`](../screenshots/16-judge-mode-persona.png)
-- **Fault Injections & 10 Dimensions Active**: [`16-judge-mode-faults-10dims.png`](../screenshots/16-judge-mode-faults-10dims.png)
-- **1440px Dark Mode (Night Lab)**: [`16-judge-mode-dark.png`](../screenshots/16-judge-mode-dark.png)
-- **768px Tablet Viewport**: [`16-judge-mode-768.png`](../screenshots/16-judge-mode-768.png)
-- **375px Mobile Viewport**: [`16-judge-mode-375.png`](../screenshots/16-judge-mode-375.png)
+These screenshots were removed with brand v2; they are in the repository history at commit `8b8c859`.
+
+- **1440px Desktop (Playful Lab)**: `docs/ui/screenshots/16-judge-mode-1440.png`
+- **Seeded Persona Active (Salma)**: `docs/ui/screenshots/16-judge-mode-persona.png`
+- **Fault Injections & 10 Dimensions Active**: `docs/ui/screenshots/16-judge-mode-faults-10dims.png`
+- **1440px Dark Mode (Night Lab)**: `docs/ui/screenshots/16-judge-mode-dark.png`
+- **768px Tablet Viewport**: `docs/ui/screenshots/16-judge-mode-768.png`
+- **375px Mobile Viewport**: `docs/ui/screenshots/16-judge-mode-375.png`

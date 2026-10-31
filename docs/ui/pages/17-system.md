@@ -262,9 +262,11 @@ Page 17 provides 3 dedicated system views accessible via tabs or URL params:
 ---
 
 ## 12. Verification & Screenshots
-- **1440px Desktop (Playful Lab — 404 Wayfinder)**: [`17-system-1440.png`](../screenshots/17-system-1440.png)
-- **Offline Resilience Hub & Telemetry Queue**: [`17-system-offline.png`](../screenshots/17-system-offline.png)
-- **Error Boundary Intercepted & Self-Healing**: [`17-system-error.png`](../screenshots/17-system-error.png)
-- **1440px Dark Mode (Night Lab)**: [`17-system-dark.png`](../screenshots/17-system-dark.png)
-- **768px Tablet Viewport**: [`17-system-768.png`](../screenshots/17-system-768.png)
-- **375px Mobile Viewport**: [`17-system-375.png`](../screenshots/17-system-375.png)
+These screenshots were removed with brand v2; they are in the repository history at commit `8b8c859`.
+
+- **1440px Desktop (Playful Lab — 404 Wayfinder)**: `docs/ui/screenshots/17-system-1440.png`
+- **Offline Resilience Hub & Telemetry Queue**: `docs/ui/screenshots/17-system-offline.png`
+- **Error Boundary Intercepted & Self-Healing**: `docs/ui/screenshots/17-system-error.png`
+- **1440px Dark Mode (Night Lab)**: `docs/ui/screenshots/17-system-dark.png`
+- **768px Tablet Viewport**: `docs/ui/screenshots/17-system-768.png`
+- **375px Mobile Viewport**: `docs/ui/screenshots/17-system-375.png`
