@@ -1,76 +1,68 @@
-# Unified Research — EMILY Behavioral Emotion Engine & Color Psychology
+# EMILY: the on-device mood guess behind Momo
 
-> **Architecture Specification & Design Reference**  
-> **Source of Truth**: `docs/architecture/EMILY_BEHAVIORAL_EMOTION_ENGINE.md`  
-> **Scope**: Emotion & Micro-Interaction Listener for You (EMILY) — Non-biometric affective computing, pointer kinematics, and anti-red counter-regulatory color tokens.
-
----
-
-## 1.1 Theoretical Foundation: The Circumplex Model of Affect (Zero Biometrics)
-
-In Human-Computer Interaction (HCI) and affective computing (Picard, 1997; Jenkins et al., 2016; Sun et al., 2014), mouse kinematics and keystroke dynamics mirror neuromuscular tension and cognitive load without requiring a webcam, microphone, or biometric sensor. This keeps the platform **100% compliant with EU AI Act Article 5(1)(f)** non-biometric regulations.
-
-EMILY (Emotion & Micro-Interaction Listener for You) maps pointer and keyboard behavior onto James Russell’s **2D Circumplex Model of Affect**:
-
-- **Valence (Horizontal Axis)**: Negative (*Frustrated, Hesitant/Confused*) ↔ Positive (*Calm Flow, Energized/Confident*).
-- **Arousal (Vertical Axis)**: Low Neurophysiological Energy (*Fatigued/Sluggish*) ↔ High Neurophysiological Energy (*Frustrated/Agitated* or *Energized/Spark*).
-
-```
-                        HIGH AROUSAL
-                             ▲
-               Frustrated    │    Energized / Confident Spark
-          (Rage Clicks/Jerk) │    (Brisk, Direct, Low Dwell)
-                             │
-  NEGATIVE ──────────────────┼──────────────────► POSITIVE
-  VALENCE                    │                    VALENCE
-         Hesitant / Confused │    Calm Flow
-         (Wandering/Flips)   │    (Smooth Arcs, Steady Rhythm)
-                             │
-                             ▼
-                        LOW AROUSAL
-                    (Fatigued / Sluggish)
-```
+> **Code:** `frontend/src/utils/emilyEngine.ts` (rules), `frontend/src/state/useEmilyStore.ts` (state and approval), `frontend/src/components/layout/EmotionListener.tsx` (listener), `frontend/src/components/features/characters/Momo.tsx` (display).
+> **Binding decision:** [ADR 0002: no server-side emotion inference](../adr/0002-no-server-side-emotion-inference.md).
 
 ---
 
-## 1.2 The 7 Client-Side Kinematic & Interaction Features
+## 1. Legal and evidence position (corrected 2026-10-31)
 
-EMILY samples DOM events (`pointermove`, `mousedown`, `mouseup`, `click`, `keydown`, `wheel`) passively inside a `requestAnimationFrame`-throttled (~50ms) rolling window, evaluating every 3 seconds over a 5–15 second sliding buffer:
+An earlier version of this doc said EMILY was "100% compliant with EU AI Act Article 5(1)(f)" and "non-biometric". **That was wrong.** The accurate position ([research §5](../research/2026-10-31-improvement-opportunities.md#5-emotion-inference-ai-act-and-gdpr)):
 
-| # | Metric (`emilyEngine.ts`) | Mathematical Formulation | Behavioral & Emotional Signal |
-| :--- | :--- | :--- | :--- |
-| **1** | **Cursor Velocity ($v$)** | $$v = \frac{\sqrt{\Delta x^2 + \Delta y^2}}{\Delta t}$$ | Optimal steady speed = Flow; abnormally low ($<0.15\text{ px/ms}$) = Fatigue; sudden spikes = Irritation. |
-| **2** | **Jerk / Tremor ($j$)** | $$j = \frac{\Delta a}{\Delta t} \quad \text{where } a = \frac{\Delta v}{\Delta t}$$ | High acceleration derivative ($j > 0.8$) reflects physical cursor tremor, agitation, or acute stress. |
-| **3** | **Path Directness ($R_{\text{path}}$) & Curvature ($\kappa$)** | $$R_{\text{path}} = \frac{D_{\text{euclidean}}}{L_{\text{actual}}} = \frac{1}{\kappa} \in (0,1]$$ | $R_{\text{path}} \ge 0.78$ ($\kappa \le 1.28$) = Confident, decisive movement; $R_{\text{path}} < 0.45$ ($\kappa > 2.2$) = Wandering, lost, or confused. |
-| **4** | **Click Dwell Time ($\tau_{\text{click}}$)** | $$\tau_{\text{click}} = t_{\text{mouseup}} - t_{\text{mousedown}}$$ | Normal: 70–120ms; $<35\text{ms}$ rapid taps or $>450\text{ms}$ heavy forceful presses signal frustration or tension. |
-| **5** | **Rage-Click Bursts ($R_{\text{click}}$)** | $\ge 3\text{ clicks}$ within $<400\text{ms}$ inside a $30\text{px}$ radius | Acute frustration, impatience, or an unintuitive UI affordance. |
-| **6** | **Hover Hesitation & Idle Dwell ($\tau_{\text{hover}}$)** | Repeated button enter/leave or hover $>2000\text{ms}$ without clicking | Uncertainty, caution, or cognitive overload on an interactive choice. |
-| **7** | **Direction Flips ($N_{\text{flip}}$) & Pacing Drift ($\Delta\text{RT}$)** | Sign inversions in $\text{sign}(\Delta x), \text{sign}(\Delta y) + \text{pauses} > 6000\text{ms}$ | High trajectory inversions = second-guessing; lengthening response pauses = mental fatigue. |
+- **It is probably emotion recognition.** The AI Act counts *behavioural* characteristics as biometric data (Art 3(34), Recital 14). Pointer and key timing are behavioural, and "frustrated" or "hesitant" are emotions (Art 3(39)). "Tired" is a physical state and is excluded (Recital 18).
+- **It is not banned.** Art 5(1)(f) covers only workplaces and education, and SynapseTwin is a consumer app.
+- **It is not an "AI system" while its rules stay hand-written** (Recital 12). A trained affect model would be high-risk under Annex III 1(c). So EMILY stays rule-based, runs on the device, and the server never infers emotion (ADR 0002).
+- **It owes a notice at first exposure** (Art 50(3), from 2 Aug 2026): Momo's mood is a guess from how you tap, and you can change it.
 
----
+**Evidence limits.** Treat every output as a guess, never as a reading:
+- In the best field study, cursor speed and distance explained about **17% of the variance** in self-reported negative emotion (out-of-sample R² .17, n = 80; Hibbeln et al. 2017).
+- The direction **contradicts** the rules below. Negative emotion made cursors **slower and longer-pathed**, not faster or jerkier.
+- High accuracies in the keystroke and mouse literature come mostly from lab, in-sample and per-user models.
+- Our own adaptive staircase aims at about 85% accuracy, so it causes errors on purpose. The store proposes "frustrated" after two consecutive errors, so normal play can trigger it wherever errors are reported.
 
-## 1.3 Unified Emotional Color Psychology & Doodle Token Matrix
-
-### Foundational Law: Affective Counter-Regulation & Anti-Red Policy
-When a user is frustrated, anxious, or overwhelmed, the UI must **never turn red (`#DC2626`)**, which elevates cortisol, task anxiety, and visual tension. Instead:
-- **Positive states** are reinforced with focused, energizing tones.
-- **Stressed / fatigued states** counter-regulate with calming, low-arousal restorative hues.
-
-To preserve **WCAG 2.2 AA accessibility** ($\ge 4.5:1$ contrast) and the Doodle Design System (`#111827` primary text, `#263D5B` secondary navy, `#49B6E5` sky blue, *Delius Swash Caps* & *JetBrains Mono*), emotional color shifts apply strictly to ambient card tints, hand-drawn sketch borders, offset doodle shadows, and status badges:
-
-| Canonical EMILY State (`EmilyEmotion`) | Trigger Thresholds | Color Psychology & Physiological Effect | Light Mode Tokens (`#FAF8F5` / `#FFFFFF`) | Night Mode Tokens (`#131b2e`) | BRIAN Mascot & Adaptive UI Behavior |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **1. Calm Flow (`calm_flow`)** | Smooth arcs ($R_{\text{path}} \ge 0.78$), moderate velocity, 0 rage clicks. | **Deep Teal / Sage Green**: Parasympathetic balance, mental clarity, sustained focus without eye strain. | **Accent**: `#0D9488` / `#2A7B76`<br/>**Tint**: `#F2F9F8` | **Accent**: `#4FD1C5`<br/>**Glow**: `rgba(79, 209, 197, 0.14)` | BRIAN has a calm smile; minimalist layout, steady sketch borders, zero interruptions. |
-| **2. Curious / Confident Spark (`energized`)** | High directness ($R_{\text{path}} \ge 0.82$), brisk velocity ($>0.6\text{ px/ms}$), prompt clicks. | **Warm Terracotta Amber & Doodle Sky**: Optimism, dopamine reinforcement, high self-efficacy, momentum. | **Accent**: `#D96B43` (Pair w/ `#263D5B` navy)<br/>**Tint**: `#FDF6F0` | **Accent**: `#F5A65B`<br/>**Glow**: `rgba(245, 166, 91, 0.15)` | BRIAN perks up with glowing gill tips; tactile doodle confetti on streak milestones. |
-| **3. Gentle De-Escalation (`frustrated`)** | Rage clicks ($R_{\text{click}} \ge 1$), high jerk ($j > 0.8$), or rapid error bursts. | **Tranquil Eucalyptus Sage & Soft Slate (Anti-Red Policy)**: Lowers visual tension, reduces cortisol, signals safety. | **Accent**: `#4D9078` / `#64748B`<br/>**Tint**: `#F1F7F4` | **Accent**: `#68D391`<br/>**Glow**: `rgba(104, 211, 145, 0.14)` | Suppresses secondary charts; BRIAN offers a 1-click *"Slow down pace / Take a 60s breather"* prompt. |
-| **4. Reassuring Guidance (`hesitant`)** | High curvature ($\kappa > 2.2$), high direction flips ($N_{\text{flip}}$), hover dwell $>2.2\text{s}$. | **Patient Periwinkle / Warm Honey Accent**: Non-judgmental clarity, cognitive grounding, reassurance. | **Accent**: `#5A67D8`<br/>**Badge**: `#D97706`<br/>**Tint**: `#F4F5FC` | **Accent**: `#90CDF4`<br/>**Glow**: `rgba(144, 205, 244, 0.14)` | BRIAN holds a lantern (*"Take your time—no wrong answers"*); highlights the single next logical CTA. |
-| **5. Restorative Wind-Down (`fatigued`)** | Low velocity ($v < 0.15\text{ px/ms}$), pauses $>6\text{s}$, sluggish cadence. | **Twilight Indigo & Revitalizing Mint**: Circadian rest, reduced eye strain, guilt-free recovery. | **Accent**: `#5C6B9C` / `#10B981`<br/>**Tint**: `#F3F4F8` | **Accent**: `#B794F4`<br/>**Glow**: `rgba(183, 148, 244, 0.14)` | BRIAN wears his nightcap; enlarges click targets (`min-h-12`) and highlights streak-protected rest mode. |
+Earlier claims about colours (that they "reduce cortisol", create "parasympathetic balance" or give "dopamine reinforcement") have no support and are withdrawn.
 
 ---
 
-## 1.4 Architectural Integration Guardrails
+## 2. What EMILY measures (on the device only)
 
-- **Zero Camera / Microphone Tracking**: Strict adherence to client-side DOM pointer kinematics only.
-- **Counter-Regulation Priority**: Negative emotions never inject high-stress alert tones (such as red warning borders or alarm banners).
-- **Subtle Layering**: Emotional shifts modulate background tints and border tones rather than violently rearranging layout geometry, ensuring accessibility and cognitive calm.
+EMILY listens passively to `pointermove`, `mousedown`, `mouseup`, `click`, `keydown` and `wheel`. Every 3 seconds it looks at a sliding buffer of 5–15 seconds. Nothing in the buffer, and no mood label, is sent anywhere.
 
+| # | Metric | Rule input |
+| :--- | :--- | :--- |
+| 1 | Cursor velocity $v$ | Very low speed (< 0.15 px/ms) counts toward "fatigued". |
+| 2 | Jerk $j$ (change in acceleration) | High jerk (> 0.8) counts toward "frustrated". |
+| 3 | Path directness $R_{\text{path}}$ | Straight paths (≥ 0.78) count toward "calm"; wandering ones (< 0.45) toward "hesitant". |
+| 4 | Click dwell $\tau_{\text{click}}$ | Very short (< 35 ms) or very long (> 450 ms) presses. |
+| 5 | Rage clicks | 3 or more clicks within 400 ms inside a 30 px radius. |
+| 6 | Hover hesitation | Hovering over 2 s without clicking, or repeated enter/leave. |
+| 7 | Direction flips and pauses | Reversals of direction; pauses over 6 s. |
+
+The thresholds are design choices, not validated cut-offs.
+
+---
+
+## 3. From rules to Momo
+
+`classifyEmilyEmotion` returns one of five states. Momo shows them as moods:
+
+| EMILY state | Momo mood | What happens |
+| :--- | :--- | :--- |
+| `calm_flow` | calm | Nothing. |
+| `energized` | happy | Nothing. |
+| `frustrated` | frustrated | **Proposed only.** The user approves it or keeps the current mood. |
+| `hesitant` | focused | Proposed only. |
+| `fatigued` | tired | Proposed only. |
+
+- **The user owns the mood.** A strained state is only *proposed* on task strain: a rage-click burst, or 2 or more consecutive errors when a caller reports them. It is never proposed from reading pauses alone. A manual choice locks the mood until the user unlocks it. `autoAdapt` is off.
+- **No red.** The frustrated mood never uses red. Moods change Momo's tint, ears and cheeks, plus a soft ambient tint through `<html data-emotion>`. Text contrast stays within WCAG AA. The layout never changes.
+
+---
+
+## 4. Guardrails
+
+- **No camera or microphone.** Pointer and key events only.
+- **On the device only.** No mood label, buffer or metric leaves the browser. The server receives `hesitation_jitter` and `keystroke_latency_ms` for task scoring only, and must not infer emotion from them (ADR 0002).
+- **No trained model.** Any change to a learned affect model needs a new ADR, a DPIA and the Annex III obligations.
+- **Copy.** Say "Momo guesses, and you can correct it". Never "Momo knows how you feel", "we detect your emotions", "100% non-biometric" or "no emotion recognition".
+- **Planned work (ticket F-D).** The Art 50(3) first-exposure notice, an opt-in in You → Privacy, and not counting errors inside adaptive blocks as strain.
