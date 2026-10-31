@@ -1,8 +1,9 @@
 """Loti's conversational runner (Member 2).
 
 Order of a chat turn:
-1. Input gates on the user's words as written: crisis check, then health signpost. A hit sends a
-   fixed reply and the LLM is never called. The user's text is never rewritten.
+1. Input gates on every USER turn the LLM would see (each turn, then all of them joined): crisis
+   check, then health signpost. A hit sends a fixed reply and the LLM is never called. The user's
+   text is never rewritten.
 2. AI Collaboration Score and the XAI adaptation reason (Member 3's Δc).
 3. Loti's reply: the LLM if one is configured, else the deterministic offline reply. An LLM error
    is logged, counted and answered with the offline reply; nothing fails silently.
@@ -38,6 +39,8 @@ PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 # Loti's voice: at most 12 words per bubble. Bubbles in one reply are separated by a blank line.
 MAX_BUBBLE_WORDS = 12
 BUBBLE_SEPARATOR = "\n\n"
+# Turns sent to the LLM. Every USER turn in this window passes the input gates first.
+HISTORY_WINDOW = 8
 
 
 def split_bubbles(text: str) -> List[str]:
@@ -68,7 +71,7 @@ class AICoachAgent:
         self.guardrail = guardrail or SafetyGuardrailEngine()
         self.llm_callable = llm_callable
         # Every non-LLM reply path is counted (research area 7, "Log fallbacks"). Keys: ReplySource values.
-        self.fallback_counts: Counter[str] = Counter()
+        self.reply_source_counts: Counter[str] = Counter()
 
         # Cache base prompt
         self.system_prompt_base = _load_prompt_template(
@@ -97,19 +100,17 @@ class AICoachAgent:
 
     def handle_chat(self, request: ChatRequest) -> CoachingResponse:
         """Gate the user's text, then score, explain, reply and lint Loti's reply."""
-        # 1. Input gates on the user's words as written. On a hit nothing reaches the LLM.
-        crisis = self.guardrail.crisis_check(request.message)
-        if crisis.hit:
-            return self._fixed_reply(crisis.reply or "", ReplySource.CRISIS)
-        signpost = self.guardrail.health_signpost(request.message)
-        if signpost.hit:
-            return self._fixed_reply(signpost.reply or "", ReplySource.HEALTH_SIGNPOST)
+        session_history = list(request.chat_history)
+        session_history.append(ChatMessage(role=ChatMessageRole.USER, content=request.message))
+
+        # 1. Input gates on every piece of user text the LLM would see, as written. On a hit
+        #    nothing reaches the LLM.
+        gated = self._gate_user_text(session_history[-HISTORY_WINDOW:])
+        if gated is not None:
+            return gated
 
         cluster_id = request.active_cluster_id if request.active_cluster_id is not None else 4
         delta_vec = request.delta_vector or {}
-
-        session_history = list(request.chat_history)
-        session_history.append(ChatMessage(role=ChatMessageRole.USER, content=request.message))
 
         # 2. AI Collaboration Score and the adaptation reason
         dimension_scores = self.scorer.evaluate_interaction_signals(session_history)
@@ -146,9 +147,27 @@ class AICoachAgent:
             reply_source=source,
         )
 
+    def _gate_user_text(self, window: List[ChatMessage]) -> Optional[CoachingResponse]:
+        """Run both gates over each USER turn in the LLM window, then over those turns joined.
+
+        Joining catches a phrase split across turns ("I want to" / "end it all"). The current
+        message is the last turn, so its result wins the reply language. Crisis beats signpost.
+        """
+        user_turns = [m.content for m in window if m.role == ChatMessageRole.USER]
+        texts = list(reversed(user_turns)) + [" ".join(user_turns)]
+        for gate, source in (
+            (self.guardrail.crisis_check, ReplySource.CRISIS),
+            (self.guardrail.health_signpost, ReplySource.HEALTH_SIGNPOST),
+        ):
+            for text in texts:
+                result = gate(text)
+                if result.hit:
+                    return self._fixed_reply(result.reply or "", source)
+        return None
+
     def _fixed_reply(self, text: str, source: ReplySource) -> CoachingResponse:
         """A scripted reply from an input gate: no LLM, no chips, no scores."""
-        self.fallback_counts[source.value] += 1
+        self.reply_source_counts[source.value] += 1
         # The user's text is not logged: it may be the most sensitive thing they ever type here.
         logger.info("coach input gate hit (%s); fixed reply sent, LLM not called", source.value)
         return CoachingResponse(
@@ -181,7 +200,7 @@ class AICoachAgent:
             delta_vector=delta_vector,
         )
         messages_payload = [{"role": "system", "content": system_prompt}]
-        for msg in history[-8:]:  # Sliding window of last 8 turns
+        for msg in history[-HISTORY_WINDOW:]:  # the same window the input gates checked
             messages_payload.append({"role": msg.role.value, "content": msg.content})
 
         try:
@@ -189,12 +208,11 @@ class AICoachAgent:
             if not isinstance(raw_reply, str) or not raw_reply.strip():
                 raise ValueError(f"LLM returned an empty or non-text reply ({type(raw_reply).__name__})")
         except Exception as exc:  # noqa: BLE001 - an LLM failure must degrade the reply, never the chat
-            self.fallback_counts[ReplySource.OFFLINE_AFTER_LLM_ERROR.value] += 1
-            # Log the error type and message only, never the payload: it holds the user's words.
+            self.reply_source_counts[ReplySource.OFFLINE_AFTER_LLM_ERROR.value] += 1
+            # Log the error type only: the message of an LLM error can echo the user's words.
             logger.warning(
-                "coach LLM call failed (%s: %s); sending the offline reply",
+                "coach LLM call failed (%s); sending the offline reply",
                 type(exc).__name__,
-                exc,
             )
             return (
                 offline_reply,
@@ -204,7 +222,7 @@ class AICoachAgent:
 
         safe_reply, meta = self.guardrail.sanitize(raw_reply, fallback=offline_reply)
         if meta.sanitized:
-            self.fallback_counts[ReplySource.OFFLINE_AFTER_LINT.value] += 1
+            self.reply_source_counts[ReplySource.OFFLINE_AFTER_LINT.value] += 1
             logger.warning(
                 "coach LLM reply withheld (banned terms: %s); sending the offline reply",
                 ", ".join(meta.clinical_terms_detected),

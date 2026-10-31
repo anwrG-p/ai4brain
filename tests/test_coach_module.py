@@ -3,7 +3,6 @@
 import json
 import logging
 import re
-import typing
 from pathlib import Path
 
 import pytest
@@ -243,11 +242,17 @@ class TestSrcCoachCompatibility:
 
 
 class TestDomainEnums:
-    def test_episodic_memory_is_a_dimension_and_matches_the_telemetry_contract(self):
-        from routes.telemetry import Dimension
-
+    def test_episodic_memory_is_a_dimension(self):
+        # The six telemetry dimensions, written out so ai_coach stays independent of any server.
         assert CognitiveDimension("episodic_memory") is CognitiveDimension.EPISODIC_MEMORY
-        assert {d.value for d in CognitiveDimension} == set(typing.get_args(Dimension))
+        assert {d.value for d in CognitiveDimension} == {
+            "working_memory",
+            "pattern_induction",
+            "executive_function",
+            "spatial_orientation",
+            "processing_speed",
+            "episodic_memory",
+        }
 
     def test_pillar_ids_and_labels_match_the_frontend(self):
         source = PILLARS_TS.read_text(encoding="utf-8")
@@ -259,7 +264,8 @@ class TestDomainEnums:
 
     def test_episodic_memory_has_its_own_rationale(self):
         rationale = XAIExplainer().generate_adaptation_rationale({"episodic_memory": 0.12}, active_cluster_id=2)
-        assert "visual memory clarity improved by 12%" in rationale
+        assert rationale == "We added closer look-alikes. Your last few rounds were steady."
+        assert "improved" not in rationale and "%" not in rationale
 
 
 def _parse_copy_linter_rules(source: str):
@@ -455,6 +461,26 @@ class TestCrisisCheck:
             "everyone would be better off dead without me",
             "I'm not safe right now",
             "thinking of taking an overdose",
+            # Review probe (BE-05 fix round): inflections, slang, misspellings, missing phrases.
+            "kms",
+            "I'm going to kms tonight",
+            "i want to kil myself",
+            "thinking about sucide",
+            "suicde",
+            "I don't want to be here anymore",
+            "I've been cutting myself again",
+            "I keep hurting myself",
+            "thinking about killing myself",
+            "I'm thinking of ending my life",
+            "taking my own life",
+            "i want to unalive myself",
+            "no point in living anymore",
+            "I wish I could disappear forever",
+            "I want it all to stop, I can't do this anymore",
+            "Im done with life",
+            "I want to die",
+            "i wanna d1e",
+            "I mutilate myself",
         ],
     )
     def test_english_crisis_phrases_are_caught(self, text):
@@ -476,6 +502,22 @@ class TestCrisisCheck:
             "Je n'ai plus envie de vivre",
             "je veux en finir",
             "JE VEUX MOURIR",
+            # Review probe (BE-05 fix round)
+            "je veux en finir, j'en peux plus",
+            "je veux juste en finir",
+            "j'ai envie d'en finir",
+            "je pense à me tuer",
+            "je vais me foutre en l'air",
+            "je veux crever",
+            "je veux disparaître",
+            "je me fais du mal",
+            "je me suis fait du mal hier",
+            "je me scarifie",
+            "j'ai pensé à me suicider hier",
+            "envie d'en finir avec tout ça",
+            "je suis suicidaire",
+            "j'ai plus envie de vivre",
+            "je n'ai plus de raison de vivre",
         ],
     )
     def test_french_crisis_phrases_are_caught_and_answered_in_french(self, text):
@@ -501,6 +543,9 @@ class TestCrisisCheck:
             "je vais me tuer à la tâche",
             "j'en peux plus de ce chrono",
             "je veux en finir avec cet exercice",
+            "j'ai envie d'en finir avec l'exercice",
+            "vivement en finir avec ce niveau",
+            "je vais crever de chaud",
             "",
         ],
     )
@@ -529,7 +574,41 @@ class TestCrisisCheck:
         assert resp.reply_text == CRISIS_REPLY_EN
         assert resp.suggested_actions == []
         assert resp.collab_score_snapshot is None
-        assert agent.fallback_counts[ReplySource.CRISIS.value] == 1
+        assert agent.reply_source_counts[ReplySource.CRISIS.value] == 1
+
+    def test_crisis_text_in_history_is_gated_before_the_llm(self):
+        calls = []
+        agent = AICoachAgent(llm_callable=lambda msgs: calls.append(msgs) or "Sure!")
+        history = [
+            ChatMessage(role=ChatMessageRole.USER, content="I want to end my life"),
+            ChatMessage(role=ChatMessageRole.ASSISTANT, content="Let's try a round."),
+        ]
+        resp = agent.handle_chat(ChatRequest(user_id="u", message="why?", chat_history=history))
+        assert calls == []
+        assert resp.reply_source == ReplySource.CRISIS
+        assert resp.reply_text == CRISIS_REPLY_EN
+
+    def test_crisis_phrase_split_across_turns_is_caught(self):
+        calls = []
+        agent = AICoachAgent(llm_callable=lambda msgs: calls.append(msgs) or "Sure!")
+        history = [ChatMessage(role=ChatMessageRole.USER, content="honestly I want to")]
+        resp = agent.handle_chat(ChatRequest(user_id="u", message="end it all", chat_history=history))
+        assert calls == []
+        assert resp.reply_source == ReplySource.CRISIS
+
+    def test_assistant_turns_are_not_gated(self):
+        # Only the user's words are checked; Loti's own scripted lines never trip the gate.
+        history = [ChatMessage(role=ChatMessageRole.ASSISTANT, content="Please call 988 if you want to die.")]
+        resp = AICoachAgent().handle_chat(ChatRequest(user_id="u", message="hello", chat_history=history))
+        assert resp.reply_source == ReplySource.OFFLINE
+
+    def test_health_text_in_history_gets_the_signpost(self):
+        calls = []
+        agent = AICoachAgent(llm_callable=lambda msgs: calls.append(msgs) or "Sure!")
+        history = [ChatMessage(role=ChatMessageRole.USER, content="I think I have dementia")]
+        resp = agent.handle_chat(ChatRequest(user_id="u", message="why?", chat_history=history))
+        assert calls == []
+        assert resp.reply_source == ReplySource.HEALTH_SIGNPOST
 
     def test_crisis_check_runs_before_the_health_signpost(self):
         resp = AICoachAgent().handle_chat(ChatRequest(user_id="u", message="my depression makes me want to die"))
@@ -551,9 +630,23 @@ class TestLLMFallback:
         offline = AICoachAgent().handle_chat(self._request())
         assert resp.reply_source == ReplySource.OFFLINE_AFTER_LLM_ERROR
         assert resp.reply_text == offline.reply_text
-        assert agent.fallback_counts[ReplySource.OFFLINE_AFTER_LLM_ERROR.value] == 1
+        assert agent.reply_source_counts[ReplySource.OFFLINE_AFTER_LLM_ERROR.value] == 1
         assert any("TimeoutError" in r.getMessage() for r in caplog.records)
         assert all("hello" not in r.getMessage() for r in caplog.records)
+
+    def test_failure_log_never_contains_user_text(self, caplog):
+        secret = "my private sentence 7f3a"
+
+        def echoing_llm(messages):
+            raise RuntimeError(f"bad request: {messages[-1]['content']}")
+
+        agent = AICoachAgent(llm_callable=echoing_llm)
+        with caplog.at_level(logging.DEBUG):
+            resp = agent.handle_chat(ChatRequest(user_id="u", message=secret))
+        assert resp.reply_source == ReplySource.OFFLINE_AFTER_LLM_ERROR
+        assert any("RuntimeError" in r.getMessage() for r in caplog.records)
+        assert all(secret not in r.getMessage() for r in caplog.records)
+        assert all(r.exc_info is None for r in caplog.records)
 
     @pytest.mark.parametrize("bad", [None, "", "   ", 42])
     def test_empty_or_non_text_llm_reply_falls_back(self, bad, caplog):
@@ -571,7 +664,7 @@ class TestLLMFallback:
         assert resp.reply_source == ReplySource.OFFLINE_AFTER_LINT
         assert "neuroplastic" not in resp.reply_text.lower()
         assert resp.safety_metadata.sanitized is True
-        assert agent.fallback_counts[ReplySource.OFFLINE_AFTER_LINT.value] == 1
+        assert agent.reply_source_counts[ReplySource.OFFLINE_AFTER_LINT.value] == 1
         assert any("withheld" in r.getMessage() for r in caplog.records)
 
     def test_clean_llm_reply_is_used_as_is(self):
@@ -579,4 +672,4 @@ class TestLLMFallback:
         resp = agent.handle_chat(self._request())
         assert resp.reply_source == ReplySource.LLM
         assert resp.reply_text == "Nice rhythm today."
-        assert not agent.fallback_counts
+        assert not agent.reply_source_counts

@@ -77,7 +77,8 @@ class XAIExplainer:
                 "negative": f"We extended pacing windows to encourage deliberate, high-accuracy problem analysis.",
             },
             CognitiveDimension.EPISODIC_MEMORY.value: {
-                "positive": f"We added closer look-alikes because your visual memory clarity improved by {pct_change}%.",
+                # Exercise-level wording: no improvement claim without a calibrated RCI gate.
+                "positive": "We added closer look-alikes. Your last few rounds were steady.",
                 "negative": f"We spaced out the look-alikes so each picture is easier to tell apart.",
             },
         }

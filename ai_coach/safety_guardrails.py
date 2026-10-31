@@ -160,41 +160,65 @@ CRISIS_REPLY_FR = (
 
 # Phrases on normalised text (see normalise_user_text). Language: "en", "fr" or None (both).
 # Choices, erring towards answering (a calm false hit costs less than a miss):
-# - Caught: "suicide/suicidal", self-harm, "kill/hurt/harm/cut/hang myself", "end my life", "end it
-#   all", "want to die", "can't go on" (frontend parity), "better off dead", "don't want to live",
-#   overdose, "not safe"; French "me tuer", "me suicider", "envie de mourir", "idées noires",
-#   "mettre fin à mes jours", "ne veux plus vivre", "en finir avec la vie".
+# - Caught: "suicide/suicidal" (and the misspellings "sucide", "suicde"), self-harm, "kill(ing) /
+#   kil / hurt(ing) / harm / cut(ting) / hang / unalive myself", "unalive", "kms", "end(ing) my
+#   life", "end it all", "tak(e|ing) my own life", "want to die", "can't go on" (frontend parity),
+#   "better off dead", "don't want to live / be here anymore", "no point in living", "done with
+#   life", "disappear forever", "want it all to stop", overdose, "not safe"; French "me tuer", "me
+#   suicider", "me fais / me suis fait du mal", "scarifi…", "mutil…", "envie de mourir", "crever",
+#   "me foutre en l'air", "idées noires", "mettre fin à mes jours", "ne veux plus vivre", "plus de
+#   raison de vivre", "(veux / envie d') en finir" unless it is "en finir avec cet exercice" & co,
+#   "veux disparaître".
+# - Digit-for-letter spellings ("d1e", "k1ll") are matched on a second, de-leeted copy.
 # - Let through, as everyday idioms with no self-reference: "this task is killing me", "I'm dying
 #   to…", "I could kill for a coffee", "dead tired", "ça me tue", "mort de fatigue", "me tuer à la
-#   tâche", "j'en peux plus de ce chrono", "going to die of boredom".
-# - Known false hits we accept: "I hurt myself playing football", "caffeine overdose", "I can't go on
-#   to the next level".
+#   tâche", "j'en peux plus de ce chrono", "going to die of boredom", "je vais crever de chaud".
+# - Known false hits we accept: "I hurt myself playing football", "cutting myself a slice of cake",
+#   "caffeine overdose", "I can't go on to the next level", "kms" meaning kilometres (in a coach
+#   chat it is far more often self-harm slang).
+_EXERCISE_NOUNS = (
+    r"(?:exercices?|exos?|niveaux?|parties?|jeux?|tests?|taches?|series?|rounds?|sessions?|"
+    r"chronos?|questions?|epreuves?|quiz)"
+)
 _CRISIS_PHRASES: Tuple[Tuple[str, Optional[str]], ...] = (
-    (r"\bsuicid\w*", None),
+    (r"\bsu?i?cid\w*|\bsuicd\w*", None),
     (r"\bself ?harm\w*", "en"),
-    (r"\b(?:kill|hurt|harm|cut|hang|starve) my ?self\b", "en"),
-    (r"\bend (?:my (?:own )?life|it all)\b", "en"),
-    (r"\btake my (?:own )?life\b", "en"),
+    (r"\b(?:kill?|hurt|harm|cut|hang|starv|unaliv)\w* my ?self\b", "en"),
+    (r"\bunaliv\w*", "en"),
+    (r"\bkms\b", "en"),
+    (r"\bend(?:s|ed|ing)? (?:my (?:own )?life|it all)\b", "en"),
+    (r"\b(?:take|takes|taking|took) my (?:own )?life\b", "en"),
     (r"\b(?:want|wanna|wish|ready) (?:to )?die\b", "en"),
     (r"\bi wish i (?:was|were) dead\b", "en"),
     (r"\bbetter off dead\b", "en"),
-    (r"\b(?:dont|do not) want to (?:live|be alive|wake up)\b", "en"),
-    (r"\bno reason to live\b", "en"),
+    (r"\b(?:dont|do not) want to (?:live|be alive|wake up|be here any ?more)\b", "en"),
+    (r"\bno (?:reason|point) (?:in |to )?(?:live|living)\b", "en"),
     (r"\bnot worth living\b", "en"),
+    (r"\bdone with (?:life|living)\b", "en"),
+    (r"\b(?:disappear|vanish) forever\b", "en"),
+    (r"\bwant (?:it all|everything) to (?:stop|end)\b", "en"),
     (r"\b(?:cant|can ?not|can t) go on\b", "en"),
     (r"\boverdos(?:e|ed|ing)\b", "en"),
     (r"\btake all (?:of )?(?:my|the) (?:pills|meds|tablets)\b", "en"),
     (r"\b(?:im|i am) not safe\b", "en"),
     (r"\b(?:dont|do not) feel safe\b", "en"),
     (r"\bme tuer\b(?! a la tache)", "fr"),
-    (r"\bme (?:pendre|faire du mal|mutiler|scarifier)\b", "fr"),
-    (r"\bautomutil\w*", "fr"),
+    (r"\bme (?:pendre|faire du mal|fais du mal|fait du mal|suis faite? du mal)\b", "fr"),
+    # "mutilate" is English too, so the reply language comes from the French hints.
+    (r"\bscarifi\w*|\b(?:auto)?mutil\w*", None),
+    (r"\bme foutre en lair\b", "fr"),
     (r"\bmettre fin a (?:mes jours|ma vie)\b", "fr"),
-    (r"\ben finir avec (?:la vie|ma vie|tout|moi)\b", "fr"),
-    (r"\b(?:veux|vais|voudrais) en finir$", "fr"),
-    (r"\b(?:veux|voudrais|envie de|prefere|prefererais) mourir\b", "fr"),
+    (
+        r"\bd?en finir\b(?! avec (?:(?:cet|cette|ce|ces|le|la|les|mon|ma|mes|ton|ta|tes) )?l?"
+        + _EXERCISE_NOUNS
+        + r"\b)",
+        "fr",
+    ),
+    (r"\b(?:veux|voudrais|envie de|prefere|prefererais) (?:mourir|crever)\b", "fr"),
+    (r"\b(?:veux|voudrais|envie de) disparaitre\b", "fr"),
     (r"\b(?:plus|pas) envie de vivre\b", "fr"),
     (r"\bveux plus vivre\b", "fr"),
+    (r"\bplus (?:de|aucune) raisons? de vivre\b", "fr"),
     (r"\bidees noires\b", "fr"),
     (r"\bpas en securite\b", "fr"),
 )
@@ -202,6 +226,7 @@ _CRISIS_PATTERNS: Tuple[Tuple[Pattern[str], Optional[str]], ...] = tuple(
     (re.compile(rx), lang) for rx, lang in _CRISIS_PHRASES
 )
 _FRENCH_HINTS = re.compile(r"\b(?:je|jai|suis|veux|moi|pas|mes|mon|vie|envie|pense|penser|au|des)\b")
+_DELEET = str.maketrans({"1": "i", "3": "e", "0": "o", "4": "a", "@": "a", "$": "s"})
 
 
 def crisis_check(user_text: str) -> GateResult:
@@ -212,7 +237,8 @@ def crisis_check(user_text: str) -> GateResult:
     text = normalise_user_text(user_text)
     if not text:
         return GateResult(hit=False)
-    langs = [lang for rx, lang in _CRISIS_PATTERNS if rx.search(text)]
+    deleeted = normalise_user_text((user_text or "").translate(_DELEET))
+    langs = [lang for rx, lang in _CRISIS_PATTERNS if rx.search(text) or rx.search(deleeted)]
     if not langs:
         return GateResult(hit=False)
     french = "fr" in langs or ("en" not in langs and bool(_FRENCH_HINTS.search(text)))
