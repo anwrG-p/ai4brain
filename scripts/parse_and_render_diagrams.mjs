@@ -1,13 +1,25 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
+import { fileURLToPath } from 'node:url'
+
+// Renders the mermaid blocks of SEQUENCE_DIAGRAMS.md to SVG + PNG. Playwright comes from
+// frontend/node_modules (run `cd frontend && npm ci` first); mermaid comes from the pinned CDN build below.
+const USAGE = 'Usage: node scripts/parse_and_render_diagrams.mjs   (needs frontend/node_modules: cd frontend && npm ci; and Microsoft Edge)'
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 const require = createRequire(import.meta.url)
-const playwrightPath = path.resolve('frontend/node_modules/@playwright/test')
-const { chromium } = require(playwrightPath)
+const playwrightPath = path.join(ROOT, 'frontend/node_modules/@playwright/test')
+const docPath = path.join(ROOT, 'docs/architecture/SEQUENCE_DIAGRAMS.md')
+const outputDir = path.join(ROOT, 'docs/architecture/diagrams')
 
-const docPath = path.resolve('docs/architecture/SEQUENCE_DIAGRAMS.md')
-const outputDir = path.resolve('docs/architecture/diagrams')
+for (const [needed, label] of [[playwrightPath, '@playwright/test in frontend/node_modules'], [docPath, docPath]]) {
+  if (!fs.existsSync(needed)) {
+    console.error(`Missing ${label}.\n${USAGE}`)
+    process.exit(1)
+  }
+}
+const { chromium } = require(playwrightPath)
 
 if (!fs.existsSync(outputDir)) {
   fs.mkdirSync(outputDir, { recursive: true })
@@ -58,7 +70,7 @@ async function run() {
     <html>
     <head>
       <meta charset="utf-8">
-      <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js"></script>
       <style>
         body {
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
