@@ -52,6 +52,26 @@ def test_three_confirmations_switch_exactly_once():
     assert gate.switches == 1
 
 
+@pytest.mark.parametrize("active, challenger", [(0.15, 0.3), (0.25, 0.4)])
+def test_a_lead_of_exactly_delta_never_counts(active, challenger):
+    # 0.3 - 0.15 == 0.15 exactly in floats; 0.4 - 0.25 rounds to 0.15000000000000002.
+    assert challenger - active >= DELTA_HYST
+    assert challenger - active == pytest.approx(DELTA_HYST, abs=1e-15)
+    gate = HysteresisGate()
+    gate.step(A)
+    for _ in range(10):
+        assert gate.step([active, challenger]) == 0
+    assert gate.switches == 0
+
+
+def test_a_lead_just_beyond_delta_counts():
+    gate = HysteresisGate()
+    gate.step(A)
+    for _ in range(3):
+        gate.step([0.25, 0.4 + 1e-9])
+    assert gate.switches == 1
+
+
 def test_a_different_challenger_restarts_the_count():
     gate = HysteresisGate()
     gate.step([0.9, 0.05, 0.05])

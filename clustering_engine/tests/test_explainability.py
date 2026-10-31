@@ -53,7 +53,7 @@ def test_same_centroid_gives_zero():
 
 
 @pytest.mark.parametrize(
-    "target,active,W",
+    "target, active, W",
     [
         (np.zeros(5), np.zeros(4), None),  # shapes differ
         (np.zeros(3), np.zeros(3), None),  # identity needs one entry per pillar

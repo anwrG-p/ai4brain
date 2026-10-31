@@ -2,8 +2,10 @@
 N_confirm = 3).
 
 The active cluster changes only after N_confirm consecutive frames in which the same challenger
-leads the active cluster's posterior by more than delta. A frame inside the margin, or a different
-challenger, restarts the count, so posteriors chattering around a boundary never switch.
+leads the active cluster's posterior by strictly more than delta. A lead of exactly delta does not
+count; the comparison carries a 1e-12 tolerance so float rounding (0.4 - 0.25 is
+0.15000000000000002) cannot turn "exactly delta" into "beyond". A frame inside the margin, or a
+different challenger, restarts the count, so posteriors chattering around a boundary never switch.
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ import numpy as np
 
 DELTA_HYST = 0.15
 N_CONFIRM = 3
+_EPS = 1e-12
 
 
 @dataclass
@@ -39,7 +42,7 @@ class HysteresisGate:
             # First frame (or the cluster count changed under us): adopt the leader, no switch.
             self.active, self.challenger, self.count = top, None, 0
             return self.active
-        if top != self.active and g[top] - g[self.active] > self.delta:
+        if top != self.active and g[top] - g[self.active] > self.delta + _EPS:
             self.count = self.count + 1 if top == self.challenger else 1
             self.challenger = top
             if self.count >= self.n_confirm:
