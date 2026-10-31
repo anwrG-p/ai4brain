@@ -39,6 +39,22 @@ async function wordsAboveFold(page: Page): Promise<number> {
   })
 }
 
+/** Text blocks in <main> (p, li, dd) that run past 2 lines, as "lines: start of text". */
+async function longBlocks(page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    Array.from(document.querySelectorAll<HTMLElement>('main p, main li, main dd'))
+      .filter((el) => el.checkVisibility())
+      .map((el) => {
+        const cs = getComputedStyle(el)
+        const lh = cs.lineHeight === 'normal' ? parseFloat(cs.fontSize) * 1.2 : parseFloat(cs.lineHeight)
+        const content = el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)
+        return { lines: Math.round(content / lh), text: (el.textContent ?? '').trim().slice(0, 60) }
+      })
+      .filter((b) => b.lines > 2)
+      .map((b) => `${b.lines}: ${b.text}`),
+  )
+}
+
 async function setAll(page: Page, open: boolean) {
   for (const name of TOPICS) {
     const details = page.locator('main details').filter({ has: page.getByRole('heading', { level: 2, name }) })
@@ -88,6 +104,9 @@ test.describe('How we calculate this (/methodology)', () => {
     await checkViewports(page, 'light', 'closed')
     await setAll(page, true)
     await expect(page.getByRole('table', { name: 'Weights per pillar' })).toBeVisible()
+    // Rule 13: no paragraph past 2 lines, even with every topic open (checked at 1440).
+    await page.setViewportSize({ width: 1440, height: 900 })
+    expect(await longBlocks(page)).toEqual([])
     await checkViewports(page, 'light', 'open')
 
     await setAll(page, false)

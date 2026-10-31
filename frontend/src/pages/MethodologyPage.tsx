@@ -28,12 +28,16 @@ import {
    the page cannot drift from the code. The scale ends quoted in the text are pinned by
    src/tests/methodologyPage.test.tsx against taskScores(). */
 
-// What each of the doc's inputs measures, in plain words, and which exercise feeds it
-// (features/insights/taskScores.ts). 'any' = every exercise; null = no exercise records it yet.
-const MEASURES: Record<InputId, { name: string; from: readonly SchemaType[] | 'any' | null; how: ReactNode }> = {
+// What each of the doc's inputs measures, in plain words, and which exercise feeds it. This MIRRORS
+// features/insights/taskScores.ts by hand (it exports no input -> exercise map): change both together.
+// methodologyPage.test.tsx checks the pillar lists against taskScores(). 'any' = every exercise;
+// null = no exercise records it yet. `note` flags a doc measure we only approximate.
+type Measure = { name: string; from: readonly SchemaType[] | 'any' | null; how: ReactNode; note?: string }
+const MEASURES: Record<InputId, Measure> = {
   OSPAN: {
     name: 'Working memory',
     from: ['n_back'],
+    note: 'from Memory Gauntlet',
     how: (
       <>
         d′ = z(H) − z(FA), with H = (hits + 0.5) ÷ (targets + 1) and FA = (false alarms + 0.5) ÷
@@ -64,6 +68,7 @@ const MEASURES: Record<InputId, { name: string; from: readonly SchemaType[] | 'a
   DCCS_SwitchCost: {
     name: 'Switching rules',
     from: ['n_back'],
+    note: 'from Memory Gauntlet',
     how: (
       <>
         Accuracy on steady trials − accuracy on switch trials. Scale: 0 → 100, 0.5 → 0. Multiplied by
@@ -79,6 +84,7 @@ const MEASURES: Record<InputId, { name: string; from: readonly SchemaType[] | 'a
   SST_SSRT: {
     name: 'Stopping a habit',
     from: ['stroop'],
+    note: 'estimated',
     how: <>A stand-in for now: accuracy on mismatched Color Clash trials. There is no stop-signal exercise yet.</>,
   },
   OTS_Execution: {
@@ -150,8 +156,13 @@ function Formula({ children }: { children: ReactNode }) {
   return <p className="font-mono-tabular rounded-md bg-surface-raised px-3 py-2 break-words text-ink">{children}</p>
 }
 
-function Source({ children }: { children: ReactNode }) {
-  return <p className="text-sm text-ink-muted">{children}</p>
+function Sources({ children }: { children: ReactNode }) {
+  return (
+    <div className="text-sm text-ink-muted">
+      <p className="font-semibold">Sources</p>
+      <ul className="flex flex-col gap-1">{children}</ul>
+    </div>
+  )
 }
 
 function Swatch({ dash, className }: { dash?: string; className: string }) {
@@ -217,6 +228,7 @@ export default function MethodologyPage() {
                       <td className="py-2 pr-4">
                         {MEASURES[id].name}
                         {MEASURES[id].from === null && <span className="text-ink-muted"> (not measured yet)</span>}
+                        {MEASURES[id].note && <span className="text-ink-muted"> ({MEASURES[id].note})</span>}
                         <code className="block break-all text-xs text-ink-muted">{id}</code>
                       </td>
                       <td className="font-mono-tabular py-2 text-right align-top">{w.toFixed(2)}</td>
@@ -241,11 +253,14 @@ export default function MethodologyPage() {
             {UNSOURCED_INPUTS.map((id) => MEASURES[id].name).join(' and ')} have no exercise yet. The scale
             ends are working values we will tune as data comes in.
           </p>
-          <Source>
-            Sources: d′ correction, Hautus 1995 (Behavior Research Methods, Instruments, &amp; Computers); LDI,
-            Stark, Stark &amp; Stark 2023 (Frontiers in Behavioral Neuroscience); time costs are noisy in one
-            session, Hedge, Powell &amp; Sumner 2018 (Behavior Research Methods).
-          </Source>
+          <Sources>
+            <li>d′ correction: Hautus 1995, Behavior Research Methods, Instruments, &amp; Computers.</li>
+            <li>LDI: Stark et al. 2023, Frontiers in Behavioral Neuroscience.</li>
+            <li>
+              Time-cost scores are unreliable from one test to the next: Hedge, Powell &amp; Sumner 2018, Behavior
+              Research Methods.
+            </li>
+          </Sources>
         </Topic>
 
         <Topic title="Brain areas">
@@ -296,18 +311,23 @@ export default function MethodologyPage() {
             </li>
           </ul>
           <p className="text-sm text-ink-muted">Both lines start at your latest score and look 30 or 90 days ahead.</p>
+          <p className="text-sm text-ink-muted">These are working values we will tune as data comes in.</p>
         </Topic>
 
         <Topic title="Real improvement">
           <Formula>
             RCI = (now − baseline) ÷ (√2 · SD · √(1 − r))
           </Formula>
-          <p>
-            For now SD = 10 points and r = 0.8 (how stable a score is from one test to the next). A change
-            counts as real when RCI ≥ {RCI_THRESHOLD} (p &lt; .05): about {RCI_POINTS} points. Smaller changes
-            are treated as normal day-to-day noise.
-          </p>
-          <Source>Source: Jacobson &amp; Truax 1991, the Reliable Change Index.</Source>
+          <ul className="flex list-disc flex-col gap-1 pl-5">
+            <li>For now SD = 10 points and r = 0.8 (how stable a score is from one test to the next).</li>
+            <li>
+              A change counts as real when RCI ≥ {RCI_THRESHOLD} (p &lt; .05): about {RCI_POINTS} points.
+            </li>
+            <li>Smaller changes are treated as normal day-to-day noise.</li>
+          </ul>
+          <Sources>
+            <li>Jacobson &amp; Truax 1991, the Reliable Change Index.</li>
+          </Sources>
         </Topic>
       </div>
     </div>

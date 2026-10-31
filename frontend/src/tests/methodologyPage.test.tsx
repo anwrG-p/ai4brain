@@ -78,6 +78,37 @@ describe('How we calculate this (/methodology)', () => {
     expect(Object.values(EXERCISE_NAME)).toEqual(expect.arrayContaining(['Color Clash', 'Pattern Puzzle']))
   })
 
+  it('lists the exercises that actually feed a pillar in taskScores()', () => {
+    renderPage()
+    const section = open(TOPICS[0]!)
+    const exercisesOf = (label: string) => within(section).getByText(label, { selector: 'dt' }).nextElementSibling?.textContent
+    const focusInputs = Object.keys(PILLAR_WEIGHTS.focus)
+    const feedsFocus = (events: TelemetryEvent[]) => Object.keys(taskScores(events)).some((id) => focusInputs.includes(id))
+
+    expect(exercisesOf(PILLAR_LABELS.focus)).toBe('Memory Gauntlet, Strategic Blueprint, Logic Web, Pattern Puzzle')
+    expect(feedsFocus([ev({ trial_type: 'target', rule: 'p', stream: 'p' }), ev({ trial_type: 'standard', rule: 'p', stream: 'p' })])).toBe(true)
+    expect(feedsFocus([ev({ l_min: 4, l_user: 4, solved: true, planning_time_ms: 5000 }, { dim: 'executive_function' })])).toBe(true)
+    expect(feedsFocus([ev({ hops: 2, inverted: false, level: 1 }, { dim: 'pattern_induction' })])).toBe(true)
+    expect(feedsFocus([ev({ item_id: 'm:0' }, { dim: 'pattern_induction' })])).toBe(true)
+    // ...and the ones it leaves out do not.
+    expect(feedsFocus([ev({ kind: 'lure', delta: 0.1, response: 'similar' }, { dim: 'episodic_memory' })])).toBe(false)
+    expect(feedsFocus([ev({ shown_ms: 50, peripheral_ok: true, quest_threshold_ms: 100 }, { dim: 'processing_speed' })])).toBe(false)
+
+    expect(exercisesOf(PILLAR_LABELS.memory)).toBe('Precision Archive')
+    const mst = [ev({ kind: 'lure', response: 'similar' }, { dim: 'episodic_memory' }), ev({ kind: 'new', response: 'new' }, { dim: 'episodic_memory' })]
+    expect(Object.keys(taskScores(mst))).toContain('MST_LDI')
+  })
+
+  it('marks the measures that only approximate the doc’s', () => {
+    renderPage()
+    const table = within(open(TOPICS[1]!)).getByRole('table', { name: 'Weights per pillar' })
+    const row = (id: string) => table.querySelector(`tr[data-input="${id}"]`)
+    expect(row('OSPAN')).toHaveTextContent('(from Memory Gauntlet)')
+    expect(row('DCCS_SwitchCost')).toHaveTextContent('(from Memory Gauntlet)')
+    expect(row('SST_SSRT')).toHaveTextContent('(estimated)')
+    expect(row('MST_LDI')).not.toHaveTextContent('(')
+  })
+
   it('shows the weights exactly as the code defines them', () => {
     renderPage()
     const section = open(TOPICS[1]!)
@@ -97,6 +128,8 @@ describe('How we calculate this (/methodology)', () => {
     expect(section).toHaveTextContent('d′ 0 → 0, 4 → 100')
     expect(section).toHaveTextContent('0 ms → 100, 300 ms → 0')
     expect(section).toHaveTextContent('17 ms → 100, 500 ms → 0')
+    expect(section).toHaveTextContent('Stark et al. 2023')
+    expect(section).toHaveTextContent('Time-cost scores are unreliable from one test to the next')
 
     // d' 4 -> 100: the OSPAN score is 25 x d'.
     const nback = [
@@ -134,6 +167,7 @@ describe('How we calculate this (/methodology)', () => {
     expect(section).toHaveTextContent('between 0.01 and 0.3')
     expect(section).toHaveTextContent(/Dashed: If you keep training/)
     expect(section).toHaveTextContent(/Dotted: If you pause/)
+    expect(section).toHaveTextContent('These are working values we will tune as data comes in.')
   })
 
   it('explains RCI with the threshold and the defaults the code uses', () => {

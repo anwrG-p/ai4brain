@@ -63,7 +63,7 @@ The run covered three areas:
   | oMST | 20 | 44 | 20 | 148 / 128 | .75 / .69 |
   | Full MST | | | | | test-retest .73 |
 
-- Source: Stark, Stark & Stark 2023, *Front Behav Neurosci* ([link](https://www.frontiersin.org/journals/behavioral-neuroscience/articles/10.3389/fnbeh.2023.1080366/pdf)). The developers' own lab; no independent replication.
+- Source: Stark, Noche, Ebersberger, Mayer & Stark 2023, *Front Behav Neurosci* ([link](https://www.frontiersin.org/journals/behavioral-neuroscience/articles/10.3389/fnbeh.2023.1080366/pdf)). The developers' own lab; no independent replication.
 
 **What to do:**
 - ✅ **Already done:** three choices, plus `kind`, `delta` and `response` logged per trial.
