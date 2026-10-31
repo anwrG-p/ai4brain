@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "TaskPayload",
-  "description": "GET /v1/tasks/next reply. Mirrors TaskPayload and the *Params types in frontend/src/features/assessment/telemetry/types.ts, plus the rules the client enforces (assessment_engine/HANDOVER.md, Member 5). dynamic_cache/tests/test_schema.py fails when types.ts and this file drift apart.",
+  "description": "GET /v1/tasks/next reply. Mirrors TaskPayload and the *Params types in frontend/src/features/assessment/telemetry/types.ts, plus the rules the client enforces (assessment_engine/HANDOVER.md, Member 5). dynamic_cache/tests/test_schema.py (when frontend/ is present) fails when types.ts and this file drift apart.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -459,7 +459,7 @@
         "trials",
         "time_limit_ms"
       ],
-      "$comment": "Inks: red, green, blue, yellow are what Stroop.tsx INK maps today (the default preset). black is the CVD-safe preset's fourth ink; Stroop.tsx must map it before that preset is served.",
+      "$comment": "Inks come from StroopInk (served). The cvd_safe preset needs StroopInkUnserved, which only the opt-in validator uses.",
       "properties": {
         "colors": {
           "type": "array",
@@ -501,12 +501,12 @@
       }
     },
     "StroopInk": {
+      "$comment": "Served inks: the four names Stroop.tsx INK maps to theme tokens today. Any other name paints in the text colour and the trial becomes unanswerable.",
       "enum": [
         "red",
         "green",
         "blue",
-        "yellow",
-        "black"
+        "yellow"
       ]
     },
     "MatrixParams": {
@@ -873,6 +873,16 @@
           }
         }
       }
+    },
+    "StroopInkUnserved": {
+      "$comment": "NOT SERVED. The cvd_safe preset's inks; validate_payload(allow_unserved=True) swaps this in for StroopInk. Merge into StroopInk only once Stroop.tsx maps black.",
+      "enum": [
+        "red",
+        "green",
+        "blue",
+        "yellow",
+        "black"
+      ]
     }
   }
 }

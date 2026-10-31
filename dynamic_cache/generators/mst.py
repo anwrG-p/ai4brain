@@ -21,13 +21,18 @@ LURE_DELTAS = (0.08, 0.14, 0.20, 0.26)
 BASE_MIN = 0.8  # framed distance between any two base figures of the same structure
 
 
+def _axis(rng: random.Random, n: int) -> list[int]:
+    """n coordinates (hundredths) in [10, 90] spanning at least 60: big enough that a lure shows."""
+    lo = rng.randint(10, 30)
+    vals = [lo, rng.randint(lo + 60, 90)] + [rng.randint(10, 90) for _ in range(n - 2)]
+    rng.shuffle(vals)
+    return vals
+
+
 def _points(rng: random.Random, n: int) -> list[tuple[float, float]]:
     while True:
-        pts = [(rng.randint(10, 90) / 100, rng.randint(10, 90) / 100) for _ in range(n)]
-        xs, ys = [x for x, _ in pts], [y for _, y in pts]
-        spread = min(max(xs) - min(xs), max(ys) - min(ys)) >= 0.6  # big enough that a lure shows
-        apart = all(math.dist(p, q) >= 0.15 for k, p in enumerate(pts) for q in pts[k + 1 :])
-        if spread and apart:
+        pts = [(x / 100, y / 100) for x, y in zip(_axis(rng, n), _axis(rng, n))]
+        if all(math.dist(p, q) >= 0.15 for k, p in enumerate(pts) for q in pts[k + 1 :]):
             return pts
 
 

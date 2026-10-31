@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import random
 
-from .solvers import glyph_key
+from ._common import positive_int
+from .solvers import glyph_key  # shared with the solver: how a glyph looks, not what the answer is
 
 SHAPES = ("circle", "square", "triangle", "diamond")
 COUNTS = (1, 2, 3)
@@ -42,9 +43,7 @@ def build(rng: random.Random, theta: float, n_options: int | None = None) -> dic
     # theta sets how many attributes vary (1..3), how often the harder distribution rule is used,
     # and how many options there are.
     n_vary = 1 + round(2 * theta)
-    n_options = n_options if n_options is not None else (4 if theta < 0.5 else 6)
-    if not 2 <= n_options <= 8:
-        raise ValueError("n_options must be in 2..8")
+    n_options = positive_int("n_options", n_options, minimum=2, maximum=8) if n_options is not None else (4 if theta < 0.5 else 6)
     # Colour never varies alone, so the puzzle never rests on colour (FE-12, WCAG 1.4.1).
     vary = rng.sample(("shape", "count"), 1) if n_vary == 1 else rng.sample(("shape", "count", "color"), n_vary)
     kinds = {}

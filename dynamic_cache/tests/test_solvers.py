@@ -13,6 +13,8 @@ from dynamic_cache.generators.solvers import (
     colour_only_pairs,
     counter_intuitive_steps,
     is_chiral,
+    poly_distance,
+    poly_structure,
     rotation_answer,
     solve_matrix,
     solve_relational,
@@ -20,43 +22,75 @@ from dynamic_cache.generators.solvers import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
-FIXTURES = {
-    f["schema_type"]: f
-    for f in json.loads((ROOT / "frontend/src/features/assessment/tasks/fixtures.json").read_text(encoding="utf-8"))
-}
+FIXTURE_FILE = ROOT / "frontend" / "src" / "features" / "assessment" / "tasks" / "fixtures.json"
+
+
+@pytest.fixture(scope="module")
+def fixtures() -> dict:
+    # the frontend is absent from an installed package or a backend-only checkout: skip, don't fail
+    if not FIXTURE_FILE.is_file():
+        pytest.skip("frontend/ is not present")
+    return {f["schema_type"]: f for f in json.loads(FIXTURE_FILE.read_text(encoding="utf-8"))}
 
 
 # ---- the fixtures the UI plays today ----------------------------------------------------------
 
 
 @pytest.mark.parametrize("schema_type", ["n_back", "stroop", "mental_rotation", "relational", "tower", "ufov"])
-def test_solvers_agree_with_the_hand_made_fixtures(schema_type):
-    assert verify(FIXTURES[schema_type]) == []
+def test_solvers_agree_with_the_hand_made_fixtures(fixtures, schema_type):
+    assert verify(fixtures[schema_type]) == []
 
 
-def test_tower_bfs_and_counter_intuitive_reproduce_the_fixture():
-    p = FIXTURES["tower"]["params"]
+def test_tower_bfs_and_counter_intuitive_reproduce_the_fixture(fixtures):
+    p = fixtures["tower"]["params"]
     start = tuple(tuple(s) for s in p["start"])
     goal = tuple(tuple(s) for s in p["goal"])
     assert tower_bfs(start, goal, p["capacities"]) == p["l_min"] == 5
     assert counter_intuitive_steps(start, goal, p["optimal_moves"]) == p["counter_intuitive"] == [2]
 
 
-def test_matrix_rule_solver_finds_the_fixture_answer_and_flags_fe12():
-    p = FIXTURES["matrix"]["params"]
+def test_matrix_rule_solver_finds_the_fixture_answer_and_flags_fe12(fixtures):
+    p = fixtures["matrix"]["params"]
     assert solve_matrix(p["cells"], p["options"]) == p["answer"] == 2
     # the fixture's last two options are both "3 triangles", red vs green: colour alone (FE-12)
     assert colour_only_pairs(p["options"]) == [(2, 3)]
-    assert verify(FIXTURES["matrix"]) == ["options 2 and 3 differ by colour alone (FE-12)"]
+    assert verify(fixtures["matrix"]) == ["options 2 and 3 differ by colour alone (FE-12)"]
 
 
-def test_mst_fixture_is_a_demo_with_approximate_deltas():
+def test_mst_fixture_is_a_demo_with_approximate_deltas(fixtures):
     # hand-made: deltas are rounded and one studied figure is tested twice; generated blocks are not
-    problems = verify(FIXTURES["mst"])
+    problems = verify(fixtures["mst"])
     assert any("delta 0.15" in x for x in problems) and any("tested twice" in x for x in problems)
 
 
 # ---- hand cases ------------------------------------------------------------------------------
+
+
+def test_poly_structure_by_hand():
+    tri = {"points": [[0, 0], [1, 0], [0, 1]], "edges": [[0, 1], [1, 2]]}
+    # edges are undirected and unordered; the vertex count is part of the structure
+    assert poly_structure(tri) == (3, frozenset({frozenset({0, 1}), frozenset({1, 2})}))
+    assert poly_structure({**tri, "edges": [[2, 1], [1, 0]]}) == poly_structure(tri)
+    assert poly_structure({**tri, "edges": [[0, 1], [0, 2]]}) != poly_structure(tri)
+    assert poly_structure({"points": tri["points"] + [[1, 1]], "edges": tri["edges"]}) != poly_structure(tri)
+
+
+def test_poly_distance_by_hand():
+    a = {"points": [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]], "edges": [[0, 1], [1, 2]]}
+    # translated and scaled copies are the same picture once PolyView frames them: distance 0
+    b = {"points": [[0.2, 0.2], [0.6, 0.2], [0.2, 0.6]], "edges": [[0, 1], [1, 2]]}
+    assert poly_distance(a, b) == pytest.approx(0.0)
+    # moving vertex 2 from (0, 1) to (0.5, 1) keeps the 1x1 box: the largest vertex gap is 0.5
+    c = {"points": [[0.0, 0.0], [1.0, 0.0], [0.5, 1.0]], "edges": [[0, 1], [1, 2]]}
+    assert poly_distance(a, c) == pytest.approx(0.5)
+    # (0, 1) -> (1, 1): gap 1.0 on vertex 2, box unchanged
+    d = {"points": [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]], "edges": [[0, 1], [1, 2]]}
+    assert poly_distance(a, d) == pytest.approx(1.0)
+    # a box of 2 x 1 is framed by its larger side: (0,0),(2,0),(0,1) -> (0,0),(1,0),(0,0.5)
+    e = {"points": [[0.0, 0.0], [2.0, 0.0], [0.0, 1.0]], "edges": [[0, 1], [1, 2]]}
+    assert poly_distance(a, e) == pytest.approx(0.5)
+    # other edges: a different figure, never a lure of this one
+    assert poly_distance(a, {**a, "edges": [[0, 1], [0, 2]]}) == float("inf")
 
 
 def test_matrix_solver_rejects_an_ambiguous_puzzle():
@@ -201,6 +235,32 @@ MUTATIONS = {
     "mst lure delta wrong": ("mst", _mst_delta),
     "mst studied item labelled lure": ("mst", _mst_lure_is_studied),
 }
+
+
+def _nback_switch_with_match(p):
+    trials, n = p["params"]["trials"], p["params"]["n"]
+    i = next(i for i, t in enumerate(trials) if t["trial_type"] == "switch")
+    key = {"position": "pos", "symbol": "symbol"}[trials[i]["rule"]]
+    trials[i][key] = trials[i - n][key]  # a hidden target on the rule stream
+    trials[i]["answer"][trials[i]["rule"]] = True  # keep the answer honest: only the switch rule breaks
+
+
+def _stroop_repeat(p):
+    p["params"]["trials"][1] = dict(p["params"]["trials"][0])
+
+
+@pytest.mark.parametrize(
+    "schema_type, mutate, message",
+    [
+        ("n_back", _nback_switch_with_match, "switch trial holds a rule-stream match"),
+        ("stroop", _stroop_repeat, "same stimulus as the trial before"),
+    ],
+)
+def test_solver_rules_for_switch_and_repeat(schema_type, mutate, message):
+    payload = copy.deepcopy(generate(schema_type, 1.0, 11))
+    assert verify(payload) == []
+    mutate(payload)
+    assert any(message in x for x in verify(payload))
 
 
 @pytest.mark.parametrize("case", sorted(MUTATIONS))

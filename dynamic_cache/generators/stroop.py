@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 
-from ._common import positive_int
+from ._common import MAX_TRIALS, GenerationError, positive_int
 
 # Ink sets. Button order is the key order (1..4), so it stays fixed across sessions.
 INK_PRESETS: dict[str, tuple[str, ...]] = {
@@ -17,15 +17,21 @@ INK_PRESETS: dict[str, tuple[str, ...]] = {
     # yellow in hue; black (the research's "black/ink") takes the fourth slot, and keeps
     # STROOP_CHANCE = 1/4 in taskScores.ts true.
     # Not servable yet: Stroop.tsx INK has no "black" (it falls back to --color-ink, which is light
-    # in the dark theme), so the frontend must map it first.
+    # in the dark theme), so the frontend must map it first. Until then generate() refuses it
+    # without allow_unserved=True, and the served schema rejects black.
     "cvd_safe": ("blue", "yellow", "red", "black"),
 }
+UNSERVED_PRESETS = frozenset({"cvd_safe"})
 
-# Default length: 96 trials, 48 congruent + 48 incongruent. The research gives no classic-Stroop
-# minimum (a 520-614-trial claim was refuted and must not be cited; evidence review 2026-10-30
-# §4). The nearest figure is a "double-shot" variant reaching r ~ .8 within about 50 trials
-# (Kucina et al. 2023, evidence review §1.1, medium confidence). The RT cost is a difference of two
-# condition means, so each condition gets about 50 trials on its own.
+# Default length: 96 trials, 48 congruent + 48 incongruent. Design judgement (J): the research
+# cites no trial count that makes the classic Stroop cost stable.
+# - Reliability paradox (Hedge et al. 2018, evidence review 2026-10-30 §1.1): the cost is robust
+#   across groups but ranks individuals poorly; RT-cost ICC is only .60-.66, so no block length
+#   makes one session a trustworthy individual score. Pool across sessions.
+# - The ~50-trial figure (Kucina et al. 2023, r ~ .8) is for a "double-shot" Simon-Stroop variant
+#   and counts ~50 trials in total, not per condition. It does not transfer to this task.
+# - A 520-614-trial claim was refuted and must not be cited (evidence review §4).
+# 48 per condition is therefore a length choice (about 3-4 minutes), not a reliability guarantee.
 DEFAULT_TRIALS = 96
 CONGRUENT_SHARE = 0.5
 
@@ -37,10 +43,10 @@ def build(
     inks: str = "classic",
     congruent_share: float = CONGRUENT_SHARE,
 ) -> dict:
-    trials = positive_int("trials", trials, minimum=2)
+    trials = positive_int("trials", trials, minimum=2, maximum=MAX_TRIALS)
     if inks not in INK_PRESETS:
         raise ValueError(f"inks must be one of {sorted(INK_PRESETS)}")
-    if not 0 < congruent_share < 1:
+    if isinstance(congruent_share, bool) or not isinstance(congruent_share, (int, float)) or not 0 < congruent_share < 1:
         raise ValueError("congruent_share must be strictly between 0 and 1")
     colors = list(INK_PRESETS[inks])
     n_cong = min(trials - 1, max(1, round(trials * congruent_share)))
@@ -60,6 +66,8 @@ def build(
             j = next((j for j in range(len(stimuli)) if _swap_ok(stimuli, i, j)), None)
             if j is not None:
                 stimuli[i], stimuli[j] = stimuli[j], stimuli[i]
+    if any(a == b for a, b in zip(stimuli, stimuli[1:])):
+        raise GenerationError("stroop: could not order the trials without a repeated stimulus")
 
     return {
         "colors": colors,

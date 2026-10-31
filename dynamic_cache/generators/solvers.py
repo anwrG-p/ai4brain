@@ -1,7 +1,23 @@
-"""Independent solvers: each one re-derives a payload's answers from the payload alone.
+"""Solvers: each one re-derives a payload's answers from the payload alone.
 
-They never read a generator's internal state, so a generator bug cannot hide behind itself.
-`verify(payload)` returns a list of problems; an empty list means every answer checks out.
+They never read a generator's internal state. `verify(payload)` returns a list of problems; an
+empty list means every answer checks out.
+
+How independent they are, per schema:
+- Fully separate code from the generator: n_back (the generator labels each trial by what it built;
+  nback_classify re-reads the sequence), stroop, relational (the generator builds chains; the solver
+  searches a premise graph), tower (the generator searches backward from the goal and has its own
+  counter-intuitive routine; tower_bfs searches forward from the start), ufov.
+- Shared helpers (a bug in one would hide on both sides; the hand-computed tests in
+  tests/test_solvers.py pin them down):
+  - matrix imports glyph_key (how a glyph looks). The answer itself is derived independently:
+    the generator builds rows from rules, solve_matrix infers the rules back.
+  - mental_rotation imports is_chiral, mirror, normalize_cells and rotate90. The generator's answer
+    is "different iff mirrored" (on chiral shapes only); rotation_answer recomputes it geometrically,
+    but on the same rotate/mirror primitives.
+  - mst imports poly_structure, poly_distance and MST_LURE_MARGIN to place lures, so the lure-
+    ambiguity check and the "new is far from studied" check use the same metric on both sides.
+    The old/lure kind and the delta are re-derived from raw coordinates.
 
 - n_back: re-classifies every trial and recomputes both streams' matches.
 - stroop: answer == ink, inks in the colour list, both congruent and incongruent trials.
@@ -62,6 +78,9 @@ def verify_n_back(p: dict) -> list[str]:
         want = nback_classify(values[rule], i, n, switch)
         if t["trial_type"] != want:
             out.append(f"trial {i}: trial_type {t['trial_type']} but the sequence says {want}")
+        if switch and nback_classify(values[rule], i, n, False) != "standard":
+            # d' leaves switch trials out, so a match hidden in one would be a silent target or lure
+            out.append(f"trial {i}: switch trial holds a rule-stream match")
         if set(t["answer"]) != set(streams):
             out.append(f"trial {i}: answer keys {sorted(t['answer'])} != streams {sorted(streams)}")
         for s in streams:
@@ -94,6 +113,10 @@ def verify_stroop(p: dict) -> list[str]:
             incongruent += 1
     if len(p["trials"]) >= 2 and (congruent == 0 or incongruent == 0):
         out.append("a block needs both congruent and incongruent trials (interference cost)")
+    for i in range(1, len(p["trials"])):
+        a, b = p["trials"][i - 1], p["trials"][i]
+        if (a["word"], a["ink"]) == (b["word"], b["ink"]):
+            out.append(f"trial {i}: same stimulus as the trial before (primes the answer)")
     return out
 
 

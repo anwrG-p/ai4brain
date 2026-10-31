@@ -6,6 +6,8 @@ import random
 from collections import deque
 from functools import lru_cache
 
+from ._common import positive_int
+
 CAPACITIES = (3, 2, 1)
 DISCS = ("R", "G", "B")
 TIME_LIMIT_MS = 60000  # TOL-F: 1 min per problem (evidence review 2026-10-30 §1.5)
@@ -14,6 +16,9 @@ TIME_LIMIT_MS = 60000  # TOL-F: 1 min per problem (evidence review 2026-10-30 §
 # TOL-F protocol (evidence review 2026-10-30 §1.5, PMC6669988; HANDOVER "Block designs"):
 # 2 two-move comprehension items and 4 three-move practice items, then 24 test problems, 8 each at
 # 4, 5 and 6 minimum moves, in increasing difficulty. Internal consistency .72-.76 (n = 7,703).
+# Only the shape of the series is TOL-F: problems are drawn at random per move count, not the
+# published TOL-F item set, so the published reliability is an approximation for this series.
+# The series ignores theta (the protocol fixes the move counts), and so does its seeding.
 PRACTICE = (2, 2, 3, 3, 3, 3)
 TEST = (4,) * 8 + (5,) * 8 + (6,) * 8
 
@@ -112,4 +117,5 @@ def problem(rng: random.Random, l_min: int, exclude: set | None = None) -> dict:
 
 def build(rng: random.Random, theta: float, l_min: int | None = None) -> dict:
     """One problem; theta maps to 2..6 minimum moves (the TOL-F range)."""
-    return problem(rng, l_min if l_min is not None else 2 + round(4 * theta))
+    # 8 is the longest minimum path on this board
+    return problem(rng, positive_int("l_min", l_min, maximum=8) if l_min is not None else 2 + round(4 * theta))

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 
-from ._common import positive_int
+from ._common import positive_int, unit_float
 
 # Default length. The research cites no minimum for n-back: online, overall accuracy and RT
 # indices were reliable but per-n-level indices were not (Kulikowski & Potasz-Kulikowska, cited in
@@ -48,10 +48,12 @@ def build(
     switches: int | None = None,
 ) -> dict:
     trials = positive_int("trials", trials)
-    n = positive_int("n", n) if n is not None else 1 + round(2 * theta)  # 1..3
-    lure_rate = 0.10 + 0.20 * theta if lure_rate is None else lure_rate  # lure density (J)
+    n = positive_int("n", n, maximum=9) if n is not None else 1 + round(2 * theta)  # 1..3
+    # lure density (J); targets take the first TARGET_RATE of each draw, so above 0.75 it saturates
+    lure_rate = 0.10 + 0.20 * theta if lure_rate is None else unit_float("lure_rate", lure_rate)
     if switches is None:
         switches = 0 if theta < 0.5 else 1 if theta < 0.85 else 2
+    switches = positive_int("switches", switches, minimum=0, maximum=20)
     symbols = rng.sample(SYMBOLS, SYMBOLS_PER_BLOCK)
     domain = {"position": list(range(9)), "symbol": symbols}
     rules = _rules(rng, trials, n, switches)

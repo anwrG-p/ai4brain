@@ -5,18 +5,32 @@ from __future__ import annotations
 import copy
 import json
 import re
+from functools import lru_cache
 from pathlib import Path
 
 import pytest
 
-from dynamic_cache.generators import SCHEMA_TYPES, generate, schema_problems
+from dynamic_cache.generators import SCHEMA_TYPES, generate, schema_problems, validate_payload
 from dynamic_cache.generators.validate import load_schema
 
 ROOT = Path(__file__).resolve().parents[2]
 TASKS = ROOT / "frontend" / "src" / "features" / "assessment"
-TYPES_TS = (TASKS / "telemetry" / "types.ts").read_text(encoding="utf-8")
-FIXTURES = json.loads((TASKS / "tasks" / "fixtures.json").read_text(encoding="utf-8"))
+# The frontend is not part of an installed package or a backend-only checkout: skip, don't fail.
+requires_frontend = pytest.mark.skipif(
+    not (TASKS / "telemetry" / "types.ts").is_file(), reason="frontend/ is not present"
+)
 SCHEMA = load_schema()
+
+
+@lru_cache(maxsize=1)
+def types_ts() -> str:
+    return (TASKS / "telemetry" / "types.ts").read_text(encoding="utf-8")
+
+
+@lru_cache(maxsize=1)
+def fixtures() -> dict:
+    data = json.loads((TASKS / "tasks" / "fixtures.json").read_text(encoding="utf-8"))
+    return {f["schema_type"]: f for f in data}
 
 # TS type -> schema definition (None = the schema root)
 TS_TO_SCHEMA = {
@@ -78,10 +92,11 @@ def _fields(body: str) -> dict:
 
 
 def ts_object(name: str) -> dict:
-    m = re.search(rf"export type {name} = \{{", TYPES_TS)
+    src = types_ts()
+    m = re.search(rf"export type {name} = \{{", src)
     assert m, f"type {name} not found in types.ts"
     open_at = m.end() - 1
-    body = TYPES_TS[open_at + 1 : _match(TYPES_TS, open_at) - 1]
+    body = src[open_at + 1 : _match(src, open_at) - 1]
     return _fields(re.sub(r"//[^\n]*", "", body))
 
 
@@ -112,6 +127,7 @@ def _compare(ts: dict, node: dict, where: str) -> list[str]:
     return out
 
 
+@requires_frontend
 @pytest.mark.parametrize("ts_name", sorted(TS_TO_SCHEMA))
 def test_schema_matches_types_ts(ts_name):
     definition = TS_TO_SCHEMA[ts_name]
@@ -119,6 +135,7 @@ def test_schema_matches_types_ts(ts_name):
     assert _compare(ts_object(ts_name), node, ts_name) == []
 
 
+@requires_frontend
 def test_reader_sees_nested_trial_shapes():
     # guards the reader itself: a nested object type and an optional key are both picked up
     nback = ts_object("NBackParams")
@@ -128,6 +145,7 @@ def test_reader_sees_nested_trial_shapes():
     assert ts_object("TowerParams")["time_limit_ms"][0] is True
 
 
+@requires_frontend
 def test_drift_is_caught():
     tower = copy.deepcopy(SCHEMA["definitions"]["TowerParams"])
     tower["properties"].pop("time_limit_ms")
@@ -137,18 +155,41 @@ def test_drift_is_caught():
     assert _compare(ts_object("NBackParams"), nback, "NBackParams")
 
 
+@requires_frontend
 def test_enums_match_the_frontend():
-    dims = re.search(r"export type Dimension =([^/]*?)\n\n", TYPES_TS, re.S).group(1)
+    dims = re.search(r"export type Dimension =([^/]*?)\n\n", types_ts(), re.S).group(1)
     assert set(re.findall(r"'(\w+)'", dims)) == set(SCHEMA["properties"]["dimension"]["enum"])
     source = (TASKS / "tasks" / "taskSource.ts").read_text(encoding="utf-8")
     listed = re.search(r"const SCHEMA_TYPES: readonly SchemaType\[\] = \[([^\]]*)\]", source).group(1)
     assert re.findall(r"'(\w+)'", listed) == list(SCHEMA_TYPES) == SCHEMA["properties"]["schema_type"]["enum"]
 
 
-@pytest.mark.parametrize("fixture", FIXTURES, ids=lambda f: f["schema_type"])
-def test_frontend_fixtures_pass_the_schema(fixture):
+@requires_frontend
+@pytest.mark.parametrize("schema_type", SCHEMA_TYPES)
+def test_frontend_fixtures_pass_the_schema(schema_type):
     # the schema is no stricter than what the UI already plays
-    assert schema_problems(fixture) == []
+    assert schema_problems(fixtures()[schema_type]) == []
+
+
+def test_schema_is_package_data():
+    # loaded through importlib.resources, so an installed wheel finds it without the repo
+    assert SCHEMA["title"] == "TaskPayload" and "StroopParams" in SCHEMA["definitions"]
+
+
+# ---- served vs not-yet-servable Stroop inks -------------------------------------------------------
+
+
+def test_served_schema_rejects_black_ink():
+    assert SCHEMA["definitions"]["StroopInk"]["enum"] == ["red", "green", "blue", "yellow"]
+    p = generate("stroop", 0.5, 3, inks="cvd_safe", allow_unserved=True)
+    assert schema_problems(p) and validate_payload(p)  # the served gate refuses it
+    assert schema_problems(p, allow_unserved=True) == [] and validate_payload(p, allow_unserved=True) == []
+
+
+def test_unserved_schema_only_widens_the_ink_list():
+    p = copy.deepcopy(generate("stroop", 0.5, 3, inks="cvd_safe", allow_unserved=True))
+    p["params"]["trials"][0]["ink"] = "purple"
+    assert schema_problems(p, allow_unserved=True)
 
 
 # ---- the schema rejects what the client would choke on -------------------------------------------
@@ -167,6 +208,7 @@ BROKEN = {
     "wrong dimension for schema": ("stroop", lambda p: p.update(dimension="working_memory")),
     "extra envelope field": ("tower", lambda p: p.update(extra=1)),
     "stroop ink the UI cannot paint": ("stroop", lambda p: p["params"]["trials"][0].update(ink="purple")),
+    "stroop black ink not served yet": ("stroop", lambda p: p["params"]["colors"].__setitem__(1, "black")),
     "matrix with no empty cell": ("matrix", lambda p: p["params"]["cells"].__setitem__(8, p["params"]["options"][0])),
     "matrix glyph colour unmapped": ("matrix", lambda p: p["params"]["options"][0].update(color="teal")),
     "n_back pos off the grid": ("n_back", lambda p: p["params"]["trials"][0].update(pos=[3, 0])),

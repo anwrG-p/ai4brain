@@ -60,9 +60,11 @@ def check_seed(seed: int) -> int:
     return seed
 
 
-def make_rng(schema_type: str, theta: float, seed: int, salt: str = "") -> random.Random:
-    # String seeds are hashed with SHA-512 (Random version 2), so the stream is stable across runs,
-    # platforms and Python 3 versions.
+def make_rng(schema_type: str, theta: float | str, seed: int, salt: str = "") -> random.Random:
+    # String seeds are hashed with SHA-512 (Random version 2), so the seed itself is stable. Payloads
+    # are only promised byte-identical on one CPython minor version (3.13, the CI pin): the methods
+    # built on the stream (choice, sample, shuffle) and float formatting may change between minors.
+    # tests/test_generators.py::test_golden_payload_hashes guards it.
     return random.Random(f"{schema_type}|{theta!r}|{seed}|{salt}")
 
 
@@ -97,7 +99,18 @@ def envelope(schema_type: str, seed: int, params: dict, tag: str | None = None) 
     }
 
 
-def positive_int(name: str, value: Any, minimum: int = 1) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
-        raise ValueError(f"{name} must be an int >= {minimum}, got {value!r}")
+# Upper bound on every length option (trials, per_level, repeats, ...): far above any block the
+# research asks for (the longest default is 150), low enough that a bad option cannot stall a worker.
+MAX_TRIALS = 500
+
+
+def positive_int(name: str, value: Any, minimum: int = 1, maximum: int = MAX_TRIALS) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
+        raise ValueError(f"{name} must be an int in [{minimum}, {maximum}], got {value!r}")
     return value
+
+
+def unit_float(name: str, value: Any) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0.0 <= value <= 1.0:
+        raise ValueError(f"{name} must be a number in [0, 1], got {value!r}")
+    return float(value)
