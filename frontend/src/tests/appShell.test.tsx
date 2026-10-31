@@ -217,8 +217,10 @@ describe('Routes and redirects (ticket 09a)', () => {
     ['/login', '/'],
     ['/register', '/'],
   ])('%s redirects to %s', async (from, to) => {
-    // /results needs a finished session, or it sends the visitor back to Welcome.
-    useSessionStore.getState().addSession({ id: 's1', at: '2026-10-31T10:00:00Z', inputs: { MST_LDI: { score: 60, trials: 20 } } })
+    // /results needs a finished session, or it sends the visitor back to Welcome. Only there: a device
+    // with a session skips / and /baseline (returningUser.test.tsx), so those run as a new device.
+    if (to === '/results')
+      useSessionStore.getState().addSession({ id: 's1', at: '2026-10-31T10:00:00Z', inputs: { MST_LDI: { score: 60, trials: 20 } } })
     expect(await at(from)).toBe(to)
   })
 

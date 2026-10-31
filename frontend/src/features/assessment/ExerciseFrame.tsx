@@ -8,10 +8,13 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { Loti } from '../../components/features/characters/Loti'
 import { useCharacterMotion } from '../../components/features/characters/shared'
 import { Button } from '../../components/ui/Button'
+import { PILLAR_LABELS } from '../insights/pillars'
 import { ExerciseDemo } from './ExerciseDemo'
+import { stepParts } from './howToPlay'
 import { introFor, OWN_FIXATION, trialCount, type Intro } from './exercises'
 import { tracker } from './telemetry/tracker'
 import type { SchemaType, TaskPayload } from './telemetry/types'
@@ -103,34 +106,57 @@ function useFocusOnMount<T extends HTMLElement>() {
 // A held Enter clicks a focused button again on every repeat; it must not skip the end card.
 const noRepeat = (e: ReactKeyboardEvent<HTMLButtonElement>) => e.repeat && e.preventDefault()
 
+// A step's text with its keys as keycaps ("press [A]").
+function Step({ text }: { text: string }) {
+  return stepParts(text).map((part, k) =>
+    typeof part === 'string' ? (
+      part
+    ) : (
+      <kbd key={k} className={KEYCAP}>
+        {part.key}
+      </kbd>
+    ),
+  )
+}
+
+// The instruction screen (INT-1 item 13: "add some explanation to the games", kept short): the name
+// and its line; how to play in 2-3 numbered steps; the demo with a caption; the pillar it trains; one
+// closed "More about this". The copy is in howToPlay.ts. Begin is the only button.
 function Instructions({ schema, intro, onBegin }: { schema: SchemaType; intro: Intro; onBegin: () => void }) {
   // Focused Begin: native Space/Enter activate it; the window listener covers an unfocused page.
   const begin = useFocusOnMount<HTMLButtonElement>()
   // A plain div, not a region: the exercise's own region carries the same name. Each exercise opens
   // here, so its slide-in from the right is also the move from one exercise to the next.
   return (
-    <div className="anim-slide-in mx-auto flex max-w-md flex-col items-center gap-6 py-8 text-center">
-      <div className="space-y-2">
-        <ExerciseDemo schema={schema} />
-        <h2 className="font-display text-2xl font-bold text-ink">
-          {intro.name}
-        </h2>
+    <div className="anim-slide-in mx-auto flex max-w-md flex-col items-center gap-3 py-2 text-center">
+      <div className="space-y-1">
+        <h2 className="font-display text-2xl font-bold text-ink">{intro.name}</h2>
         <p className="text-ink">{intro.line}</p>
       </div>
-      {intro.keys.length > 0 && (
-        <ul aria-label="Keys" className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-ink-muted">
-          {intro.keys.map((h, k) => (
-            <li key={k} className="flex items-center gap-1.5">
-              {h.keys.map((key) => (
-                <kbd key={key} className={KEYCAP}>
-                  {key}
-                </kbd>
-              ))}
-              <span>{h.label}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ol aria-label="How to play" className="m-0 flex list-decimal flex-col gap-1 pl-6 text-left text-ink marker:text-ink-muted">
+        {intro.steps.map((step) => (
+          <li key={step}>
+            <Step text={step} />
+          </li>
+        ))}
+      </ol>
+      {/* The example: decorative, as the steps already say it. */}
+      <div aria-hidden="true" className="flex flex-col items-center gap-1">
+        <ExerciseDemo schema={schema} />
+        <p data-demo-caption className="text-sm text-ink-muted">
+          {intro.caption}
+        </p>
+      </div>
+      <p className="rounded-pill border border-border px-2.5 py-0.5 text-xs text-ink-muted">Trains: {PILLAR_LABELS[intro.pillar]}</p>
+      <details className="group w-full text-sm text-ink-muted">
+        <summary className="focus-ring mx-auto flex min-h-11 w-fit cursor-pointer list-none items-center gap-1 rounded-md px-2 [&::-webkit-details-marker]:hidden">
+          More about this
+          <ChevronDown aria-hidden="true" size={16} strokeWidth={1.75} className="group-open:rotate-180" />
+        </summary>
+        {intro.more.map((line) => (
+          <p key={line}>{line}</p>
+        ))}
+      </details>
       <div className="flex flex-col items-center gap-2">
         <Button ref={begin} size="lg" className="anim-press" onClick={onBegin} onKeyDown={noRepeat}>
           Begin

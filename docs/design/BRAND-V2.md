@@ -41,6 +41,7 @@ flowchart LR
   B --> R["/results<br/>blurred → Dolphin → data choice → reveal"]
   R --> H["/dashboard Home"]
 ```
+Returning devices (at least one saved session) go straight to Home: `/` and `/baseline` redirect to `/dashboard` (`/baseline?again=1` is the retake).
 
 ### Route map
 
@@ -94,7 +95,10 @@ Hiding the tab during the fixation or the trials pauses the run. A paused attemp
 - **Telemetry stays on the device until you choose "Save my answers".** The tracker is `features/assessment/telemetry/tracker.ts`. Choosing "Keep them on this device only" sends nothing and clears the queue.
 - **Users are anonymous** (R13): no accounts.
 - **Export my data** downloads everything the device holds. **Delete my data** clears it and keeps your theme and reduce-motion settings.
-- **Server:** `backend/app` (FastAPI): telemetry ingest, export, delete and 30-day retention. Endpoints that aren't built yet answer "not available yet".
+- **Server:** `backend/app` (FastAPI) combines our backend work with Hamza's:
+  - **Hamza's base:** the app, the `/v1` routes, Docker, and the scoring library (IRT, EZ-diffusion, Kalman + RCI, SSRT, 85% difficulty rule).
+  - **Our modules:** telemetry ingest, privacy (export, delete, 30-day retention), task generators (`dynamic_cache/`), coach safety (`ai_coach/`) and synthetic data (`data/synthetic/`).
+  - Endpoints that aren't built yet answer "not available yet".
 
 ## 7. Rulings that changed the design (dated 2026-10-31)
 - **R8:** livelier Welcome and exercise screens, with motion outside the trials only.

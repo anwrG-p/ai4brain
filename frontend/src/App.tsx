@@ -1,7 +1,8 @@
-import React, { Suspense } from 'react'
+import React, { Suspense, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
 import { ErrorBoundary } from './components/layout/ErrorBoundary'
+import { useSessionStore } from './features/insights/sessionStore'
 
 const WelcomePage = React.lazy(() => import('./pages/WelcomePage'))
 const BaselinePage = React.lazy(() => import('./pages/BaselinePage'))
@@ -46,6 +47,19 @@ function RedirectKeepQuery({ to }: { to: string }) {
   return <Navigate to={{ pathname: to, search }} replace />
 }
 
+/* The first-visit flow (Welcome, then the baseline) is for new devices only (user, INT-1 item 14: "an
+   old user doesn't need to redo the test"). A device with a saved session goes to Home instead, with
+   replace so Back does not loop. Users are anonymous (R13), so "returning" means this device. The
+   store is read once, synchronously, before the page renders: Welcome never flashes, and a session
+   saved at the end of the baseline does not redirect it away from /results. `?again=1` on /baseline
+   is the explicit retake (no button links to it; Train plays any exercise). */
+function FirstVisitOnly({ children, allowAgain = false }: { children: React.ReactNode; allowAgain?: boolean }) {
+  const { search } = useLocation()
+  const [returning] = useState(() => useSessionStore.getState().sessions.length > 0)
+  const again = allowAgain && new URLSearchParams(search).get('again') === '1'
+  return returning && !again ? <Navigate to="/dashboard" replace /> : <>{children}</>
+}
+
 function RouteLoadingSkeleton() {
   return (
     <div role="status" aria-label="Loading page" className="space-y-4">
@@ -62,8 +76,22 @@ export function App() {
         <ErrorBoundary>
           <Suspense fallback={<RouteLoadingSkeleton />}>
             <Routes>
-              <Route path="/" element={<WelcomePage />} />
-              <Route path="/baseline" element={<BaselinePage />} />
+              <Route
+                path="/"
+                element={
+                  <FirstVisitOnly>
+                    <WelcomePage />
+                  </FirstVisitOnly>
+                }
+              />
+              <Route
+                path="/baseline"
+                element={
+                  <FirstVisitOnly allowAgain>
+                    <BaselinePage />
+                  </FirstVisitOnly>
+                }
+              />
               <Route path="/results" element={<ResultsPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/train" element={<TrainPage />} />
