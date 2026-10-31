@@ -20,7 +20,10 @@ Two separate parts. Neither one ever rewrites or euphemises what the user wrote.
 THE KEYWORD CRISIS GATE IS A FLOOR, NOT A CLASSIFIER. It catches the listed phrasings and an
 intent x harm composition of them, but recall on wording it has never seen is low: on three held-out
 sets of 20 phrasings, each written before the patterns it was measured against, it caught 14, 8 and
-5 (70%, 40%, 25%). An LLM-based backup classifier, run on every user message alongside this gate, is
+5 (70%, 40%, 25%). Precision has the same limit: after the round-4 guards (first-person subject,
+benign game/time tails) it passes all 54 benign training messages it was tuned on, but 3 of 20
+held-out benign messages still trip it (15%). An LLM-based backup classifier, run on every user
+message alongside this gate, is
 REQUIRED before any LLM path is enabled for users (research area 7, improvement 1). Until then the
 LLM path stays off, as it is by default in the frontend (VITE_LOTI_COACH).
 """
@@ -190,14 +193,37 @@ _EXERCISE_NOUNS = (
     r"chronos?|questions?|epreuves?|quiz|matrices?|grilles?)"
 )
 
-# Intent x harm composition. Any intent, up to three filler words, then any harm, so new wording
-# ("I'm going to end things tonight", "j'ai envie de me jeter sous un train") is caught without
-# listing every phrase. Idioms of exaggeration are cut off by negative lookaheads.
+# Intent x harm composition: a first-person subject, an intent, up to three filler words, then a
+# harm, so new wording ("I'm going to end things tonight", "j'ai envie de me jeter sous un train")
+# is caught without listing every phrase.
+# Precision guards (round 4, after 35 of 54 benign training messages tripped the gate):
+# - the subject must be first person (i, im, ill, ive, je, jai…), optionally followed by up to two
+#   adverbs ("I just want…", "I've been thinking…", "je veux juste…"): "my streak is going to die"
+#   and "will the hints disappear" have no first-person subject;
+# - bare will / ill / might are not intents;
+# - _BENIGN_TAIL: a game, exercise, time or idiom word within five words after the harm ("end it
+#   on a high score", "be gone for the weekend", "sauter de niveau", "die laughing", "mourir de
+#   stress", "dead meat") means it is not a crisis.
+_EN_SUBJECT = r"(?:i|im|i m|i am|ive|i ve|ill|i ll|i will|id|i d|i would)"
+_FR_SUBJECT = r"(?:je|jai|j)"
+_ADVERBS = (
+    r"(?: (?:just|really|honestly|seriously|actually|literally|kinda|still|so|sometimes|often|"
+    r"always|also|even|been|keep|have|ne|n|vraiment|juste|parfois|souvent|pas|y)){0,2}"
+)
+_BENIGN_TAIL_WORDS = (
+    r"(?:" + _EXERCISE_NOUNS[3:-1] + r"|streaks?|scores?|levels?|leaderboard|classement|games?|"
+    r"matchs?|training|entrainement|workout|today|aujourdhui|apps?|appli|application|"
+    r"phone|telephone|weekend|week end|vacances|holidays?|vacation|couch|sofa|lit|"
+    r"for (?:a|the|one|now|today) ?(?:week|bit|while|day|moment)?|quelques jours|un moment|"
+    r"see you|a demain|early|here|errors?|mistakes?|erreurs?|by \d\w*|"
+    r"laughing|laughter|hunger|faim|stress|joie|rire|ennui|boredom|meat)"
+)
+_BENIGN_TAIL = rf"(?!(?: \w+){{0,4}} {_BENIGN_TAIL_WORDS}\b)"
 _FILLER = r"(?: \w+){0,3}?"
 _EN_INTENT = (
     r"(?:want(?:s|ed)? to|wanna|going to|gonna|plan(?:s|ned|ning)? (?:to|on)|a plan to|"
     r"thinking (?:about|of)|think(?:s)? about|thought (?:about|of)|ready to|about to|decided to|"
-    r"trying to|try to|wish i could|will|ill|might|keep thinking about)"
+    r"trying to|try to|wish i could|keep thinking about)"
 )
 _EN_HARM = (
     r"(?:die(?! (?:of|from) (?:boredom|laughter|laughing|embarrassment|shame|cringe))|dying|"
@@ -233,7 +259,8 @@ _CRISIS_PHRASES: Tuple[Tuple[str, Optional[str]], ...] = (
     (r"\bdone with (?:life|living)\b", "en"),
     (r"\b(?:disappear|vanish) forever\b", "en"),
     (r"\bwant (?:it all|everything) to (?:stop|end)\b", "en"),
-    (r"\b(?:cant|can ?not|can t) go on\b", "en"),
+    # Frontend parity keeps the plain form; a benign tail ("too many errors", "this round") clears it.
+    (rf"\b(?:cant|can ?not|can t) go on\b{_BENIGN_TAIL}", "en"),
     (r"\boverdos(?:e|ed|ing)\b", "en"),
     (r"\btake all (?:of )?(?:my|the) (?:pills|meds|tablets)\b", "en"),
     (r"\b(?:im|i am) not safe\b", "en"),
@@ -251,18 +278,18 @@ _CRISIS_PHRASES: Tuple[Tuple[str, Optional[str]], ...] = (
         "fr",
     ),
     (r"\b(?:veux|voudrais|envie de|prefere|prefererais) (?:mourir|crever)\b", "fr"),
-    (r"\b(?:veux|voudrais|envie de) disparaitre\b", "fr"),
+    (rf"\b(?:veux|voudrais|envie de) disparaitre\b{_BENIGN_TAIL}(?! d[eu]s? )", "fr"),
     (r"\b(?:plus|pas) envie de vivre\b", "fr"),
     (r"\bveux plus vivre\b", "fr"),
     (r"\bplus (?:de|aucune) raisons? de vivre\b", "fr"),
     (r"\bidees noires\b", "fr"),
     (r"\bpas en securite\b", "fr"),
     # Composition (see _EN_INTENT / _FR_INTENT above).
-    (rf"\b{_EN_INTENT}{_FILLER} {_EN_HARM}\b", "en"),
-    (rf"\b{_FR_INTENT}{_FILLER} {_FR_HARM}\b", "fr"),
+    (rf"\b{_EN_SUBJECT}{_ADVERBS} {_EN_INTENT}{_FILLER} {_EN_HARM}\b{_BENIGN_TAIL}", "en"),
+    (rf"\b{_FR_SUBJECT}{_ADVERBS} {_FR_INTENT}{_FILLER} {_FR_HARM}\b{_BENIGN_TAIL}", "fr"),
     # Standalone forms that need no intent word.
     (r"\bend myself\b", "en"),
-    (r"\b(?:cant|can ?not|can t) (?:keep|go on|continue) (?:living|like this)\b", "en"),
+    (rf"\b(?:cant|can ?not|can t) (?:keep|go on|continue) (?:living|like this)\b{_BENIGN_TAIL}", "en"),
     (r"\b(?:cant|can ?not|can t) live like this\b", "en"),
     (r"\bif i (?:was|were) (?:gone|dead)\b|\bif i (?:wasnt|werent|was not|were not) (?:here|around|alive)\b", "en"),
     (r"\b(?:better|happier|easier) (?:off )?without me\b", "en"),
@@ -299,7 +326,7 @@ _CRISIS_PHRASES: Tuple[Tuple[str, Optional[str]], ...] = (
     (r"\bmettre fin a (?:tout|mon existence|mes souffrances)\b", "fr"),
     # Not wanting to exist.
     (
-        r"\b(?:stop|cease|quit) (?:existing|being alive|living)\b|"
+        r"\b(?:stop|cease|quit) (?:existing|being alive|living)\b(?! (?:on|in|at|with|off)\b)|"
         r"\b(?:dont|do not|no longer) want to (?:exist|be around)\b|\b(?:want|wish|prefer|rather) (?:to )?not exist\b",
         "en",
     ),
@@ -323,8 +350,16 @@ _CRISIS_PHRASES: Tuple[Tuple[str, Optional[str]], ...] = (
     (r"\bjamais (?:etre )?naitre\b|\b(?:jamais|pas) ete (?:ne|nee)\b", "fr"),
     # Wanting the pain or everything to stop for good; a bare "end it" with a time.
     (r"\b(?:pain|everything|it all|it|this|the hurt) to (?:stop|end) (?:forever|for good)\b", "en"),
-    (r"\bend it (?:tonight|today|tomorrow|soon|now|this week|for good)\b|\bthe night i end it\b", "en"),
-    (r"\b(?:tout )?arreter pour (?:toujours|de bon)\b|\bm?endormir pour (?:toujours|de bon)\b", "fr"),
+    (
+        rf"\b{_EN_SUBJECT}(?: \w+){{0,2}} end it (?:tonight|tomorrow|soon|this week|for good)\b{_BENIGN_TAIL}|"
+        r"\bthe night i end it\b",
+        "en",
+    ),
+    (
+        rf"\b(?:tout )?arreter pour (?:toujours|de bon)\b(?! avec){_BENIGN_TAIL}|"
+        r"\bm?endormir pour (?:toujours|de bon)\b",
+        "fr",
+    ),
 )
 _CRISIS_PATTERNS: Tuple[Tuple[Pattern[str], Optional[str]], ...] = tuple(
     (re.compile(rx), lang) for rx, lang in _CRISIS_PHRASES

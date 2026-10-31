@@ -1,9 +1,10 @@
 """Loti's conversational runner (Member 2).
 
 Order of a chat turn:
-1. Input gates. The crisis check runs on every USER turn the LLM would see (each turn, then all of
-   them joined); the health signpost runs on the current message only. A hit sends a fixed reply
-   and the LLM is never called. The user's text is never rewritten.
+1. Input gates, on the user's words as written (never rewritten). The crisis reply goes out when the
+   current message hits, or the previous user turn joined with it; the health signpost when the
+   current message raises health. On a hit the LLM is never called. Earlier user turns that trip
+   the crisis check are redacted from the LLM payload, and the chat carries on.
 2. AI Collaboration Score and the XAI adaptation reason (Member 3's Δc).
 3. Loti's reply: the LLM if one is configured, else the deterministic offline reply. An LLM error
    is logged, counted and answered with the offline reply; nothing fails silently.
@@ -103,11 +104,13 @@ class AICoachAgent:
         session_history = list(request.chat_history)
         session_history.append(ChatMessage(role=ChatMessageRole.USER, content=request.message))
 
-        # 1. Input gates on every piece of user text the LLM would see, as written. On a hit
-        #    nothing reaches the LLM.
-        gated = self._gate_user_text(session_history[-HISTORY_WINDOW:], request.message)
+        # 1. Input gates on the user's words as written. On a hit nothing reaches the LLM. Older
+        #    turns that hit are redacted from the LLM payload instead, so one false hit cannot lock
+        #    the coach for the whole window.
+        gated = self._gate_user_text(request.chat_history, request.message)
         if gated is not None:
             return gated
+        llm_window = self._redact_crisis_turns(session_history[-HISTORY_WINDOW:])
 
         cluster_id = request.active_cluster_id if request.active_cluster_id is not None else 4
         delta_vec = request.delta_vector or {}
@@ -126,7 +129,7 @@ class AICoachAgent:
         # 3 + 4. Loti's reply, linted, with an explicit fallback
         safe_reply, safety_meta, source = self._generate_response(
             message=request.message,
-            history=session_history,
+            history=llm_window,
             cluster_id=cluster_id,
             delta_vector=delta_vec,
             collab_result=collab_result,
@@ -147,16 +150,21 @@ class AICoachAgent:
             reply_source=source,
         )
 
-    def _gate_user_text(self, window: List[ChatMessage], message: str) -> Optional[CoachingResponse]:
-        """Crisis check over the LLM window, then the health signpost on the current message only.
+    def _gate_user_text(self, history: List[ChatMessage], message: str) -> Optional[CoachingResponse]:
+        """Crisis reply when the CURRENT message hits, or the previous user turn joined with it.
 
-        The crisis check runs on each USER turn in the window, then on those turns joined, so a
-        phrase split across turns ("I want to" / "end it all") is caught. The current message is
-        checked first, so its language sets the reply. The health signpost looks at the current
-        message only: health mentioned earlier must not lock the chat into the doctor reply.
+        The join catches a phrase split across the last two turns ("I want to" / "end it all").
+        Older turns never trigger the reply; `_redact_crisis_turns` keeps them from the LLM. The
+        health signpost looks at the current message only, so health mentioned earlier does not
+        lock the chat into the doctor reply.
         """
-        user_turns = [m.content for m in window if m.role == ChatMessageRole.USER]
-        for text in list(reversed(user_turns)) + [" ".join(user_turns)]:
+        previous = next((m.content for m in reversed(history) if m.role == ChatMessageRole.USER), None)
+        candidates = [message]
+        # The join is for split phrases only. A previous turn that hit on its own already got the
+        # crisis reply; joining it again would lock the next, benign message too.
+        if previous and not self.guardrail.crisis_check(previous).hit:
+            candidates.append(f"{previous} {message}")
+        for text in candidates:
             crisis = self.guardrail.crisis_check(text)
             if crisis.hit:
                 return self._fixed_reply(crisis.reply or "", ReplySource.CRISIS)
@@ -164,6 +172,25 @@ class AICoachAgent:
         if signpost.hit:
             return self._fixed_reply(signpost.reply or "", ReplySource.HEALTH_SIGNPOST)
         return None
+
+    def _redact_crisis_turns(self, window: List[ChatMessage]) -> List[ChatMessage]:
+        """Drop earlier USER turns that trip the crisis check, alone or joined with the next USER turn.
+
+        The LLM never sees crisis text, and the chat goes on normally after a (possibly false) hit.
+        Loti's own turns are kept: they are fixed, pre-checked text.
+        """
+        user_idx = [i for i, m in enumerate(window) if m.role == ChatMessageRole.USER]
+        alone = {i: self.guardrail.crisis_check(window[i].content).hit for i in user_idx}
+        drop = {i for i in user_idx if alone[i]}
+        # A split phrase: neither turn hits alone, the two together do. Drop both.
+        for i, j in zip(user_idx, user_idx[1:]):
+            if not alone[i] and not alone[j]:
+                if self.guardrail.crisis_check(f"{window[i].content} {window[j].content}").hit:
+                    drop.update((i, j))
+        if drop:
+            self.reply_source_counts["redacted_history_turn"] += len(drop)
+            logger.info("coach redacted %d earlier user turn(s) from the LLM payload", len(drop))
+        return [m for k, m in enumerate(window) if k not in drop]
 
     def _fixed_reply(self, text: str, source: ReplySource) -> CoachingResponse:
         """A scripted reply from an input gate: no LLM, no chips, no scores."""
@@ -200,7 +227,7 @@ class AICoachAgent:
             delta_vector=delta_vector,
         )
         messages_payload = [{"role": "system", "content": system_prompt}]
-        for msg in history[-HISTORY_WINDOW:]:  # the same window the input gates checked
+        for msg in history[-HISTORY_WINDOW:]:  # the redacted window from handle_chat
             messages_payload.append({"role": msg.role.value, "content": msg.content})
 
         try:
