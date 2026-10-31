@@ -2,9 +2,10 @@
 
 Defines data contracts for:
 - State transitions and explainability vectors from Member 3
+- Cognitive dimensions and the five consumer pillars
 - Dynamic collaboration score calculations (5 dimensions)
 - Chat interactions and coaching responses
-- Safety guardrail metadata
+- Safety guardrail metadata, crisis and health gates
 """
 
 from __future__ import annotations
@@ -22,6 +23,26 @@ class CognitiveDimension(str, Enum):
     EXECUTIVE_FUNCTION = "executive_function"
     SPATIAL_ORIENTATION = "spatial_orientation"
     PROCESSING_SPEED = "processing_speed"
+    EPISODIC_MEMORY = "episodic_memory"
+
+
+class PillarId(str, Enum):
+    """The five consumer pillars (spec "Five pillars"; frontend/src/features/insights/pillars.ts)."""
+    FOCUS = "focus"
+    AGILITY = "agility"
+    IMPULSE = "impulse"
+    MEMORY = "memory"
+    VISUAL = "visual"
+
+
+# Consumer names, the only pillar wording Loti may show (U5). Mirrors PILLAR_LABELS in pillars.ts.
+PILLAR_LABELS: Dict[PillarId, str] = {
+    PillarId.FOCUS: "Focus & Strategy",
+    PillarId.AGILITY: "Mental Agility",
+    PillarId.IMPULSE: "Impulse Control",
+    PillarId.MEMORY: "Deep Memory",
+    PillarId.VISUAL: "Visual Radar",
+}
 
 
 class ArchetypeTier(str, Enum):
@@ -129,6 +150,25 @@ class SafetyMetadata(BaseModel):
     violations: List[SafetyViolation] = Field(default_factory=list)
 
 
+class GateResult(BaseModel):
+    """Result of a deterministic gate on user text (crisis check, health signpost).
+
+    Same shape as the frontend seam `crisisGate(text) => { hit, reply? }`: `reply` is set only on a hit.
+    """
+    hit: bool = False
+    reply: Optional[str] = None
+
+
+class ReplySource(str, Enum):
+    """Where a coach reply came from. Every fallback is explicit, never silent."""
+    LLM = "llm"
+    OFFLINE = "offline"                      # no LLM configured
+    OFFLINE_AFTER_LLM_ERROR = "offline_after_llm_error"
+    OFFLINE_AFTER_LINT = "offline_after_lint"  # LLM reply withheld: it tripped a banned term
+    CRISIS = "crisis"
+    HEALTH_SIGNPOST = "health_signpost"
+
+
 class ChatMessageRole(str, Enum):
     USER = "user"
     ASSISTANT = "assistant"
@@ -158,4 +198,5 @@ class CoachingResponse(BaseModel):
     suggested_actions: List[str] = Field(default_factory=list)
     collab_score_snapshot: Optional[CollaborationScoreResult] = None
     safety_metadata: SafetyMetadata
+    reply_source: ReplySource = ReplySource.OFFLINE
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

@@ -3,14 +3,14 @@
 Modules:
 - agent: Conversational AI Coach prompt runner with XAI injection.
 - collaboration_scorer: Dynamic AI Collaboration Scorer (0-100).
-- safety_guardrails: Non-clinical regex filters and growth-mindset guardrails.
+- safety_guardrails: Output lint against banned_terms.json, plus the crisis and health input gates.
 - xai_explainer: Member 3 prototype differential vector (Δc) decoder.
 - schemas: Pydantic v2 data models and contracts.
 """
 
 from ai_coach.agent import AICoachAgent
 from ai_coach.collaboration_scorer import CollaborationScorer
-from ai_coach.safety_guardrails import SafetyGuardrailEngine
+from ai_coach.safety_guardrails import SafetyGuardrailEngine, crisis_check, health_signpost
 from ai_coach.xai_explainer import XAIExplainer
 from ai_coach.schemas import (
     ArchetypeTier,
@@ -23,6 +23,9 @@ from ai_coach.schemas import (
     CollaborationScoreResult,
     DimensionScores,
     DimensionWeights,
+    GateResult,
+    PillarId,
+    ReplySource,
     SafetyMetadata,
     SafetyViolation,
     StateBusEvent,
@@ -33,6 +36,8 @@ __all__ = [
     "CollaborationScorer",
     "SafetyGuardrailEngine",
     "XAIExplainer",
+    "crisis_check",
+    "health_signpost",
     "ArchetypeTier",
     "ChatMessage",
     "ChatMessageRole",
@@ -43,6 +48,9 @@ __all__ = [
     "CollaborationScoreResult",
     "DimensionScores",
     "DimensionWeights",
+    "GateResult",
+    "PillarId",
+    "ReplySource",
     "SafetyMetadata",
     "SafetyViolation",
     "StateBusEvent",
