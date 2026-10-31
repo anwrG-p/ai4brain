@@ -23,6 +23,20 @@ const loadBaseline = () =>
     throw e
   }))
 
+/* How long the full baseline takes (the six default tasks in tasks/fixtures.json, at full length,
+   no ?fast). Timed parts use each exercise's fixed timing or its time limit, so this is a ceiling:
+     Logic Web            6 trials x 15 s limit                          =  90 s
+     Memory Gauntlet      10 trials x (500 ms stimulus + 2000 ms gap)    =  25 s
+     Color Clash          4 trials x 3 s limit                           =  12 s
+     Strategic Blueprint  60 s limit + ~10 s for the move prediction     =  70 s
+     Perceptual Radar     4 trials x (500 ms fixation + ~0.5 s flash
+                          and mask + ~5 s for the two answers)           =  24 s
+     Precision Archive    3 x 2 s study + 5 tests x 5 s limit            =  31 s
+   plus each exercise's own screens, ~13 s x 6 (reading the instruction, the 500 ms fixation, the
+   end card)                                                             =  78 s
+   Total 330 s = 5.5 min, rounded up: about 6 minutes. Recount when the baseline or its tasks change. */
+const MINUTES = 6
+
 /* Welcome: Loti says hello, one button starts the baseline, and, only with Google sign-in set up,
    one quiet link opens the login sheet. Nothing else (Landing page doc: "VERY SIMPLE UI early on";
    anti-slop rules 13 and 14). Motion (spec R8, "Loti welcomes you into the app"): an entrance, a
@@ -98,7 +112,7 @@ export default function WelcomePage() {
           <Reveal text="Hi, I'm Loti." from={0} motion={motion} />
         </h1>
         <p className="mt-1 text-lg text-ink">
-          <Reveal text="Want to see how your mind works today? It takes about 5 minutes." from={3} motion={motion} />
+          <Reveal text={`Want to see how your mind works today? It takes about ${MINUTES} minutes.`} from={3} motion={motion} />
         </p>
       </LotiSays>
       <div className={`flex flex-col items-center gap-2 ${a('anim-cta')}`}>

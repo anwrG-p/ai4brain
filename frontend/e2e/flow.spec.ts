@@ -8,8 +8,8 @@ import path from 'node:path'
 
    Test hook: `?fast=1` (see src/features/flow/baseline.ts) shortens each exercise: fewer trials and
    short time limits. It needs mock tasks and a test build: playwright.config.ts builds with
-   VITE_E2E=1 into dist/e2e; a normal build ignores the query. The exercises still run for real and
-   record real events. Logic Web, Memory Gauntlet, Strategic Blueprint and Color Clash finish on
+   VITE_E2E=1 into dist-e2e; a normal build ignores the query. The exercises still run for real and
+   record real events. Logic Web, Memory Gauntlet, Color Clash and Strategic Blueprint finish on
    their own once started (Tower needs its move prediction first); Perceptual Radar and Precision
    Archive wait for answers, which this spec gives with the keyboard. Welcome passes its query
    string on to /baseline.
@@ -78,13 +78,13 @@ async function runBaseline(page: Page, info: TestInfo, theme: string) {
   await begin(page, 2, 'Memory Gauntlet')
   await finish(page)
 
-  await begin(page, 3, 'Strategic Blueprint')
+  await begin(page, 3, 'Color Clash')
+  await finish(page)
+
+  await begin(page, 4, 'Strategic Blueprint')
   const tower = page.getByRole('region', { name: 'Strategic Blueprint' })
   await tower.getByRole('spinbutton').fill('5')
   await tower.getByRole('button', { name: 'Start' }).click()
-  await finish(page)
-
-  await begin(page, 4, 'Color Clash')
   await finish(page)
 
   await begin(page, 5, 'Perceptual Radar')

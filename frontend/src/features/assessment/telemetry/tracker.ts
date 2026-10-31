@@ -388,6 +388,17 @@ export class Tracker {
     this.notify()
   }
 
+  // An abandoned attempt (the baseline's pause, R3): drops that task's unsent events here and in
+  // storage, so they never leave the device. Returns how many were dropped.
+  // ponytail: a batch already in flight is not recalled (the baseline holds everything until consent).
+  dropTask(taskId: string): number {
+    const before = this.buffer.length
+    this.buffer = this.buffer.filter((e) => e.task_id !== taskId)
+    const dropped = before - this.buffer.length
+    if (dropped) this.changed()
+    return dropped
+  }
+
   // Privacy purge: drops every pending event here and in storage. Returns how many were dropped.
   clear(): number {
     const cleared = this.buffer.length

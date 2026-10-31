@@ -25,7 +25,7 @@ describe('Welcome (/): Loti, one button, one link', () => {
   it('shows Loti with one bubble', async () => {
     const main = await renderWelcome()
     expect(within(main).getByRole('img', { name: /Loti/ })).toBeInTheDocument()
-    expect(within(main).getByText('Want to see how your mind works today? It takes about 5 minutes.')).toBeInTheDocument()
+    expect(within(main).getByText('Want to see how your mind works today? It takes about 6 minutes.')).toBeInTheDocument()
   })
 
   const controlsIn = (main: HTMLElement) => Array.from(main.querySelectorAll('a, button'))
@@ -90,7 +90,7 @@ describe('Welcome (/): Loti, one button, one link', () => {
   // Motion pass (ticket 07b, spec R8).
   it('reveals the bubble word by word on screen, with the full text in the DOM for screen readers from the start', async () => {
     const main = await renderWelcome()
-    const line = 'Want to see how your mind works today? It takes about 5 minutes.'
+    const line = 'Want to see how your mind works today? It takes about 6 minutes.'
     expect(screen.getByRole('heading', { level: 1, name: "Hi, I'm Loti." })).toBeInTheDocument()
     expect(within(main).getByText(line)).toHaveClass('sr-only')
     const shown = main.querySelectorAll('[aria-hidden="true"] .anim-word')
@@ -142,7 +142,7 @@ describe('Welcome (/): Loti, one button, one link', () => {
     finePointer(false)
     const main = await renderWelcome()
     const x0 = eyeX(main)
-    act(() => void fireEvent.mouseMove(window, { clientX: 2000, clientY: 0 }))
+    act(() => void fireEvent.mouseMove(document.body, { clientX: 2000, clientY: 0 }))
     expect(eyeX(main)).toBeGreaterThan(x0)
   })
 
@@ -150,14 +150,14 @@ describe('Welcome (/): Loti, one button, one link', () => {
     finePointer(true)
     const main = await renderWelcome()
     const x0 = eyeX(main)
-    act(() => void fireEvent.mouseMove(window, { clientX: 2000, clientY: 0 }))
+    act(() => void fireEvent.mouseMove(document.body, { clientX: 2000, clientY: 0 }))
     expect(eyeX(main)).toBe(x0)
   })
 
   it("touch (no fine pointer): Loti's eyes stay still", async () => {
     const main = await renderWelcome() // jsdom has no matchMedia: treated as no fine pointer
     const x0 = eyeX(main)
-    act(() => void fireEvent.mouseMove(window, { clientX: 2000, clientY: 0 }))
+    act(() => void fireEvent.mouseMove(document.body, { clientX: 2000, clientY: 0 }))
     expect(eyeX(main)).toBe(x0)
   })
 })

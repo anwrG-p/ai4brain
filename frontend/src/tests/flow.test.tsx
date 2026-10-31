@@ -17,8 +17,8 @@ const META: Partial<Record<SchemaType, TelemetryEvent['trial_meta']>> = {
   mst: { kind: 'lure', response: 'similar' },
 }
 
-// The stub opens on its "instruction" (Begin); Begin starts its "trials" under the motion lock
-// ([data-timed-trial], as the real frame does) and records one event. `stub` steers a test's run.
+// The stub opens on its "instruction" (Begin); Begin starts its block ([data-block-running], as the
+// real frame marks it) and records one event. `stub` steers a test's run.
 const stub = { failing: null as SchemaType | null, wrongOnFirstAttempt: false, tasks: [] as string[] }
 
 vi.mock('../features/assessment/ExerciseHost', () => ({
@@ -49,7 +49,7 @@ vi.mock('../features/assessment/ExerciseHost', () => ({
       tracker.push(r.finish({ correct: !(stub.wrongOnFirstAttempt && attempt === 0), meta: META[schemaType] }))
     }
     return running ? (
-      <div data-timed-trial="true">
+      <div data-block-running="true">
         <button type="button" onClick={onDone}>
           Finish {schemaType}
         </button>
@@ -90,7 +90,7 @@ const go = (path: string) => {
   render(<App />)
 }
 
-const ALL: readonly SchemaType[] = ['relational', 'n_back', 'tower', 'stroop', 'ufov', 'mst']
+const ALL: readonly SchemaType[] = ['relational', 'n_back', 'stroop', 'tower', 'ufov', 'mst']
 
 async function playThrough(schemas: readonly SchemaType[] = ALL) {
   for (const s of schemas) {
@@ -133,6 +133,8 @@ describe('/baseline', () => {
     act(() => void document.dispatchEvent(new Event('visibilitychange')))
     hidden.mockRestore()
   }
+  // A real key lands on an element and bubbles to window (window listeners may read e.target).
+  const escape = () => fireEvent.keyDown(document.body, { key: 'Escape' })
 
   it('a hidden tab pauses a running exercise; Resume starts it again', async () => {
     go('/baseline')
@@ -147,25 +149,28 @@ describe('/baseline', () => {
   it('Escape or a hidden tab on an instruction screen does nothing: no pause, no new task', async () => {
     go('/baseline')
     await screen.findByRole('button', { name: 'Begin relational' })
-    fireEvent.keyDown(window, { key: 'Escape' })
+    escape()
     hideTab()
     expect(screen.queryByRole('heading', { name: 'Paused' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Begin relational' })).toBeInTheDocument()
     expect(stub.tasks).toEqual(['stub-relational-0'])
     // Once the trials run, Escape pauses.
     fireEvent.click(screen.getByRole('button', { name: 'Begin relational' }))
-    fireEvent.keyDown(window, { key: 'Escape' })
+    escape()
     expect(screen.getByRole('heading', { name: 'Paused' })).toBeInTheDocument()
   })
 
-  it('a paused attempt is dropped: its events are not scored', async () => {
+  it('a paused attempt is dropped: its events are neither scored nor kept to send', async () => {
     stub.wrongOnFirstAttempt = true // attempt 0 answers wrong, the restart answers right
     go('/baseline')
     fireEvent.click(await screen.findByRole('button', { name: 'Begin relational' }))
-    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(tracker.getStatus().queuedCount).toBe(1)
+    escape()
+    expect(tracker.getStatus().queuedCount).toBe(0)
     fireEvent.click(screen.getByRole('button', { name: 'Resume' }))
     await playThrough()
     expect(useSessionStore.getState().sessions[0]!.inputs.FluidMatrices).toMatchObject({ score: 100 })
+    expect(tracker.getStatus().queuedCount).toBe(6) // one per finished exercise, none from the pause
   })
 
   it('an exercise that cannot be shown is skipped, and Results counts only the finished ones', async () => {
