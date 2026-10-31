@@ -129,3 +129,5 @@ Graphics (≥ 3:1):
 Text: Tower hint `.text-danger` on canvas 5.85 light, 7.78 dark. Ink on a lit N-back cell alone is still under 3:1 (3.12 light, 2.15 dark), unchanged in kind: the centre symbol keeps its unlit-colour halo. Thinnest margin is still `--dim-3` 4.58 light.
 
 Note for ticket 06: dark `--color-danger` `#F28B9E` reads rose rather than pure red. It passes, but Stroop "red" may want its own ink when exercises are re-skinned.
+
+**2026-10-31 — Review fix round 1.** The Quicksand guard is now an allow-list that fails safe. `.font-display` and h1–h6 are Inter by default. Quicksand applies only with `text-xl`…`text-6xl`, or their `sm:`/`md:`/`lg:`/`xl:` variants at that breakpoint. The old deny-list leaked on colour variants (`hover:text-brand`) and on sizeless spans. Edge scan over 12 routes at 375 and 1280 px: 0 Quicksand elements under 20 px. Never put coral text on a brand-subtle chip: `--color-accent-strong` on `--color-brand-subtle` is 4.42:1 (light). `tokens.test.ts` now fails on `text-brand-vivid` or `text|stroke|fill-accent` in src.

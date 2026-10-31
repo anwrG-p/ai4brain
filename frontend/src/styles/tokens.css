@@ -57,7 +57,9 @@
      --color-brand is the spec's text-safe sky #1E6FA8, used as the fill too: white on the spec
      fill #2B8FD6 is only 3.50:1. #2B8FD6 survives as --color-brand-vivid for graphics (>= 3:1).
      --color-accent (coral) is a fill under --color-accent-ink; coral text and marks on a surface
-     use --color-accent-strong. --color-reward is the coral milestone fill. */
+     use --color-accent-strong. --color-reward is the coral milestone fill.
+     Never put coral text on a brand-subtle chip: accent-strong on brand-subtle is 4.42:1 (light).
+     Never use brand-vivid or the coral fill as text (tokens.test.ts scans src for it). */
   --color-canvas: #F3F9FD;
   --color-surface: #FFFFFF;
   --color-surface-raised: #E8F3FB;
@@ -400,7 +402,7 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     transition: background-color var(--duration-base) ease, color var(--duration-base) ease;
   }
 
-  /* Headings default to Inter; Quicksand only from 20 px (text-xl) up, per the spec's Typography. */
+  /* Headings default to Inter; the font-display allow-list (unlayered, below) sets Quicksand from 20 px. */
   h1,
   h2,
   h3,
@@ -411,17 +413,9 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     font-weight: 600;
     letter-spacing: normal;
   }
-
-  :is(h1, h2, h3, h4, h5, h6):is(.text-xl, .text-2xl, .text-3xl, .text-4xl, .text-5xl, .text-6xl) {
-    font-family: var(--font-display);
-  }
 }
 
 @layer components {
-  .font-display {
-    font-family: var(--font-display);
-  }
-
   /* Numbers: Inter with tabular numerals (class name kept for its call sites) */
   .font-mono-tabular {
     font-family: var(--font-sans);
@@ -633,12 +627,42 @@ html[data-theme="dark"][data-emotion="fatigued"] {
   transition: none !important;
 }
 
-/* Quicksand is for headings of 20 px and up: a font-display element set at text-lg or smaller
-   falls back to Inter. Unlayered so it beats the font-display utility.
-   ponytail: class-name match; any responsive size (sm:text-2xl) opts the element out entirely. */
-.font-display:is(.text-xs, .text-sm, .text-base, .text-lg):not([class*=":text-"]) {
+/* font-display allow-list: start */
+/* Quicksand only for headings and .font-display text of 20 px (text-xl) and up; everything else,
+   including a sizeless .font-display, is Inter. An allow-list, so an unknown class fails safe to Inter.
+   Unlayered so it beats the Tailwind font-display utility. Responsive sizes switch at their breakpoint. */
+.font-display {
   font-family: var(--font-sans);
 }
+
+:is(h1, h2, h3, h4, h5, h6, .font-display):is(.text-xl, .text-2xl, .text-3xl, .text-4xl, .text-5xl, .text-6xl) {
+  font-family: var(--font-display);
+}
+
+@media (width >= 40rem) {
+  :is(h1, h2, h3, h4, h5, h6, .font-display):is(.sm\:text-xl, .sm\:text-2xl, .sm\:text-3xl, .sm\:text-4xl, .sm\:text-5xl, .sm\:text-6xl) {
+    font-family: var(--font-display);
+  }
+}
+
+@media (width >= 48rem) {
+  :is(h1, h2, h3, h4, h5, h6, .font-display):is(.md\:text-xl, .md\:text-2xl, .md\:text-3xl, .md\:text-4xl, .md\:text-5xl, .md\:text-6xl) {
+    font-family: var(--font-display);
+  }
+}
+
+@media (width >= 64rem) {
+  :is(h1, h2, h3, h4, h5, h6, .font-display):is(.lg\:text-xl, .lg\:text-2xl, .lg\:text-3xl, .lg\:text-4xl, .lg\:text-5xl, .lg\:text-6xl) {
+    font-family: var(--font-display);
+  }
+}
+
+@media (width >= 80rem) {
+  :is(h1, h2, h3, h4, h5, h6, .font-display):is(.xl\:text-xl, .xl\:text-2xl, .xl\:text-3xl, .xl\:text-4xl, .xl\:text-5xl, .xl\:text-6xl) {
+    font-family: var(--font-display);
+  }
+}
+/* font-display allow-list: end */
 
 /* Status and brand text (WCAG 2.1 AA >= 4.5:1 on canvas, surface, surface-raised and the
    matching -subtle fill, both themes; ratios in token-metadata.ts). */

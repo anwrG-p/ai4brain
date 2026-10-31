@@ -152,20 +152,38 @@ describe('tokens.css shape and elevation', () => {
   })
 
   it('has no backdrop-blur utility anywhere in src', () => {
-    const hits: string[] = []
-    const walk = (dir: string) => {
-      for (const e of readdirSync(dir, { withFileTypes: true })) {
-        const full = path.join(dir, e.name)
-        if (e.isDirectory()) walk(full)
-        else if (/\.(tsx?|css)$/.test(e.name) && !/\.test\.tsx?$/.test(e.name)) {
-          if (/backdrop-blur|backdrop-filter/.test(readFileSync(full, 'utf8'))) hits.push(full)
-        }
-      }
+    expect(srcHits(/backdrop-blur|backdrop-filter/)).toEqual([])
+  })
+
+  // brand-vivid (3.50:1) and the coral fill (2.48:1 on white) fail as text; coral text and
+  // milestone marks use --color-accent-strong. Fills under their ink and bg-* are fine.
+  it('never uses brand-vivid as text or the coral fill as text, stroke or fill', () => {
+    const banned = /\btext-brand-vivid\b|\b(?:text|stroke|fill)-accent\b(?!-)/
+    for (const bad of ['hover:text-accent', 'stroke-accent', 'fill-accent/50', 'text-brand-vivid']) {
+      expect(bad).toMatch(banned)
     }
-    walk(path.resolve(__dirname, '..'))
-    expect(hits).toEqual([])
+    for (const ok of ['text-accent-strong', 'text-accent-ink', 'bg-accent', 'stroke-brand-vivid']) {
+      expect(ok).not.toMatch(banned)
+    }
+    expect(srcHits(banned)).toEqual([])
   })
 })
+
+function srcHits(pattern: RegExp): string[] {
+  const hits: string[] = []
+  const walk = (dir: string) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, e.name)
+      if (e.isDirectory()) walk(full)
+      else if (/\.(tsx?|css)$/.test(e.name) && !/\.test\.tsx?$/.test(e.name)) {
+        const m = readFileSync(full, 'utf8').match(pattern)
+        if (m) hits.push(`${path.relative(path.resolve(__dirname, '..'), full)}: ${m[0]}`)
+      }
+    }
+  }
+  walk(path.resolve(__dirname, '..'))
+  return hits
+}
 
 describe('tokens.css fonts', () => {
   it('sets Quicksand for display and Inter for UI in @theme and :root', () => {
@@ -187,6 +205,66 @@ describe('tokens.css fonts', () => {
     expect(deps).toContain('@fontsource/quicksand')
     expect(deps).toContain('@fontsource/inter')
     expect(deps.filter((d) => /lexend|delius|fredoka/.test(d))).toEqual([])
+  })
+
+  // Allow-list: .font-display is Inter unless the element carries a size of 20 px or more.
+  // jsdom applies the unlayered rules (its cascade skips non-"screen" @media blocks, so the
+  // responsive sizes are asserted as text below).
+  describe('Quicksand only from 20 px (fails safe)', () => {
+    const start = tokensCss.indexOf('/* font-display allow-list: start */')
+    const end = tokensCss.indexOf('/* font-display allow-list: end */')
+    // The base-layer heading default (Inter) comes first, as in the real cascade (layers lose to unlayered).
+    const headingBase = /^ {2}h1,\n {2}h2,\n[\s\S]*?\}/m.exec(tokensCss)?.[0] ?? ''
+    const rules = headingBase + '\n' + tokensCss.slice(start, end)
+
+    function fontOf(tag: string, className: string): string {
+      const style = document.createElement('style')
+      style.textContent = rules
+      document.head.appendChild(style)
+      const el = document.createElement(tag)
+      el.className = className
+      document.body.appendChild(el)
+      const font = getComputedStyle(el).fontFamily
+      el.remove()
+      style.remove()
+      return font
+    }
+
+    it('has the allow-list block and no class-substring deny-list', () => {
+      expect(start).toBeGreaterThan(0)
+      expect(end).toBeGreaterThan(start)
+      expect(headingBase).toMatch(/font-family:\s*var\(--font-sans\)/)
+      expect(tokensCss).not.toMatch(/:not\(\[class\*=/)
+    })
+
+    it.each([
+      ['span', 'font-display text-sm hover:text-brand'],
+      ['span', 'font-display'],
+      ['span', 'font-display text-lg'],
+      ['p', 'font-display text-lg sm:text-2xl'],
+      ['h3', 'font-display text-base font-bold'],
+      ['h1', ''],
+      ['h2', 'text-lg'],
+    ])('<%s class="%s"> is Inter', (tag, cls) => {
+      expect(fontOf(tag, cls)).toBe('var(--font-sans)')
+    })
+
+    it.each([
+      ['h1', 'font-display text-3xl sm:text-4xl'],
+      ['span', 'font-display text-xl'],
+      ['h2', 'text-2xl'],
+      ['h3', 'text-xl hover:text-brand'],
+    ])('<%s class="%s"> is Quicksand', (tag, cls) => {
+      expect(fontOf(tag, cls)).toBe('var(--font-display)')
+    })
+
+    it('switches responsive sizes of 20 px and up to Quicksand at their breakpoint only', () => {
+      for (const [bp, width] of [['sm', '40rem'], ['md', '48rem'], ['lg', '64rem']] as const) {
+        const media = rules.slice(rules.indexOf(`@media (width >= ${width})`))
+        expect(media, `${bp} block`).toMatch(new RegExp(`\\.${bp}\\\\:text-xl`))
+        expect(media).toMatch(new RegExp(`\\.${bp}\\\\:text-4xl`))
+      }
+    })
   })
 
   it('sets numbers in Inter with tabular numerals', () => {
