@@ -78,6 +78,14 @@ describe('pillarScores', () => {
     expect(one).toBeGreaterThan(two)
   })
 
+  it('keeps the band narrow for Deep Memory on a full block: unsourced inputs do not widen it', () => {
+    // oMST: 44 lures + 20 foils. PAL has no source by design, so coverage stays 0.55 but the band
+    // is only the LDI's own: 1.96 * 50 / 8.
+    const memory = pillarScores({ MST_LDI: { score: 70, trials: 64 } }).memory
+    expect(memory.coverage).toBeCloseTo(0.55, 12)
+    expect(memory.uncertainty).toBeCloseTo(12.25, 6)
+  })
+
   it('widens the uncertainty as trials drop, and caps it at 50', () => {
     const at = (trials: number) => pillarScores({ MST_LDI: { score: 70, trials } }).memory.uncertainty
     expect(at(10)).toBeGreaterThan(at(40))

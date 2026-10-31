@@ -51,10 +51,14 @@ export function ldi(similarLures: number, nLures: number, similarNew: number, nN
   return similarLures / nLures - similarNew / nNew
 }
 
-// Scale anchors (documented in pillars.ts).
-const D_PRIME_MAX = 4
-const SWITCH_COST_MAX = 0.5
-const STROOP_COST_MAX_MS = 300
+// Scale anchors and gates (listed in pillars.ts). ASSUMPTIONS to tune against Member 3's data,
+// not evidence, except the UFOV range (the payload's duration grid) and Stroop chance (4 inks).
+const D_PRIME_MAX = 4 // d' 0 -> 0, 4 -> 100
+const D_PRIME_GATE = 1 // the switch cost counts fully from d' 1
+const SWITCH_COST_MAX = 0.5 // switch cost 0 -> 100, 0.5 -> 0
+const STROOP_COST_MAX_MS = 300 // RT cost 0 ms -> 100, 300 ms -> 0
+const STROOP_CHANCE = 0.25 // red, green, blue, yellow (README payload contract)
+const PLAN_SHARE = 0.8 // OTS_Planning = 0.8 x solved in minimum moves + 0.2 x planning speed
 const PLAN_TIME_MAX_MS = 30_000 // half of the TOL-F 60 s limit
 const UFOV_MIN_MS = 17 // one 60 Hz frame
 const UFOV_MAX_MS = 500 // the top of the UFOV duration grid
@@ -78,31 +82,33 @@ export function taskScores(events: readonly TelemetryEvent[]): TaskScores {
   const get = (s: SchemaType) => by.get(s) ?? []
   const out: TaskScores = {}
 
-  // n-back. Only the rule stream's answer follows trial_type (target <-> respond), so d' uses it.
-  // ponytail: 'parity' rule events have no stream to score and are skipped for d'.
+  // n-back. d' on the rule stream, switch trials left out (they feed the switch cost).
   const nb = get('n_back')
-  const ruleStream = nb.filter((e) => e.trial_meta?.stream === e.trial_meta?.rule)
-  const signal = ruleStream.filter((e) => e.trial_meta?.trial_type === 'target')
-  const noise = ruleStream.filter((e) => e.trial_meta?.trial_type !== 'target')
-  if (signal.length && noise.length) {
-    const d = dPrime(signal.filter(ok).length, signal.length, noise.filter((e) => !ok(e)).length, noise.length)
-    out.OSPAN = input(d / D_PRIME_MAX, ruleStream.length)
-  }
-  const switches = nb.filter((e) => e.trial_meta?.trial_type === 'switch')
-  const rest = nb.filter((e) => e.trial_meta?.trial_type !== 'switch')
-  if (switches.length && rest.length) {
-    const cost = share(rest, ok) - share(switches, ok)
-    out.DCCS_SwitchCost = input(1 - cost / SWITCH_COST_MAX, nb.length)
+  const d = nbackDPrime(nb)
+  if (d !== null) out.OSPAN = input(d / D_PRIME_MAX, ruleStream(nb).filter((e) => !isSwitch(e)).length)
+  // Switch cost: switch trials against the rule stream's non-switch noise trials (both withhold a
+  // response, so response bias cancels), gated by d' so a non-responder's perfect withholding
+  // scores 0, not 100.
+  const rs = ruleStream(nb)
+  const switches = rs.filter(isSwitch)
+  const quiet = rs.filter((e) => !isSwitch(e) && !isTarget(e))
+  if (d !== null && switches.length && quiet.length) {
+    const cost = share(quiet, ok) - share(switches, ok)
+    out.DCCS_SwitchCost = input((1 - cost / SWITCH_COST_MAX) * clamp01(d / D_PRIME_GATE), switches.length + quiet.length)
   }
 
-  // Stroop: RT cost on correct trials; incongruent accuracy stands in for SSRT.
+  // Stroop: RT cost on correct trials, gated by accuracy above chance so random or absent
+  // pressing (no RT difference) scores 0, not 100. Incongruent accuracy stands in for SSRT.
   const st = get('stroop')
   const inc = st.filter((e) => e.trial_meta?.congruent === false)
   const incOk = inc.filter(ok)
   const conOk = st.filter((e) => e.trial_meta?.congruent === true && ok(e))
+  const gate = st.length ? stroopGate(st) : 0
   if (incOk.length && conOk.length) {
     const cost = mean(incOk.map((e) => e.response_time_ms)) - mean(conOk.map((e) => e.response_time_ms))
-    out.ANT_Conflict = input(1 - cost / STROOP_COST_MAX_MS, incOk.length + conOk.length)
+    out.ANT_Conflict = input((1 - cost / STROOP_COST_MAX_MS) * gate, incOk.length + conOk.length)
+  } else if (st.length && gate === 0) {
+    out.ANT_Conflict = input(0, st.length) // no cost to measure, and nothing above chance either
   }
   if (inc.length) out.SST_SSRT = { ...input(share(inc, ok), inc.length), proxy: true }
 
@@ -116,7 +122,7 @@ export function taskScores(events: readonly TelemetryEvent[]): TaskScores {
     const speed = perfect.length
       ? mean(perfect.map((e) => clamp01(1 - (num(e, 'planning_time_ms') ?? PLAN_TIME_MAX_MS) / PLAN_TIME_MAX_MS)))
       : 0
-    out.OTS_Planning = input(0.8 * (perfect.length / tw.length) + 0.2 * speed, tw.length)
+    out.OTS_Planning = input(PLAN_SHARE * (perfect.length / tw.length) + (1 - PLAN_SHARE) * speed, tw.length)
   }
 
   // Matrix accuracy and hop-weighted relational accuracy, averaged.
@@ -148,18 +154,42 @@ export function taskScores(events: readonly TelemetryEvent[]): TaskScores {
   return out
 }
 
+const ruleStream = (nb: TelemetryEvent[]) => nb.filter((e) => e.trial_meta?.stream === e.trial_meta?.rule)
+const isSwitch = (e: TelemetryEvent) => e.trial_meta?.trial_type === 'switch'
+const isTarget = (e: TelemetryEvent) => e.trial_meta?.trial_type === 'target'
+
+/** d' on the n-back rule stream (only its answer follows trial_type: target <-> respond), switch
+    trials left out, floored at 0 when the raw hit rate is not above the raw false-alarm rate (the
+    log-linear correction alone would give a non-responder a small positive d'). Null without both
+    signal and noise trials.
+    ponytail: 'parity' rule events have no stream to score and are skipped. */
+function nbackDPrime(nb: TelemetryEvent[]): number | null {
+  const scored = ruleStream(nb).filter((e) => !isSwitch(e))
+  const signal = scored.filter(isTarget)
+  const noise = scored.filter((e) => !isTarget(e))
+  if (!signal.length || !noise.length) return null
+  const hits = signal.filter(ok).length
+  const fas = noise.filter((e) => !ok(e)).length
+  if (hits / signal.length <= fas / noise.length) return 0
+  return Math.max(0, dPrime(hits, signal.length, fas, noise.length))
+}
+
+/** 0 at chance accuracy (1 in 4 inks) or below, 1 at perfect accuracy. */
+const stroopGate = (st: TelemetryEvent[]) => clamp01((share(st, ok) - STROOP_CHANCE) / (1 - STROOP_CHANCE))
+
 /** Accuracy on the trial right after an error, within each task. A trial (n-back logs one event
-    per stream) is wrong when any of its events is. */
+    per stream) is wrong when any of its events is. Tasks played at chance or below (n-back d' 0,
+    Stroop accuracy <= 1 in 4) are left out: a non-responder's next n-back trial is "correct" by
+    withholding, which is not recovery. */
 function errorRecovery(events: readonly TelemetryEvent[]): InputScore | null {
-  const tasks = new Map<string, Map<number, boolean>>()
-  for (const e of events) {
-    const trials = tasks.get(e.task_id) ?? new Map<number, boolean>()
-    trials.set(e.trial_index, (trials.get(e.trial_index) ?? true) && ok(e))
-    tasks.set(e.task_id, trials)
-  }
+  const byTask = new Map<string, TelemetryEvent[]>()
+  for (const e of events) byTask.set(e.task_id, [...(byTask.get(e.task_id) ?? []), e])
   let after = 0
   let recovered = 0
-  for (const trials of tasks.values()) {
+  for (const taskEvents of byTask.values()) {
+    if (atChance(taskEvents)) continue
+    const trials = new Map<number, boolean>()
+    for (const e of taskEvents) trials.set(e.trial_index, (trials.get(e.trial_index) ?? true) && ok(e))
     const seq = [...trials.entries()].sort((x, y) => x[0] - y[0]).map(([, correct]) => correct)
     for (let k = 1; k < seq.length; k++) {
       if (seq[k - 1]) continue
@@ -168,4 +198,12 @@ function errorRecovery(events: readonly TelemetryEvent[]): InputScore | null {
     }
   }
   return after ? input(recovered / after, after) : null
+}
+
+function atChance(taskEvents: TelemetryEvent[]): boolean {
+  const first = taskEvents[0]
+  const schema = first ? schemaOf(first) : null
+  if (schema === 'n_back') return nbackDPrime(taskEvents) === 0
+  if (schema === 'stroop') return stroopGate(taskEvents) === 0
+  return false
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Dimension, TelemetryEvent, TrialMeta } from '../assessment/telemetry/types'
+import { pillarScores } from './pillars'
 import { dPrime, ldi, probit, schemaOf, taskScores } from './taskScores'
 
 let seq = 0
@@ -83,13 +84,40 @@ describe('taskScores', () => {
     expect(ospan?.score).toBeCloseTo((100 * 2.757501) / 4, 3)
   })
 
-  it('scores the n-back switch cost as an accuracy delta', () => {
+  it("scores the n-back switch cost against the rule stream's noise trials, counting trials", () => {
+    const rule = 'symbol'
+    const nb = (trial_type: string, ok: boolean, stream = rule) => ev({ trial_type, rule, stream }, { ok })
     const events = [
-      ...repeat(4, (k) => ev({ trial_type: 'switch', rule: 'symbol', stream: 'symbol' }, { ok: k !== 0 })),
-      ...repeat(8, () => ev({ trial_type: 'standard', rule: 'symbol', stream: 'symbol' })),
+      ...repeat(10, (k) => nb('target', k < 9)),
+      ...repeat(30, (k) => nb(k % 2 ? 'standard' : 'lure_plus', k !== 0)),
+      ...repeat(4, (k) => nb('switch', k !== 0)),
+      // The other stream is ignored, even when it is wrong.
+      ...repeat(20, () => nb('standard', false, 'position')),
     ]
-    // cost = 1 - 0.75 = 0.25; 0 -> 100, 0.5 -> 0
-    expect(taskScores(events).DCCS_SwitchCost).toEqual({ score: 50, trials: 12 })
+    // cost = 29/30 - 3/4; 0 -> 100, 0.5 -> 0; d' > 1 so the engagement gate is open
+    const s = taskScores(events).DCCS_SwitchCost
+    expect(s?.score).toBeCloseTo(100 * (1 - (29 / 30 - 0.75) / 0.5), 6)
+    expect(s?.trials).toBe(34)
+  })
+
+  it("leaves switch trials out of d'", () => {
+    const rule = 'position'
+    const base = [
+      ...repeat(10, (k) => ev({ trial_type: 'target', rule, stream: rule }, { ok: k < 9 })),
+      ...repeat(30, (k) => ev({ trial_type: 'standard', rule, stream: rule }, { ok: k !== 0 })),
+    ]
+    const withSwitches = [...base, ...repeat(6, () => ev({ trial_type: 'switch', rule, stream: rule }, { ok: false }))]
+    expect(taskScores(withSwitches).OSPAN).toEqual(taskScores(base).OSPAN)
+  })
+
+  it("floors d' at 0 when the hit rate is not above the false-alarm rate", () => {
+    const rule = 'position'
+    // A non-responder: misses every target, "correct" on every noise trial.
+    const silent = [
+      ...repeat(10, () => ev({ trial_type: 'target', rule, stream: rule }, { ok: false })),
+      ...repeat(30, () => ev({ trial_type: 'standard', rule, stream: rule })),
+    ]
+    expect(taskScores(silent).OSPAN?.score).toBe(0)
   })
 
   it('scores the Stroop RT cost on correct trials only, and incongruent accuracy as a proxy', () => {
@@ -102,8 +130,9 @@ describe('taskScores', () => {
       ev({ congruent: false }, { dim, rt: 2000, ok: false }),
     ]
     const s = taskScores(events)
-    // cost = 700 - 550 = 150 ms; 0 ms -> 100, 300 ms -> 0
-    expect(s.ANT_Conflict).toEqual({ score: 50, trials: 4 })
+    // cost = 700 - 550 = 150 ms; 0 ms -> 100, 300 ms -> 0; times the accuracy gate (4/5 - 0.25) / 0.75
+    expect(s.ANT_Conflict?.score).toBeCloseTo(50 * (0.8 - 0.25) / 0.75, 6)
+    expect(s.ANT_Conflict?.trials).toBe(4)
     expect(s.SST_SSRT?.score).toBeCloseTo(200 / 3, 6)
     expect(s.SST_SSRT).toMatchObject({ trials: 3, proxy: true })
   })
@@ -174,5 +203,51 @@ describe('taskScores', () => {
     const s = taskScores(events)
     // After errors: r1 ok, r3 wrong, r4 ok, n2 ok -> 3 / 4
     expect(s.ErrorRecovery).toEqual({ score: 75, trials: 4 })
+  })
+})
+
+describe('Mental Agility does not reward doing nothing', () => {
+  // One task per exercise, trials in order, so ErrorRecovery sees real sequences.
+  function session(o: {
+    nback: (kind: 'target' | 'noise' | 'switch', j: number) => boolean // j counts within the kind
+    stroop: (congruent: boolean, k: number) => { ok: boolean; rt: number }
+  }) {
+    const rule = 'position'
+    const kinds = repeat(48, (k) => (k % 4 === 2 ? 'target' : k % 8 === 5 ? 'switch' : 'noise') as 'target' | 'noise' | 'switch')
+    const seen = { target: 0, noise: 0, switch: 0 }
+    const nb = kinds.map((kind, trial) =>
+      ev({ trial_type: kind === 'noise' ? 'standard' : kind, rule, stream: rule }, { ok: o.nback(kind, seen[kind]++), trial, task: 'nb' }),
+    )
+    const st = repeat(40, (trial) => {
+      const congruent = trial % 2 === 0
+      const r = o.stroop(congruent, trial)
+      return ev({ congruent }, { dim: 'executive_function', ok: r.ok, rt: r.rt, trial, task: 'st' })
+    })
+    return pillarScores(taskScores([...nb, ...st])).agility
+  }
+
+  it('gives a non-responder a low score', () => {
+    const agility = session({
+      nback: (kind) => kind !== 'target', // never presses
+      stroop: () => ({ ok: false, rt: 3000 }), // every trial times out
+    })
+    expect(agility.score ?? 0).toBeLessThan(10)
+  })
+
+  it('gives a random presser a low score', () => {
+    const agility = session({
+      nback: (_kind, j) => j % 2 === 0, // presses on every other trial of each kind: hit rate = FA rate
+      stroop: (_c, k) => ({ ok: k % 4 === 0, rt: 450 }), // 1 in 4 by chance, same speed both ways
+    })
+    expect(agility.score ?? 0).toBeLessThan(10)
+  })
+
+  it('gives an engaged user with a realistic effect a mid-range score', () => {
+    const agility = session({
+      nback: (kind, j) => (kind === 'switch' ? j % 3 !== 0 : j % 13 !== 12),
+      stroop: (congruent, k) => ({ ok: k % 17 !== 0, rt: congruent ? 600 : 700 }),
+    })
+    expect(agility.score).toBeGreaterThan(40)
+    expect(agility.score).toBeLessThan(85)
   })
 })

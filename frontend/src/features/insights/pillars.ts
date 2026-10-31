@@ -20,21 +20,35 @@ export function isPillarId(value: unknown): value is PillarId {
 
 /* ---------------------------------------------------------------------------------------------
    The doc's model ("Rou7 zebda cognitive intelligence", RADAR SCORES). Input names are the doc's.
-   Every input is a 0-100 score; taskScores.ts derives them from telemetry events:
+   Every input is a 0-100 score; taskScores.ts derives them from telemetry events.
 
-   OSPAN                 n-back d' (log-linear correction, Hautus 1995), d' 0 -> 0, d' 4 -> 100
-   OTS_Planning          tower: 0.8 * share solved in minimum moves + 0.2 * planning speed on those
+   SCALE ANCHORS, GATES AND SPLITS MARKED (A) ARE ASSUMPTIONS TO TUNE AGAINST MEMBER 3'S DATA, NOT
+   EVIDENCE. The formulas themselves (d' log-linear, LDI, Stroop RT cost on correct trials) follow
+   docs/research/2026-10-30-member1-evidence-review.md sections 1.1-1.3.
+
+   OSPAN                 n-back d' on the rule stream (log-linear correction, Hautus 1995), switch
+                         trials left out, floored at 0 when hit rate <= false-alarm rate;
+                         (A) d' 0 -> 0, d' 4 -> 100
+   OTS_Planning          tower: (A) 0.8 x share solved in minimum moves + 0.2 x planning speed on
+                         those, (A) planning 0 s -> 1, 30 s -> 0
    OTS_Execution         tower: mean of l_min / l_user (0 when unsolved)
    FluidMatrices         mean of matrix accuracy and relational accuracy weighted by hops
-   ANT_Conflict          Stroop RT cost (incongruent - congruent, correct trials), 0 ms -> 100, 300 ms -> 0
-   DCCS_SwitchCost       n-back accuracy on switch trials vs the rest, cost 0 -> 100, cost 0.5 -> 0
-   ErrorRecovery         accuracy on the trial right after an error, all exercises
+   ANT_Conflict          Stroop RT cost (incongruent - congruent, correct trials), (A) 0 ms -> 100,
+                         300 ms -> 0, times the gate (accuracy - 1/4) / (3/4) (chance = 4 inks);
+                         0 when accuracy is at chance and no cost can be measured
+   DCCS_SwitchCost       n-back accuracy on switch trials vs the rule stream's non-switch noise
+                         trials, (A) cost 0 -> 100, 0.5 -> 0, times the gate min(1, d' / 1) (A)
+   ErrorRecovery         accuracy on the trial right after an error, all exercises; tasks played at
+                         chance (n-back d' 0, Stroop accuracy <= 1/4) are left out
    SST_SSRT              PROXY: Stroop incongruent accuracy (no stop-signal task exists)
    DDM_Caution           omitted: no source
    PAL_FirstTrialMemory  omitted: no source
    MST_LDI               P(similar | lure) - P(similar | new), clamped to 0..1
-   UFOV_SOA              QUEST threshold, 17 ms -> 100, 500 ms -> 0
+   UFOV_SOA              QUEST threshold, 17 ms -> 100, 500 ms -> 0 (the payload's duration grid)
    ANT_Orienting         UFOV peripheral accuracy
+
+   The gates exist so doing nothing (or pressing at random) scores low: a difference score alone
+   is ~0 for a disengaged user, which would read as a perfect 100.
    --------------------------------------------------------------------------------------------- */
 
 export const INPUT_IDS = [
@@ -84,20 +98,26 @@ export type PillarScore = {
 
 export const MIN_COVERAGE = 0.3
 const MAX_UNCERTAINTY = 50
+/** Inputs with no source by design: they lower `coverage` but do not widen the band forever. */
+export const UNSOURCED_INPUTS: readonly InputId[] = ['DDM_Caution', 'PAL_FirstTrialMemory']
 
 /** Scores every pillar from the inputs that are there, renormalising the weights over them.
     Uncertainty: each input's standard error is taken as the worst-case binomial one, 50 / sqrt(trials)
-    points; they combine with the renormalised weights, and the result is divided by coverage, so the
-    band widens both as trials drop and as inputs go missing. 1.96 x that, capped at 50.
+    points; they combine with the renormalised weights, and the result is divided by the coverage of
+    the SOURCEABLE inputs (UNSOURCED_INPUTS excluded), so the band widens as trials drop and as
+    inputs that could have been measured go missing. 1.96 x that, capped at 50. `coverage` itself
+    stays the doc-weight share.
     ponytail: worst-case binomial SE, not a fitted measurement model; Member 3's profile can replace it. */
 export function pillarScores(inputs: TaskScores): Record<PillarId, PillarScore> {
   const out = {} as Record<PillarId, PillarScore>
   for (const pillar of PILLAR_IDS) {
     let coverage = 0
+    let sourceable = 0
     let sum = 0
     const used: [number, InputScore][] = []
     const proxies: InputId[] = []
     for (const [id, w] of Object.entries(PILLAR_WEIGHTS[pillar]) as [InputId, number][]) {
+      if (!UNSOURCED_INPUTS.includes(id)) sourceable += w
       const input = inputs[id]
       if (!input) continue
       coverage += w
@@ -108,7 +128,7 @@ export function pillarScores(inputs: TaskScores): Record<PillarId, PillarScore> 
     let uncertainty = MAX_UNCERTAINTY
     if (coverage > 0 && used.every(([, i]) => i.trials > 0)) {
       const variance = used.reduce((v, [w, i]) => v + (w / coverage) ** 2 * (2500 / i.trials), 0)
-      uncertainty = Math.min(MAX_UNCERTAINTY, (1.96 * Math.sqrt(variance)) / coverage)
+      uncertainty = Math.min(MAX_UNCERTAINTY, (1.96 * Math.sqrt(variance)) / Math.min(1, coverage / sourceable))
     }
     out[pillar] = { score: coverage >= MIN_COVERAGE ? sum / coverage : null, uncertainty, coverage, proxies }
   }
