@@ -29,6 +29,8 @@ type Props = {
   onDone: () => void
   // The block is over (the end card appears). The host must not pause or replay it from here on.
   onBlockEnd?: () => void
+  // The block has started (Begin, or at once for a bare exercise): a host shows Pause from here on.
+  onBlockStart?: () => void
   // Renders the exercise, which calls `end` once its block is over. `end` keeps its identity, so a
   // frame re-render never restarts the exercise's trial loop (it restarts when onDone changes).
   children: (end: () => void) => ReactNode
@@ -237,15 +239,21 @@ function EndCard({ onContinue }: { onContinue: () => void }) {
 // no event is recorded on the instruction or fixation screens; its timing and telemetry are its own.
 // UFOV skips the fixation here (it draws one before every trial). An unknown schema runs bare.
 // The block ends on the end card: onBlockEnd fires then, onDone only on Continue.
-export function ExerciseFrame({ task, onDone, onBlockEnd, children }: Props) {
+export function ExerciseFrame({ task, onDone, onBlockEnd, onBlockStart, children }: Props) {
   const intro = introFor(task)
   const [phase, setPhase] = useState<Phase>('intro')
   const done = useTrialsDone(task.task_id)
   const handed = useRef(false)
   const blockEnd = useRef(onBlockEnd)
+  const blockStart = useRef(onBlockStart)
   useLayoutEffect(() => {
     blockEnd.current = onBlockEnd
+    blockStart.current = onBlockStart
   })
+  const started = !intro || phase !== 'intro'
+  useEffect(() => {
+    if (started) blockStart.current?.()
+  }, [started])
   const ownFixation = OWN_FIXATION.has(task.schema_type)
 
   const begin = useCallback(
@@ -262,8 +270,9 @@ export function ExerciseFrame({ task, onDone, onBlockEnd, children }: Props) {
     onDone()
   }, [onDone])
   // Bare (no intro, so no end card): the block ends and hands over at once, onBlockEnd first, so a
-  // host that saves on block end (TaskRunnerPage) still saves the run.
+  // host that saves on block end (TaskRunnerPage) still saves the run. Once only, like finish.
   const endBare = useCallback(() => {
+    if (handed.current) return
     blockEnd.current?.()
     finish()
   }, [finish])

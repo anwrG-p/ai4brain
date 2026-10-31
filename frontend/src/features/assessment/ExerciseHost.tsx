@@ -12,6 +12,8 @@ type ExerciseHostProps = {
   onDone: () => void
   // The block is over and its end card shows: from here a pause must not discard it.
   onBlockEnd?: () => void
+  // The block has started (Begin pressed): from here the host offers Pause.
+  onBlockStart?: () => void
   onError: (msg: string) => void
   // Reshapes the fetched task before it runs (the baseline's ?fast=1 test hook).
   prepare?: (task: TaskPayload) => TaskPayload
@@ -28,15 +30,16 @@ let fetchCount = 0
 
 // Fetches one task, records it with its own TrialRecorder and renders the matching exercise inside
 // the jsPsych-style ExerciseFrame (instruction, fixation, progress dots, end card).
-export function ExerciseHost({ schemaType, attempt, onDone, onBlockEnd, onError, prepare, onTask }: ExerciseHostProps) {
+export function ExerciseHost({ schemaType, attempt, onDone, onBlockEnd, onBlockStart, onError, prepare, onTask }: ExerciseHostProps) {
   const [run, setRun] = useState<{ task: TaskPayload; recorder: TrialRecorder } | null>(null)
   // The exercises restart their trial loop when onDone changes, so they get a stable callback.
-  const cb = useRef({ onDone, onBlockEnd, onError, prepare, onTask })
+  const cb = useRef({ onDone, onBlockEnd, onBlockStart, onError, prepare, onTask })
   useLayoutEffect(() => {
-    cb.current = { onDone, onBlockEnd, onError, prepare, onTask }
+    cb.current = { onDone, onBlockEnd, onBlockStart, onError, prepare, onTask }
   })
   const done = useCallback(() => cb.current.onDone(), [])
   const blockEnd = useCallback(() => cb.current.onBlockEnd?.(), [])
+  const blockStart = useCallback(() => cb.current.onBlockStart?.(), [])
 
   useEffect(() => {
     let live = true
@@ -79,7 +82,7 @@ export function ExerciseHost({ schemaType, attempt, onDone, onBlockEnd, onError,
     <div className="w-full min-w-0">
       {run ? (
         <SkipOnError key={run.task.task_id} taskId={run.task.task_id} onSkip={skip}>
-          <ExerciseFrame task={run.task} onDone={done} onBlockEnd={blockEnd}>
+          <ExerciseFrame task={run.task} onDone={done} onBlockEnd={blockEnd} onBlockStart={blockStart}>
             {(end) => <TaskRunner task={run.task} recorder={run.recorder} onDone={end} />}
           </ExerciseFrame>
         </SkipOnError>

@@ -273,6 +273,9 @@ test('an unknown exercise ends its block before handing over, so its host still 
   )
   act(() => void fireEvent.click(screen.getByRole('button', { name: 'finish' })))
   expect(calls).toEqual(['blockEnd', 'done'])
+  // A second end (a late timer in the exercise) is a no-op: the block ended once.
+  act(() => void fireEvent.click(screen.getByRole('button', { name: 'finish' })))
+  expect(calls).toEqual(['blockEnd', 'done'])
 })
 
 test('an unknown exercise skips the frame and runs as before', () => {

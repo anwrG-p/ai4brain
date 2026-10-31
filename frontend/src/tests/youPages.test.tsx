@@ -50,34 +50,24 @@ afterEach(() => {
 })
 
 describe('You (/you)', () => {
-  it('has one h1 with the guest name and exactly 4 rows', () => {
+  it('has one h1 with the guest name and exactly 3 rows: no sign-in (R13, users stay anonymous)', () => {
     const page = renderPage(<YouPage />)
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Guest')
     const rows = within(screen.getByRole('navigation', { name: 'You' })).getAllByRole('listitem')
-    expect(rows.map((r) => r.textContent?.trim())).toEqual(['Privacy', 'Settings', 'How we calculate this', 'Sign in'])
+    expect(rows.map((r) => r.textContent?.trim())).toEqual(['Privacy', 'Settings', 'How we calculate this'])
     expect(page.querySelector('a[href="/privacy"]')).not.toBeNull()
     expect(page.querySelector('a[href="/settings"]')).not.toBeNull()
     expect(page.querySelector('a[href="/methodology"]')).not.toBeNull()
+    expect(page.textContent).not.toMatch(/sign(ed)? (in|out)/i)
+    expect(screen.queryByRole('button')).toBeNull()
   })
 
-  it('shows the signed-in name, and Sign out signs out', () => {
+  it('a stored name still shows (no account behind it)', () => {
     useAppStore.getState().loginUser({ preferredName: 'Mazen', email: 'm@example.com', focusGoal: 'x' })
-    renderPage(<YouPage />)
+    const page = renderPage(<YouPage />)
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Mazen')
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
-    expect(useAppStore.getState().isAuthenticated).toBe(false)
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Guest')
-    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument()
-  })
-
-  it('Sign in opens the login sheet for a guest', () => {
-    vi.stubEnv('VITE_GOOGLE_CLIENT_ID', '')
-    renderPage(<YouPage />)
-    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
-    const sheet = screen.getByRole('dialog')
-    fireEvent.click(within(sheet).getByRole('button', { name: 'Continue as guest' }))
-    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(page.textContent).not.toMatch(/sign(ed)? (in|out)|m@example\.com/i)
   })
 
   it('keeps to 60 words and no technical words', () => {
