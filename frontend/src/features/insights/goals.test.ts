@@ -32,6 +32,18 @@ describe('goals slice', () => {
     expect(loadGoals()).toEqual({ year: 2026, goals: { memory: 10 } })
   })
 
+  it('clamps loaded and set targets to 1-100 and drops invalid ones', () => {
+    localStorage.setItem(
+      GOALS_KEY,
+      '{"version":1,"year":2026,"goals":{"memory":250,"focus":0,"agility":-5,"impulse":7.6,"visual":null}}',
+    )
+    expect(loadGoals()).toEqual({ year: 2026, goals: { memory: 100, impulse: 8 } })
+    useGoalsStore.getState().setGoal('visual', 500, new Date('2026-03-01T12:00:00'))
+    expect(useGoalsStore.getState().goals).toEqual({ visual: 100 })
+    useGoalsStore.getState().setGoal('focus', 0, new Date('2026-03-01T12:00:00'))
+    expect(useGoalsStore.getState().goals).toEqual({ visual: 100 })
+  })
+
   it('is empty after clear', () => {
     useGoalsStore.getState().setGoal('visual', 15)
     useGoalsStore.getState().clearGoals()

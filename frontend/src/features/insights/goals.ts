@@ -22,6 +22,12 @@ export interface GoalsState extends StoredGoals {
 
 const EMPTY: StoredGoals = { year: null, goals: {} }
 
+/** A sane target: a whole number of points from 1 to 100; anything else is dropped (null). */
+export function sanitizeTarget(target: unknown): number | null {
+  if (typeof target !== 'number' || !Number.isFinite(target) || target < 1) return null
+  return Math.min(100, Math.round(target))
+}
+
 /** Reads the stored goals; anything corrupt, foreign or from another version reads as empty. */
 export function loadGoals(): StoredGoals {
   try {
@@ -31,7 +37,8 @@ export function loadGoals(): StoredGoals {
     if (version !== VERSION || typeof year !== 'number' || !goals || typeof goals !== 'object') return EMPTY
     const clean: Goals = {}
     for (const [pillar, target] of Object.entries(goals)) {
-      if (isPillarId(pillar) && typeof target === 'number' && Number.isFinite(target)) clean[pillar] = target
+      const value = sanitizeTarget(target)
+      if (isPillarId(pillar) && value !== null) clean[pillar] = value
     }
     return { year, goals: clean }
   } catch {
@@ -50,8 +57,10 @@ function save(state: StoredGoals) {
 export const useGoalsStore = create<GoalsState>((set, get) => ({
   ...loadGoals(),
   setGoal: (pillar, target, now = new Date()) => {
+    const value = sanitizeTarget(target)
+    if (value === null) return
     const year = now.getFullYear()
-    const goals = get().year === year ? { ...get().goals, [pillar]: target } : { [pillar]: target }
+    const goals = get().year === year ? { ...get().goals, [pillar]: value } : { [pillar]: value }
     set({ year, goals })
     save({ year, goals })
   },

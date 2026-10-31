@@ -5,6 +5,8 @@ import type { LotiAction, LotiBrain, LotiContext, LotiMessage } from './types'
    Voice: warm, short, specific. No hype words, no brain regions, no chemical claims (U5). */
 
 export const MAX_MESSAGE_CHARS = 120
+/** Rule 4: about 12 words per line of UI text; the script tests hold every bubble to 14. */
+export const MAX_MESSAGE_WORDS = 14
 
 /** Four sessions a week is the "optimal" plan in the pillar model (ticket 04). */
 export const WEEKLY_TARGET = 4
@@ -55,7 +57,7 @@ function node(id: string, ctx: LotiContext): LotiMessage | null {
       return {
         id,
         pose: 'happy',
-        text: `Done: ${PILLAR_LABELS[arg]}, up ${arg2} points this year. It's on your dashboard. Another one?`,
+        text: `Goal saved: ${PILLAR_LABELS[arg]}, up ${arg2} points this year. Another one?`,
         choices: [
           { id: 'another', label: 'Add another', action: reply('goal-pick') },
           { id: 'done', label: "That's all" },
@@ -85,17 +87,17 @@ function node(id: string, ctx: LotiContext): LotiMessage | null {
       return {
         id,
         pose: 'happy',
-        text: "Good to hear! Let's put some time into training?",
+        text: 'Good to hear! Want to put some time into training?',
         choices: [{ id: 'yes', label: "Yes, let's train", action: train(ctx) }],
       }
     case 'day-okay':
       return {
         id,
-        text: 'Thanks for telling me. A short session can be a nice reset. Try one?',
+        text: 'Thanks for telling me. A short session can help. Try one?',
         choices: [{ id: 'yes', label: "Yes, let's try one", action: train(ctx) }],
       }
     case 'day-tough':
-      return { id, text: "I'm sorry it was a tough one. Rest counts too. I'm here when you're ready.", choices: [] }
+      return { id, text: "Sorry it was tough. Rest counts too. I'm here when you're ready.", choices: [] }
     case 'weekend':
       return {
         id,

@@ -81,6 +81,7 @@ describe('scriptedBrain.respond', () => {
   })
 
   it('ends a tough day kindly, with no push to train', () => {
+    expect(scriptedBrain.respond('day', 'great', ctx)?.text).toBe('Good to hear! Want to put some time into training?')
     const tough = scriptedBrain.respond('day', 'tough', ctx)
     expect(tough?.choices).toEqual([])
   })
@@ -134,6 +135,14 @@ describe('script copy', () => {
   it.each(messages.map((m) => [m.id, m] as const))('%s fits in one bubble', (_id, msg) => {
     expect(msg.text.length).toBeLessThanOrEqual(MAX_MESSAGE_CHARS)
     expect(MAX_MESSAGE_CHARS).toBe(120)
+  })
+
+  it.each(messages.map((m) => [m.id, m.text] as const))('%s stays short: at most 14 words (rule 4)', (_id, text) => {
+    expect(text.split(/\s+/).filter(Boolean).length).toBeLessThanOrEqual(14)
+  })
+
+  it('makes no claim about where a goal shows up (rule 12)', () => {
+    for (const m of messages) expect(m.text).not.toMatch(/dashboard/i)
   })
 
   it('has no banned, hype, brain-region or chemical words', () => {

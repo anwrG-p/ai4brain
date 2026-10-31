@@ -44,6 +44,19 @@ describe('LotiBubbles', () => {
     }
   })
 
+  it('every reply button is described by the bubble text, so a focused chip reads the question', async () => {
+    const user = userEvent.setup()
+    renderBubbles()
+    for (const name of ['Great', 'Okay', 'Tough', 'Not now']) {
+      expect(screen.getByRole('button', { name })).toHaveAccessibleDescription('How was your day?')
+    }
+    await user.click(screen.getByRole('button', { name: 'Great' }))
+    await user.click(screen.getByRole('button', { name: 'Not now' }))
+    await user.click(screen.getByRole('button', { name: /continue with loti/i }))
+    expect(screen.getByRole('button', { name: /yes, let's train/i })).toHaveFocus()
+    expect(screen.getByRole('button', { name: /yes, let's train/i })).toHaveAccessibleDescription(/good to hear/i)
+  })
+
   it('advances the conversation when a chip is clicked', async () => {
     const user = userEvent.setup()
     renderBubbles()
@@ -76,7 +89,7 @@ describe('LotiBubbles', () => {
     expect(screen.getByRole('button', { name: /continue with loti/i })).toHaveFocus()
   })
 
-  it('a closing message ends the talk with "Okay"', async () => {
+  it('a closing message ends the talk with "Okay", leaving a focused "Talk to Loti" that starts over', async () => {
     const user = userEvent.setup()
     renderBubbles()
     await user.click(screen.getByRole('button', { name: 'Tough' }))
@@ -84,6 +97,29 @@ describe('LotiBubbles', () => {
     await user.click(screen.getByRole('button', { name: 'Okay' }))
     expect(screen.queryByRole('group', { name: /reply to loti/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /continue with loti/i })).toBeNull()
+    expect(screen.getByRole('button', { name: /talk to loti/i })).toHaveFocus()
+    await user.click(screen.getByRole('button', { name: /talk to loti/i }))
+    expect(screen.getByText('How was your day?')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Great' })).toHaveFocus()
+  })
+
+  it('Escape on a closing line ends the talk without dropping focus to the page', async () => {
+    const user = userEvent.setup()
+    renderBubbles()
+    await user.click(screen.getByRole('button', { name: 'Tough' }))
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('button', { name: /talk to loti/i })).toHaveFocus()
+    expect(document.body).not.toHaveFocus()
+  })
+
+  it('a choice that ends the talk in place leaves "Talk to Loti" focused', async () => {
+    const user = userEvent.setup()
+    renderBubbles({ ...dayCtx, now: new Date('2026-01-05T15:00:00'), hasGoalsThisYear: false })
+    await user.click(screen.getByRole('button', { name: /let's do it/i }))
+    await user.click(screen.getByRole('button', { name: 'Visual Radar' }))
+    await user.click(screen.getByRole('button', { name: /a little/i }))
+    await user.click(screen.getByRole('button', { name: /that's all/i }))
+    expect(screen.getByRole('button', { name: /talk to loti/i })).toHaveFocus()
   })
 
   it('a train choice runs the action and navigates to the exercise', async () => {
@@ -109,7 +145,7 @@ describe('LotiBubbles', () => {
     await user.click(screen.getByRole('button', { name: 'Deep Memory' }))
     await user.click(screen.getByRole('button', { name: /steady/i }))
     expect(useGoalsStore.getState().goals).toEqual({ memory: 10 })
-    expect(screen.getByText(/deep memory, up 10 points/i)).toBeInTheDocument()
+    expect(screen.getByText(/goal saved: deep memory, up 10 points/i)).toBeInTheDocument()
   })
 
   it('Loti talks while each new bubble enters, then settles', () => {
