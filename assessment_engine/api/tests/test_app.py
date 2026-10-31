@@ -4,6 +4,8 @@ import pytest
 from fastapi import APIRouter
 from fastapi.testclient import TestClient
 
+import main  # noqa: F401  (puts the repo root on sys.path, so the module routers below resolve)
+
 # One router per module. main.py mounts all of them, so later tickets add routes here, not in main.py.
 MODULE_ROUTERS = [
     "routes.telemetry",
