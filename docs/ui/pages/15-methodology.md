@@ -1,5 +1,7 @@
 # Page 15 Specification: Methodology, Limits & Ethics (`/methodology`)
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: `/methodology` is **How we calculate this**: 5 closed topics with the real formulas. Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 - **Page Name & Route**: How It Works, Limits & Ethics (`/methodology`)
 - **Primary Users**: Competition judges, research evaluators, neurodiverse learners, educators, and students seeking complete scientific and ethical transparency.
 - **Challenge Goals**:
@@ -186,16 +188,16 @@ Page 15 establishes **SynapseTwin's Scientific & Ethical Declaration**:
 
 ## 9. Definition of Done Checklist (10 Items)
 
-- [x] **DoD 01**: Author [`MethodologyPage.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/pages/MethodologyPage.tsx) matching design tokens and semantic classes.
+- [x] **DoD 01**: Author `frontend/src/pages/MethodologyPage.tsx` matching design tokens and semantic classes.
 - [x] **DoD 02**: Render 4-Stage Cognitive Computation Pipeline with interactive stage selection.
 - [x] **DoD 03**: Render mathematical formulation section with formulas for Bayesian estimation, Archetype Hysteresis, and SAT-JEPA $\Delta c$.
 - [x] **DoD 04**: Render Interactive Bias & Uncertainty Simulator with real-time confidence band calculation.
 - [x] **DoD 05**: Render 4-Pillar Ethical Charter detailing Non-Clinical Guarantee, Non-Biometric Lock, Zero-Guilt, and Sovereign Data Rights.
 - [x] **DoD 06**: Render Live Non-Clinical Copy Guardrail Sandbox powered by `lintCopyText`.
 - [x] **DoD 07**: Render Accessible Measurement Biases & Confounders Reference Table (`role="region"` with `tabIndex={0}`).
-- [x] **DoD 08**: Wire route `/methodology` in [`App.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/App.tsx) and navigation link in [`AppShell.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/components/layout/AppShell.tsx).
-- [x] **DoD 09**: Append 21st unit test in [`frontend/src/tests/designSystem.test.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/tests/designSystem.test.tsx).
-- [x] **DoD 10**: Create Playwright E2E suite [`frontend/e2e/methodology.spec.ts`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/e2e/methodology.spec.ts), verify 0 `axe-core` violations, 0 horizontal overflow, and save 6 screenshots to `docs/ui/screenshots/15-methodology-*.png`.
+- [x] **DoD 08**: Wire route `/methodology` in `frontend/src/App.tsx` and navigation link in `frontend/src/components/layout/AppShell.tsx`.
+- [x] **DoD 09**: Append 21st unit test in `frontend/src/tests/designSystem.test.tsx`.
+- [x] **DoD 10**: Create Playwright E2E suite `frontend/e2e/methodology.spec.ts`, verify 0 `axe-core` violations, 0 horizontal overflow, and save 6 screenshots to `docs/ui/screenshots/15-methodology-*.png`.
 
 ---
 

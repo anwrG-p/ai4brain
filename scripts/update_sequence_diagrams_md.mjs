@@ -12,6 +12,7 @@ if (!fs.existsSync(docPath)) {
 const content = fs.readFileSync(docPath, 'utf8')
 
 const diagramsData = [
+  // null: a brand v2 consumer flow (section 7, diagrams 1, 2 and 4), kept as Mermaid source only, left as is.
   {
     id: '01-high-level-closed-loop',
     title: 'High-Level 5-Subsystem Closed-Loop Overview',
@@ -48,30 +49,15 @@ const diagramsData = [
     svg: './diagrams/06-seq5-profile-ingestion-dashboard.svg',
     png: './diagrams/06-seq5-profile-ingestion-dashboard.png',
   },
-  {
-    id: '07-consumer-ux-flow',
-    title: 'Consumer UX Flow: First Click to De-Cluttered Dashboard',
-    svg: './diagrams/07-consumer-ux-flow.svg',
-    png: './diagrams/07-consumer-ux-flow.png',
-  },
-  {
-    id: '08-emily-emotion-color-adaptation',
-    title: 'EMILY Behavioral Emotion Tracking & Human-Approved Color Adaptation',
-    svg: './diagrams/08-emily-emotion-color-adaptation.svg',
-    png: './diagrams/08-emily-emotion-color-adaptation.png',
-  },
+  null,
+  null,
   {
     id: '09-telemetry-jepa-cache',
     title: 'Assessment Telemetry, Brain Twin (SAT-JEPA + 3x3 GMM), and <10ms Task Cache',
     svg: './diagrams/09-telemetry-jepa-cache.svg',
     png: './diagrams/09-telemetry-jepa-cache.png',
   },
-  {
-    id: '10-ai-coach-guardrails-collab',
-    title: 'Explainable AI Coach, Non-Clinical Firewall & Dynamic Collaboration Scorer',
-    svg: './diagrams/10-ai-coach-guardrails-collab.svg',
-    png: './diagrams/10-ai-coach-guardrails-collab.png',
-  },
+  null,
   {
     id: '11-human-ux-review-jargon-gate',
     title: 'Human-in-the-Loop UX Review & Jargon Gate Workflow (?review_mode=true)',

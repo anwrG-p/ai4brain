@@ -1,5 +1,7 @@
 # 02 — Design System Specification (`docs/ui/02-design-system.md`)
 
+> **History.** This describes the UI before brand v2 (BRIAN, the Doodle design, 19 pages, 7 dimensions), superseded on 2026-10-31. Current: the [root README](../../README.md), the [glossary](../../docs/GLOSSARY.md) and `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 > **Design Direction Locked (`DEC-006`)**: **Playful Lab** (Light default) + **Night Lab** (Dark theme), paired with **Fredoka** (Display), **Lexend** (UI/Reading), and **JetBrains Mono** (Tabular metrics & formulas).
 
 ---

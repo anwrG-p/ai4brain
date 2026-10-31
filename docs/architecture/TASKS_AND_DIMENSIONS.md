@@ -1,112 +1,54 @@
-# Cognitive Tasks, Dimension Registry & Measurement Bias Mitigations
+# Exercises, dimensions and the 5 skills
 
-> **CISTAC 1.0 (AI4Brain Challenge)** — Layer A Assessment Engine & Psychometric Specifications  
-> **Source of Truth**: `frontend/src/config/dimensions.ts` · `frontend/src/types/index.ts` · `assessment_engine/`
+> **Source of truth:** `frontend/src/features/assessment/names.ts` (names), `frontend/src/features/assessment/tasks/fixtures.json` (each exercise's telemetry dimension), `frontend/src/features/insights/taskScores.ts` and `pillars.ts` (scoring), `dynamic_cache/generators/` (server task generators).
 
----
+Three layers of naming:
+- **Exercise:** what the user plays (consumer name, `schema_type`).
+- **Dimension:** the telemetry key on every event. Never shown in the UI.
+- **Skill (pillar):** what the UI shows. Computed on the device from scoring inputs, with the weights in `PILLAR_WEIGHTS`.
 
-## 1. The 6 Canonical Cognitive Skills & Task Specifications
+## 1. Exercises
 
-To deliver continuous, non-clinical cognitive evaluation without user exhaustion, the platform implements 6 core cognitive tasks, adapting difficulty via client-side psychometric staircases:
+| Exercise | `schema_type` | Telemetry dimension | Scoring inputs → skill |
+| :--- | :--- | :--- | :--- |
+| Logic Web | `relational` | `pattern_induction` | FluidMatrices → Focus & Strategy |
+| Pattern Puzzle | `matrix` | `pattern_induction` | FluidMatrices → Focus & Strategy |
+| Strategic Blueprint | `tower` | `executive_function` | OTS_Planning → Focus & Strategy; OTS_Execution → Impulse Control |
+| Memory Gauntlet | `n_back` | `working_memory` | OSPAN (n-back d′) → Focus & Strategy; DCCS_SwitchCost → Mental Agility |
+| Color Clash | `stroop` | `executive_function` | ANT_Conflict → Mental Agility; SST_SSRT (proxy) → Impulse Control |
+| Shape Turn | `mental_rotation` | `spatial_orientation` | none of its own |
+| Precision Archive | `mst` | `episodic_memory` | MST_LDI → Deep Memory |
+| Perceptual Radar | `ufov` | `processing_speed` | UFOV_SOA, ANT_Orienting → Visual Radar |
 
-```
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                             6 CORE COGNITIVE SKILLS                              │
-├────────────────────┬────────────────────┬───────────────────┬────────────────────┤
-│ 1. Working Memory  │ 2. Inhibition &    │ 3. Pattern &      │ 4. Visuospatial    │
-│    (Dual N-Back)   │    Flexibility     │    Relational     │    Planning        │
-│                    │    (Stroop)        │    (Matrix & Hop) │    (Tower)         │
-├────────────────────┴────────────────────┼───────────────────┴────────────────────┤
-│ 5. Perceptual Speed & Divided Attention │ 6. Episodic Pattern Separation         │
-│    (UFOV with QUEST+)                   │    (Mnemonic Similarity / MST)         │
-└─────────────────────────────────────────┴────────────────────────────────────────┘
-```
+ErrorRecovery (→ Mental Agility) uses the trial after an error in every exercise. DDM_Caution and PAL_FirstTrialMemory have no source yet, so they are left out. A skill below 30% coverage shows "Not measured yet".
 
-### Cognitive Tasks & Measurement Matrix
+The Train tab lists each exercise under one skill (`frontend/src/features/train/catalog.ts`); the scoring above is what the numbers use. The **baseline** plays 6: Logic Web, Memory Gauntlet, Color Clash, Strategic Blueprint, Perceptual Radar, Precision Archive.
 
-| # | Consumer Skill Name (Internal ID) | Everyday Construct Definition | Interactive Browser Task & Difficulty Levers | Captured Signals (tracker.ts + EMILY) | Scoring & Clarity Method | Documented Biases & Technical Mitigations |
-| :-: | :--- | :--- | :--- | :--- | :--- | :--- |
-| 1 | **Working Memory** (`working_memory`) | Holding and updating visual patterns in active focus over short intervals. | **Spatial Grid Recall ($N$-Back)**: Track glowing tokens on a $3 \times 3$ grid across $N \in \{1, 2, 3\}$ steps back; presentation window scales from $2500\text{ ms}$ to $1200\text{ ms}$. | Hit accuracy, false-alarm rate, `rt_ms`, hover hesitation ($\tau_{\text{hover}}$), click dwell ($\tau_{\text{click}}$). | Bayesian state update mapped to $0\text{–}100\%$ with $\pm 95\%$ Clarity Range halo. | **Memorization bias**: Procedural seed shuffling rotates grid patterns every session. |
-| 2 | **Pattern Discovery** (`pattern_induction`) | Spotting underlying visual rules and completing sequences without words. | **Visual Matrix Flow**: Complete a $3 \times 3$ geometric grid by identifying $1\text{–}3$ interacting visual rules (rotation, shape, fill). | Solution accuracy, deliberation time (`rt_ms`), direction flips ($N_{\text{flip}}$) across options. | Item-difficulty weighted mastery score + clarity band. | **Language/education bias**: 100% non-verbal geometric shapes requiring zero reading or math. |
-| 3 | **Focus & Rule-Switching** (`executive_function`) | Resisting visual distractions and smoothly shifting between changing rules. | **Colorblind-Safe Shape Switch**: Match cards by Shape or Pattern as cues switch; distractor congruence scales dynamically. | Rule-switch latency cost ($\Delta\text{RT}$), error bursts, rage-click count ($R_{\text{click}}$), cursor jerk ($j$). | Composite of switch accuracy ($65\%$) and pacing stability ($35\%$). | **Color vision & hardware lag**: Uses Okabe-Ito shapes/patterns + subtracts baseline device tap lag. |
-| 4 | **Spatial Orientation** (`spatial_orientation`) | Mentally rotating shapes and tracking perspectives in 2D/3D space. | **Mental Perspective Match**: Identify which rotated geometric figure matches the target reference under varying angles ($30^\circ\text{–}150^\circ$). | Angular accuracy slope, `rt_ms`, path directness ($R_{\text{path}} = 1/\kappa$). | Confidence-weighted percentage score with decay on long idle pauses. | **Motor speed bias**: Separates deliberation movement onset from click execution time. |
-| 5 | **Visual Memory Clarity** (`episodic_pattern`) | Distinguishing familiar visual items from very similar look-alikes. | **Old / Similar / New Flow**: Classify illustrated tokens as Old, Similar, or New as visual lure similarity increases. | Lure discrimination index, response consistency, hesitation pauses ($\tau_{\text{hover}}$). | Bayesian precision update; hatched clarity band shown until $\ge 6$ lure trials logged. | **Fatigue bias**: Capped at 4 rapid trials per micro-block with streak-protected rest mode. |
-| 6 | **Processing Rhythm** (`processing_speed`) | Steady, calm perceptual encoding speed without rushing into errors. | **Symbol-Key Pairing**: Match 6 abstract glyphs to keys 1–6 using a randomized key legend each round. | Rate-correct score (correct matches per $30\text{ s}$), velocity variance ($v$), pacing drift. | Sigmoid-normalized rate-correct percentage $\pm$ variance halo. | **Keyboard vs. touch bias**: Normalizes against the user's own device class and initial warm-up. |
+## 2. Dimension presets (judge tool)
 
-### 1.1 Working Memory: Dual-Stream Spatial & Symbolic N-Back
-- **Scientific Foundation**: Assesses updating and maintenance in transient memory while resisting proactive interference.
-- **Task Dynamics**: $3 \times 3$ grid with simultaneous spatial positions and symbolic glyphs. Employs rule-switching cues (`position` vs `symbol` vs `parity`) and targeted lure trials ($N-1$, $N+1$).
-- **Scoring & Adaptation**: Weighted staircase targeting 85% accuracy. Computes $d'$ sensitivity index across lure false-alarm rates.
-- **Backend Key**: `working_memory` · Schema: `n_back`.
+`frontend/src/config/dimensions.ts` keeps the earlier dimension registry (3, 6, 7, 8 and 10 dimensions) for the Generalisation criterion. Its switch shows only in the exercise runner under `?judge=1`. Users see the 5 skills.
 
-### 1.2 Inhibition Control & Cognitive Flexibility: Stroop & Rule-Switch
-- **Scientific Foundation**: Assesses voluntary suppression of prepotent automatic responses and swift mental set-shifting.
-- **Task Dynamics**: Congruent, incongruent, and neutral color-word stimuli. Fast-paced blocks with dynamic stimulus-onset asynchrony (SOA).
-- **Scoring & Adaptation**: Interference cost calculated as $\Delta\text{RT} = \text{RT}_{\text{incongruent}} - \text{RT}_{\text{congruent}}$ and error burst frequency.
-- **Backend Key**: `executive_function` · Schema: `stroop`.
+## 3. Measurement biases
 
-### 1.3 Pattern Induction & Relational Reasoning: Progressive Matrix & Multi-Hop
-- **Scientific Foundation**: Evaluates fluid intelligence ($G_f$), inductive pattern extraction, and transitive relational inference without verbal requirements.
-- **Task Dynamics**: 9-cell abstract geometric grids with rotational, numerosity, and shape progression rules; multi-hop premise verification ($A > B, B > C \implies A > C$).
-- **Scoring & Adaptation**: Accuracy norm $\in [0, 1]$, latency-to-first-click, and counter-intuitive premise validation.
-- **Backend Key**: `pattern_induction` · Schemas: `matrix`, `relational`.
+| Bias | Status |
+| :--- | :--- |
+| Display refresh rate | **Done.** UFOV records the actually rendered duration (`shown_ms`). |
+| Disengaged or random answering | **Done.** Chance gates: a non-responder scores about 0, not a perfect difference score. |
+| Hidden tab or interruption | **Done.** Hiding the tab pauses the exercise; a paused attempt is never scored or sent. |
+| Colour vision | **Partly.** The server's Stroop generator has a `cvd_safe` ink set; the app enables it once `black` is mapped (ticket F-D). |
+| Practice effects | **Planned (F-A).** No "real improvement" before session 3, with a practice-adjusted reliable-change check. |
+| Too few trials | **Planned (F-A).** Minimum trials per input, and "Building your profile" below it. |
+| Input device and timing | **Planned (F-A).** Device and input logging, and flags for very fast answers. |
 
-### 1.4 Visuospatial Planning & Mental Rotation: Tower of London & Rotated Polygons
-- **Scientific Foundation**: Measures look-ahead problem solving, sub-goal generation, and mental coordinate manipulation.
-- **Task Dynamics**: Constrained peg movement puzzles with minimum move paths ($l_{\text{min}}$) and 2D/3D polygon angle matching ($0^\circ\text{–}180^\circ$).
-- **Scoring & Adaptation**: Optimality ratio $\text{Score} = \min(1, l_{\text{min}} / l_{\text{user}})$, pre-movement planning latency, and conflict latency before counter-intuitive moves.
-- **Backend Key**: `spatial_orientation` · Schemas: `tower`, `mental_rotation`.
+Evidence for each: [research 2026-10-31](../research/2026-10-31-improvement-opportunities.md).
 
-### 1.5 Divided Attention & Perceptual Speed: Useful Field of View (UFOV)
-- **Scientific Foundation**: Quantifies the visual field area over which information can be extracted in a single brief tachistoscopic glance.
-- **Task Dynamics**: Central vehicle identification paired with simultaneous peripheral target localization ($0^\circ\text{–}315^\circ$ across 8 radial coordinates) amidst distractor clutter.
-- **Scoring & Adaptation**: **QUEST+ Bayesian Staircase** directly estimates display duration thresholds ($\text{ms}$) rather than holding accuracy at 85%. Logs whole-frame-measured `shown_ms`.
-- **Backend Key**: `processing_speed` · Schema: `ufov`.
+## 4. Telemetry event (`POST /v1/telemetry/event`)
 
-### 1.6 Episodic Pattern Separation: Mnemonic Similarity Task (MST)
-- **Scientific Foundation**: Assesses hippocampal dentate gyrus pattern separation by measuring the ability to distinguish exact repeats from visually similar lure items.
-- **Task Dynamics**: Rapid encoding phase of complex irregular polygons followed by surprise discrimination testing: `old`, `similar` (perturbed polygon vertex $\Delta$), or `new`.
-- **Scoring & Adaptation**: Lure Discrimination Index ($\text{LDI} = P(\text{"Similar"} \mid \text{Lure}) - P(\text{"Similar"} \mid \text{New})$).
-- **Backend Key**: `episodic_memory` · Schema: `mst`.
-
----
-
-## 2. Config-Driven Dimension Registry (`DimensionRegistry`)
-
-To prove **Generalisation (10% evaluation rubric)**, SynapseTwin decouples UI rendering from hardcoded dimension counts. The active system can be switched in real time across 5 architectural presets:
-
-| Preset Key | Dimension Count | Intended Rubric Verification | Primary Slot Mappings |
-| :--- | :---: | :--- | :--- |
-| **`3-minimal`** | 3 | Stress-test minimal polygon rendering on Uncertainty Radar | Memory, Inhibition, Speed |
-| **`6-intake`** | 6 | 1:1 match with Member 1 Backend & Intake specification | WM, IC, CF, AN, PS, Reason |
-| **`7-team-default`** | 7 | Canonical Section 3 Team Plan default architecture | WM, IC, CF, AN, PS, EP, VP |
-| **`8-extended`** | 8 | Generalization test with extra dashed geometry cross | 7 Dims + Metacognitive Auditing |
-| **`10-full-generalisation`** | 10 | Evaluator stress-test for Phase 2 surprise requirements | 7 Dims + Surprise Slots 8, 9, 10 |
-
----
-
-## 3. Comprehensive Measurement Bias Mitigations
-
-Every cognitive psychometric measurement is vulnerable to systematic real-world distortions. SynapseTwin deploys active algorithmic and UI countermeasures for each known bias:
-
-| Measurement Bias | Real-World Distortion Mechanism | Algorithmic & UX Mitigation Countermeasure |
-| :--- | :--- | :--- |
-| **Circadian Alertness Bias** | Late-night sessions exhibit $+180\text{ ms}$ reaction time lag and higher jitter, misdiagnosed as cognitive decline. | **Session Fatigue Heatmap & Normalization**: Telemetry is weighted by time-of-day baseline; late sessions trigger rest pacing advice rather than score downgrades. |
-| **Hardware Input Latency Bias** | Bluetooth keyboards add $80\text{–}150\text{ ms}$ latency vs wired gaming keyboards ($5\text{ ms}$). | **Latency Calibration Baseline**: Measures initial keydown vs pointer down; subtracts calibrated baseline hardware offset from raw response times. |
-| **Speed-Accuracy Trade-Off (SAT)** | Impulsive learners click rapidly with low accuracy; perfectionists click slowly with 100% accuracy. | **Drift-Diffusion Modeling (DDM)**: Balances drift rate ($v$) and boundary separation ($a$) so fast guesses and deliberate pauses are normalized fairly. |
-| **Cultural & Linguistic Bias** | Standard tests rely on English vocabulary or culturally specific idioms. | **Language-Free Abstract Stimuli**: All tasks use geometric polygons, Okabe-Ito colors, and non-representational glyphs with zero cultural prerequisites. |
-| **Evaluator & Test Anxiety Bias** | White-coat syndrome artificially elevates heart rate and freezes working memory. | **Non-Clinical Doodle Framing**: Warm paper canvas, cheerful axolotl companion, zero fail states, and rest-protected streaks eliminate testing pressure. |
-| **Display Refresh Rate Variance** | 60 Hz monitors refresh every $16.7\text{ ms}$, while 144 Hz monitors refresh every $6.9\text{ ms}$, skewing tachistoscopic displays. | **Frame-Measured Duration Logging**: UFOV renderer synchronizes with `requestAnimationFrame`, records actual rendered `shown_ms`, and passes true frame counts to QUEST+. |
-
----
-
-## 4. Telemetry Contract Summary (`POST /v1/telemetry/event`)
-
-Every completed trial emits a non-biometric event conforming to the root schema:
+One event per trial, sent only after "Save my answers". Full contract: [contracts](../ui/contracts.md).
 
 ```json
 {
-  "user_id": "usr_nour_01",
+  "user_id": "a1b2c3d4",
   "session_id": "sess_20261029_01",
   "task_id": "nback_wm_03",
   "trial_index": 4,
@@ -117,8 +59,12 @@ Every completed trial emits a non-biometric event conforming to the root schema:
   "error_burst": 0,
   "hesitation_jitter": 24.2,
   "keystroke_latency_ms": 210.0,
+  "trial_meta": {},
   "voice_opt_in": false,
-  "client_ts": 1793260800000
+  "client_ts": "2026-10-29T09:00:00.000Z"
 }
 ```
 
+`hesitation_jitter` and `keystroke_latency_ms` are for task scoring only. The server must not infer emotion from them ([ADR 0002](../adr/0002-no-server-side-emotion-inference.md)).
+
+*Rewritten 2026-10-31. The earlier version (6 "skills", tasks that were never built, Doodle framing) is in git history.*

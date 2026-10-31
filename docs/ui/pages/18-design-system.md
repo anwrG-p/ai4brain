@@ -1,5 +1,7 @@
 # 18. Living Style Guide (`/design-system`)
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: `/design-system` redirects to Home; tokens live in `frontend/src/styles/tokens.css`. Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 ## Purpose, user moment, rubric criteria
 - **Purpose**: Single source of truth for all visual tokens, typography, Okabe-Ito WCAG 3:1 dimension scales (3 to 10 dimensions), interactive UI primitives, signature component previews, and live automated QA checks (WCAG contrast calculator + Non-Clinical Copy Linter).
 - **User / Evaluator Moment**: Visited by teammates reusing components and by IEEE judges inspecting craft, accessibility rigor, and design-system consistency.

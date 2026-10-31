@@ -1,5 +1,7 @@
 # 01 — UX Strategy: Personas, Journeys & Epistemic Principles
 
+> **History.** This describes the UI before brand v2 (BRIAN, the Doodle design, 19 pages, 7 dimensions), superseded on 2026-10-31. Current: the [root README](../../README.md), the [glossary](../../docs/GLOSSARY.md) and `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 ## 1. Core UX Philosophy
 - **First Insight in $\le 3$ Minutes**: Users and evaluators reach a complete, uncertainty-aware Brain Twin profile in under 3 minutes via either the **2-Minute Quick Baseline** (3 core trials per dimension) or the **1-Click Judge Persona Switcher**.
 - **Epistemic Honesty by Default**: No score is ever shown without its confidence band ($\pm \text{CI}$). Low-confidence dimensions (`confidence < 0.60`) automatically render with diagonal SVG hatching and plain-language guidance on how many trials will narrow the range.

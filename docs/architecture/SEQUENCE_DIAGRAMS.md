@@ -1,8 +1,9 @@
 # System Architecture Sequence Diagrams
 
-> **CISTAC 1.0 (AI4Brain Challenge)** — 5-Subsystem Interoperability & Closed-Loop Protocol  
-> **Source of Truth**: Root `README.md` · `docs/ui/contracts.md` · `assessment_engine/`  
-> 🚀 **Interactive Visual Viewer**: Open [`sequence_diagrams_viewer.html`](./sequence_diagrams_viewer.html) in any browser to zoom, pan, inspect, and export all 11 sequence diagrams interactively.
+> **What is built (2026-10-31).** Sections 1–6 are the original challenge design (see [TEAM_PLAN.md](TEAM_PLAN.md)), not the running system. Live today in `backend/app`: telemetry ingest (`POST /v1/telemetry/event`), export (`GET /v1/user/export`) and delete (`DELETE /v1/user/telemetry`). These answer 501 until their ticket lands: `GET /v1/tasks/next` (BE-04), `POST /v1/coach/chat` and `GET /v1/coach/collaboration-score` (BE-06), `POST /v1/clustering/evaluate` (BE-11); `GET /v1/dashboard/profile` returns `not_enough_data` until BE-11. Section 7 describes the current consumer flows.
+>
+> **Source of truth**: `backend/app` · [`docs/ui/contracts.md`](../ui/contracts.md) · the root [`README.md`](../../README.md)  
+> 🚀 **Interactive Visual Viewer**: Open [`sequence_diagrams_viewer.html`](./sequence_diagrams_viewer.html) in any browser to zoom, pan, inspect and export the 8 rendered diagrams. Section 7's diagrams 1, 2 and 4 were rewritten for brand v2 on 2026-10-31 and render from their Mermaid source only (GitHub draws them inline).
 
 ---
 
@@ -223,95 +224,72 @@ sequenceDiagram
 
 ---
 
-## 7. Consumer UX, Behavioral Adaptation & Governance Flows
+## 7. Consumer flows (brand v2), mood guess, coach and review
 
-### Diagram 1: End-to-End User UX Flow (First Click to De-Cluttered Dashboard)
-
-![Consumer UX Flow: First Click to De-Cluttered Dashboard](./diagrams/07-consumer-ux-flow.svg)
-
-> 📊 **Rendered Visual Diagram**: [🔍 Open Vector SVG](./diagrams/07-consumer-ux-flow.svg) · [🖼️ View High-DPI Retina PNG](./diagrams/07-consumer-ux-flow.png)
-
-<details open>
-<summary><b>Mermaid Diagram Specification & Code</b></summary>
+### Diagram 1: First visit (Welcome → Baseline → Results → Home)
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as Human User
-    participant Welcome as WelcomePage (/) [Manual Lock]
-    participant Auth as AuthPage (/auth) [Manual Lock]
-    participant Arena as Zen Practice Arena (/practice?mode=baseline)
-    participant EMILY as EMILY Emotion Engine (Client JS)
-    participant Twin as Brain Twin API (/v1/telemetry)
-    participant Reveal as Twin Reveal (/reveal)
-    participant Dash as Consumer Dashboard (/dashboard)
+    actor User
+    participant Welcome as Welcome (/)
+    participant Baseline as Baseline (/baseline)
+    participant Device as This device (taskScores, pillars, sessionStore)
+    participant Results as Results (/results)
+    participant API as Server (backend/app)
+    participant Home as Home (/dashboard)
 
-    User->>Welcome: Lands on site (sees BRIAN & "Start 2-Min Calibration")
-    Welcome->>Auth: Clicks CTA -> 1-click Sign In or Guest Alias ("Maya")
-    Auth->>Arena: Routes to distraction-free 2-Minute Baseline (4 micro-rounds)
-
-    loop 4 Visual Micro-Rounds (~90s total)
-        Arena->>User: Renders tactile visual puzzle (zero navbars or math clutter)
-        User->>Arena: Moves pointer & clicks / presses keys
-        Arena->>EMILY: Streams pointer velocity, jerk, curvature & dwell time
-        Arena->>Twin: POST /v1/telemetry/event (rt_ms, accuracy, hesitation_jitter)
+    User->>Welcome: Opens the app (Loti says hi, one button: Start)
+    Welcome->>Baseline: Start
+    loop 6 exercises (Logic Web, Memory Gauntlet, Color Clash, Strategic Blueprint, Perceptual Radar, Precision Archive)
+        Baseline->>User: Instruction, fixation "+", trials, end card
+        User->>Baseline: Answers
+        Baseline->>Device: Queues one telemetry event per trial (nothing sent yet)
     end
-
-    EMILY-->>Reveal: Sets initial ambient emotion state (e.g., calm_flow -> Teal)
-    Twin-->>Reveal: Computes humanized "Thinking Style" + 6-Skill Clarity Halos
-    Arena->>Reveal: Celebratory transition -> Shows "Steady Strategist" & top strengths
-    User->>Reveal: Clicks "Enter My Cognitive Space →"
-    Reveal->>Dash: Routes to de-cluttered 3-section Dashboard
-    Dash->>User: Renders BRIAN greeting + EMILY Mood Pill, 6-Skill Radar & 7-Day Strip
+    Baseline->>Device: Scores the run and saves a session
+    Baseline->>Results: Blurred 5-skill chart, then the Dolphin
+    Results->>User: Save my answers / Keep them on this device only (equal weight)
+    alt Save my answers
+        Results->>API: POST /v1/telemetry/event (the queued events)
+    else Keep them on this device only
+        Results->>Device: Clears the queue; nothing is sent
+    end
+    Results->>Home: Go to my space
+    Home->>User: Greeting, Momo, one Loti line, Start today's session, 5-skill chart
 ```
 
-</details>
+A returning device (at least one saved session) skips Welcome and the baseline and opens Home.
 
 ---
 
-### Diagram 2: EMILY Behavioral Emotion Tracking & Human-Approved Color Adaptation
+### Diagram 2: Momo's mood guess (on the device only)
 
-![EMILY Behavioral Emotion Tracking & Human-Approved Color Adaptation](./diagrams/08-emily-emotion-color-adaptation.svg)
-
-> 📊 **Rendered Visual Diagram**: [🔍 Open Vector SVG](./diagrams/08-emily-emotion-color-adaptation.svg) · [🖼️ View High-DPI Retina PNG](./diagrams/08-emily-emotion-color-adaptation.png)
-
-<details open>
-<summary><b>Mermaid Diagram Specification & Code</b></summary>
+See [EMILY](EMILY_BEHAVIORAL_EMOTION_ENGINE.md) and [ADR 0002](../adr/0002-no-server-side-emotion-inference.md).
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as Human User
-    participant DOM as Browser DOM Listener (rAF ~50ms)
-    participant Buffer as 15s Sliding Window Buffer
-    participant EMILY as EMILY Circumplex Classifier
-    participant Pill as BRIAN & EmilyMoodPill UI
-    participant Theme as CSS Token Adapter (html[data-emotion])
+    actor User
+    participant Listener as EmotionListener (app shell)
+    participant Rules as emilyEngine.ts (hand-written rules)
+    participant Store as useEmilyStore
+    participant Momo as Momo (Home)
 
-    loop Continuous Passive Interaction
-        User->>DOM: pointermove, mousedown, mouseup, click, keydown
-        DOM->>Buffer: Pushes {x, y, t, type, target} (100% on-device)
+    loop While the user moves, taps and types
+        User->>Listener: pointer, click and key events (kept in the browser)
     end
-
-    loop Every 3000ms Evaluation Tick
-        Buffer->>EMILY: Computes {velocity, jerk, pathDirectness, clickDwellMs, rageClicks, hoverHesitation, directionFlips}
-        EMILY->>EMILY: Maps Valence x Arousal -> ('calm_flow' | 'energized' | 'frustrated' | 'hesitant' | 'fatigued')
-
-        alt Positive State ('calm_flow' or 'energized')
-            EMILY->>Theme: Smoothly transitions ambient tokens (Teal #0D9488 or Terracotta #D96B43)
-            Theme->>User: Updates doodle card glow & BRIAN expression (WCAG >= 4.5:1 ink locked)
-        else Stressed / Low-Energy State ('frustrated', 'hesitant', or 'fatigued')
-            EMILY->>Pill: Triggers gentle BRIAN check-in ("Pace felt intense—switch to Calm Mode?")
-            Pill->>User: Requests explicit Human Approval [Apply Calm Palette] / [Keep Current]
-            opt User Approves Adaptation (or Manually Selects via Mood Pill)
-                User->>Theme: Applies counter-regulatory Sage (#4D9078), Periwinkle (#5A67D8), or Indigo (#5C6B9C)
-                Theme->>User: Softens visual density & slows task pacing
-            end
+    loop Every 3 s
+        Listener->>Rules: Sliding window of events
+        Rules->>Store: A guess: calm_flow, energized, frustrated, hesitant or fatigued
+        alt calm_flow or energized
+            Store->>Momo: Calm or happy
+        else Strained guess with task strain (rage clicks, or 2+ errors when reported)
+            Store->>Momo: Proposed only; the user approves it or keeps the current mood
         end
     end
+    User->>Store: Picks a mood (locks it until unlocked)
+    Note over Listener,Momo: No mood label, buffer or metric is sent to the server.
 ```
-
-</details>
 
 ---
 
@@ -327,7 +305,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Client as Layer A Client (tracker.ts)
+    participant Client as Client tracker (tracker.ts)
     participant API as Telemetry API (/v1/telemetry/event)
     participant JEPA as Member 3: SAT-JEPA & 3x3 GMM
     participant Cache as Member 5: Bloom Filter Cache (/v1/tasks/next)
@@ -347,33 +325,37 @@ sequenceDiagram
 
 ---
 
-### Diagram 4: Explainable AI Coach, Non-Clinical Firewall & Dynamic Collaboration Scorer
-
-![Explainable AI Coach, Non-Clinical Firewall & Dynamic Collaboration Scorer](./diagrams/10-ai-coach-guardrails-collab.svg)
-
-> 📊 **Rendered Visual Diagram**: [🔍 Open Vector SVG](./diagrams/10-ai-coach-guardrails-collab.svg) · [🖼️ View High-DPI Retina PNG](./diagrams/10-ai-coach-guardrails-collab.png)
-
-<details open>
-<summary><b>Mermaid Diagram Specification & Code</b></summary>
+### Diagram 4: Loti, the crisis gates and the optional AI mode
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as Human User
-    participant CoachUI as Coach Page (/coach)
-    participant Guard as Non-Clinical Firewall (safety_guardrails.py)
-    participant Scorer as Collaboration Scorer (collaboration_scorer.py)
-    participant Agent as XAI Coach Agent (agent.py)
+    actor User
+    participant Loti as Loti page (/coach)
+    participant Scripted as Scripted brain (frontend)
+    participant API as POST /v1/coach/chat
+    participant Gates as crisis_check, then backup classifier, then health_signpost
+    participant LLM as LLM (only with a key and VITE_LOTI_COACH=on)
+    participant Guard as Output guardrail (banned_terms.json)
 
-    User->>CoachUI: Asks question, verifies hint, or clicks "Why Brian suggests this"
-    CoachUI->>Guard: Scans input for clinical/diagnostic terms
-    CoachUI->>Scorer: Extracts 5 synergy signals (Clarification, Verification, Iteration, Autonomy, Responsible Use)
-    Scorer-->>CoachUI: Updates 0-100 Co-Pilot Synergy Score (20/25/20/20/15 & Dynamic Weights)
-    Agent->>Guard: Drafts empathetic response injected with Brain Twin progress delta (Δc) & EMILY mood
-    Guard-->>CoachUI: Verifies 0 clinical terms & renders message + 3-bullet "Why Brian Suggests This" card
+    User->>Loti: Taps an answer chip (or types, in AI mode)
+    alt Default: scripted
+        Loti->>Scripted: Picks the next bubble from the user's own data on the device
+        Scripted-->>Loti: Bubble and chips
+    else AI mode (R14: every condition met)
+        Loti->>API: The transcript the user actually saw (never Momo's mood or unseen scores)
+        API->>Gates: Keyword crisis gate first, then the LLM backup classifier
+        alt Crisis or health question
+            Gates-->>Loti: Fixed reply: crisis line and emergency services, or "A doctor can."
+        else Clear
+            API->>LLM: Prompt with exercise-level context (no percentages)
+            LLM->>Guard: Draft reply
+            Guard-->>Loti: The reply, or a fixed fallback if any rule trips
+        end
+    end
 ```
 
-</details>
+`POST /v1/coach/chat` answers 501 until BE-06 ships it. The Collaboration Score (`GET /v1/coach/collaboration-score`, also 501 until BE-06) will be computed from real chat history only, and will appear only in Home's "Further explore" when there is enough data (BE-06/F-C).
 
 ---
 

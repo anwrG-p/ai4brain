@@ -1,5 +1,7 @@
 # Page 12 — AI Collaboration Score (`/collaboration`) Specification
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: `/collaboration` redirects to Home; the Collaboration Score appears under "Further explore" only with enough chat data. Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 - **Page Name & Route**: AI Collaboration Score Deep-Dive (`/collaboration`)
 - **Wave & Priority**: Wave 2 · **Must** (`P1` AI Collaboration Score & Signature #5 `<CollaborationScoreCard />`)
 - **Branch**: `ui/page-12-collaboration`

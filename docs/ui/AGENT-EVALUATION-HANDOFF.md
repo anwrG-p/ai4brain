@@ -1,5 +1,7 @@
 # Agent Evaluation & Audit Handoff Guide (`docs/ui/AGENT-EVALUATION-HANDOFF.md`)
 
+> **History.** This describes the UI before brand v2 (BRIAN, the Doodle design, 19 pages, 7 dimensions), superseded on 2026-10-31. Current: the [root README](../../README.md), the [glossary](../../docs/GLOSSARY.md) and `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 This guide is designed for any secondary AI agent, external code auditor, or competition evaluator assessing the frontend implementation of **SynapseTwin (CISTAC 1.0 AI4Brain)**.
 
 ---
@@ -10,7 +12,7 @@ This guide is designed for any secondary AI agent, external code auditor, or com
 - **Production UI Branch**: [`ui/main`](https://github.com/anwrG-p/ai4brain/tree/ui/main)
 - **Phase 1 Production Release Tag**: [`ui-v1.0-phase1`](https://github.com/anwrG-p/ai4brain/releases/tag/ui-v1.0-phase1)
 - **Local Working Directory**: `c:\Users\Smida\Desktop\CISTAC`
-- **Scope Boundary**: Strictly isolated to [`frontend/**`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/) and [`docs/ui/**`](file:///c:/Users/Smida/Desktop/CISTAC/docs/ui/) (root files and backend folders untouched).
+- **Scope Boundary**: Strictly isolated to `frontend/` and `docs/ui/` (root files and backend folders untouched).
 
 ---
 
@@ -18,15 +20,15 @@ This guide is designed for any secondary AI agent, external code auditor, or com
 
 Instruct the evaluating agent to read the documentation in this exact order to understand the architecture, rubric alignment, and verification evidence:
 
-1. **Rubric-to-Code Matrix**: [`docs/ui/JUDGES-UI.md`](file:///c:/Users/Smida/Desktop/CISTAC/docs/ui/JUDGES-UI.md)
+1. **Rubric-to-Code Matrix**: `docs/ui/JUDGES-UI.md`
    - Maps all 11 competition criteria (Relevance, Quality, Innovation, UX, Explainability, Safety, Generalisation, Robustness, Profile Quality, Plan Relevance, Defense) directly to route URLs, React components, and verification screenshots.
-2. **Architectural Decisions**: [`docs/ui/DECISIONS.md`](file:///c:/Users/Smida/Desktop/CISTAC/docs/ui/DECISIONS.md)
+2. **Architectural Decisions**: `docs/ui/DECISIONS.md`
    - `DEC-001` to `DEC-006` covering repository boundaries, design system lock, dimension registries, and accessibility mandates.
-3. **Automated QA & Contrast Logs**: [`docs/ui/QA-log.md`](file:///c:/Users/Smida/Desktop/CISTAC/docs/ui/QA-log.md)
+3. **Automated QA & Contrast Logs**: `docs/ui/QA-log.md`
    - Computed contrast numbers (15.61:1 Playful Lab ink, 16.12:1 Night Lab ink), Okabe-Ito colorblind markers, Vitest logs, and Playwright `axe-core` accessibility results.
-4. **Backend Contracts & Schemas**: [`docs/ui/contracts.md`](file:///c:/Users/Smida/Desktop/CISTAC/docs/ui/contracts.md)
+4. **Backend Contracts & Schemas**: `docs/ui/contracts.md`
    - REST/JSON schemas for `GET /v1/twin/state`, `POST /v1/tasks/next`, `POST /v1/coach/message`, and `POST /v1/collaboration/evaluate`.
-5. **Page Specifications**: [`docs/ui/pages/01-welcome.md`](file:///c:/Users/Smida/Desktop/CISTAC/docs/ui/pages/01-welcome.md) through [`19-layer-d.md`](file:///c:/Users/Smida/Desktop/CISTAC/docs/ui/pages/19-layer-d.md)
+5. **Page Specifications**: `docs/ui/pages/01-welcome.md` through `docs/ui/pages/19-layer-d.md`
    - Full 11-section specifications detailing information architecture, WCAG 2.1 AA checklists, edge cases, Definition of Done, and design critique reviews.
 
 ---
@@ -62,14 +64,14 @@ npm run dev
 
 Instruct the evaluating agent to inspect the 8 Signature Components:
 
-1. **Signature #1 `<UncertaintyRadar />`** ([`UncertaintyRadar.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/components/signature/UncertaintyRadar.tsx)): Dual-polygon confidence bands with diagonal SVG hatching on low-confidence dimensions ($< 0.60$) and Okabe-Ito glyphs.
-2. **Signature #2 `<BrainTwinTimeTravel />`** ([`BrainTwinTimeTravel.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/components/signature/BrainTwinTimeTravel.tsx)): 14-snapshot historical timeline scrubber with snapshot diffing.
-3. **Signature #3 `<WhyThisPanel />`** ([`WhyThisPanel.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/components/signature/WhyThisPanel.tsx)): 5-tab explainability drawer (*Data, Inference, Advice, Confidence, Counterfactual*).
-4. **Signature #4 `<ProjectionFanChart />`** ([`ProjectionFanChart.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/components/signature/ProjectionFanChart.tsx)): Bayesian trajectory fan with transparent credible intervals ($\pm \sigma, \pm 2\sigma$).
-5. **Signature #5 `<CollaborationScoreCard />`** ([`CollaborationScoreCard.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/components/signature/CollaborationScoreCard.tsx)): 0–100 metacognitive collaboration metric with dynamic weighting.
-6. **Signature #6 `<PrivacyCenter />`** ([`PrivacyCenter.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/components/signature/PrivacyCenter.tsx)): Hardware lock banner, telemetry JSON viewer, and GDPR right-to-erasure suite.
-7. **Signature #7 `<JudgeModeDock />`** ([`JudgeModeDock.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/components/signature/JudgeModeDock.tsx)): Evaluator dock with 6 seeded personas, fault injection switches, and dimension generalisation toggles.
-8. **Signature #8 `<Mascot />`** ([`Mascot.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/components/signature/Mascot.tsx)): Interactive companion featuring 5 cognitive states (`idle`, `hello`, `thinking`, `celebrate`, `rest`).
+1. **Signature #1 `<UncertaintyRadar />`** (`frontend/src/components/signature/UncertaintyRadar.tsx`): Dual-polygon confidence bands with diagonal SVG hatching on low-confidence dimensions ($< 0.60$) and Okabe-Ito glyphs.
+2. **Signature #2 `<BrainTwinTimeTravel />`** (`frontend/src/components/signature/BrainTwinTimeTravel.tsx`): 14-snapshot historical timeline scrubber with snapshot diffing.
+3. **Signature #3 `<WhyThisPanel />`** (`frontend/src/components/signature/WhyThisPanel.tsx`): 5-tab explainability drawer (*Data, Inference, Advice, Confidence, Counterfactual*).
+4. **Signature #4 `<ProjectionFanChart />`** (`frontend/src/components/signature/ProjectionFanChart.tsx`): Bayesian trajectory fan with transparent credible intervals ($\pm \sigma, \pm 2\sigma$).
+5. **Signature #5 `<CollaborationScoreCard />`** (`frontend/src/components/signature/CollaborationScoreCard.tsx`): 0–100 metacognitive collaboration metric with dynamic weighting.
+6. **Signature #6 `<PrivacyCenter />`** (`frontend/src/components/signature/PrivacyCenter.tsx`): Hardware lock banner, telemetry JSON viewer, and GDPR right-to-erasure suite.
+7. **Signature #7 `<JudgeModeDock />`** (`frontend/src/components/signature/JudgeModeDock.tsx`): Evaluator dock with 6 seeded personas, fault injection switches, and dimension generalisation toggles.
+8. **Signature #8 `<Mascot />`** (`frontend/src/components/signature/Mascot.tsx`): Interactive companion featuring 5 cognitive states (`idle`, `hello`, `thinking`, `celebrate`, `rest`).
 
 ---
 

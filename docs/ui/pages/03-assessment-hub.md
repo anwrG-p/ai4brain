@@ -1,5 +1,7 @@
 # 03. Assessment Hub (`/assessment`)
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: `/assessment` redirects to **Train** (`/train`). Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 ## Purpose, user moment, rubric criteria
 - **Purpose**: The **Layer A Assessment & Psychometric Calibration Center** of **SynapseTwin**, allowing learners and evaluators to inspect and launch adaptive micro-task blocks across all configured cognitive dimensions (`3 | 6 | 7 | 8 | 10`), review each dimension's **QUEST+ / 85%-accuracy staircase level**, see why low-confidence hatched dimensions (`< 60%` confidence) are prioritized in the queue, and verify our **mandatory non-biometric telemetry contract** (`GET /v1/tasks/next` & `POST /v1/telemetry/event`).
 - **User / Evaluator Moment**: Reached when clicking **"Start Next 2-Min Block"** from the Dashboard or navigating to `/assessment` to launch a specific cognitive task (`/task/:dimId`).

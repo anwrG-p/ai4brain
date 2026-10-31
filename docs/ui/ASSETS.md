@@ -1,5 +1,7 @@
 # Open-Source Assets & License Ledger (`docs/ui/ASSETS.md`)
 
+> **History.** This describes the UI before brand v2 (BRIAN, the Doodle design, 19 pages, 7 dimensions), superseded on 2026-10-31. Current: the [root README](../../README.md), the [glossary](../../docs/GLOSSARY.md) and `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 Every font, icon library, and visual asset used in `frontend/**` and `docs/ui/**` is openly licensed, commercial/competition-safe, and documented here.
 
 | Asset / Resource | Type | License | Source / Author | Usage in Project |

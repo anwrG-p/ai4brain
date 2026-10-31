@@ -26,16 +26,17 @@ if (!fs.existsSync(outputDir)) {
 }
 
 const titles = [
+  // null: a brand v2 consumer flow (section 7, diagrams 1, 2 and 4), kept as Mermaid source only, never rendered.
   { id: '01-high-level-closed-loop', title: 'High-Level 5-Subsystem Closed-Loop Overview' },
   { id: '02-seq1-assessment-telemetry-streaming', title: 'Sequence 1: Assessment Execution & Telemetry Streaming (M1 → M3)' },
   { id: '03-seq2-latent-representation-encoding', title: 'Sequence 2: Latent Representation Encoding & Task Blueprints Cache (M3 → M5)' },
   { id: '04-seq3-prototype-explainability-xai', title: 'Sequence 3: State Transition & Prototype Explainability XAI (M3 → M2)' },
   { id: '05-seq4-low-latency-task-cache', title: 'Sequence 4: Low-Latency Task Next & Runtime Adaptive Execution (M5 → M1)' },
   { id: '06-seq5-profile-ingestion-dashboard', title: 'Sequence 5: Profile Ingestion, Radar Chart & Dashboard Analytics (M3 & M2 → M4)' },
-  { id: '07-consumer-ux-flow', title: 'Consumer UX Flow: First Click to De-Cluttered Dashboard' },
-  { id: '08-emily-emotion-color-adaptation', title: 'EMILY Behavioral Emotion Tracking & Human-Approved Color Adaptation' },
+  null,
+  null,
   { id: '09-telemetry-jepa-cache', title: 'Assessment Telemetry, Brain Twin SAT-JEPA, and Task Cache' },
-  { id: '10-ai-coach-guardrails-collab', title: 'Explainable AI Coach, Non-Clinical Firewall & Collaboration Scorer' },
+  null,
   { id: '11-human-ux-review-jargon-gate', title: 'Human-in-the-Loop UX Review & Jargon Gate Workflow' },
 ]
 
@@ -47,6 +48,10 @@ let index = 0
 
 while ((match = mermaidRegex.exec(content)) !== null) {
   const code = match[1].trim()
+  if (titles[index] === null) {
+    index++
+    continue
+  }
   const meta = titles[index] || { id: `diagram_${index + 1}`, title: `Diagram ${index + 1}` }
   diagrams.push({
     ...meta,

@@ -1,5 +1,7 @@
 # Page 08 Specification — Brain Twin & Historical Timeline (`HERO`, `/brain-twin`)
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: `/brain-twin` redirects to Home; the page was removed. Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 **Route:** `/brain-twin`  
 **Priority:** `Must` · **HERO SCREEN**  
 **Branch:** `ui/page-08-brain-twin`  

@@ -1,5 +1,7 @@
 # 01. Welcome (`/`) · HERO PAGE
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: `/` is the brand v2 Welcome: Loti, one line, **Start**. Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 ## Purpose, user moment, rubric criteria
 - **Purpose**: First-impression landing screen that communicates the 4 pillars (*Assess, Understand, Coach, Improve*), proves epistemic honesty at a glance via a live interactive preview of the Uncertainty Radar, and launches users or evaluators into their first insight in under 3 minutes via two clear paths: **"Start 2-Minute Baseline"** or **"Try a Judge Demo Persona"**.
 - **User / Evaluator Moment**: Second `0:00` of the 3–5 minute demo video, Slide 2 of the pitch deck, and the very first screen evaluators open. Must survive a video freeze-frame with zero visual clutter.

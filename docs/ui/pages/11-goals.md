@@ -1,5 +1,7 @@
 # Page 11 — Goals & Habit Contracts (`/goals`) Specification
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: `/goals` redirects to Home; goals sit under "Further explore". Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 - **Page Name & Route**: Goals & Habit Contracts (`/goals`)
 - **Wave & Priority**: Wave 3 · **Must** (`P1` Layer C Goal Tracking & Uncertainty-Aware Habit Scaffolding)
 - **Branch**: `ui/page-11-goals`

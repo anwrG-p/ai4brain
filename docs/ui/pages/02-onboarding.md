@@ -1,5 +1,7 @@
 # 02. Onboarding & Consent (`/onboarding`)
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: `/onboarding` redirects to `/`; consent is the equal-weight choice on Results. Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 ## Purpose, user moment, rubric criteria
 - **Purpose**: 3-step progressive onboarding flow (**Step 1: Goal & Study Context** $\rightarrow$ **Step 2: Granular Telemetry Consent & Non-Biometric Lock** $\rightarrow$ **Step 3: 30-Second Input & Baseline Calibration Mode**) that establishes informed consent, proves privacy-by-default before a single keystroke is logged, and gets the user into their first assessment block in under 60 seconds.
 - **User / Evaluator Moment**: Triggered when a user or evaluator clicks **"Start 2-Minute Baseline →"** or **"Onboarding"** in the header. Evaluators inspect this page specifically for the **Safety & Ethics (6%)** and **UX (9%)** rubric criteria.

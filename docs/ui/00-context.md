@@ -1,5 +1,7 @@
 # 00 — Challenge Context, Rubric Proof Matrix & Team Alignment
 
+> **History.** This describes the UI before brand v2 (BRIAN, the Doodle design, 19 pages, 7 dimensions), superseded on 2026-10-31. Current: the [root README](../../README.md), the [glossary](../../docs/GLOSSARY.md) and `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 ## 1. Challenge Summary (CISTAC 1.0 — AI4Brain)
 - **Topic**: Continuous, non-clinical cognitive assessment and personalized adaptive coaching powered by generative AI, cognitive science, and temporal representation learning (SAT-JEPA + GMM archetypes).
 - **Four Core Pillars**:
