@@ -178,6 +178,11 @@ class AICoachAgent:
 
         The LLM never sees crisis text, and the chat goes on normally after a (possibly false) hit.
         Loti's own turns are kept: they are fixed, pre-checked text.
+
+        Known gap (R14): after a redacted crisis turn, Loti's CRISIS_REPLY stays in the LLM window
+        without the user text it answered, so the LLM sees an emergency line with no context. The
+        LLM-based backup classifier must handle this (see the safety_guardrails docstring) before
+        any LLM path is enabled for users.
         """
         user_idx = [i for i, m in enumerate(window) if m.role == ChatMessageRole.USER]
         alone = {i: self.guardrail.crisis_check(window[i].content).hit for i in user_idx}

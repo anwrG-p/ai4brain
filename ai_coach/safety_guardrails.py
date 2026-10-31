@@ -20,9 +20,10 @@ Two separate parts. Neither one ever rewrites or euphemises what the user wrote.
 THE KEYWORD CRISIS GATE IS A FLOOR, NOT A CLASSIFIER. It catches the listed phrasings and an
 intent x harm composition of them, but recall on wording it has never seen is low: on three held-out
 sets of 20 phrasings, each written before the patterns it was measured against, it caught 14, 8 and
-5 (70%, 40%, 25%). Precision has the same limit: after the round-4 guards (first-person subject,
-benign game/time tails) it passes all 54 benign training messages it was tuned on, but 3 of 20
-held-out benign messages still trip it (15%). An LLM-based backup classifier, run on every user
+5 (70%, 40%, 25%; set 3 is 5 of 19 since round 5, when one item became covered by a mandated
+pattern). Precision has the same limit: with the round-4/5 guards (first-person subject, method vs
+soft harms, game/session tails) it passes all 54 benign training messages it was tuned on, but 3
+of 20 held-out benign messages still trip it (15%). An LLM-based backup classifier, run on every user
 message alongside this gate, is
 REQUIRED before any LLM path is enabled for users (research area 7, improvement 1). Until then the
 LLM path stays off, as it is by default in the frontend (VITE_LOTI_COACH).
@@ -201,9 +202,18 @@ _EXERCISE_NOUNS = (
 #   adverbs ("I just want…", "I've been thinking…", "je veux juste…"): "my streak is going to die"
 #   and "will the hints disappear" have no first-person subject;
 # - bare will / ill / might are not intents;
-# - _BENIGN_TAIL: a game, exercise, time or idiom word within five words after the harm ("end it
-#   on a high score", "be gone for the weekend", "sauter de niveau", "die laughing", "mourir de
-#   stress", "dead meat") means it is not a crisis.
+# - harms come in two kinds (round 5, after the tail guard hid "I want to jump off a bridge today"):
+#   * METHOD harms (die, mourir, kill/hang/drown myself, jump off a bridge, me jeter, sauter du
+#     pont, overdose, swallow all the pills, slit wrists, never wake up…) ALWAYS hit after a
+#     first-person intent, whatever time or place follows. Only their own idiom tails clear them
+#     ("die laughing", "die of hunger", "mourir de stress", "die if I miss my streak").
+#   * SOFT harms (end it / end things / be gone / disappear / partir pour de bon / disparaître)
+#     hit unless _BENIGN_TAIL finds a game, exercise, app or object word within five words ("end
+#     it on a high score", "disappear from the leaderboard", "partir en vacances").
+# - Bare time words (today, aujourd'hui, weekend, here, for a while, tonight) never clear a hit on
+#   their own. They clear a soft harm only inside a session phrase: "for today", "for now", "see
+#   you", or next to an exercise word ("this session today"). Concrete bounded durations that
+#   imply a return ("for a week", "quelques jours", "un moment", "by 6pm") also clear soft harms.
 _EN_SUBJECT = r"(?:i|im|i m|i am|ive|i ve|ill|i ll|i will|id|i d|i would)"
 _FR_SUBJECT = r"(?:je|jai|j)"
 _ADVERBS = (
@@ -212,11 +222,10 @@ _ADVERBS = (
 )
 _BENIGN_TAIL_WORDS = (
     r"(?:" + _EXERCISE_NOUNS[3:-1] + r"|streaks?|scores?|levels?|leaderboard|classement|games?|"
-    r"matchs?|training|entrainement|workout|today|aujourdhui|apps?|appli|application|"
-    r"phone|telephone|weekend|week end|vacances|holidays?|vacation|couch|sofa|lit|"
-    r"for (?:a|the|one|now|today) ?(?:week|bit|while|day|moment)?|quelques jours|un moment|"
-    r"see you|a demain|early|here|errors?|mistakes?|erreurs?|by \d\w*|"
-    r"laughing|laughter|hunger|faim|stress|joie|rire|ennui|boredom|meat)"
+    r"matchs?|training|entrainement|workout|apps?|appli|application|phone|telephone|"
+    r"vacances|holidays?|vacation|couch|sofa|lit|"
+    r"for (?:today|now)|pour (?:aujourdhui|ce soir|le moment)|for (?:a|one) (?:week|day|moment)|"
+    r"quelques jours|un moment|see you|a demain|early|by \d\w*|errors?|mistakes?|erreurs?)"
 )
 _BENIGN_TAIL = rf"(?!(?: \w+){{0,4}} {_BENIGN_TAIL_WORDS}\b)"
 _FILLER = r"(?: \w+){0,3}?"
@@ -225,23 +234,42 @@ _EN_INTENT = (
     r"thinking (?:about|of)|think(?:s)? about|thought (?:about|of)|ready to|about to|decided to|"
     r"trying to|try to|wish i could|keep thinking about)"
 )
-_EN_HARM = (
-    r"(?:die(?! (?:of|from) (?:boredom|laughter|laughing|embarrassment|shame|cringe))|dying|"
-    r"be(?:ing)? (?:dead|gone)|end(?:ing)? (?:myself|things|it|it all|everything|my life)|"
-    r"jump(?:ing)? (?:off|from|in front of)|(?:never|not) wak(?:e|ing) up|"
-    r"(?:go|going) to sleep forever|sleep forever|disappear(?:ing)?(?! from (?:the|this) (?:screen|list))|"
-    r"(?:kill|hurt|harm|cut|hang)(?:ing)? myself|take my (?:own )?life|taking my (?:own )?life)"
+# Idiom tails that clear "die"/"mourir" (and only those): the person is exaggerating.
+_EN_DIE_IDIOM = (
+    r"(?! (?:of|from) (?:boredom|laughter|laughing|embarrassment|shame|cringe|hunger|thirst)\b)"
+    r"(?! laughing\b)"
+    r"(?! if i (?:miss|lose|skip|break|fail)\w*(?: \w+){0,3} (?:streaks?|scores?|levels?|rounds?|games?)\b)"
+)
+_EN_METHOD = (
+    r"(?:die" + _EN_DIE_IDIOM + r"|dying" + _EN_DIE_IDIOM + r"|be dead(?! meat)|being dead|"
+    r"end(?:ing)? (?:myself|my life)|(?:kill|hurt|harm|cut|hang)(?:ing)? myself|"
+    r"drown(?:ing)? myself(?! in (?:work|homework|coffee|tasks?|exercises?|emails?)\b)|"
+    r"take my (?:own )?life|taking my (?:own )?life|(?:never|not) wak(?:e|ing) up|"
+    r"(?:go|going) to sleep forever|sleep forever|overdos\w*|"
+    r"jump(?:ing)? (?:off|from|in front of|out of)"
+    r"(?: (?:a|an|the|my|this|that|our|high|tall|nearest|big|moving|next|top|of)){0,3}"
+    r" (?:bridge|train|window|roof|metro|subway|building|cliff|balcony|tower|ledge|bus|car)s?|"
+    r"throw(?:ing)? myself (?:under|off|in front of|from|out of)|"
+    r"swallow\w* (?:every|all|all of|the whole)(?: \w+){0,2} (?:pills?|meds|tablets|bottle)|"
+    r"(?:slit|cut|slash)\w* (?:my )?wrists?)"
+)
+_EN_SOFT = (
+    r"(?:be(?:ing)? gone|end(?:ing)? (?:things|it|it all|everything)|"
+    r"disappear(?:ing)?(?! from (?:the|this) (?:screen|list)))"
 )
 _FR_INTENT = (
     r"(?:veux|voudrais|vais|envie de|envie d|pense a|pense|pensais a|penser a|compte|"
     r"prefere|prefererais|aimerais|ai pense a|vais aller)"
 )
-_FR_HARM = (
-    r"(?:mourir(?! (?:dennui|de rire|de faim|de soif|de honte|de froid|de chaud|de fatigue|de peur))|"
-    r"crever(?! (?:de chaud|de faim|de soif|de froid|dennui))|me tuer(?! a la tache)|me jeter|"
-    r"me pendre|partir pour (?:toujours|de bon)|(?:ne )?plus (?:jamais )?me reveiller|"
-    r"ne (?:jamais|pas) me reveiller|disparaitre|me faire du mal|sauter (?:du|dun|par|sous|de))"
+_FR_METHOD = (
+    r"(?:mourir(?! (?:dennui|de rire|de faim|de soif|de honte|de froid|de chaud|de fatigue|de peur|"
+    r"de stress|de joie)\b)|crever(?! (?:de chaud|de faim|de soif|de froid|dennui|de stress)\b)|"
+    r"me tuer(?! a la tache)|me jeter(?! a leau)|me pendre|me noyer(?! dans (?:le|les|mes|un|mon) \w+)|"
+    r"(?:ne )?plus (?:jamais )?me reveiller|ne (?:jamais|pas) me reveiller|me faire du mal|"
+    r"sauter(?: (?:du|de|la|le|les|un|une|d|dun|par|sous|dans|haut|depuis|l|mon|ma)){1,4}"
+    r" (?:pont|fenetre|toit|balcon|immeuble|train|metro|falaise|vide|tour))"
 )
+_FR_SOFT = r"(?:partir pour (?:toujours|de bon)|disparaitre)"
 _CRISIS_PHRASES: Tuple[Tuple[str, Optional[str]], ...] = (
     (r"\bsu?i?cid\w*|\bsuicd\w*", None),
     (r"\bself ?harm\w*", "en"),
@@ -285,8 +313,20 @@ _CRISIS_PHRASES: Tuple[Tuple[str, Optional[str]], ...] = (
     (r"\bidees noires\b", "fr"),
     (r"\bpas en securite\b", "fr"),
     # Composition (see _EN_INTENT / _FR_INTENT above).
-    (rf"\b{_EN_SUBJECT}{_ADVERBS} {_EN_INTENT}{_FILLER} {_EN_HARM}\b{_BENIGN_TAIL}", "en"),
-    (rf"\b{_FR_SUBJECT}{_ADVERBS} {_FR_INTENT}{_FILLER} {_FR_HARM}\b{_BENIGN_TAIL}", "fr"),
+    # Method harms: no tail guard, whatever time or place follows.
+    (rf"\b{_EN_SUBJECT}{_ADVERBS} {_EN_INTENT}{_FILLER} {_EN_METHOD}\b", "en"),
+    (rf"\b{_FR_SUBJECT}{_ADVERBS} {_FR_INTENT}{_FILLER} {_FR_METHOD}\b", "fr"),
+    # Soft harms: cleared by a game, exercise, app or object word after them.
+    (rf"\b{_EN_SUBJECT}{_ADVERBS} {_EN_INTENT}{_FILLER} {_EN_SOFT}\b{_BENIGN_TAIL}", "en"),
+    (rf"\b{_FR_SUBJECT}{_ADVERBS} {_FR_INTENT}{_FILLER} {_FR_SOFT}\b{_BENIGN_TAIL}", "fr"),
+    # Method standalones that need no intent word.
+    (r"\bdrown\w* my ?self\b(?! in (?:work|homework|coffee|tasks?|exercises?|emails?)\b)", "en"),
+    (r"\bthrow\w* my ?self (?:under|off|in front of|from|out of)\b", "en"),
+    (r"\bswallow\w* (?:every|all|all of|the whole)(?: \w+){0,2} (?:pills?|meds|tablets|bottle)\b", "en"),
+    (r"\b(?:id|i d|i would) rather (?:be dead|die|not be alive|not exist|not wake up)\b", "en"),
+    (r"\bme noyer\b(?! dans (?:le|les|mes|un|mon) \w+)", "fr"),
+    # "going to end it tonight" needs no subject; "tonight" is never benign.
+    (r"\b(?:going to|gonna) end it (?:tonight|tomorrow|after this)\b", "en"),
     # Standalone forms that need no intent word.
     (r"\bend myself\b", "en"),
     (rf"\b(?:cant|can ?not|can t) (?:keep|go on|continue) (?:living|like this)\b{_BENIGN_TAIL}", "en"),
@@ -326,7 +366,10 @@ _CRISIS_PHRASES: Tuple[Tuple[str, Optional[str]], ...] = (
     (r"\bmettre fin a (?:tout|mon existence|mes souffrances)\b", "fr"),
     # Not wanting to exist.
     (
-        r"\b(?:stop|cease|quit) (?:existing|being alive|living)\b(?! (?:on|in|at|with|off)\b)|"
+        # Only digital objects clear "stop living": "on my phone", not "on this earth".
+        r"\b(?:stop|cease|quit) (?:existing|being alive|living)\b"
+        r"(?! (?:on|in front of|through) (?:my |the |a |social )?(?:phones?|screens?|media|internet|"
+        r"computer|laptop|instagram|tiktok|socials|online)\b)|"
         r"\b(?:dont|do not|no longer) want to (?:exist|be around)\b|\b(?:want|wish|prefer|rather) (?:to )?not exist\b",
         "en",
     ),

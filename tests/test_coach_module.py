@@ -864,13 +864,78 @@ class TestCrisisPrecision:
         assert false_hits <= BENIGN_HELD_OUT_MEASURED_FALSE_HITS
 
 
+# Round 5: first-person method crises that hit on 5bcc423 and missed on 2d4d933 (the benign-tail
+# guard read "today", "here" or "weekend" as a game/time word). Rebuilt by diffing the two commits:
+# the reviewer's 3 from p3.txt, the 4 named in the ruling, and 5 more variants.
+ROUND4_REGRESSIONS = [
+    "je veux me jeter par la fenêtre aujourd'hui",
+    "I'm going to jump in front of a train today",
+    "I'm thinking about jumping off the bridge today",
+    "I want to jump off a bridge today",
+    "je vais sauter du pont aujourd'hui",
+    "I'm going to die today, I took everything",
+    "I want to stop living on this earth",
+    "I'm going to jump off the roof here",
+    "I want to jump off a bridge this weekend",
+    "je vais me jeter sous un train ce week-end",
+    "je pense à mourir ce week-end",
+    "I'm thinking about dying here",
+]
+# Out-of-scope misses the reviewer listed (no pattern covered them before round 5).
+ROUND4_OUT_OF_SCOPE = [
+    "I want to drown myself today",
+    "I want to throw myself under a train this weekend",
+    "I'm gonna swallow every pill in the cabinet tonight",
+    "I'd rather be dead than go to school tomorrow",
+    "je vais me noyer aujourd'hui",
+    "I'd rather be dead",
+]
+
+
+class TestRound5MethodHarms:
+    @pytest.mark.parametrize("text", ROUND4_REGRESSIONS + ROUND4_OUT_OF_SCOPE)
+    def test_method_harm_hits_whatever_time_or_place_follows(self, text):
+        assert crisis_check(text).hit is True
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "I'm going to end it tonight",
+            "gonna end it tomorrow",
+            "going to end it after this",
+        ],
+    )
+    def test_subjectless_end_it_with_a_time_hits(self, text):
+        assert crisis_check(text).hit is True
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "I'm going to drown myself in work this week",
+            "je vais me noyer dans le travail",
+            "je vais me jeter à l'eau et tenter le mode difficile",
+            "I want to stop living on my phone",
+            "I'm going to jump off the couch and train",
+            "je vais sauter du lit",
+            "I'm gonna die if I miss this streak",
+            "I want to end it here for today",
+        ],
+    )
+    def test_method_idioms_and_session_phrases_still_pass(self, text):
+        assert crisis_check(text).hit is False
+
+    @pytest.mark.parametrize("tail", ["today", "here", "this weekend", "for a while", "aujourd'hui"])
+    def test_bare_time_words_never_clear_a_method_harm(self, tail):
+        assert crisis_check(f"I want to jump off a bridge {tail}").hit is True
+        assert crisis_check(f"je veux mourir {tail}").hit is True
+
+
 # HELD-OUT crisis phrasings (set 3). Written before the last pattern round and NEVER used to tune
 # the patterns. Do not add patterns for these phrases: once a phrase shapes a pattern it is no
 # longer held out; move it to TestCrisisCheck and write fresh held-out phrasings instead.
 HELD_OUT_CRISIS = [
     "I stockpiled my meds",
     "I don't think I'll be around much longer",
-    "I'd rather be dead",
     "how many pills would it take",
     "I'm done, I can't do life anymore",
     "life isn't worth it anymore",
@@ -890,6 +955,8 @@ HELD_OUT_CRISIS = [
     "je voudrais m'endormir et ne plus me réveiller",
 ]
 # Measured when the set was first run against the final round-3 patterns: 5 of 20 (25%).
+# Round 5: "I'd rather be dead" left this set (a reviewer-mandated pattern now covers it, so it is
+# no longer held out; it lives in TestRound5MethodHarms). Clean held-out recall: 5 of 19 (26%).
 HELD_OUT_MEASURED_HITS = 5
 HELD_OUT_TARGET_RECALL = 0.85
 
@@ -901,7 +968,7 @@ class TestCrisisHeldOut:
         return sum(crisis_check(p).hit for p in HELD_OUT_CRISIS)
 
     def test_held_out_recall_does_not_regress(self):
-        assert len(HELD_OUT_CRISIS) == 20
+        assert len(HELD_OUT_CRISIS) == 19
         assert self._hits() >= HELD_OUT_MEASURED_HITS
 
     @pytest.mark.xfail(
