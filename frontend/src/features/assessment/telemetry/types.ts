@@ -149,10 +149,37 @@ export type NBackParams = {
     pos: [number, number] | null
     symbol: string | null
     rule: 'position' | 'symbol' | 'parity'
+    // The trial's kind on the rule's stream (RULE_STREAM below). Under a parity rule a 'target' is a
+    // trial whose symbol is even, the trial that expects L.
     trial_type: 'target' | 'standard' | 'lure_minus' | 'lure_plus' | 'switch'
+    // Per-stream data: the true n-back match on each stream (parity: "the symbol is even"). Only the
+    // rule's stream expects a press (R16, as the hint says); a true answer on the other stream is a lure.
     answer: { position?: boolean; symbol?: boolean }
   }[]
 }
+
+type NBackStream = NBackParams['streams'][number]
+type NBackRule = NBackParams['trials'][number]['rule']
+
+/** The stream whose key the on-screen hint names for each rule: the rule's own stream, and L (the
+    symbol stream) for parity ("L = even number"). NBack.tsx scores and taskScores reads by it. */
+export const NBACK_RULE_STREAM: Readonly<Record<NBackRule, NBackStream>> = {
+  position: 'position',
+  symbol: 'symbol',
+  parity: 'symbol',
+}
+
+/* N-back events (NBack.tsx), one per stream per trial; trial_meta keys unchanged: trial_type, rule,
+   stream. Meaning since R16 (scoring follows the on-screen hint):
+   - Rule-stream event (stream = NBACK_RULE_STREAM[rule]): trial_type is the payload's. error_flag is
+     the trial's verdict: false only when the rule key's press-or-withhold matches answer[rule stream]
+     and the off-rule key was not pressed. So an off-rule press makes a noise trial a false alarm and
+     a target trial a miss (never a hit plus a false alarm). response_time_ms is the rule key's press,
+     else the off-rule press, else interval_ms.
+   - Off-rule event: expects no press. trial_type is 'lure_stream' when that stream matched n back
+     (an other-stream lure), else 'standard'; error_flag means its key was pressed.
+   Before R16 every event was scored against answer[stream] and carried the payload's trial_type. */
+export type NBackEventTrialType = NBackParams['trials'][number]['trial_type'] | 'lure_stream'
 
 export type StroopParams = {
   colors: string[]

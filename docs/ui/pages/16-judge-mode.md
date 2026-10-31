@@ -1,5 +1,7 @@
 # Page 16 — Demo & Judge Mode (`/judge-mode`) Specification
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: evaluator tools render only with `?judge=1`. Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 - **Page Name & Route**: Demo & Judge Mode (`/judge-mode`) · Signature #7 `<JudgeModeDock />`
 - **Wave & Priority**: Wave 3 · **Must** (`P1` Evaluator Defense & Rubric-to-UI Proof Suite · Signature Component #7)
 - **Branch**: `ui/page-16-judge-mode`
@@ -177,7 +179,7 @@
 ---
 
 ## 10. Definition of Done Checklist (10 Items)
-- [x] **DoD 01**: Author [`JudgeModeDock.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/components/signature/JudgeModeDock.tsx) and [`JudgeModePage.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/pages/JudgeModePage.tsx) matching design tokens.
+- [x] **DoD 01**: Author `frontend/src/components/signature/JudgeModeDock.tsx` and `frontend/src/pages/JudgeModePage.tsx` matching design tokens.
 - [x] **DoD 02**: Render 6 seeded persona switcher with 1-click state transition and badge updates.
 - [x] **DoD 03**: Render Fault Injection & Stress Studio with offline mode and LLM-down toggles.
 - [x] **DoD 04**: Render Dimension Generalisation switcher (3, 6, 7, 8, 10 dims).

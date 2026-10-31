@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-e2e/
 .vite/
 test-results/
 playwright-report/

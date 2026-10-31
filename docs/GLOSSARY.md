@@ -1,63 +1,79 @@
-# Canonical Consumer Glossary & Non-Clinical Copy Standards
+# Glossary: consumer words and copy rules
 
-> **CISTAC 1.0 (AI4Brain Challenge)** — Continuous, Non-Clinical Cognitive Assessment & Adaptive Growth  
-> **Source of Truth**: `frontend/src/utils/copyLinter.ts` · `frontend/scripts/lint-copy.mjs`
-
----
-
-## 1. Epistemic Principles & Tone Foundations
-
-SynapseTwin is an **empathetic personal cognitive twin**, not a medical diagnostic apparatus. Every phrase in the user interface, conversational coach agent, and telemetry summary must adhere to three foundational communication pillars:
-
-1. **Growth-Mindset Neuroplasticity**: Cognitive capacities fluctuate dynamically based on sleep, circadian rhythms, physical movement, and practice. We measure transient performance states, not fixed traits.
-2. **Epistemic Honesty & Uncertainty Awareness**: No estimate is presented as an absolute verdict. We openly display confidence intervals ($\pm \text{CI}$) and diagonal hatching when samples are insufficient.
-3. **Zero-Guilt Rest Protection**: Recovery is an active biological phase of learning. Users are never penalized, guilted, or reprimanded for scheduled rest days or taking breaks.
+> **Enforced by:** `frontend/src/utils/copyLinter.ts` and `frontend/scripts/lint-copy.mjs` (`npm run lint:copy`).
+> **Product:** SynapseTwin, a calm cognitive-training app. For training and self-reflection. Not a medical tool.
 
 ---
 
-## 2. Canonical Consumer Vocabulary (Approved Lexicon)
+## 1. Tone
 
-Use these preferred consumer terms across all pages, UI copy, and coach interactions:
+1. **Practice, not diagnosis.** Scores describe how you did on these exercises. Claims stay at "practice improves these exercises": nothing about life outside them, and nothing about health.
+2. **Honest numbers.** Scores come only from your own sessions. Missing data shows "Not measured yet", never a made-up value. Ranges appear only in "View as table" ("62 · likely 55–69").
+3. **No guilt.** No streaks to lose, no decay lines and no "you'll lose your progress".
+4. **Guesses are labelled as guesses.** Momo's mood is a guess the user can correct ([ADR 0002](adr/0002-no-server-side-emotion-inference.md)).
 
-| Canonical Consumer Term | Conceptual Definition | Context / UI Placement |
+---
+
+## 2. Words we use
+
+### Characters
+| Term | Meaning | Where |
 | :--- | :--- | :--- |
-| **Personal Cognitive Twin** | A living mathematical twin that mirrors and anticipates cognitive rhythms. | AppShell header, Welcome hero, Profile reveal |
-| **Your Thinking Style** | A qualitative persona cluster (e.g. *Steady Strategist*, *Agile Explorer*) reflecting natural attentional pacing and cognitive strategy. | `/reveal`, `/dashboard`, Profile cards |
-| **Weekly Progress Boost** | The measured rate of positive adaptive growth in speed, endurance, or accuracy across weekly micro-sessions. | Trend badges, Progress summaries |
-| **Clarity Range (±%) / Calibration Confidence** | The honest statistical interval and sync percentage reflecting baseline certainty. | Uncertainty Radar, Skill cards, Status pills |
-| **Auto-Paced to Your Flow Zone** | Dynamic difficulty calibration maintaining an optimal 85% accuracy state without cognitive fatigue. | Practice arena, Briefings |
-| **✨ Why Brian Suggests This** | A concise, 3-bullet explainability card (*What You Did*, *How Your Profile Shifted*, *When We'll Adjust Pace*). | AI Coach drawer, Assessment recommendations |
-| **Co-Pilot Synergy with Brian (0–100)** | An exploratory index measuring how effectively a learner audits and steers AI assistants (keeps small *Experimental Model* badge). | `/coach` synergy panel, Collaboration score |
-| **Visual Memory Clarity** | High-fidelity recognition distinguishing subtle visual variations from lures without false alarms. | Task cards, Skill arena (`episodic_pattern_separation`) |
-| **Wide-Angle Focus** | Simultaneous central and peripheral target discrimination under rapid presentation. | Task cards, Skill arena (`divided_perceptual_speed` / UFOV) |
-| **Distraction Shield** | Goal-directed stimulus selection while suppressing high-conflict surrounding clutter. | Task cards, Skill arena (`inhibition_control` / Flanker) |
-| **Daily Energy & Focus Rhythm** | The natural cyclical variance in alertness, focus, and executive endurance across the day. | `/brain-twin` rhythm tab, Dashboard overview, Settings |
-| **Rest-Protected Streak (Zero-Guilt Continuity Strip)** | A continuous habit counter that automatically pauses during rest days without resetting. | Dashboard Section 3, Goals page, Habit contract cards |
-| **Calibration Session (Today's 2-Min Flow)** | A gamified, low-stakes micro-puzzle block designed to estimate current cognitive parameters. | Assessment Hub, Task Runner, Briefing modals |
-| **Developing Range** | An exploratory ability range that has ample headroom for expansion through progressive practice. | Dimension Detail, Score Cards, Coach Feedback |
-| **BRIAN** | The friendly axolotl companion embodying adaptive guidance, celebration, and neuroplasticity encouragement. | Mascot widgets, Auth page, Error boundary fallbacks |
-| **EMILY** | The ambient mood and pointer rhythm calibrator that quietly measures baseline pointer pacing and atmosphere. | Dashboard Atmosphere Pill, Task runner background |
+| **Loti** | The guide: an axolotl coach who talks in short bubbles with answer chips. Scripted today; an AI mode only behind the crisis checks (R14). | Welcome, Home, the Loti tab, system pages |
+| **Dolphin** | The celebration character. It swims in to say "Good job!". | Results, milestones |
+| **Momo** | The mood companion. It shows an on-device *guess* of your mood (calm, happy, focused, tired, frustrated), which you can change. | Home |
+
+### Skills (the 5 pillars)
+The UI says **skills**; code and docs say **pillars** (`frontend/src/features/insights/pillars.ts`). The table follows the Train grouping; which exercises feed which score is in [TASKS_AND_DIMENSIONS.md](architecture/TASKS_AND_DIMENSIONS.md).
+
+| Skill | Listed under (Train): consumer name, `schema_type` |
+| :--- | :--- |
+| **Focus & Strategy** | Logic Web (`relational`), Strategic Blueprint (`tower`), Pattern Puzzle (`matrix`) |
+| **Mental Agility** | Memory Gauntlet (`n_back`), Shape Turn (`mental_rotation`) |
+| **Impulse Control** | Color Clash (`stroop`) |
+| **Deep Memory** | Precision Archive (`mst`) |
+| **Visual Radar** | Perceptual Radar (`ufov`) |
+
+The **baseline** is 6 exercises in this order: Logic Web, Memory Gauntlet, Color Clash, Strategic Blueprint, Perceptual Radar, Precision Archive (R10).
+
+### Screens and actions
+| Term | Meaning |
+| :--- | :--- |
+| **Home · Train · Loti · You** | The four tabs. |
+| **Welcome → Baseline → Results** | The first visit. A returning device goes straight to Home. |
+| **Save my answers / Keep them on this device only** | The consent choice on Results, with equal weight. Nothing is sent without "Save my answers". |
+| **Export my data / Delete my data** | On Privacy. Delete clears this device ("Deleted from this device."). The server's `DELETE /v1/user/telemetry` returns the counts it removed; once the screen calls it (ticket F-C), the message states those counts, or "this device only". |
+| **How we calculate this** | `/methodology`, the only place formulas appear. |
+| **Why Loti picked this** | The short reason behind today's suggestion, on Home under "Further explore". |
+| **Not measured yet** | Shown instead of a score when there is not enough data. |
 
 ---
 
-## 2.1 Master Jargon-to-Human Translation Table
+## 2.1 Words we no longer use
 
-| Forbidden Academic / ML Jargon (_Avoid_ in UI) | Approved Consumer-Friendly Copy (Canonical Term) | Where Technical Details Live |
+| Old term | Use instead | Why |
 | :--- | :--- | :--- |
-| **SAT-JEPA Latent Twin State & Hysteresis / GMM Archetype Cluster (k=0..8)** | **Your Thinking Style** (e.g., *Steady Strategist*, *Agile Explorer*) | Collapsible `<details>` drawer ("Explore How This Is Calculated") |
-| **Differential Vector Δc (+0.18)** | **Weekly Progress Boost** (e.g., +12% Memory Speed this week) | Tooltip on trend badge |
-| **Epistemic Uncertainty (±1.96σ CI) / Uncertainty Polygon Error Bands** | **Clarity Range (±5%) / Calibration Confidence (92% Calibrated)** | Subtext: *"Still getting to know you (2 quick games left)"* & deep telemetry drawer |
-| **QUEST+ / Elo Psychometric Staircase Target** | **Auto-Paced to Your Flow Zone** | Hidden from user (internal adaptive engine parameter) |
-| **5-Part Reasoning Trail (Telemetry -> Inference -> Counterfactual)** | **✨ Why Brian Suggests This** (3 friendly bullets: *What You Did*, *How Your Profile Shifted*, *When We'll Adjust Pace*) | Expandable drawer on Coach card |
-| **0–100 AI Collaboration Score** | **Co-Pilot Synergy with Brian (0–100)** | `/coach` synergy panel (keeps small *"Experimental Model (Design proposal, not validated)"* tag for rubric compliance) |
-| **Episodic Pattern Separation / UFOV / Inhibitory Flanker** | **Visual Memory Clarity · Wide-Angle Focus · Distraction Shield** | Skill cards & practice arena details |
-| **Continuous Saccadic Drift / Fatigue Heatmap** | **Daily Energy & Focus Rhythm** | `/brain-twin` rhythm tab & collapsible deep telemetry drawer |
+| BRIAN, Nodi (mascots) | **Loti** | Brand v2 replaced them. |
+| EMILY (in the UI) | **Momo** | EMILY is the code name of the mood rules, not a UI word. |
+| Doodle, Calm & Clean (design systems) | **the classroom board** | Wood frame, dotted whiteboard (light) or green chalkboard (dark). |
+| 7 (or 6, 10) dimensions; "dimension" in the UI | **5 skills** | Dimension ids stay in telemetry and code. |
+| ✨ Why Brian Suggests This | **Why Loti picked this** | |
+| Co-Pilot Synergy with Brian | **Collaboration Score** | Not shown yet. Will appear only in "Further explore" with enough chat data (BE-06/F-C). |
+| Weekly Progress Boost (+12%) | nothing | No improvement claims or percentages before a calibrated reliable-change check. |
+| Clarity Range (±%), Calibration Confidence (92%) | a range in "View as table" | R12. |
+| Rest-Protected Streak | a weekly goal that tolerates a miss | Streaks frame stopping as a loss. |
+| Privacy certificate, purge certificate, SHA receipt, "permanently purged" | **Delete my data** with honest counts | We certify nothing we did not do. |
+| "never collected", "non-biometric", "no emotion recognition" | say what we record, in one sentence | These claims were false or unprovable. |
+| Brain regions, chemicals, "brain age", "rewire" | nothing | We don't measure your brain (U5). |
+| Personal Cognitive Twin, Your Thinking Style | nothing in the UI yet | Archetypes exist on the server (clustering) but have no screen. |
 
 ---
 
 ## 3. Forbidden Academic & Clinical Jargon Table
 
 The terms below are **strictly prohibited** in all learner-facing copy. They are actively monitored by the AST copy linter (`npm run lint:copy` / `copyLinter.ts`). Any PR containing an unexempted violation fails CI automatically.
+
+The replacements below are for UI copy. When a user raises a health concern in the Loti chat, Loti signposts help instead of rewriting their words (research §7, `ai_coach/safety_guardrails.py`).
 
 ### 3.1 Clinical & Diagnostic Banned Terms
 
@@ -100,5 +116,5 @@ The terms below are **strictly prohibited** in all learner-facing copy. They are
 The copy linter recognizes valid technical contexts and explicit disclaimers:
 - **Negated Disclaimers**: Phrases like `"not a medical or clinical diagnostic tool"` or `"zero clinical diagnostic claims"` are explicitly permitted.
 - **Technical System Diagnostics**: Developer infrastructure, error boundaries, and system logs (`ErrorBoundary diagnostic JSON`, `System Faults`) are exempt from copy linting.
-- **Interactive Sandbox Fixtures**: The copy linter demo sandbox on `/design-system` and `/methodology` may render isolated strings inside inspection panels to demonstrate active regex interception.
+- **Test fixtures**: the copy linter's own tests may hold banned strings to prove they are caught.
 

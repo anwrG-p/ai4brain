@@ -5,13 +5,14 @@ import { tracker } from '../telemetry/tracker'
 import { useInputCapture } from '../telemetry/useInputCapture'
 import type { TowerParams } from '../telemetry/types'
 import type { TaskProps } from './TaskRunner'
+import { EXERCISE_NAME } from '../names'
 
 const same = (a: string[][], b: string[][]) => JSON.stringify(a) === JSON.stringify(b)
 
 // Fixed client palette of theme tokens; payload disc ids never reach CSS. Disc labels are painted in
 // --color-surface (white in light, slate in dark): >= 4.5:1 on every disc token in both themes
-// (ratios in ticket 06's Comments). Not --dim-5 (4.29:1 light). Distinct hues: blue, red, green,
-// indigo, olive, orange, pink, slate.
+// (ratios in brand-v2 ticket 01's Comments). Not --dim-5 (4.29:1 light). Distinct hues: blue, red, green,
+// brown, olive, orange, teal, slate.
 // ponytail: colours repeat after 8 distinct discs; the id text still tells them apart.
 export const PALETTE = [
   'var(--dim-1)',
@@ -167,8 +168,7 @@ export function Tower({ params, recorder, onDone }: TaskProps<TowerParams>) {
 
   const locked = predicted === null
   return (
-    <section aria-label="Tower puzzle" className="flex flex-col items-center gap-4">
-      <p className="text-ink">Rearrange the discs to match the goal. Move the top disc of one peg onto another peg; each peg holds a limited number of discs.</p>
+    <section aria-label={EXERCISE_NAME.tower} className="flex flex-col items-center gap-4">
       <form noValidate onSubmit={submit} className="flex flex-wrap items-center justify-center gap-3">
         <label className="flex flex-wrap items-center gap-2 text-ink">
           How many moves will you need?{' '}

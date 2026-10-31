@@ -1,5 +1,7 @@
 # UI & UX Architecture Decisions (`DECISIONS.md`)
 
+> **History.** Entries are kept as written. Later decisions supersede earlier ones: DEC-010 (Calm & Clean) replaced the Doodle direction, and brand v2 (Loti, the classroom board, 5 skills; DEC-011) replaced both. Current: the [glossary](../../docs/GLOSSARY.md) and `docs/design/BRAND-V2.md`.
+
 Every non-trivial frontend, UX, design-system, and contract decision is recorded here in chronological order.
 
 ---
@@ -122,3 +124,17 @@ Every non-trivial frontend, UX, design-system, and contract decision is recorded
   8. `playwright.config.ts` uses `channel: 'chrome'` outside CI, so `npm run qa:e2e` needs Google Chrome installed. Ticket 08 ran the spec with installed Edge via a scratch config that only changed the channel.
   9. The task runner's `loading` and `extreme-text` stages are unreachable too (nothing sets them) and make claims nothing backs: "60/120 Hz Sync", "Trial #9,999 · … Posterior Confidence: 99.8%". Suggestion: delete both stages with `briefing` (item 4).
   10. `docs/ui/QA-log.md` (DEC-008 entry, "Truth-in-Claims Verified") still credits the deleted `telemetryQueue.ts` with idempotency IDs and exponential backoff. The Tracker has the backoff (D3 above) but no idempotency IDs (the contract has no event id field).
+
+---
+
+## DEC-010: "Calm & Clean" Design System (Lexend, Indigo, One Soft Elevation)
+- **Date**: 2026-10-30
+- **Status**: **Accepted by the team, pending the UI owner** (DEC-001: the UI team owns `frontend/**`).
+- **Context**: The team finds the Doodle UI too bulky: cursive Delius type, hard offset shadows, 2 px borders, dot grids, wood and podium textures, decorative mascots, too much copy and too many steps. Evidence: `docs/research/2026-10-30-ui-simplification-review.md` §1 and §3. Spec: `.scratch/ui-calm-clean/spec.md`.
+- **Choice**: Flat, minimal "Calm & Clean" system. It **supersedes the Doodle / Delius direction** (DEC-006's display pairing and DEC-007's offset-shadow and gradient tokens):
+  - **Type**: Lexend for display and body (400/500/600/700, self-hosted via `@fontsource/lexend`, as DEC-006 and DEC-008 already chose), JetBrains Mono for tabular numbers. Delius is removed.
+  - **Colour**: off-white canvas `#F8FAFC`, white surfaces, slate ink, one primary (indigo `#4F46E5`, dark `#818CF8`) and one accent (teal `#0F766E`, dark `#2DD4BF`). `--dim-1..10` (Okabe-Ito) are unchanged. Every text pair ≥ 4.5:1 and every UI boundary ≥ 3:1, checked by `npm run check:contrast` (`src/styles/token-metadata.ts`).
+  - **Shape**: radii sm 6 / md 10 / lg 12 / xl 16 / pill; cards use xl and a 1 px `--color-border`; one soft elevation in light, none in dark (1 px border only); no offset shadows, no translate on hover or press; focus is a 2 px brand outline with a 2 px offset.
+  - **Background**: plain canvas. Dot grids, the dashed scrollbar track, gradients, wood and podium textures are removed.
+  - **Kept**: the class names and component APIs (`.tactile-card`, `.tactile-btn`, `.editorial-card`, `.hero-card`, `.focus-ring`, Button / Card / Badge props) and every DEC-007 selector; only their visuals change. The reduced-motion and timed-trial locks are kept.
+- **Why**: Visual complexity hurts first impressions more than colour choice does; a flat system with one primary colour, Lexend and generous whitespace lowers clutter and keeps the WCAG AA guarantees in both themes.

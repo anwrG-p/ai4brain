@@ -1,5 +1,7 @@
 # Page 13 — Privacy Center & Audit Log (`/privacy`) Specification
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: `/privacy` shows consent, Export my data and Delete my data; no certificates, receipts or hashes. Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 - **Page Name & Route**: Privacy Center & Audit Log (`/privacy`) · Signature #6 `<PrivacyCenter />`
 - **Wave & Priority**: Wave 3 · **Must** (`P1` Safety, Transparency & User Agency · Signature Component #6)
 - **Branch**: `ui/page-13-privacy`
@@ -183,11 +185,11 @@
 ---
 
 ## 9. Data Contracts & Backend Integration
-- **`DELETE /v1/user/telemetry`**:
-  - Request: Empty or `{ "purge_reason": "user_right_to_be_forgotten" }`.
-  - Response: `200 {"status": "purged", "purged_records": 142, "certificate_id": "CERT-PURGE-2026-8F4A"}`.
-- **`GET /v1/user/export`**:
-  - Response: Full JSON archive matching `cistac-v1.0` schema.
+- **`DELETE /v1/user/telemetry?user_id=<anonymous id>`** (`backend/app/api/routes/v1_privacy.py`):
+  - Response: `200 {"deleted_events": n, "deleted_files": n}`, counting only what was removed (`0, 0` when nothing was stored). Idempotent.
+  - `422` for a missing or unsafe id; `503` with `Retry-After: 1` when the telemetry store is busy.
+- **`GET /v1/user/export?user_id=<anonymous id>`**:
+  - Response: `200` raw JSONL (`application/x-ndjson`, one stored event per line, as an attachment); `404` when nothing is stored; `413` above 50 MB; `503` with `Retry-After: 1` when busy.
 - **`ConsentPreferences`** (from `frontend/src/store/useAppStore.ts`):
   - `coreTelemetry: true` (Locked)
   - `nonBiometricMode: true` (Locked)
@@ -200,7 +202,7 @@
 ---
 
 ## 10. Definition of Done Checklist (10 Items)
-- [x] **DoD 01**: Author [`PrivacyCenter.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/components/signature/PrivacyCenter.tsx) and [`PrivacyPage.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/pages/PrivacyPage.tsx) matching design tokens and 12-column desktop / 1-column mobile layouts.
+- [x] **DoD 01**: Author `frontend/src/components/signature/PrivacyCenter.tsx` and `frontend/src/pages/PrivacyPage.tsx` matching design tokens and 12-column desktop / 1-column mobile layouts.
 - [x] **DoD 02**: Prominently display Non-Biometric Hardware Lock Banner with physical disconnection guarantee.
 - [x] **DoD 03**: Render granular consent controls with equal-prominence "Reject All Optional" and "Restore Defaults" buttons.
 - [x] **DoD 04**: Implement "What the AI Sees" live telemetry JSON inspector updating dynamically when toggles change.

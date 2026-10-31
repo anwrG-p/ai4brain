@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   computeEmilyMetrics,
   classifyEmilyEmotion,
   EMILY_EMOTION_CONFIGS,
+  startEmilyListener,
   type EmilyInteractionEvent,
   type EmilyEmotion,
 } from '../utils/emilyEngine'
@@ -273,5 +274,29 @@ describe('EMILY Behavioral Emotion Engine (Circumplex Affective Model)', () => {
       })
     })
   })
-})
 
+  describe('5. Passive listener', () => {
+    it('records events whose target is not an element (window, document) without throwing', () => {
+      vi.useFakeTimers()
+      const onEvaluation = vi.fn()
+      const stop = startEmilyListener(onEvaluation, { evalIntervalMs: 100 })
+      try {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }))
+        document.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        const button = document.body.appendChild(document.createElement('button'))
+        button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        button.remove()
+        vi.advanceTimersByTime(100)
+        const buffer = onEvaluation.mock.calls.at(-1)?.[2] as EmilyInteractionEvent[] | undefined
+        expect(buffer?.map((e) => [e.type, e.isInteractive])).toEqual([
+          ['keydown', false],
+          ['click', false],
+          ['click', true],
+        ])
+      } finally {
+        stop()
+        vi.useRealTimers()
+      }
+    })
+  })
+})

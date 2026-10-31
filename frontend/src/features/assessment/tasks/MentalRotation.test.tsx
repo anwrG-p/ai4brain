@@ -73,7 +73,7 @@ test('trial_meta carries the trial angle_deg and mirrored flag (also on timeout)
 
 test('on-screen buttons answer too; a timeout scores 0 at time_limit_ms', () => {
   setup(params([same, different]))
-  act(() => void fireEvent.pointerDown(screen.getByRole('button', { name: /same/i })))
+  act(() => void fireEvent.pointerDown(screen.getByRole('button', { name: /turned/i })))
   advance(7000)
   expect(pushed.map((e) => e.score_norm)).toEqual([1, 0])
   expect(pushed[1]!.response_time_ms).toBe(7000)
@@ -86,7 +86,7 @@ test('keyboard activation of a button answers once; Ctrl+F / Meta+J are not resp
     fireEvent.keyDown(window, { key: 'j', metaKey: true })
   })
   expect(pushed).toHaveLength(0)
-  const btn = screen.getByRole('button', { name: /different/i })
+  const btn = screen.getByRole('button', { name: /mirrored/i })
   btn.focus()
   act(() => void fireEvent.click(btn, { detail: 0 }))
   expect(pushed).toHaveLength(1)

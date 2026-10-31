@@ -1,5 +1,7 @@
 # UX Transformation Plan: Affective Computing, Journey Flow & Human Approval Protocol
 
+> **History.** This describes the UI before brand v2 (BRIAN, the Doodle design, 19 pages, 7 dimensions), superseded on 2026-10-31. Current: the [root README](../../README.md), the [glossary](../../docs/GLOSSARY.md) and `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 > **SynapseTwin / BRIAN Cognitive Companion** — CISTAC 1.0 (AI4Brain Challenge)  
 > **Status**: Complete & Verified Across 19 Screens · **DoD Compliant**
 

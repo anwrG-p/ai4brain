@@ -1,11 +1,15 @@
+{# Renderer note: pass XAIExplainer.describe_shift into the template context as `describe_shift`
+   (e.g. template.render(..., describe_shift=explainer.describe_shift)); the template calls it. #}
 [ADAPTATION EVENT]
-The system detected an archetype transition or latent delta shift:
-- Active Cluster: {{ active_cluster_id }}
-- Differential Shifts (Δc):
+The next task changed. What the model saw:
+- Active group: {{ active_cluster_id }}
+- Shifts (direction only, from XAIExplainer.describe_shift):
 {% for dim, delta in delta_vector.items() %}
-  * {{ dim }}: {{ "%+.1f"|format(delta * 100) }}%
+  * {{ dim }}: {{ describe_shift(delta) }}
 {% endfor %}
-- Explanatory Rationale: {{ rationale }}
+- Reason: {{ rationale }}
 
-Guidance:
-Explain to the user how this cognitive shift directly triggered their latest task calibration, reinforcing their progress and outlining the strategic benefit of the adaptation.
+Guidance for Loti:
+Say what changed and why, in one bubble of at most 12 words.
+Never quote a number or a percentage. Talk about the exercise, never about the brain.
+Example: "Rounds got a bit faster. Your last few were steady."

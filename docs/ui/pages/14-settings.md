@@ -1,5 +1,7 @@
 # Page 14 Specification: Settings & Accessibility Controls (`/settings`)
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: `/settings` has Theme and Reduce motion. Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 - **Page Name & Route**: Settings & Accessibility Controls (`/settings`)
 - **Primary Users**: Neurodivergent learners, screen reader users, keyboard-only operators, students requiring sensory adjustments, and competition evaluators.
 - **Challenge Goals**:
@@ -213,7 +215,7 @@ Page 14 establishes **SynapseTwin's Cognitive Ergonomics Suite**:
 
 ## 9. Definition of Done Checklist (10 Items)
 
-- [x] **DoD 01**: Author [`SettingsPage.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/pages/SettingsPage.tsx) matching design tokens and semantic classes.
+- [x] **DoD 01**: Author `frontend/src/pages/SettingsPage.tsx` matching design tokens and semantic classes.
 - [x] **DoD 02**: Render Theme Mode selector (Playful Lab vs. Night Lab) with real-time application and `data-theme` synchronization.
 - [x] **DoD 03**: Render Text Scaling controls (100%, 115%, 130%) with live interactive cognitive card preview.
 - [x] **DoD 04**: Render Reduced Motion toggle with instant `data-reduced-motion` attribute update on root element.
@@ -221,7 +223,7 @@ Page 14 establishes **SynapseTwin's Cognitive Ergonomics Suite**:
 - [x] **DoD 06**: Render Cognitive Dimension Pool preset switcher (3, 6, 7, 8, 10 dims) synced with `useAppStore`.
 - [x] **DoD 07**: Render Non-Punitive Habit & Study Windows with protected rest days checkboxes.
 - [x] **DoD 08**: Render accessible keyboard shortcuts reference table (`role="region"` with `tabIndex={0}`).
-- [x] **DoD 09**: Wire route `/settings` in [`App.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/App.tsx) and navigation link in [`AppShell.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/components/layout/AppShell.tsx).
+- [x] **DoD 09**: Wire route `/settings` in `frontend/src/App.tsx` and navigation link in `frontend/src/components/layout/AppShell.tsx`.
 - [x] **DoD 10**: Pass all QA checks (`npm run qa:checks`), 0 `axe-core` violations, 0 overflow, and save 6 Playwright screenshots to `docs/ui/screenshots/14-settings-*.png`.
 
 ---

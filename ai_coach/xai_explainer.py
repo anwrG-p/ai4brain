@@ -6,7 +6,10 @@ growth-mindset justifications for task adaptations.
 
 Reference:
 - README: 'Implement Explainability Injection: ingest the differential vector Δc from Member 3
-  to justify recommendations (e.g., "We adjusted task pacing because your working memory stability improved by 20%").'
+  to justify recommendations (e.g., "We adjusted the working memory pacing and added an item to
+  remember. Your last few rounds were steady.").'
+- Wording rule: exercise-level only. No "improved", no percentages, until a calibrated
+  reliable-change gate exists (docs/research/2026-10-31-improvement-opportunities.md, area 3).
 """
 
 from __future__ import annotations
@@ -14,6 +17,8 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 from ai_coach.schemas import CognitiveDimension, StateBusEvent
 from ai_coach.safety_guardrails import SafetyGuardrailEngine
+
+NEUTRAL_RATIONALE = "We adjusted this round to fit your recent results."
 
 
 class XAIExplainer:
@@ -51,28 +56,34 @@ class XAIExplainer:
             )
 
         top_dim, top_delta = significant_shifts[0]
-        pct_change = abs(round(top_delta * 100))
 
+        # Exercise-level wording only. There is no calibrated reliable-change gate yet, so a reason
+        # never claims the person improved and never quotes a percentage (research area 3).
+        steady = "Your last few rounds were steady."
         dimension_explanations = {
             CognitiveDimension.WORKING_MEMORY.value: {
-                "positive": f"We adjusted task pacing and increased item spans because your working memory stability improved by {pct_change}%.",
-                "negative": f"We added intermediate recall checkpoints to support working memory consolidation as challenge depth increases.",
+                "positive": f"We adjusted the working memory pacing and added an item to remember. {steady}",
+                "negative": "We added intermediate recall checkpoints to support working memory consolidation as challenge depth increases.",
             },
             CognitiveDimension.PATTERN_INDUCTION.value: {
-                "positive": f"We advanced rule complexity because your matrix pattern induction agility showed a +{pct_change}% acceleration.",
-                "negative": f"We scaffolded visual contrast cues to assist in deconstructing intricate matrix transformations.",
+                "positive": f"We added a little more challenge to the matrix pattern rules. {steady}",
+                "negative": "We scaffolded visual contrast cues to assist in deconstructing intricate matrix transformations.",
             },
             CognitiveDimension.EXECUTIVE_FUNCTION.value: {
-                "positive": f"We reduced inter-stimulus intervals to challenge your executive task-switching speed (+{pct_change}% fluidity).",
-                "negative": f"We tuned distractor ratios to create optimal focus conditions for task-switching flow.",
+                "positive": f"We shortened the gap between task switches a little. {steady}",
+                "negative": "We tuned distractor ratios to create optimal focus conditions for task-switching flow.",
             },
             CognitiveDimension.SPATIAL_ORIENTATION.value: {
-                "positive": f"We expanded rotational angles in spatial tasks to match your +{pct_change}% spatial orientation progression.",
-                "negative": f"We provided directional reference markers to anchor mental rotation pathways.",
+                "positive": f"We added wider rotation angles to the spatial rounds. {steady}",
+                "negative": "We provided directional reference markers to anchor mental rotation pathways.",
             },
             CognitiveDimension.PROCESSING_SPEED.value: {
-                "positive": f"We tightened response windows to match your faster, jitter-free cognitive throughput (+{pct_change}%).",
-                "negative": f"We extended pacing windows to encourage deliberate, high-accuracy problem analysis.",
+                "positive": f"We tightened the response window a little. {steady}",
+                "negative": "We extended pacing windows to encourage deliberate, high-accuracy problem analysis.",
+            },
+            CognitiveDimension.EPISODIC_MEMORY.value: {
+                "positive": f"We added closer look-alikes. {steady}",
+                "negative": "We spaced out the look-alikes so each picture is easier to tell apart.",
             },
         }
 
@@ -81,17 +92,27 @@ class XAIExplainer:
 
         if dim_key in dimension_explanations:
             rationale = dimension_explanations[dim_key][direction]
+        elif top_delta >= 0:
+            rationale = f"We added a little more challenge to the {top_dim.replace('_', ' ')} rounds."
         else:
-            trend = "strengthened" if top_delta >= 0 else "is actively calibrating"
-            rationale = f"We fine-tuned difficulty parameters because your {top_dim.replace('_', ' ')} {trend} by {pct_change}%."
+            rationale = f"We eased the {top_dim.replace('_', ' ')} rounds a little."
 
         # If uncertainty is notable, acknowledge adaptive calibration
         if uncertainty > 0.4:
             rationale += " (Adaptive calibration active: exploratory tolerance widened)."
 
-        # Ensure non-clinical safety
-        safe_rationale, _ = self.safety_guardrail.sanitize(rationale)
+        # Ensure non-clinical safety: a rationale that trips a banned term (e.g. from an unknown
+        # dimension key) is withheld whole, never reworded.
+        safe_rationale, _ = self.safety_guardrail.sanitize(rationale, fallback=NEUTRAL_RATIONALE)
         return safe_rationale
+
+    def describe_shift(self, delta: float) -> str:
+        """Exercise-level word for one Δc entry: more challenge, more support, or steady."""
+        if delta >= self.significance_threshold:
+            return "steadier, so a little more challenge"
+        if delta <= -self.significance_threshold:
+            return "harder lately, so a little more support"
+        return "steady, no change"
 
     def format_xai_prompt_context(
         self,
@@ -110,13 +131,13 @@ class XAIExplainer:
             "### EXPLAINABILITY CONTEXT (MEMBER 3 LATENT STATE):",
             f"- Active Cognitive Archetype Index: Cluster {active_k}",
             f"- State Estimation Uncertainty (sigma): {uncertainty:.3f}",
-            "- Prototype Differential Vector (Δc):",
+            "- What changed per dimension (direction only; never quote numbers for these):",
         ]
 
+        # Direction words, not percentages: the LLM must not repeat an unbacked "+20%" to the user.
         if deltas:
             for dim, delta in deltas.items():
-                sign = "+" if delta >= 0 else ""
-                lines.append(f"  * {dim}: {sign}{delta * 100:.1f}%")
+                lines.append(f"  * {dim}: {self.describe_shift(delta)}")
         else:
             lines.append("  * (No active differential shift)")
 

@@ -3,6 +3,7 @@ import { afterEach, expect, test, vi } from 'vitest'
 import { TrialRecorder } from '../telemetry/tracker'
 import type { TaskPayload } from '../telemetry/types'
 import fixtures from './fixtures.json'
+import { introFor } from '../exercises'
 import { TaskRunner } from './TaskRunner'
 
 afterEach(() => {
@@ -36,14 +37,14 @@ test('unmounting before the skip fires never calls onDone', () => {
 
 // Every schema renders its exercise (a labelled region); unknown ones fall back to the skip (above).
 const PORTED: Record<string, string> = {
-  n_back: 'Memory Sharpness',
-  stroop: 'Color naming',
-  matrix: 'Pattern puzzle',
-  mental_rotation: 'Shape turning',
-  relational: 'Word relations',
-  tower: 'Tower puzzle',
-  ufov: 'Quick look',
-  mst: 'Shape memory',
+  n_back: 'Memory Gauntlet',
+  stroop: 'Color Clash',
+  matrix: 'Pattern Puzzle',
+  mental_rotation: 'Shape Turn',
+  relational: 'Logic Web',
+  tower: 'Strategic Blueprint',
+  ufov: 'Perceptual Radar',
+  mst: 'Precision Archive',
 }
 
 test('the fixture schemas and the ported components are the same set', () => {
@@ -55,4 +56,12 @@ test.each((fixtures as TaskPayload[]).map((t) => [t.schema_type, t] as const))('
   render(<TaskRunner task={task} recorder={recorderFor(task)} onDone={vi.fn()} />)
   expect(screen.getByRole('region', { name: PORTED[schemaType] })).toBeInTheDocument()
   expect(screen.queryByText(/Unsupported task/)).toBeNull()
+})
+
+// Anti-slop rule 13: the instruction screen says what to do once; the trial area keeps only per-trial state.
+test.each((fixtures as TaskPayload[]).map((t) => [t.schema_type, t] as const))('%s does not repeat its instruction line', (_s, task) => {
+  render(<TaskRunner task={task} recorder={recorderFor(task)} onDone={vi.fn()} />)
+  expect(screen.queryByText(introFor(task)!.line)).toBeNull()
+  const region = screen.getByRole('region')
+  for (const p of region.querySelectorAll('p')) expect(p.textContent!.split(/\s+/).length).toBeLessThanOrEqual(12)
 })

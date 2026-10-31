@@ -1,0 +1,9 @@
+# The API server (backend/app). The root requirements.txt includes this file.
+fastapi==0.161.1
+pydantic==2.14.1
+uvicorn==0.54.0
+numpy==2.5.4
+scipy==1.18.1
+# Tests (FastAPI's TestClient runs on httpx2)
+httpx2==2.16.0
+pytest==9.1.1

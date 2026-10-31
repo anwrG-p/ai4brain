@@ -92,17 +92,27 @@ type TrackerOpts = {
   storage?: StorageLike | null
 }
 
+// R3: pending = not asked yet (events are held on the device), granted = send, denied = keep nothing.
+export type Consent = 'pending' | 'granted' | 'denied'
+
 export type TrackerStatus = {
   isOnline: boolean
   queuedCount: number
   droppedCount: number
   maxCapacity: number
+  consent: Consent
 }
 
 const MAX_PER_REQUEST = 100 // server Batch max_length
 // New key: events from the old UI queue have another shape and must never be resent.
 const STORAGE_KEY = 'synapsetwin_telemetry_queue_v2'
 const OLD_STORAGE_KEY = 'synapsetwin_telemetry_queue'
+// Holds 'granted' or 'denied'; absent (or anything else) means pending.
+const CONSENT_KEY = 'synapsetwin_consent_v1'
+// The privacy page's export and delete read these (features/privacy/myData.ts).
+export { STORAGE_KEY as QUEUE_KEY, CONSENT_KEY }
+const asConsent = (v: string | null | undefined): Consent =>
+  v === 'granted' || v === 'denied' ? v : 'pending'
 
 // Reading window.localStorage itself throws when site data is blocked.
 function defaultStorage(): StorageLike | null {
@@ -136,6 +146,8 @@ function safely(fn: () => void): void {
 
 // Buffers events and sends them in the background; push() never awaits the network.
 // The buffer is mirrored to storage so pending events survive a reload.
+// Consent gate (R3): only flush() and flushBeacon() send, and both return early unless consent is
+// granted, so the timer, batch-size, online, pagehide and hidden paths all respect it.
 export class Tracker {
   private endpoint: string
   private batchSize: number
@@ -147,6 +159,7 @@ export class Tracker {
   private inFlight = false
   private isOnline = typeof navigator === 'undefined' ? true : navigator.onLine
   private droppedCount = 0
+  private consent: Consent = 'pending'
   private clears = 0 // bumped by clear(), so an in-flight flush knows its batch was purged
   private status: TrackerStatus | null = null
   private listeners = new Set<() => void>()
@@ -171,6 +184,27 @@ export class Tracker {
     this.isOnline = false
     this.notify()
   }
+  // Another tab declined, purged (key removed) or accepted: this tab follows at once, so a tab
+  // mid-exercise stops sending and stops rewriting the queue the other tab just cleared.
+  // key null means that tab cleared all of storage.
+  private onStorage = (e: StorageEvent) => {
+    // While pending, the queue only disappears elsewhere through a purge (clear()); without this,
+    // this tab would write its held, purged events back and send them after a later accept.
+    // ponytail: while granted, tabs still share one queue key last-writer-wins, as before.
+    const purged = this.store((s) => s.getItem(STORAGE_KEY)) == null
+    if ((e.key === STORAGE_KEY || e.key === null) && this.consent === 'pending' && purged && this.buffer.length)
+      this.clear()
+    if (e.key !== CONSENT_KEY && e.key !== null) return
+    const next = asConsent(this.store((s) => s.getItem(CONSENT_KEY)))
+    if (next === this.consent) return
+    this.consent = next
+    this.schedule()
+    if (next === 'granted') {
+      this.notify() // getStatus() and subscribers see the new consent
+      return void this.flush()
+    }
+    this.clear() // denied, or pending after a purge: drop what this tab held
+  }
 
   constructor(opts: TrackerOpts = {}) {
     this.endpoint = opts.endpoint ?? '/v1/telemetry/event'
@@ -186,12 +220,16 @@ export class Tracker {
     this.flushMs = opts.flushMs ?? 2000
     this.maxBackoffMs = opts.maxBackoffMs ?? 60_000
     this.store((s) => s.removeItem(OLD_STORAGE_KEY))
-    this.add(this.restore())
+    this.consent = asConsent(this.store((s) => s.getItem(CONSENT_KEY)))
+    // Read before restoring: a restored full batch flushes at once, and only if granted.
+    if (this.consent === 'denied') this.store((s) => s.removeItem(STORAGE_KEY))
+    else this.add(this.restore())
     this.schedule()
     if (typeof window !== 'undefined') {
       window.addEventListener('pagehide', this.onPageHide)
       window.addEventListener('online', this.onOnline)
       window.addEventListener('offline', this.onOffline)
+      window.addEventListener('storage', this.onStorage)
     }
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', this.onVisibility)
   }
@@ -199,7 +237,12 @@ export class Tracker {
   push(e: TelemetryEvent): void {
     const [valid] = this.validOnly([e])
     if (!valid) return this.notify() // dropped and counted; it was never recorded
-    this.add([valid])
+    // Denied: nothing is kept for sending, so the event is dropped and counted. Listeners still
+    // hear it, so results keep showing on this device.
+    if (this.consent === 'denied') {
+      this.droppedCount++
+      this.notify()
+    } else this.add([valid])
     for (const l of this.eventListeners) safely(() => l(valid))
   }
 
@@ -230,6 +273,7 @@ export class Tracker {
   }
 
   async flush(): Promise<void> {
+    if (this.consent !== 'granted') return // held; grantConsent() flushes
     if (this.inFlight) return // the running flush reschedules when it settles
     if (!this.buffer.length) return this.schedule()
     this.inFlight = true
@@ -274,7 +318,7 @@ export class Tracker {
   // (2 s, 4 s, 8 s … capped at 60 s, each shortened by up to 20%) so a down API is not hammered.
   private schedule(): void {
     clearTimeout(this.timer)
-    if (this.destroyed) return
+    if (this.destroyed || this.consent !== 'granted') return
     const delay =
       this.failures === 0
         ? this.flushMs
@@ -283,6 +327,7 @@ export class Tracker {
   }
 
   flushBeacon(): void {
+    if (this.consent !== 'granted') return
     // sendBeacon returns true once queued, not delivered, and browsers do not check connectivity:
     // offline it would drop the buffer and its storage copy. Keep them for the next online flush.
     if (!this.isOnline) return
@@ -316,8 +361,44 @@ export class Tracker {
       queuedCount: this.buffer.length,
       droppedCount: this.droppedCount,
       maxCapacity: this.maxBuffer,
+      consent: this.consent,
     }
     return this.status
+  }
+
+  grantConsent(): void {
+    this.setConsent('granted')
+    this.failures = 0
+    void this.flush()
+  }
+
+  // Decline (R3): forget the held events; later pushes are dropped and counted (see push).
+  denyConsent(): void {
+    this.setConsent('denied')
+    this.clear()
+  }
+
+  // Back to not asked: new events are held again, nothing is sent. Used by the privacy purge.
+  resetConsent(): void {
+    this.setConsent('pending')
+  }
+
+  private setConsent(c: Consent): void {
+    this.consent = c
+    this.store((s) => (c === 'pending' ? s.removeItem(CONSENT_KEY) : s.setItem(CONSENT_KEY, c)))
+    this.schedule() // starts the timer when granted, stops it otherwise
+    this.notify()
+  }
+
+  // An abandoned attempt (the baseline's pause, R3): drops that task's unsent events here and in
+  // storage, so they never leave the device. Returns how many were dropped.
+  // ponytail: a batch already in flight is not recalled (the baseline holds everything until consent).
+  dropTask(taskId: string): number {
+    const before = this.buffer.length
+    this.buffer = this.buffer.filter((e) => e.task_id !== taskId)
+    const dropped = before - this.buffer.length
+    if (dropped) this.changed()
+    return dropped
   }
 
   // Privacy purge: drops every pending event here and in storage. Returns how many were dropped.
@@ -337,6 +418,7 @@ export class Tracker {
       window.removeEventListener('pagehide', this.onPageHide)
       window.removeEventListener('online', this.onOnline)
       window.removeEventListener('offline', this.onOffline)
+      window.removeEventListener('storage', this.onStorage)
     }
     if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', this.onVisibility)
   }

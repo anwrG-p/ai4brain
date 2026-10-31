@@ -1,6 +1,6 @@
 # 03: Replace the UI telemetry queue with the Tracker
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 02
 Spec: `../spec.md` (D3, R5)
 
@@ -27,3 +27,5 @@ From `frontend/`, `npm run qa:checks` is green. Commit with no AI attribution.
 ## Comments
 
 - **Dead code for the UI owner:** `frontend/src/services/api/apiClient.ts` still has `postTelemetryEvent`, `getNextTask` and `deleteUserTelemetry`. Nothing in the app calls them now: telemetry goes through `features/assessment/telemetry/tracker`, and the purge only clears the local Tracker until Member 4's delete route exists. They were left in place as this ticket asked, and the UI team can remove them.
+
+- 2026-10-31 (TD-03 tracker hygiene): Done in ec76596..f6179ac, review clean (member1-ui-integration ledger).

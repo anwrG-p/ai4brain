@@ -206,7 +206,7 @@ test('shown_ms that is not positive skips the QUEST update but still emits', asy
 test('the canvas is described for assistive tech', async () => {
   await setup(params())
   expect(screen.getByRole('img', { name: 'Briefly flashed display' })).toBeTruthy()
-  expect(screen.getByRole('region', { name: 'Quick look' })).toBeTruthy()
+  expect(screen.getByRole('region', { name: 'Perceptual Radar' })).toBeTruthy()
 })
 
 test('canvas colours are read from CSS variables, once per trial, and are the only fill styles used', async () => {

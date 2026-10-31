@@ -1,5 +1,7 @@
 # UI Changelog (`docs/ui/CHANGELOG.md`)
 
+> **History.** A record of the UI before brand v2 (BRIAN, the Doodle design, 19 pages, 7 dimensions). Entries are kept as written; later work supersedes them. Current: the [root README](../../README.md), the [glossary](../../docs/GLOSSARY.md) and `docs/design/BRAND-V2.md`.
+
 All notable UI, UX, design system, and documentation changes on `ui/main` follow Conventional Commits.
 
 ## [Unreleased] — Aesthetic Upgrade Sprint (2026-10-25)

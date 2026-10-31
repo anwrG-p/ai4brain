@@ -1,137 +1,106 @@
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test } from '@playwright/test'
-import { openJudgeMode, closeJudgeMode } from './testUtils'
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-const SCREENSHOT_DIR = path.resolve(__dirname, '../../docs/ui/screenshots')
+// SHOTS_DIR sends the screenshots to a scratch folder instead of the docs.
+const SCREENSHOT_DIR = process.env.SHOTS_DIR ?? path.resolve(process.cwd(), '../docs/ui/screenshots')
 
-test.describe('Page 13: Privacy Center & Audit Log (/privacy) Visual QA & A11y', () => {
-  test('passes axe-core accessibility, 375/768/1440px responsive layout, consent toggles, live inspector, and purge modal', async ({
-    page,
-  }) => {
-    // 1. Desktop 1440px Light (Playful Lab) — Baseline State
+const VIEWPORTS = [
+  { width: 1440, height: 900 },
+  { width: 768, height: 1024 },
+  { width: 375, height: 812 },
+]
+
+const NOT_CHOSEN = 'Not chosen yet. Your answers stay on this device.'
+
+async function setTheme(page: Page, theme: 'light' | 'dark') {
+  // The store is the theme's source of truth; the header toggle belongs to 09a.
+  await page.evaluate((t) => (window as any).__appStore.getState().setTheme(t), theme)
+  await expect(page.locator('html')).toHaveAttribute('data-theme', theme)
+}
+
+async function checkViewports(page: Page, theme: 'light' | 'dark') {
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize(vp)
+    await expect(page.getByRole('heading', { level: 1, name: 'Privacy' })).toBeVisible()
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)
+    expect(overflow, `Horizontal overflow at ${vp.width}px (${theme})`).toBe(false)
+    const axe = await new AxeBuilder({ page }).analyze()
+    expect(axe.violations, `axe at ${vp.width}px (${theme})`).toEqual([])
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, `13-privacy-${theme}-${vp.width}.png`), fullPage: true })
+  }
+}
+
+test.describe('Page 13: Privacy (/privacy)', () => {
+  test.use({ reducedMotion: 'reduce' })
+
+  test('consent line, one sentence, Delete my data; ≤60 words; axe light and dark; no overflow at 375/768/1440', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/privacy', { waitUntil: 'networkidle' })
+    await expect(page.getByTestId('consent-line')).toHaveText(NOT_CHOSEN)
+    await expect(page.getByText('We record answer timing and accuracy only. No camera, no microphone.')).toBeVisible()
+    await expect(page.getByText(/JSON|receipt|never collected|SHA256/i)).toHaveCount(0)
+    // The whole page fits above the fold, so every word in <main> counts.
+    const words = await page.evaluate(() => (document.querySelector('main')?.innerText ?? '').split(/\s+/).filter(Boolean).length)
+    expect(words).toBeLessThanOrEqual(60)
+    await checkViewports(page, 'light')
+    await setTheme(page, 'dark')
+    await checkViewports(page, 'dark')
+  })
 
-    await expect(
-      page.getByRole('heading', {
-        name: /Privacy Center & Sovereign Audit Log/i,
-        level: 1,
-      }),
-    ).toBeVisible()
+  test('Choose shows two equal choices; the line follows the choice', async ({ page }) => {
+    await page.goto('/privacy', { waitUntil: 'networkidle' })
+    await page.getByRole('button', { name: 'Choose' }).click()
+    const save = page.getByRole('button', { name: 'Save my answers' })
+    const keep = page.getByRole('button', { name: 'Keep them on this device only' })
+    expect(await save.getAttribute('class')).toBe(await keep.getAttribute('class'))
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+    await keep.click()
+    await expect(page.getByTestId('consent-line')).toHaveText('Your answers are kept on this device only.')
+    await page.getByRole('button', { name: 'Change' }).click()
+    await page.getByRole('button', { name: 'Save my answers' }).click()
+    await expect(page.getByTestId('consent-line')).toHaveText('Your answers are saved.')
+  })
 
-    // Verify Hardware Lock Banner is prominently displayed
-    await expect(
-      page.getByText(/Non-Biometric Hardware Lock Active/i),
-    ).toBeVisible()
-    await expect(
-      page.getByText(/Physically Disconnected/i),
-    ).toBeVisible()
+  test('Export my data downloads one JSON file with every device key', async ({ page }) => {
+    await page.goto('/privacy', { waitUntil: 'networkidle' })
+    await page.getByRole('button', { name: 'Choose' }).click()
+    await page.getByRole('button', { name: 'Keep them on this device only' }).click()
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export my data' }).click()])
+    expect(download.suggestedFilename()).toMatch(/^my-data-\d{4}-\d{2}-\d{2}\.json$/)
+    const file = await download.path()
+    const data = JSON.parse(await readFile(file, 'utf8'))
+    expect(Object.keys(data.localStorage).sort()).toEqual(
+      ['aura_uid', 'synapsetwin_consent_v1', 'synapsetwin_goals_v1', 'synapsetwin_sessions_v1', 'synapsetwin_telemetry_queue_v2'],
+    )
+    expect(data.localStorage.synapsetwin_consent_v1).toBe('denied')
+    // Loti's talk comes from its store (INT-1), not a raw sessionStorage key.
+    expect(data.lotiTalk).toEqual({ turns: [], current: null })
+    expect(data.app).toHaveProperty('userProfile')
+    expect(data.app).toHaveProperty('theme')
+  })
 
-    // Verify zero horizontal overflow at 1440px
-    const overflow1440 = await page.evaluate(() => {
-      return (
-        document.documentElement.scrollWidth >
-        document.documentElement.clientWidth
-      )
-    })
-    expect(overflow1440).toBe(false)
-
-    // Run axe-core on 1440px Light
-    const axeLight = await new AxeBuilder({ page }).analyze()
-    expect(axeLight.violations).toEqual([])
-
-    await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, '13-privacy-1440.png'),
-      fullPage: true,
-    })
-
-    // 2. Reject All Optional Consent Action
-    await page
-      .getByRole('button', {
-        name: /Reject All Optional/i,
-      })
-      .click()
-
-    await expect(
-      page.getByText(/Revoked/i).first(),
-    ).toBeVisible()
-
-    const axeRejected = await new AxeBuilder({ page }).analyze()
-    expect(axeRejected.violations).toEqual([])
-
-    await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, '13-privacy-rejected-optional-1440.png'),
-      fullPage: true,
-    })
-
-    // 3. Switch to Night Lab (Dark Theme) + Open Purge Modal
-    await openJudgeMode(page)
-    await page.getByRole('button', { name: /Dark \(Night Lab\)/i }).first().click()
-    await page.waitForTimeout(300)
-
-    await page
-      .getByRole('button', {
-        name: /Purge All Data/i,
-      })
-      .click()
-
-    await expect(
-      page.getByRole('heading', {
-        name: /Confirm Irrevocable Data Purge/i,
-      }),
-    ).toBeVisible()
-
-    const axeModal = await new AxeBuilder({ page }).analyze()
-    expect(axeModal.violations).toEqual([])
-
-    await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, '13-privacy-dark-purge-modal-1440.png'),
-      fullPage: true,
-    })
-
-    // Cancel modal to restore page view
-    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
-
-    // Restore Light + 7 Dims
-    await page.getByRole('button', { name: /Light \(Playful Lab\)/i }).first().click()
-    await closeJudgeMode(page)
-    await page.waitForTimeout(300)
-
-    // 4. Tablet 768px
-    await page.setViewportSize({ width: 768, height: 1024 })
-    const overflow768 = await page.evaluate(() => {
-      return (
-        document.documentElement.scrollWidth >
-        document.documentElement.clientWidth
-      )
-    })
-    expect(overflow768).toBe(false)
-
-    await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, '13-privacy-768.png'),
-      fullPage: true,
-    })
-
-    // 5. Mobile 375px
+  test('Delete my data asks first, then deletes; keeps the theme; axe on the dialog in both themes', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 })
-    const overflow375 = await page.evaluate(() => {
-      return (
-        document.documentElement.scrollWidth >
-        document.documentElement.clientWidth
-      )
-    })
-    expect(overflow375).toBe(false)
+    await page.goto('/privacy', { waitUntil: 'networkidle' })
+    await page.getByRole('button', { name: 'Delete my data' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Delete your data?' })
+    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused()
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, '13-privacy-delete-light-375.png') })
+    await page.keyboard.press('Escape')
+    await expect(dialog).toHaveCount(0)
 
-    const axeMobile = await new AxeBuilder({ page }).analyze()
-    expect(axeMobile.violations).toEqual([])
-
-    await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, '13-privacy-375.png'),
-      fullPage: true,
-    })
+    await setTheme(page, 'dark')
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.getByRole('button', { name: 'Delete my data' }).click()
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, '13-privacy-delete-dark-1440.png') })
+    await dialog.getByRole('button', { name: 'Delete', exact: true }).click()
+    await expect(dialog).toHaveCount(0)
+    await expect(page.getByText('Deleted from this device.')).toBeVisible()
+    await expect(page.getByTestId('consent-line')).toHaveText(NOT_CHOSEN)
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark') // a preference, not data
   })
 })

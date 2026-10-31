@@ -1,40 +1,49 @@
 @import "tailwindcss";
 
+/* Brand v2 design system: sky blue + coral, Quicksand + Inter, soft clay shape
+   (.scratch/brand-v2/spec.md "Brand system"; supersedes the Calm & Clean palette of DEC-010).
+   Every colour is defined twice: here in @theme (Tailwind utilities) and in the
+   :root / [data-theme] blocks below. Keep them in sync; src/styles/tokens.test.ts checks it.
+   Do not add --shadow-* tokens to @theme: it would revive the dead shadow-doodle* utilities.
+   No purple, no gradients, no backdrop blur (anti-slop rules 1, 2, 9; tokens.test.ts checks them). */
 @theme {
-  --color-canvas: #FFF5EE;
+  --color-canvas: #FFFFFF;
+  --color-wood: #E2B179;
   --color-surface: #FFFFFF;
-  --color-surface-raised: #FDF0E7;
-  --color-ink: #111827;
-  --color-ink-muted: #4B5E78;
-  --color-border: #E7DFD8;
-  --color-border-strong: #263D5B;
-  --color-brand: #E86A33;
-  --color-brand-hover: #D55823;
-  --color-brand-subtle: #FDF2EB;
-  --color-brand-ink: #111827;
-  --color-secondary: #263D5B;
-  --color-reward: #FFC83D;
-  --color-reward-ink: #111827;
-  --color-accent: #E86A33;
-  --color-accent-ink: #111827;
-  --color-success: #16A34A;
-  --color-success-subtle: #F0FDF4;
-  --color-warning: #D97706;
-  --color-warning-subtle: #FFFBEB;
-  --color-danger: #DC2626;
-  --color-danger-subtle: #FEF2F2;
-  --color-info: #E86A33;
-  --color-info-subtle: #FDF2EB;
+  --color-surface-raised: #E8F3FB;
+  --color-ink: #0F2233;
+  --color-ink-muted: #46617A;
+  --color-border: #D6E7F3;
+  --color-border-strong: #5E7C96;
+  --color-brand: #1E6FA8;
+  --color-brand-hover: #185C8C;
+  --color-brand-subtle: #E1F0FA;
+  --color-brand-ink: #FFFFFF;
+  --color-brand-vivid: #2B8FD6;
+  --color-secondary: #2C4A63;
+  --color-reward: #F2876B;
+  --color-reward-ink: #0F2233;
+  --color-accent: #F2876B;
+  --color-accent-ink: #0F2233;
+  --color-accent-strong: #B94A2F;
+  --color-success: #2D7650;
+  --color-success-subtle: #EAF6EF;
+  --color-warning: #8A5800;
+  --color-warning-subtle: #FBF3E4;
+  --color-danger: #A83A4E;
+  --color-danger-subtle: #FBEEF0;
+  --color-info: #1E6FA8;
+  --color-info-subtle: #E1F0FA;
 
-  --font-display: 'Delius Swash Caps', 'Delius', cursive, sans-serif;
-  --font-sans: 'Delius', 'Delius Swash Caps', cursive, sans-serif;
+  --font-display: 'Quicksand', 'Inter', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-2xl: 20px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  --radius-2xl: 28px;
   --radius-pill: 9999px;
 
   --color-emotion-accent: var(--color-emotion-accent);
@@ -45,63 +54,136 @@
 
 :root,
 [data-theme="light"] {
-  /* Doodle (Hand Drawn) Design System Semantic Color Roles */
-  --color-canvas: #FFF5EE;
+  /* Brand v2 semantic colour roles (light). Ratios in token-metadata.ts.
+     --color-brand is the spec's text-safe sky #1E6FA8, used as the fill too: white on the spec
+     fill #2B8FD6 is only 3.50:1. #2B8FD6 survives as --color-brand-vivid for graphics (>= 3:1).
+     --color-accent (coral) is a fill under --color-accent-ink; coral text and marks on a surface
+     use --color-accent-strong. --color-reward is the coral milestone fill.
+     Never put coral text on a brand-subtle chip: accent-strong on brand-subtle is 4.42:1 (light).
+     Never use brand-vivid or the coral fill as text (tokens.test.ts scans src for it). */
+  --color-canvas: #FFFFFF;
+  --color-wood: #E2B179;
   --color-surface: #FFFFFF;
-  --color-surface-raised: #FDF0E7;
-  --color-ink: #111827;
-  --color-ink-muted: #4B5E78;
-  --color-border: #E7DFD8;
-  --color-border-strong: #263D5B;
-  --color-brand: #E86A33;
-  --color-brand-hover: #D55823;
-  --color-brand-subtle: #FDF2EB;
-  --color-brand-ink: #111827;
-  --color-secondary: #263D5B;
-  --color-reward: #FFC83D;
-  --color-reward-ink: #111827;
-  --color-accent: #E86A33;
-  --color-accent-ink: #111827;
-  --color-success: #16A34A;
-  --color-success-subtle: #F0FDF4;
-  --color-warning: #D97706;
-  --color-warning-subtle: #FFFBEB;
-  --color-danger: #DC2626;
-  --color-danger-subtle: #FEF2F2;
-  --color-info: #E86A33;
-  --color-info-subtle: #FDF2EB;
+  --color-surface-raised: #E8F3FB;
+  --color-ink: #0F2233;
+  --color-ink-muted: #46617A;
+  --color-border: #D6E7F3;
+  --color-border-strong: #5E7C96;
+  --color-brand: #1E6FA8;
+  --color-brand-hover: #185C8C;
+  --color-brand-subtle: #E1F0FA;
+  --color-brand-ink: #FFFFFF;
+  --color-brand-vivid: #2B8FD6;
+  --color-secondary: #2C4A63;
+  --color-reward: #F2876B;
+  --color-reward-ink: #0F2233;
+  --color-accent: #F2876B;
+  --color-accent-ink: #0F2233;
+  --color-accent-strong: #B94A2F;
+  --color-success: #2D7650;
+  --color-success-subtle: #EAF6EF;
+  --color-warning: #8A5800;
+  --color-warning-subtle: #FBF3E4;
+  --color-danger: #A83A4E;
+  --color-danger-subtle: #FBEEF0;
+  --color-info: #1E6FA8;
+  --color-info-subtle: #E1F0FA;
 
-  /* Okabe-Ito WCAG >= 3:1 Dimension Palette (3 to 10 Dimensions) */
+  /* Five pillar colours (>= 3:1 on surface, no red, no purple; distinct under deuteranopia,
+     min CIEDE2000 17.8 light / 20.1 dark). Always pair them with a shape or a text label. */
+  --pillar-focus: #2E86C1;
+  --pillar-agility: #0A6B57;
+  --pillar-impulse: #D2691E;
+  --pillar-memory: #34479A;
+  --pillar-visual: #6E560C;
+
+  /* Exercise palette (Okabe-Ito based, >= 3:1 on surface; Stroop and Tower inks >= 4.5:1).
+     --dim-4 and --dim-8 left plum and indigo for teal and brown (anti-slop rule 1). */
   --dim-1: #0072B2;
   --dim-2: #C45100;
   --dim-3: #008662;
-  --dim-4: #9E4778;
+  --dim-4: #00747F;
   --dim-5: #A86E00;
   --dim-6: #0B76A8;
   --dim-7: #7D7300;
-  --dim-8: #4F46E5;
+  --dim-8: #80552A;
   --dim-9: #0F766E;
   --dim-10: #831843;
+  /* Stroop "red" ink: a pure red, not --color-danger (crimson-rose) and clearly apart from coral
+     (CIEDE2000 25.7 vs the coral fill, 10.2 vs accent-strong). 5.88:1 on surface. Anti-Red is
+     about mood colour, not this stimulus. */
+  --color-stroop-red: #C8102E;
 
-  /* Uncertainty Tokens */
-  --uncertainty-band-fill: rgba(232, 106, 51, 0.20);
-  --uncertainty-low-stroke: #9E4778;
-  --uncertainty-low-tint: #FDF2EB;
+  /* Home: the board (--color-canvas, #root) takes a faint tint from Momo's mood; calm keeps the plain
+     board, and the wood frame never changes. Never red. Text on them is audited in token-metadata.ts. */
+  --color-canvas-happy: #FFF7F2;
+  --color-canvas-tired: #F5F7F9;
+  --color-canvas-frustrated: #FFF8EC;
+  --color-canvas-focused: #F1F8FD;
 
-  /* Hand-Drawn Sketch Borders & Hard Offset Shadows */
-  --border-card-subtle: #263D5B;
-  --border-card-hover: #263D5B;
-  --shadow-doodle: 3px 3px 0 #263D5B;
-  --shadow-doodle-sm: 2px 2px 0 #263D5B;
-  --shadow-doodle-lg: 4px 4px 0 #263D5B;
-  --shadow-tactile: 3px 3px 0 #263D5B;
-  --shadow-tactile-active: 1px 1px 0 #263D5B;
-  --shadow-card: 4px 4px 0 #263D5B;
-  --shadow-soft: 3px 3px 0 #263D5B;
-  --shadow-soft-hover: 4px 4px 0 #263D5B;
-  --shadow-hero: 5px 5px 0 #263D5B;
-  --bg-hero-gradient: linear-gradient(135deg, #FFFFFF 0%, #FDF0E7 100%);
-  --bg-card-gradient: linear-gradient(135deg, #FFFFFF 0%, #FFF5EE 100%);
+  /* Past-results heatmap, low to high: pale sky, warm grey, peach, coral, deep coral. Lightness falls
+     as the score rises (higher = warmer and stronger). Never blue-to-red, never purple. Light steps
+     sit below 3:1 on surface, so every cell and legend swatch carries a --color-border-strong edge
+     (PastResults.tsx) and the value as text. */
+  --color-heat-0: #D3E8F7;
+  --color-heat-1: #DCD3CC;
+  --color-heat-2: #F2B39C;
+  --color-heat-3: #DB7A59;
+  --color-heat-4: #B94A2F;
+  /* Each step's printed value: ink on the pale steps, white on the deepest (>= 4.5:1, audited). */
+  --color-heat-ink-0: #0F2233;
+  --color-heat-ink-1: #0F2233;
+  --color-heat-ink-2: #0F2233;
+  --color-heat-ink-3: #0F2233;
+  --color-heat-ink-4: #FFFFFF;
+
+  /* Uncertainty Tokens: a 15% band in the sky hue */
+  --uncertainty-band-fill: rgba(43, 143, 214, 0.15);
+  --uncertainty-low-stroke: #46617A;
+  --uncertainty-low-tint: #E8F3FB;
+
+  /* One soft elevation for real containers. The legacy names all carry it. */
+  --shadow-elevation: 0 6px 20px rgb(30 111 168 / 0.08);
+  --shadow-doodle: var(--shadow-elevation);
+  --shadow-doodle-sm: var(--shadow-elevation);
+  --shadow-doodle-lg: var(--shadow-elevation);
+  --shadow-tactile: var(--shadow-elevation);
+  --shadow-tactile-active: var(--shadow-elevation);
+  --shadow-card: var(--shadow-elevation);
+  --shadow-soft: var(--shadow-elevation);
+  --shadow-soft-hover: var(--shadow-elevation);
+  --shadow-hero: var(--shadow-elevation);
+
+  /* Clay depth: characters, illustrations and at most the primary CTA (anti-slop rule 9). */
+  --clay: 0 12px 28px rgb(30 111 168 / 0.16), inset 0 2px 6px rgb(255 255 255 / 0.7), inset 0 -4px 10px rgb(15 34 51 / 0.1);
+  /* --clay's outer shadow as a filter, for SVG characters (the inner highlight is drawn in the SVG). */
+  --clay-drop: drop-shadow(0 6px 10px rgb(30 111 168 / 0.16));
+
+  /* Character clay (Loti, Dolphin, Momo; components/features/characters). Graphics only, never text.
+     Each ramp is lit (-hi), mid, shaded (-lo) for one key light from the top-left. The sky ramp centres
+     on --color-brand-vivid, softened for matte clay; the coral mid is --color-accent. Faces stay navy in both themes. */
+  --char-sky-hi: #BFE3FA;
+  --char-sky: #4DA6E2;
+  --char-sky-lo: #2479BC;
+  --char-coral-hi: #FFD3C4;
+  --char-coral: #F2876B;
+  --char-coral-lo: #D2654A;
+  --char-pale-hi: #E4F3FD;
+  --char-pale: #9FD1F2;
+  --char-pale-lo: #5FA7DA;
+  --char-peach-hi: #FFE6DC;
+  --char-peach: #FFB59C;
+  --char-peach-lo: #EA8A6E;
+  --char-mist-hi: #E6EDF2;
+  --char-mist: #B2C2CF;
+  --char-mist-lo: #8297A9;
+  --char-amber-hi: #FCE8C4;
+  --char-amber: #EFBD72;
+  --char-amber-lo: #CB9147;
+  --char-face: #0F2233;
+  --char-glint: #FFFFFF;
+  --char-shadow: #1D4F78;
+  --char-shadow-alpha: 0.28;
 
   /* EMILY Emotion Adaptive Color Tokens (Default: Calm Flow) */
   --color-emotion-accent: #0D9488;
@@ -109,26 +191,26 @@
   --color-emotion-glow: rgba(13, 148, 136, 0.12);
   --color-emotion-badge: #0D9488;
 
-  /* Typography Families */
-  --font-display: 'Delius Swash Caps', 'Delius', cursive, sans-serif;
-  --font-sans: 'Delius', 'Delius Swash Caps', cursive, sans-serif;
+  /* Typography Families: Quicksand for headings of 20 px and up, Inter for everything else */
+  --font-display: 'Quicksand', 'Inter', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-  /* Typography Scale (Doodle 14/16/18/24/32/40 px) */
+  /* Typography Scale (12 / 14 / 16 / 18 / 20 / 24 / 32 px) */
   --text-xs: 0.75rem;
   --leading-xs: 1rem;
   --text-sm: 0.875rem;
   --leading-sm: 1.25rem;
   --text-base: 1rem;
-  --leading-base: 1.5rem;
+  --leading-base: 1.6;
   --text-lg: 1.125rem;
   --leading-lg: 1.75rem;
-  --text-xl: 1.375rem;
+  --text-xl: 1.25rem;
   --leading-xl: 1.75rem;
-  --text-2xl: 1.75rem;
-  --leading-2xl: 2.25rem;
-  --text-3xl: 2.25rem;
-  --leading-3xl: 2.75rem;
+  --text-2xl: 1.5rem;
+  --leading-2xl: 2rem;
+  --text-3xl: 2rem;
+  --leading-3xl: 2.5rem;
 
   /* 4px Base Spacing Scale */
   --space-1: 0.25rem;
@@ -142,76 +224,119 @@
   --space-12: 3rem;
   --space-16: 4rem;
 
-  /* Radius Scale */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  /* Radius Scale: soft clay (cards xl/2xl, buttons pill) */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  --radius-2xl: 28px;
   --radius-pill: 9999px;
 
-  /* Motion Scale */
-  --duration-fast: 120ms;
+  /* Motion Scale (hover and press 150–200 ms; ease-out to enter, ease-in to exit) */
+  --duration-fast: 150ms;
   --duration-base: 200ms;
-  --duration-slow: 320ms;
+  --duration-slow: 300ms;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.55, 0, 1, 0.45);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  /* Event motion (ticket 07b, spec R8): enter 200–400 ms ease-out, exit about two thirds, ease-in. */
+  --duration-press: 100ms;
+  --duration-enter: 320ms;
+  --duration-exit: 220ms;
+  --duration-word: 35ms;
 }
 
 [data-theme="dark"] {
-  /* Blackboard Sketch (Dark Theme) */
-  --color-canvas: #131B2E;
-  --color-surface: #1E293B;
-  --color-surface-raised: #27354A;
-  --color-ink: #FFFFFF;
-  --color-ink-muted: #CBD5E1;
-  --color-border: #3B4D68;
-  --color-border-strong: #FF8C5A;
-  --color-brand: #FF8C5A;
-  --color-brand-hover: #FFA47A;
-  --color-brand-subtle: #2D1A14;
-  --color-brand-ink: #131B2E;
-  --color-secondary: #E7DFD8;
-  --color-reward: #FFC83D;
-  --color-reward-ink: #131B2E;
-  --color-accent: #FF8C5A;
-  --color-accent-ink: #131B2E;
-  --color-success: #4ADE80;
-  --color-success-subtle: #0F2E1E;
-  --color-warning: #FBBF24;
-  --color-warning-subtle: #332409;
-  --color-danger: #F87171;
-  --color-danger-subtle: #381418;
-  --color-info: #FF8C5A;
-  --color-info-subtle: #2D1A14;
+  /* Brand v2 semantic colour roles (dark) */
+  --color-canvas: #162621;
+  --color-wood: #6E3F1F;
+  --color-surface: #122130;
+  --color-surface-raised: #1A2D40;
+  --color-ink: #F2F8FC;
+  --color-ink-muted: #A9C1D6;
+  --color-border: #2A4157;
+  --color-border-strong: #8FB0CC;
+  --color-brand: #7CC4F2;
+  --color-brand-hover: #A5D6F6;
+  --color-brand-subtle: #15304A;
+  --color-brand-ink: #0B1622;
+  --color-brand-vivid: #7CC4F2;
+  --color-secondary: #C5D8E8;
+  --color-reward: #FF9F86;
+  --color-reward-ink: #0B1622;
+  --color-accent: #FF9F86;
+  --color-accent-ink: #0B1622;
+  --color-accent-strong: #FF9F86;
+  --color-success: #6FCF97;
+  --color-success-subtle: #123123;
+  --color-warning: #F2C063;
+  --color-warning-subtle: #33270F;
+  --color-danger: #F28B9E;
+  --color-danger-subtle: #3A1A24;
+  --color-info: #7CC4F2;
+  --color-info-subtle: #15304A;
 
-  /* Okabe-Ito Dark Theme Dimension Palette */
+  --pillar-focus: #8ECDF5;
+  --pillar-agility: #2E9E84;
+  --pillar-impulse: #D97A2E;
+  --pillar-memory: #5B7BDC;
+  --pillar-visual: #F2E29A;
+
+  /* Exercise palette (dark) */
   --dim-1: #56B4E9;
   --dim-2: #FF8C3B;
   --dim-3: #2DD4BF;
-  --dim-4: #E899C8;
+  --dim-4: #7FE0EA;
   --dim-5: #FACC15;
   --dim-6: #38BDF8;
   --dim-7: #F0E442;
-  --dim-8: #818CF8;
+  --dim-8: #E0B48A;
   --dim-9: #34D399;
   --dim-10: #F472B6;
+  /* Stroop red (dark): 5.39:1 on surface; dark danger #F28B9E reads rose. */
+  --color-stroop-red: #FF5C5C;
 
-  --uncertainty-band-fill: rgba(255, 140, 90, 0.22);
-  --uncertainty-low-stroke: #F472B6;
-  --uncertainty-low-tint: #2D1A14;
+  --color-canvas-happy: #202622;
+  --color-canvas-tired: #19221F;
+  --color-canvas-frustrated: #212719;
+  --color-canvas-focused: #132529;
 
-  --border-card-subtle: #FF8C5A;
-  --border-card-hover: #FFA47A;
-  --shadow-doodle: 3px 3px 0 #FF8C5A;
-  --shadow-doodle-sm: 2px 2px 0 #FF8C5A;
-  --shadow-doodle-lg: 4px 4px 0 #FF8C5A;
-  --shadow-tactile: 3px 3px 0 #FF8C5A;
-  --shadow-tactile-active: 1px 1px 0 #FF8C5A;
-  --shadow-card: 4px 4px 0 #FF8C5A;
-  --shadow-soft: 3px 3px 0 #FF8C5A;
-  --shadow-soft-hover: 4px 4px 0 #FFA47A;
-  --shadow-hero: 5px 5px 0 #FF8C5A;
-  --bg-hero-gradient: linear-gradient(135deg, #1E293B 0%, #172234 100%);
-  --bg-card-gradient: linear-gradient(135deg, #1E293B 0%, #223046 100%);
+  /* Dark: brighter = higher. Two deep sky steps, then three light coral steps; no step sits at mid
+     lightness, where neither light nor dark text reaches 4.5:1 (the old muddy step 2). */
+  --color-heat-0: #1E4A68;
+  --color-heat-1: #3F6077;
+  --color-heat-2: #C47A63;
+  --color-heat-3: #E8937A;
+  --color-heat-4: #FFB39E;
+  --color-heat-ink-0: #F2F8FC;
+  --color-heat-ink-1: #F2F8FC;
+  --color-heat-ink-2: #0B1622;
+  --color-heat-ink-3: #0B1622;
+  --color-heat-ink-4: #0B1622;
+
+  --uncertainty-band-fill: rgba(124, 196, 242, 0.15);
+  --uncertainty-low-stroke: #A9C1D6;
+  --uncertainty-low-tint: #1A2D40;
+
+  /* Dark theme: a 1 px border only, no shadow */
+  --shadow-elevation: none;
+  --shadow-doodle: none;
+  --shadow-doodle-sm: none;
+  --shadow-doodle-lg: none;
+  --shadow-tactile: none;
+  --shadow-tactile-active: none;
+  --shadow-card: none;
+  --shadow-soft: none;
+  --shadow-soft-hover: none;
+  --shadow-hero: none;
+
+  --clay: 0 12px 28px rgb(0 0 0 / 0.35), inset 0 2px 6px rgb(255 255 255 / 0.14), inset 0 -4px 10px rgb(0 0 0 / 0.3);
+  --clay-drop: drop-shadow(0 8px 14px rgb(0 0 0 / 0.55));
+  --char-sky-lo: #2272B0;
+  --char-pale-lo: #6AAFE0;
+  --char-mist-lo: #8C9FB0;
+  --char-shadow: #000000;
+  --char-shadow-alpha: 0.75;
 
   /* EMILY Dark Emotion Adaptive Color Tokens (Default: Calm Flow) */
   --color-emotion-accent: #4FD1C5;
@@ -238,7 +363,7 @@ html[data-emotion="calm_flow"]:not([data-theme="dark"]) {
 :root[data-emotion="energized"],
 [data-theme="light"][data-emotion="energized"],
 html[data-emotion="energized"]:not([data-theme="dark"]) {
-  /* Warm Terracotta Amber & Doodle Sky (High self-efficacy) */
+  /* Warm Terracotta Amber (High self-efficacy) */
   --color-emotion-accent: #D96B43;
   --color-emotion-tint: #FDF6F0;
   --color-emotion-glow: rgba(217, 107, 67, 0.15);
@@ -258,25 +383,25 @@ html[data-emotion="frustrated"]:not([data-theme="dark"]) {
 :root[data-emotion="hesitant"],
 [data-theme="light"][data-emotion="hesitant"],
 html[data-emotion="hesitant"]:not([data-theme="dark"]) {
-  /* Serene Periwinkle & Warm Honey (Cognitive grounding) */
-  --color-emotion-accent: #5A67D8;
-  --color-emotion-tint: #F4F5FC;
-  --color-emotion-glow: rgba(90, 103, 216, 0.14);
+  /* Calm Sky & Warm Honey (Cognitive grounding) */
+  --color-emotion-accent: #2F7AB0;
+  --color-emotion-tint: #EEF5FB;
+  --color-emotion-glow: rgba(47, 122, 176, 0.14);
   --color-emotion-badge: #D97706;
 }
 
 :root[data-emotion="fatigued"],
 [data-theme="light"][data-emotion="fatigued"],
 html[data-emotion="fatigued"]:not([data-theme="dark"]) {
-  /* Twilight Indigo & Revitalizing Mint (Circadian recovery) */
-  --color-emotion-accent: #5C6B9C;
-  --color-emotion-tint: #F3F4F8;
-  --color-emotion-glow: rgba(92, 107, 156, 0.14);
-  --color-emotion-badge: #5C6B9C;
+  /* Dusk Slate & Revitalizing Mint (Circadian recovery) */
+  --color-emotion-accent: #5A7186;
+  --color-emotion-tint: #F1F5F8;
+  --color-emotion-glow: rgba(90, 113, 134, 0.14);
+  --color-emotion-badge: #5A7186;
 }
 
 /* ==========================================================================
-   EMILY Emotion-Adaptive Color Coding (Dark Mode - Blackboard Sketch)
+   EMILY Emotion-Adaptive Color Coding (Dark Mode)
    ========================================================================== */
 
 [data-theme="dark"][data-emotion="calm_flow"],
@@ -314,10 +439,10 @@ html[data-theme="dark"][data-emotion="hesitant"] {
 
 [data-theme="dark"][data-emotion="fatigued"],
 html[data-theme="dark"][data-emotion="fatigued"] {
-  --color-emotion-accent: #B794F4;
-  --color-emotion-tint: #201D33;
-  --color-emotion-glow: rgba(183, 148, 244, 0.16);
-  --color-emotion-badge: #B794F4;
+  --color-emotion-accent: #A3BBD0;
+  --color-emotion-tint: #1A2330;
+  --color-emotion-glow: rgba(163, 187, 208, 0.16);
+  --color-emotion-badge: #A3BBD0;
 }
 
 @layer base {
@@ -327,384 +452,113 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     box-sizing: border-box;
   }
 
-  /* =========================================================================
-     Doodle (Hand Drawn) Custom Website Scrollbar
-     ========================================================================= */
-  /* Modern CSS Scrollbar Standard (Firefox, Safari 18+) */
+  /* Quiet scrollbar: thin slate thumb on the plain canvas */
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--color-brand) var(--color-canvas);
+    scrollbar-color: var(--color-border-strong) var(--color-canvas);
   }
 
-  /* WebKit & Chromium Custom Scrollbar (Chrome, Edge, Safari, Brave) */
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
   }
 
-  ::-webkit-scrollbar-track {
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
     background-color: var(--color-canvas);
-    border-left: 1.5px dashed rgba(38, 61, 91, 0.22);
-  }
-
-  [data-theme="dark"] ::-webkit-scrollbar-track {
-    background-color: var(--color-canvas);
-    border-left: 1.5px dashed rgba(255, 140, 90, 0.22);
   }
 
   ::-webkit-scrollbar-thumb {
-    background-color: var(--color-brand);
+    background-color: var(--color-border-strong);
     border-radius: var(--radius-pill);
     border: 2px solid var(--color-canvas);
-    box-shadow: inset 0 0 0 1px var(--color-border-strong);
-    transition: background-color 0.2s ease;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background-color: var(--color-brand-hover);
-  }
-
-  ::-webkit-scrollbar-thumb:active {
     background-color: var(--color-secondary);
-  }
-
-  ::-webkit-scrollbar-corner {
-    background-color: var(--color-canvas);
   }
 
   html,
   body {
     background-color: var(--color-canvas);
-    /* Subtle sketchbook / whiteboard dot grid background */
-    background-image: radial-gradient(rgba(38, 61, 91, 0.09) 0.8px, transparent 0.8px);
-    background-size: 24px 24px;
-    background-position: 0 0;
     color: var(--color-ink);
     font-family: var(--font-sans);
     font-size: var(--text-base);
-    line-height: var(--leading-base);
+    line-height: 1.6;
     margin: 0;
     padding: 0;
     overflow-x: clip;
-    transition: background-color 0.45s ease, border-color 0.45s ease, box-shadow 0.45s ease;
+    transition: background-color var(--duration-base) ease, color var(--duration-base) ease;
   }
 
-  [data-theme="dark"] html,
-  [data-theme="dark"] body {
-    background-image: radial-gradient(rgba(255, 140, 90, 0.12) 0.8px, transparent 0.8px);
-  }
-
+  /* Headings default to Inter; the font-display allow-list (unlayered, below) sets Quicksand from 20 px. */
   h1,
   h2,
   h3,
-  h4 {
-    font-family: var(--font-display);
-    letter-spacing: -0.01em;
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    letter-spacing: normal;
   }
 }
 
 @layer components {
-  .font-display {
-    font-family: var(--font-display);
-  }
-
+  /* Numbers: Inter with tabular numerals (class name kept for its call sites) */
   .font-mono-tabular {
-    font-family: var(--font-mono);
+    font-family: var(--font-sans);
     font-variant-numeric: tabular-nums;
   }
 
-  /* Doodle Hand-Drawn Card Primitives */
+  /* Card primitives: 1 px border, radius xl (24 px clay), the one soft elevation, no movement */
   .tactile-card {
     background-color: var(--color-surface);
-    border: 2px solid var(--color-border-strong);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-doodle);
-    transition: transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
-  }
-
-  .tactile-card:hover {
-    transform: translate(-1px, -1px);
-    box-shadow: var(--shadow-doodle-lg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-elevation);
+    transition: border-color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
   }
 
   .editorial-card {
-    background: var(--bg-card-gradient);
-    border: 2px solid var(--color-border-strong);
-    border-radius: var(--radius-md);
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
     padding: 1.5rem;
-    box-shadow: var(--shadow-doodle);
-    transition: transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
-  }
-
-  .editorial-card:hover {
-    box-shadow: var(--shadow-doodle-lg);
+    box-shadow: var(--shadow-elevation);
+    transition: border-color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
   }
 
   .hero-card {
-    background: var(--bg-hero-gradient);
-    border: 2.5px solid var(--color-border-strong);
-    border-radius: var(--radius-md);
-    padding: 1.5rem;
-    box-shadow: var(--shadow-hero);
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    padding: 2rem;
+    box-shadow: var(--shadow-elevation);
     position: relative;
   }
 
-  .glass-dock {
-    background: color-mix(in srgb, var(--color-surface) 96%, transparent);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 2px solid var(--color-border-strong);
-    box-shadow: var(--shadow-hero);
-    border-radius: var(--radius-md);
-  }
-
-  /* Doodle Buttons with Hand-Drawn Hard Offset Shadow & Tactile Press */
+  /* Buttons: 44 px pills, 1 px boundary, colour change only, no offset shadow or press translate */
   .tactile-btn {
-    min-height: 2.75rem;
-    min-width: 2.75rem;
-    border-radius: var(--radius-md);
-    border: 2px solid var(--color-border-strong);
-    box-shadow: var(--shadow-tactile);
-    transition-property: transform, background-color, box-shadow, border-color;
+    min-height: 44px;
+    min-width: 44px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--color-border-strong);
+    transition-property: background-color, border-color, color, opacity;
     transition-duration: var(--duration-fast);
     transition-timing-function: var(--ease-out);
-    font-family: var(--font-display);
-    letter-spacing: 0.01em;
-  }
-
-  .tactile-btn:hover:not(:disabled) {
-    transform: translate(-1px, -1px);
-    box-shadow: var(--shadow-doodle-lg);
-  }
-
-  .tactile-btn:active:not(:disabled) {
-    transform: translate(2px, 2px);
-    box-shadow: var(--shadow-tactile-active);
+    font-family: var(--font-sans);
   }
 
   .tactile-btn:focus-visible,
   .focus-ring:focus-visible {
-    outline: 3px solid var(--color-brand);
+    outline: 2px solid var(--color-brand);
     outline-offset: 2px;
   }
 
-  /* Doodle Sketch Utilities */
+  /* ponytail: neutralized until tickets 03/06 remove the remaining <div className="doodle-tape" /> usages */
   .doodle-tape {
-    position: absolute;
-    top: -8px;
-    left: 20px;
-    width: 60px;
-    height: 16px;
-    background-color: rgba(255, 200, 61, 0.45);
-    border: 1px dashed rgba(38, 61, 91, 0.4);
-    transform: rotate(-3deg);
-    pointer-events: none;
-  }
-
-  .doodle-highlight {
-    background: linear-gradient(104deg, rgba(232, 106, 51, 0) 0%, rgba(232, 106, 51, 0.22) 3%, rgba(232, 106, 51, 0.22) 97%, rgba(232, 106, 51, 0) 100%);
-    padding: 0 4px;
-    border-radius: 2px;
-  }
-
-  .doodle-wobble-border {
-    border: 2px solid var(--color-border-strong);
-    border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
-  }
-
-  /* Classroom Lecture Board (Doodle Aesthetic) */
-  .board-wood-frame {
-    display: flex;
-    flex-direction: column;
-    background-color: #E2B179;
-    background-image: linear-gradient(135deg, #ECC18A 0%, #D4A373 100%);
-    border: 3.5px solid var(--color-border-strong);
-    border-radius: 28px;
-    padding: 16px;
-    box-shadow: 6px 6px 0 var(--color-border-strong);
-    position: relative;
-    transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
-  }
-
-  [data-theme="dark"] .board-wood-frame {
-    background-color: #6E3F1F;
-    background-image: linear-gradient(135deg, #7D4925 0%, #563016 100%);
-    border-color: #FF8C5A;
-    box-shadow: 6px 6px 0 #FF8C5A;
-  }
-
-  /* Board Canvas: Whiteboard in Light Mode */
-  .board-canvas {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    background-color: #FFFFFF;
-    background-image: radial-gradient(rgba(38, 61, 91, 0.08) 1.2px, transparent 1.2px);
-    background-size: 24px 24px;
-    border: 2.5px solid var(--color-border-strong);
-    border-radius: 18px;
-    color: #111827;
-    position: relative;
-    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
-  }
-
-  /* Board Canvas: Chalkboard in Dark Mode */
-  [data-theme="dark"] .board-canvas {
-    background-color: #162621;
-    background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1.2px, transparent 1.2px);
-    background-size: 24px 24px;
-    border: 2.5px solid rgba(255, 255, 255, 0.3);
-    border-radius: 18px;
-    color: #F8FAFC;
-  }
-
-  [data-theme="dark"] .board-canvas h1,
-  [data-theme="dark"] .board-canvas h2,
-  [data-theme="dark"] .board-canvas h3,
-  [data-theme="dark"] .board-canvas h4 {
-    color: #FFFFFF;
-  }
-
-  [data-theme="dark"] .board-canvas .text-ink {
-    color: #FFFFFF !important;
-  }
-
-  [data-theme="dark"] .board-canvas .text-ink-muted {
-    color: #CBD5E1 !important;
-  }
-
-  [data-theme="dark"] .board-canvas .tactile-card,
-  [data-theme="dark"] .board-canvas .bg-surface {
-    background-color: rgba(255, 255, 255, 0.06) !important;
-    border-color: rgba(255, 255, 255, 0.22) !important;
-    color: #FFFFFF !important;
-  }
-
-  [data-theme="dark"] .board-canvas .bg-surface-raised {
-    background-color: rgba(255, 255, 255, 0.09) !important;
-    border-color: rgba(255, 255, 255, 0.24) !important;
-    color: #FFFFFF !important;
-  }
-
-  [data-theme="dark"] .board-canvas .border-border-strong {
-    border-color: rgba(255, 255, 255, 0.28) !important;
-  }
-
-  [data-theme="dark"] .board-canvas .border-border {
-    border-color: rgba(255, 255, 255, 0.16) !important;
-  }
-
-  [data-theme="dark"] .board-canvas svg text {
-    fill: #FFFFFF !important;
-    stroke: #162621 !important;
-  }
-
-  /* =========================================================================
-     Classroom Lecture Stage: Wooden Podium (Doodle Aesthetic)
-     ========================================================================= */
-  .wooden-podium {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    width: 100%;
-    user-select: none;
-    pointer-events: none;
-  }
-
-  /* Top Tier: Standing Platform with Beveled Edge */
-  .podium-top-tier {
-    width: 100%;
-    height: 18px;
-    background-color: #ECC18A;
-    background-image: linear-gradient(180deg, #F5D7B0 0%, #ECC18A 55%, #DFAB74 100%);
-    border: 3px solid var(--color-border-strong);
-    border-radius: 8px 8px 0 0;
-    position: relative;
-    z-index: 3;
-  }
-
-  [data-theme="dark"] .podium-top-tier {
-    background-color: #7D4925;
-    background-image: linear-gradient(180deg, #8E532B 0%, #7D4925 55%, #633618 100%);
-    border-color: #FF8C5A;
-  }
-
-  /* Middle Tier: Main Column with Wooden Planks & Inset Bevel */
-  .podium-mid-tier {
-    width: 100%;
-    height: 44px;
-    background-color: #E2B179;
-    background-image: linear-gradient(135deg, #ECC18A 0%, #D4A373 50%, #C89563 100%);
-    border-left: 3px solid var(--color-border-strong);
-    border-right: 3px solid var(--color-border-strong);
-    border-bottom: 2px solid var(--color-border-strong);
-    position: relative;
-    z-index: 2;
-    overflow: hidden;
-  }
-
-  [data-theme="dark"] .podium-mid-tier {
-    background-color: #6E3F1F;
-    background-image: linear-gradient(135deg, #7D4925 0%, #6E3F1F 50%, #563016 100%);
-    border-left-color: #FF8C5A;
-    border-right-color: #FF8C5A;
-    border-bottom-color: #FF8C5A;
-  }
-
-  /* Vertical wood slat grooves on middle tier */
-  .podium-planks-overlay {
-    position: absolute;
-    inset: 0;
-    background-image: repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 46px,
-      rgba(0, 0, 0, 0.08) 46px,
-      rgba(0, 0, 0, 0.08) 48px
-    );
-    pointer-events: none;
-  }
-
-  [data-theme="dark"] .podium-planks-overlay {
-    background-image: repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 46px,
-      rgba(255, 255, 255, 0.06) 46px,
-      rgba(255, 255, 255, 0.06) 48px
-    );
-  }
-
-  /* Base Tier: Sturdy Foundation Plinth (No Drop Shadow) */
-  .podium-base-tier {
-    width: 100%;
-    height: 20px;
-    background-color: #D4A373;
-    background-image: linear-gradient(180deg, #DFAB74 0%, #C89563 60%, #B88553 100%);
-    border: 3.5px solid var(--color-border-strong);
-    border-radius: 0 0 12px 12px;
-    position: relative;
-    z-index: 1;
-  }
-
-  [data-theme="dark"] .podium-base-tier {
-    background-color: #563016;
-    background-image: linear-gradient(180deg, #6E3F1F 0%, #563016 60%, #40200C 100%);
-    border-color: #FF8C5A;
-  }
-
-  /* Gentle Floating Idle Animation for Hero Character */
-  @keyframes brian-float {
-    0%, 100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-5px);
-    }
-  }
-
-  .animate-brian-float {
-    animation: brian-float 3.5s ease-in-out infinite;
+    display: none;
   }
 
   /* EMILY Emotion-Adaptive Utility Classes */
@@ -720,40 +574,6 @@ html[data-theme="dark"][data-emotion="fatigued"] {
   .shadow-emotion-glow {
     box-shadow: 0 0 14px var(--color-emotion-glow);
   }
-
-  /* =========================================================================
-     Full-Page Slide Deck Presentation & Scrolling Transition Animations
-     ========================================================================= */
-  .slide-stage {
-    scroll-margin-top: 5rem;
-    min-height: calc(100vh - 6rem);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    position: relative;
-  }
-
-  .slide-anim-active {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    transition: opacity 650ms cubic-bezier(0.16, 1, 0.3, 1), transform 650ms cubic-bezier(0.16, 1, 0.3, 1);
-    will-change: transform, opacity;
-  }
-
-  .slide-anim-next {
-    opacity: 0.35;
-    transform: translateY(28px) scale(0.975);
-    transition: opacity 650ms cubic-bezier(0.16, 1, 0.3, 1), transform 650ms cubic-bezier(0.16, 1, 0.3, 1);
-    will-change: transform, opacity;
-  }
-
-  .slide-anim-prev {
-    opacity: 0.35;
-    transform: translateY(-28px) scale(0.975);
-    transition: opacity 650ms cubic-bezier(0.16, 1, 0.3, 1), transform 650ms cubic-bezier(0.16, 1, 0.3, 1);
-    will-change: transform, opacity;
-  }
-
 }
 
 /* Reduced Motion & Timed-Trial Zero-Distraction Lock */
@@ -767,11 +587,7 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     scroll-behavior: auto !important;
   }
   .tactile-btn:active:not(:disabled),
-  .tactile-card:hover,
-  .animate-brian-float,
-  .slide-anim-active,
-  .slide-anim-next,
-  .slide-anim-prev {
+  .tactile-card:hover {
     transform: none !important;
     opacity: 1 !important;
     transition: none !important;
@@ -788,43 +604,492 @@ html[data-theme="dark"][data-emotion="fatigued"] {
 [data-reduced-motion="true"] .tactile-btn:active:not(:disabled),
 [data-timed-trial="true"] .tactile-btn:active:not(:disabled),
 [data-reduced-motion="true"] .tactile-card:hover,
-[data-timed-trial="true"] .tactile-card:hover,
-[data-reduced-motion="true"] .animate-brian-float,
-[data-timed-trial="true"] .animate-brian-float,
-[data-reduced-motion="true"] .slide-anim-active,
-[data-reduced-motion="true"] .slide-anim-next,
-[data-reduced-motion="true"] .slide-anim-prev {
+[data-timed-trial="true"] .tactile-card:hover {
   transform: none !important;
   opacity: 1 !important;
   transition: none !important;
 }
 
-/* Accessible text contrast overrides for light theme status & brand text tokens (WCAG 2.1 AA ≥4.5:1) */
-.text-brand {
-  color: #C2410C !important;
+/* font-display allow-list: start */
+/* Quicksand only for headings and .font-display text of 20 px (text-xl) and up; everything else,
+   including a sizeless .font-display, is Inter. An allow-list, so an unknown class fails safe to Inter.
+   Unlayered so it beats the Tailwind font-display utility. Responsive sizes switch at their breakpoint. */
+.font-display {
+  font-family: var(--font-sans);
 }
-[data-theme="dark"] .text-brand {
+
+:is(h1, h2, h3, h4, h5, h6, .font-display):is(.text-xl, .text-2xl, .text-3xl, .text-4xl, .text-5xl, .text-6xl) {
+  font-family: var(--font-display);
+}
+
+@media (width >= 40rem) {
+  :is(h1, h2, h3, h4, h5, h6, .font-display):is(.sm\:text-xl, .sm\:text-2xl, .sm\:text-3xl, .sm\:text-4xl, .sm\:text-5xl, .sm\:text-6xl) {
+    font-family: var(--font-display);
+  }
+}
+
+@media (width >= 48rem) {
+  :is(h1, h2, h3, h4, h5, h6, .font-display):is(.md\:text-xl, .md\:text-2xl, .md\:text-3xl, .md\:text-4xl, .md\:text-5xl, .md\:text-6xl) {
+    font-family: var(--font-display);
+  }
+}
+
+@media (width >= 64rem) {
+  :is(h1, h2, h3, h4, h5, h6, .font-display):is(.lg\:text-xl, .lg\:text-2xl, .lg\:text-3xl, .lg\:text-4xl, .lg\:text-5xl, .lg\:text-6xl) {
+    font-family: var(--font-display);
+  }
+}
+
+@media (width >= 80rem) {
+  :is(h1, h2, h3, h4, h5, h6, .font-display):is(.xl\:text-xl, .xl\:text-2xl, .xl\:text-3xl, .xl\:text-4xl, .xl\:text-5xl, .xl\:text-6xl) {
+    font-family: var(--font-display);
+  }
+}
+/* font-display allow-list: end */
+
+/* Status and brand text (WCAG 2.1 AA >= 4.5:1 on canvas, surface, surface-raised and the
+   matching -subtle fill, both themes; ratios in token-metadata.ts). */
+.text-brand {
   color: var(--color-brand) !important;
 }
 
 .text-warning {
-  color: #92400E !important;
-}
-[data-theme="dark"] .text-warning {
   color: var(--color-warning) !important;
 }
 
 .text-success {
-  color: #166534 !important;
-}
-[data-theme="dark"] .text-success {
   color: var(--color-success) !important;
 }
 
 .text-danger {
-  color: #B91C1C !important;
-}
-[data-theme="dark"] .text-danger {
   color: var(--color-danger) !important;
 }
 
+/* Characters (ticket 02): still when idle; motion only on an event (anti-slop rule 10).
+   Every class plays once or a few times and stops. Ease-out on enter, ease-in on the way down. */
+.char-figure {
+  filter: var(--clay-drop);
+  overflow: visible;
+}
+
+@keyframes char-talk {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.4); }
+}
+.char-anim-talk {
+  animation: char-talk 340ms var(--ease-in-out) 6;
+}
+
+@keyframes char-pulse {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+.char-anim-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: char-pulse 900ms var(--ease-out) 1;
+}
+
+@keyframes char-wave {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(14deg); }
+  70% { transform: rotate(-8deg); }
+}
+.char-anim-wave {
+  animation: char-wave 640ms var(--ease-in-out) 3;
+}
+
+@keyframes char-appear {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: scale(1); }
+}
+.char-anim-think > * {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: char-appear 360ms var(--ease-out) both;
+}
+.char-anim-think > :nth-child(2) { animation-delay: 120ms; }
+.char-anim-think > :nth-child(3) { animation-delay: 240ms; }
+
+@keyframes char-swim-in {
+  from { opacity: 0; transform: translateX(-70px) rotate(-6deg); }
+  40% { opacity: 1; }
+  to { opacity: 1; transform: translateX(0) rotate(0deg); }
+}
+.char-anim-swim-in {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: char-swim-in 900ms var(--ease-out) 1 both;
+}
+
+@keyframes char-hop {
+  0% { transform: translateY(0); animation-timing-function: var(--ease-out); }
+  45% { transform: translateY(-22px) rotate(-4deg); animation-timing-function: var(--ease-in); }
+  100% { transform: translateY(0); }
+}
+.char-anim-hop {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: char-hop 720ms 1 both;
+}
+
+@keyframes char-hop-shadow {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  45% { transform: scale(0.7); opacity: 0.5; }
+}
+.char-anim-hop-shadow {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: char-hop-shadow 720ms var(--ease-in-out) 1 both;
+}
+
+@keyframes char-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.char-anim-fade-in {
+  animation: char-fade-in 900ms var(--ease-out) 1 both;
+}
+
+@keyframes char-mood {
+  0% { transform: scale(1, 1); }
+  30% { transform: scale(1.06, 0.92); }
+  65% { transform: scale(0.97, 1.04); }
+  100% { transform: scale(1, 1); }
+}
+.char-anim-mood {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: char-mood 560ms var(--ease-out) 1;
+}
+
+/* The one idle a character may have (spec R8): a nearly imperceptible breath and an occasional blink.
+   Opt-in per use (Loti's `alive` prop), off under reduced motion and in timed trials (lock below). */
+@keyframes char-breathe {
+  0%, 100% { transform: scale(1, 1); }
+  50% { transform: scale(1.01, 1.025); }
+}
+.char-anim-breathe {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: char-breathe 4200ms var(--ease-in-out) infinite;
+}
+
+@keyframes char-blink {
+  0%, 94%, 100% { transform: scaleY(1); }
+  97% { transform: scaleY(0.1); }
+}
+.char-anim-blink {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: char-blink 5200ms var(--ease-in-out) 1200ms infinite;
+}
+
+/* characters: motion lock */
+@media (prefers-reduced-motion: reduce) {
+  [class*="char-anim-"],
+  [class*="char-anim-"] > * {
+    animation: none !important;
+  }
+}
+
+[data-reduced-motion="true"] [class*="char-anim-"],
+[data-reduced-motion="true"] [class*="char-anim-"] > *,
+[data-timed-trial="true"] [class*="char-anim-"],
+[data-timed-trial="true"] [class*="char-anim-"] > * {
+  animation: none !important;
+}
+
+/* Motion pass (ticket 07b, spec R8). Transform and opacity only; ease-out to enter, ease-in to exit.
+   Every anim-* class is off under reduced motion (lock at the end of this block). None of them sits
+   on a trial stimulus: ExerciseFrame keeps [data-timed-trial] on the exercise alone, so the motion
+   lives on the instruction and end screens, the progress dots and presses. The fixation cross
+   appears at once (R9). */
+
+/* Welcome: Loti rises with a small overshoot (and waves once it has landed, 400 ms), the bubble
+   follows, its words reveal one by one, then Start. The timeline is ~1.3 s; Start leaves in 300 ms
+   (80 + 220). */
+@keyframes anim-rise {
+  0% { opacity: 0; transform: translateY(24px) scale(0.96); }
+  60% { opacity: 1; transform: translateY(-4px) scale(1.01); }
+  100% { opacity: 1; transform: none; }
+}
+.anim-rise {
+  animation: anim-rise 400ms var(--ease-out) both;
+}
+.anim-rise .char-anim-wave {
+  animation-delay: 400ms;
+}
+
+/* Loti's breath on an HTML wrapper (LotiSays `alive`), so the browser composites it instead of
+   repainting the SVG each frame. Loti's own `alive` breath on its SVG group is turned off inside it,
+   which leaves the blink. */
+@keyframes anim-breathe {
+  0%, 100% { transform: scale(1, 1); }
+  50% { transform: scale(1.01, 1.025); }
+}
+.anim-breathe {
+  transform-origin: 50% 100%;
+  animation: anim-breathe 4200ms var(--ease-in-out) infinite;
+}
+.anim-breathe .char-anim-breathe {
+  animation: none;
+}
+
+@keyframes anim-bubble {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+.anim-bubble {
+  transform-origin: 50% 0;
+  animation: anim-bubble var(--duration-enter) var(--ease-out) 350ms both;
+}
+
+@keyframes anim-word {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.anim-word {
+  display: inline-block;
+  animation: anim-word 240ms var(--ease-out) both;
+  animation-delay: calc(450ms + var(--i, 0) * var(--duration-word));
+}
+
+@keyframes anim-fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+.anim-cta {
+  animation: anim-fade-up var(--duration-enter) var(--ease-out) 900ms both;
+}
+
+@keyframes anim-page-exit {
+  to { opacity: 0; transform: translateY(-8px); }
+}
+.anim-page-exit {
+  pointer-events: none;
+  animation: anim-page-exit var(--duration-exit) var(--ease-in) 80ms both;
+}
+
+/* Press: a 0.97 scale while held. Outside trials on the screen's own buttons (Start, Begin, Continue). */
+.anim-press {
+  transition-property: background-color, border-color, color, opacity, transform;
+}
+.anim-press:active:not(:disabled) {
+  transform: scale(0.97);
+  transition-duration: var(--duration-press);
+}
+
+/* Inside a trial, the answer buttons get the same press, and only them: a button that draws part of
+   the stimulus (a Tower peg, a Pattern Puzzle piece, any button holding an SVG) never moves. The
+   answer is already recorded on pointerdown, so the press cannot change what is measured.
+   No correctness feedback (it would change the assessment). */
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-reduced-motion="true"]) [data-timed-trial="true"] .tactile-btn:not(:has(svg)) {
+    transition: transform var(--duration-press) var(--ease-out) !important;
+  }
+  :root:not([data-reduced-motion="true"]) [data-timed-trial="true"] .tactile-btn:not(:has(svg)):active:not(:disabled) {
+    transform: scale(0.97) !important;
+  }
+}
+
+/* Exercise frame: a new exercise's instruction slides in from the right; a filled progress dot
+   pops; the end card's Loti pops in with one burst of sparkles. The fixation cross (R9) and the
+   trial area never animate in. */
+@keyframes anim-slide-in {
+  from { opacity: 0; transform: translateX(32px); }
+  to { opacity: 1; transform: none; }
+}
+.anim-slide-in {
+  animation: anim-slide-in var(--duration-enter) var(--ease-out) both;
+}
+
+@keyframes anim-dot-pop {
+  0% { transform: scale(0.6); }
+  60% { transform: scale(1.4); }
+  100% { transform: none; }
+}
+.anim-dot-pop {
+  animation: anim-dot-pop 240ms var(--ease-out) both;
+}
+
+@keyframes anim-pop {
+  0% { opacity: 0; transform: scale(0.6); }
+  60% { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: none; }
+}
+.anim-pop {
+  animation: anim-pop 360ms var(--ease-out) both;
+}
+
+/* Hidden at rest, so with motion off the burst simply never shows. */
+@keyframes anim-sparkle {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.4); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--sx), var(--sy)) scale(1); }
+}
+.anim-sparkle {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: anim-sparkle 700ms var(--ease-out) 150ms both;
+}
+
+/* Instruction demos: short loops of what the exercise shows (ExerciseDemo.tsx). The resting state
+   (motion off) is a still picture of the same thing; .demo-later layers stay hidden at rest. */
+.demo-later {
+  opacity: 0;
+}
+
+@keyframes anim-demo-cycle {
+  0% { opacity: 0; }
+  6%, 30% { opacity: 1; }
+  36%, 100% { opacity: 0; }
+}
+.anim-demo-cycle {
+  animation: anim-demo-cycle 3000ms var(--ease-in-out) infinite both;
+  animation-delay: calc(var(--i, 0) * 1000ms);
+}
+
+@keyframes anim-demo-seq {
+  0% { opacity: 0; transform: scale(0.8); }
+  10%, 80% { opacity: 1; transform: none; }
+  90%, 100% { opacity: 0; transform: none; }
+}
+.anim-demo-seq {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: anim-demo-seq 3200ms var(--ease-out) infinite both;
+  animation-delay: calc(var(--i, 0) * 400ms);
+}
+
+@keyframes anim-demo-turn {
+  0%, 20% { transform: rotate(0deg); }
+  45%, 70% { transform: rotate(90deg); }
+  95%, 100% { transform: rotate(0deg); }
+}
+.anim-demo-turn {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: anim-demo-turn 3000ms var(--ease-in-out) infinite;
+}
+
+/* One short flash every 2.4 s (well under 3 flashes a second). */
+@keyframes anim-demo-flash {
+  0%, 30% { opacity: 0; }
+  32%, 42% { opacity: 1; }
+  44%, 100% { opacity: 0; }
+}
+.anim-demo-flash {
+  animation: anim-demo-flash 2400ms var(--ease-in-out) infinite both;
+}
+
+@keyframes anim-demo-move {
+  0%, 15% { opacity: 1; transform: none; }
+  30% { transform: translate(0, -24px); }
+  55% { transform: translate(56px, -24px); }
+  70%, 88% { opacity: 1; transform: translate(56px, 12px); }
+  96% { opacity: 0; transform: translate(56px, 12px); }
+  97% { opacity: 0; transform: none; }
+  100% { opacity: 1; transform: none; }
+}
+.anim-demo-move {
+  animation: anim-demo-move 3200ms var(--ease-in-out) infinite;
+}
+
+/* Home (ticket 08): the three blocks fade up in sequence (60 ms apart, all in by 360 ms) and the
+   radar's shape grows from its centre once. Momo's mood squash is the character's own (char-anim-mood). */
+.anim-enter {
+  animation: anim-fade-up 240ms var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+
+@keyframes anim-radar-grow {
+  from { opacity: 0; transform: scale(0); }
+  to { opacity: 1; transform: none; }
+}
+.anim-radar-grow {
+  transform-box: view-box;
+  animation: anim-radar-grow 400ms var(--ease-out) 120ms both;
+}
+
+/* motion pass: lock */
+@media (prefers-reduced-motion: reduce) {
+  [class*="anim-"] {
+    animation: none !important;
+  }
+  .anim-press:active:not(:disabled) {
+    transform: none !important;
+  }
+}
+
+[data-reduced-motion="true"] [class*="anim-"] {
+  animation: none !important;
+}
+[data-reduced-motion="true"] .anim-press:active:not(:disabled) {
+  transform: none !important;
+}
+
+/* Classroom board (user, 2026-10-31: "make the platform bg like the first one" → the classroom board).
+   The page is a wooden frame; the app sits on the board inside it: a dotted whiteboard in light,
+   a chalkboard in dark (--color-canvas is the board surface). Flat wood, no gradient. Static, so
+   nothing moves behind a stimulus. */
+/* --board-gap: the wood frame's width (body padding); --board-edge: the board's border. The board's
+   min-height is the viewport minus the frame (border-box, so the edge is inside it): a short page is
+   exactly one screen tall. */
+:root {
+  --board-gap: var(--space-2);
+  --board-edge: 2.5px;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --board-gap: var(--space-4);
+  }
+}
+
+body {
+  background-color: var(--color-wood);
+  padding: var(--board-gap);
+}
+
+#root {
+  min-height: calc(100dvh - 2 * var(--board-gap));
+  background-color: var(--color-canvas);
+  background-image: radial-gradient(color-mix(in srgb, var(--color-ink) 9%, transparent) 1.2px, transparent 1.2px);
+  background-size: 24px 24px;
+  border: var(--board-edge) solid var(--color-border-strong);
+  border-radius: var(--radius-xl);
+  /* Keep the app's own backgrounds inside the board's rounded edge (ticket 08 review). */
+  overflow: clip;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The phone tab bar is fixed to the viewport, so it is inset by the frame and the board's edge: it
+   sits on the bottom of the board, inside the wood, with the board's rounded corners. */
+.board-tabs {
+  left: calc(var(--board-gap) + var(--board-edge));
+  right: calc(var(--board-gap) + var(--board-edge));
+  bottom: calc(var(--board-gap) + var(--board-edge));
+  border-bottom-left-radius: calc(var(--radius-xl) - var(--board-edge));
+  border-bottom-right-radius: calc(var(--radius-xl) - var(--board-edge));
+}
+
+[data-theme="dark"] #root {
+  border-color: color-mix(in srgb, var(--color-ink) 30%, transparent);
+}
+
+/* Home: Momo's mood tints the board (the canvas inside the wood frame) while the dashboard is
+   mounted (DashboardPage puts .mood-tint-<mood> on its root). Calm is the plain board. */
+:root:has(.mood-tint-happy) { --color-canvas: var(--color-canvas-happy); }
+:root:has(.mood-tint-tired) { --color-canvas: var(--color-canvas-tired); }
+:root:has(.mood-tint-frustrated) { --color-canvas: var(--color-canvas-frustrated); }
+:root:has(.mood-tint-focused) { --color-canvas: var(--color-canvas-focused); }
+
+.heat-0 { background-color: var(--color-heat-0); color: var(--color-heat-ink-0); }
+.heat-1 { background-color: var(--color-heat-1); color: var(--color-heat-ink-1); }
+.heat-2 { background-color: var(--color-heat-2); color: var(--color-heat-ink-2); }
+.heat-3 { background-color: var(--color-heat-3); color: var(--color-heat-ink-3); }
+.heat-4 { background-color: var(--color-heat-4); color: var(--color-heat-ink-4); }

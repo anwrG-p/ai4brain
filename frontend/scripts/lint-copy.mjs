@@ -64,13 +64,8 @@ const BANNED_ACADEMIC_ML = [
   { term: 'Continuous Saccadic Drift (use Daily Energy & Focus Rhythm)', pattern: /\b(?:continuous\s+)?saccadic drift\b/i },
 ]
 
-// Developer diagnostics and technical inspect pages explicitly exempt from academic jargon checks
-const ACADEMIC_JARGON_EXEMPT_PAGES = [
-  'MethodologyPage.tsx',
-  'SystemPage.tsx',
-  'LayerDPage.tsx',
-  'DesignSystemPage.tsx',
-]
+// The one page that may name the method ("How we calculate this", spec U5)
+const ACADEMIC_JARGON_EXEMPT_PAGES = ['MethodologyPage.tsx']
 
 let violations = 0
 for (const file of walkFiles(SRC_DIR)) {
@@ -114,7 +109,7 @@ for (const file of walkFiles(SRC_DIR)) {
 
     // Skip intentional linter sandbox test fixtures
     if (
-      (rel.endsWith('DesignSystemPage.tsx') || rel.endsWith('MethodologyPage.tsx')) &&
+      rel.endsWith('MethodologyPage.tsx') &&
       (line.includes('SAMPLE_CLINICAL_DEMO_INPUT') ||
         line.includes('SAMPLE_GUILT_DEMO_INPUT') ||
         line.includes('SAMPLE_GUARDRAIL_INTERCEPTION_INPUT') ||
@@ -154,16 +149,7 @@ for (const file of walkFiles(SRC_DIR)) {
       inDetailsDrawer ||
       ACADEMIC_JARGON_EXEMPT_PAGES.some((page) => rel.endsWith(page)) ||
       !rel.includes(`pages${path.sep}`) ||
-      rel.endsWith('BrainTwinPage.tsx') || // Dedicated deep technical telemetry view
-      rel.endsWith('PlanPage.tsx') || // Plan optimization inspect panels
-      rel.endsWith('AiCoachPage.tsx') || // Coach explainability grounding
-      rel.endsWith('AssessmentHubPage.tsx') || // Task algorithm inspection
-      rel.endsWith('ProfileRevealPage.tsx') || // Baseline synthesis inspection
-      rel.endsWith('TaskRunnerPage.tsx') || // Task runner trial inspection
-      rel.endsWith('DimensionDetailPage.tsx') || // Dimension telemetry inspection
-      rel.endsWith('PrivacyPage.tsx') || // Cryptographic data retention specs
-      rel.endsWith('OnboardingPage.tsx') || // Historical snapshot configuration
-      rel.endsWith('CollaborationScorePage.tsx') || // AI collaboration technical breakdown
+      rel.endsWith('PrivacyPage.tsx') || // 09d's page; its owner drops this exemption
       line.includes('Explore How This Is Calculated') ||
       line.includes('data-technical-drawer')
 

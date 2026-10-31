@@ -1,19 +1,17 @@
 import type { Page } from '@playwright/test'
 
-/**
- * Helper to ensure page DOM is loaded and ready.
- * Note: Judge console drawer was removed; dimension presets and evaluators
- * are now rendered directly and accessibly in AppShell footer and TaskRunner.
- */
+/* Judge mode (spec R6): the evaluator, inspector, stage and persona controls render only after
+   `?judge=1`, which the app remembers for the tab. These reload the current page with the flag. */
+async function withJudgeFlag(page: Page, value: '1' | '0') {
+  const url = new URL(page.url())
+  url.searchParams.set('judge', value)
+  await page.goto(url.toString(), { waitUntil: 'domcontentloaded' })
+}
+
 export async function openJudgeMode(page: Page) {
-  await page.waitForLoadState('domcontentloaded')
-  await page.evaluate(() => {
-    document.querySelectorAll('details[data-technical-drawer]').forEach((el) => {
-      ;(el as HTMLDetailsElement).open = true
-    })
-  })
+  await withJudgeFlag(page, '1')
 }
 
 export async function closeJudgeMode(page: Page) {
-  await page.waitForLoadState('domcontentloaded')
+  await withJudgeFlag(page, '0')
 }

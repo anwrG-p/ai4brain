@@ -1,12 +1,37 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
+const USAGE = `Usage: STITCH_API_KEY=<key> node scripts/download_stitch.mjs <screens.json>
+  <screens.json>  output of the Stitch list_screens call: { "screens": [...] }`;
+
+function fail(message) {
+  console.error(`${message}\n${USAGE}`);
+  process.exit(2);
+}
+
+const screensJsonPath = process.argv[2];
+if (!screensJsonPath) fail('Missing the screens JSON path.');
 const API_KEY = process.env.STITCH_API_KEY || '';
+if (!API_KEY) fail('Missing STITCH_API_KEY in the environment.');
+if (!fs.existsSync(screensJsonPath)) fail(`Screens JSON not found: ${screensJsonPath}`);
+
+// Load screens from the list_screens JSON
+let screens;
+try {
+  ({ screens } = JSON.parse(fs.readFileSync(screensJsonPath, 'utf8')));
+} catch (err) {
+  fail(`Cannot read ${screensJsonPath}: ${err.message}`);
+}
+if (!Array.isArray(screens)) fail(`No "screens" array in ${screensJsonPath}`);
+
 const PROJECT_ID = '8638452789122956738';
 
-const BASE_DIR = path.resolve('stitch_designs');
-const PUBLIC_MASCOT_DIR = path.resolve('frontend/public/mascot');
-const SRC_MASCOT_DIR = path.resolve('frontend/src/assets/mascot');
+// Paths are relative to the repo root, whatever the working directory.
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const BASE_DIR = path.join(ROOT, 'stitch_designs');
+const PUBLIC_MASCOT_DIR = path.join(ROOT, 'frontend/public/mascot');
+const SRC_MASCOT_DIR = path.join(ROOT, 'frontend/src/assets/mascot');
 
 [
   BASE_DIR,
@@ -22,10 +47,6 @@ const SRC_MASCOT_DIR = path.resolve('frontend/src/assets/mascot');
     fs.mkdirSync(dir, { recursive: true });
   }
 });
-
-// Load screens from list_screens json
-const screensJsonPath = 'C:/Users/Smida/.gemini/antigravity-ide/brain/12754f9c-43db-44ad-90e9-883b84a9b595/.system_generated/steps/12/output.txt';
-const { screens } = JSON.parse(fs.readFileSync(screensJsonPath, 'utf8'));
 
 console.log(`Found ${screens.length} screens/items to download.`);
 
@@ -105,7 +126,7 @@ async function run() {
 
       // If it's an SVG brand logo, also copy to branding
       if (ext === '.svg') {
-        const brandDest = path.resolve(`frontend/src/assets/branding/${safeTitle}`);
+        const brandDest = path.join(ROOT, `frontend/src/assets/branding/${safeTitle}`);
         fs.copyFileSync(dest, brandDest);
         console.log(`Copied SVG to ${brandDest}`);
       }

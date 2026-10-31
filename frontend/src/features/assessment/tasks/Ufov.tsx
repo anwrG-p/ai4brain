@@ -8,6 +8,7 @@ import { pressProps } from '../telemetry/useTimedTrials'
 import type { TrialMeta, UfovParams } from '../telemetry/types'
 import { defaultRaf, framesFor, measureFrameMs, type Raf } from './frames'
 import type { TaskProps } from './TaskRunner'
+import { EXERCISE_NAME } from '../names'
 
 const FIXATION_MS = 500
 const SIZE = 360
@@ -17,7 +18,8 @@ const RING_PX = [0, 60, 115, 165]
 const TARGET_RING = 2
 const BLOB_R = 10
 const CELL = 10 // mask noise cell size (px)
-const DIR_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8']
+export const LETTER_KEYS = ['A', 'B']
+export const DIR_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8']
 // Answer pad: a 240 px square of 44 px buttons (the tactile-btn minimum); directions on a 96 px ring.
 const PAD = 240
 const BTN = 44
@@ -25,10 +27,11 @@ const PAD_RING = 96
 
 type Trial = UfovParams['trials'][number]
 const isDir = (d: unknown): d is number => Number.isInteger(d) && (d as number) >= 0 && (d as number) <= 7
-const valid = (t: Trial | undefined) => !!t && (t.central === 'A' || t.central === 'B') && isDir(t.peripheral_dir)
+// A trial UFOV can show (letter A/B, direction 0–7); the others are skipped. ExerciseFrame counts these.
+export const isValidTrial = (t: Trial | undefined) => !!t && (t.central === 'A' || t.central === 'B') && isDir(t.peripheral_dir)
 const nextValid = (trials: Trial[], from: number) => {
   let k = from
-  while (k < trials.length && !valid(trials[k])) k++
+  while (k < trials.length && !isValidTrial(trials[k])) k++
   return k
 }
 const clamp01 = (x: number) => (Number.isFinite(x) ? Math.min(1, Math.max(0, x)) : 0)
@@ -119,7 +122,7 @@ function Choice({ label, x, y, onPress, children }: { label?: string; x: number;
 export function Ufov({ params, recorder, onDone, raf = defaultRaf }: TaskProps<UfovParams> & { raf?: Raf }) {
   const { trials, similarity, mask_noise } = params
   let lastValid = trials.length - 1
-  while (lastValid >= 0 && !valid(trials[lastValid])) lastValid--
+  while (lastValid >= 0 && !isValidTrial(trials[lastValid])) lastValid--
 
   const [quest] = useState(() => new QuestPlus(params.duration_grid_ms))
   const [frameMs, setFrameMs] = useState<number | null>(null)
@@ -225,7 +228,7 @@ export function Ufov({ params, recorder, onDone, raf = defaultRaf }: TaskProps<U
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
       const k = e.key.toUpperCase()
-      if (k === 'A' || k === 'B') press('central', k)
+      if (LETTER_KEYS.includes(k)) press('central', k)
       else if (DIR_KEYS.includes(e.key)) press('dir', Number(e.key) - 1)
     }
     window.addEventListener('keydown', onKey)
@@ -255,8 +258,7 @@ export function Ufov({ params, recorder, onDone, raf = defaultRaf }: TaskProps<U
 
   const mid = PAD / 2
   return (
-    <section aria-label="Quick look" className="flex flex-col items-center gap-4">
-      <p className="text-ink">Look at the cross. A letter and shapes flash briefly. Then pick the letter in the middle (A or B) and the direction of the round shape (1–8).</p>
+    <section aria-label={EXERCISE_NAME.ufov} className="flex flex-col items-center gap-4">
       <Card className="flex w-full justify-center">
         {/* Scales down on narrow screens; the drawing buffer stays SIZE × SIZE. */}
         <canvas ref={canvas} width={SIZE} height={SIZE} role="img" aria-label="Briefly flashed display" className="block h-auto max-w-full" />

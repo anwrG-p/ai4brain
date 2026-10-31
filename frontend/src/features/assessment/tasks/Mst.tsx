@@ -6,10 +6,11 @@ import { pressProps, useTimedTrials } from '../telemetry/useTimedTrials'
 import type { MstParams, Poly } from '../telemetry/types'
 import { PolyView } from './svg'
 import type { TaskProps } from './TaskRunner'
+import { EXERCISE_NAME } from '../names'
 
 type Response = 'old' | 'similar' | 'new'
 const EXPECTED = { old: 'old', lure: 'similar', new: 'new' } as const
-const KEYS: Record<string, Response> = { '1': 'old', '2': 'similar', '3': 'new' }
+export const KEYS: Record<string, Response> = { '1': 'old', '2': 'similar', '3': 'new' }
 // ponytail: the mst contract has no time_limit_ms, so test trials use a fixed limit; add one to the
 // contract if Member 5 wants control.
 const TEST_MS = 5000
@@ -95,7 +96,7 @@ function Test({ test, recorder, onDone }: { test: MstParams['test']; recorder: T
   if (!t) return null
   return (
     <>
-      <p className="text-ink">Have you seen this exact shape? Old (1), Similar (2) or New (3).</p>
+      <p className="text-ink">Have you seen this exact shape?</p>
       <Stage>{!paused && <PolyView poly={t.item} label="Test shape" />}</Stage>
       <div className="flex flex-wrap justify-center gap-3">
         <Button variant="secondary" {...pressProps(() => answer('old'))}>
@@ -118,7 +119,7 @@ export function Mst({ params, recorder, onDone }: TaskProps<MstParams>) {
   const [testing, setTesting] = useState(false)
   const startTest = useCallback(() => setTesting(true), [])
   return (
-    <section aria-label="Shape memory" className="flex flex-col items-center gap-4">
+    <section aria-label={EXERCISE_NAME.mst} className="flex flex-col items-center gap-4">
       {testing ? (
         <Test test={params.test} recorder={recorder} onDone={onDone} />
       ) : (

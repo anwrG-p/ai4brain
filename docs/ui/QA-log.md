@@ -1,5 +1,7 @@
 # Quality Assurance & Verification Log (`docs/ui/QA-log.md`)
 
+> **History.** A record of the UI before brand v2 (BRIAN, the Doodle design, 19 pages, 7 dimensions). Entries are kept as written; later work supersedes them. Current: the [root README](../../README.md), the [glossary](../../docs/GLOSSARY.md) and `docs/design/BRAND-V2.md`.
+
 Every automated check and manual critique round is logged here with computed numbers.
 
 ## 1. Design Direction Sprint — Computed WCAG 2.1 Contrast Verification (2026-10-24)

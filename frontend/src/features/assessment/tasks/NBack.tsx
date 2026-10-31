@@ -4,13 +4,15 @@ import { Card } from '../../../components/ui/Card'
 import { tracker } from '../telemetry/tracker'
 import { useInputCapture } from '../telemetry/useInputCapture'
 import { pressProps } from '../telemetry/useTimedTrials'
-import type { NBackParams, TelemetryEvent } from '../telemetry/types'
+import { NBACK_RULE_STREAM as RULE_STREAM } from '../telemetry/types'
+import type { NBackEventTrialType, NBackParams, TelemetryEvent } from '../telemetry/types'
 import type { TaskProps } from './TaskRunner'
+import { EXERCISE_NAME } from '../names'
 
 type Stream = NBackParams['streams'][number]
 type Rule = NBackParams['trials'][number]['rule']
 
-const KEYS: Record<string, Stream> = { a: 'position', l: 'symbol' }
+export const KEYS: Record<string, Stream> = { a: 'position', l: 'symbol' }
 const LABEL: Record<Stream, string> = { position: 'Position match (A)', symbol: 'Symbol match (L)' }
 
 const hint = (rule: Rule, n: number) =>
@@ -26,7 +28,12 @@ const LIT = 'var(--dim-1)'
 const UNLIT = 'var(--color-surface-raised)'
 
 // Interference N-back: 3×3 grid position + centre symbol, one event per stream per trial.
-// Correctness comes from answer[stream] only; `rule` drives the banner and key hint.
+// Scoring follows the hint (R16): only the rule's stream (RULE_STREAM) expects a press, when
+// answer[rule stream] is true. The rule-stream event carries the trial's verdict: right when the rule
+// key's press-or-withhold matches that answer and the off-rule key was not pressed at all (so an
+// off-rule press is a false alarm on a noise trial and a miss on a target trial). A match on the other
+// stream is a lure (`lure_stream`): its key must be withheld, and a press is wrong on that stream's own
+// event too. `answer` stays per-stream data (the true n-back match on each stream).
 export function NBack({ params, recorder, onDone }: TaskProps<NBackParams>) {
   const [i, setI] = useState(0)
   const [stimOff, setStimOff] = useState(-1) // index of the trial whose stimulus has been hidden
@@ -60,15 +67,30 @@ export function NBack({ params, recorder, onDone }: TaskProps<NBackParams>) {
       live.current = false
       let first: TelemetryEvent | null = null
       // TrialRecorder.finish closes the trial, so each extra stream re-opens trial i and borrows the
-      // input-derived fields (keystroke latency, jitter) from the first stream's event. RT is per stream.
+      // input-derived fields (keystroke latency, jitter) from the first stream's event. RT is per stream,
+      // except that a rule event answered only by an off-rule press takes that press's time.
+      const ruleStream = RULE_STREAM[tr.rule]
+      const offPress = params.streams
+        .filter((s) => s !== ruleStream)
+        .map((s) => presses.current[s])
+        .filter((rt): rt is number => rt !== undefined)
       for (const s of params.streams) {
         if (first) recorder.start(i)
         const rt = presses.current[s]
-        const e = recorder.finish({
-          correct: (rt !== undefined) === (tr.answer[s] ?? false),
-          windowMs: rt ?? params.interval_ms,
-          meta: { trial_type: tr.trial_type, rule: tr.rule, stream: s },
-        })
+        const onRule = s === ruleStream
+        const e = recorder.finish(
+          onRule
+            ? {
+                correct: (rt !== undefined) === (tr.answer[s] ?? false) && offPress.length === 0,
+                windowMs: rt ?? (offPress.length ? Math.min(...offPress) : params.interval_ms),
+                meta: { trial_type: tr.trial_type, rule: tr.rule, stream: s },
+              }
+            : {
+                correct: rt === undefined,
+                windowMs: rt ?? params.interval_ms,
+                meta: { trial_type: (tr.answer[s] ? 'lure_stream' : 'standard') satisfies NBackEventTrialType, rule: tr.rule, stream: s },
+              },
+        )
         tracker.push(
           first ? { ...e, keystroke_latency_ms: first.keystroke_latency_ms, hesitation_jitter: first.hesitation_jitter } : e,
         )
@@ -126,7 +148,7 @@ export function NBack({ params, recorder, onDone }: TaskProps<NBackParams>) {
   if (!t) return null // no trials: the effect has already called onDone
   const showStim = stimOff !== i && !paused && i < trials.length
   return (
-    <section aria-label="Memory Sharpness" className="flex flex-col items-center gap-4">
+    <section aria-label={EXERCISE_NAME.n_back} className="flex flex-col items-center gap-4">
       {t.trial_type === 'switch' && !paused && i < trials.length && (
         <p role="status" className="font-bold text-ink">
           New rule: {hint(t.rule, params.n)}

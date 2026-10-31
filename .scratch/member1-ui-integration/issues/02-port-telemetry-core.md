@@ -1,6 +1,6 @@
 # 02: Port the telemetry core and adaptive engines; add Tracker extras
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 01
 Spec: `../spec.md` (D2, D3, Constraints)
 
@@ -58,3 +58,7 @@ Existing tracker, metrics, staircase, quest, frames and useInputCapture tests po
 ## Done when
 
 From `frontend/`: `npx vitest run src/features/assessment`, `npm run typecheck`, `npm run lint:tokens` and `npm run lint:copy` are all clean. Commit with no AI attribution.
+
+## Comments
+
+- 2026-10-31 (TD-03 tracker hygiene): Done in c8d5150..ec76596, review clean (member1-ui-integration ledger).

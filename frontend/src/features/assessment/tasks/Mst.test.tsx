@@ -139,7 +139,7 @@ test('no element carries a hex or rgb() colour in its style or paint attributes,
 
 test('the encoding phase is a labelled region with a text-labelled study shape and no unlabelled controls', () => {
   setup(params())
-  const region = screen.getByRole('region', { name: 'Shape memory' })
+  const region = screen.getByRole('region', { name: 'Precision Archive' })
   expect(region).toContainElement(screen.getByRole('img', { name: 'Study shape' }))
   expect(region.querySelectorAll('button, input, a')).toHaveLength(0)
 })

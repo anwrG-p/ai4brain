@@ -1,0 +1,11 @@
+# Context is the repo root; send only what backend/Dockerfile copies.
+*
+!requirements.txt
+!backend/requirements.txt
+!backend/app
+!ai_coach
+!brain_twin_jepa
+!clustering_engine
+!dynamic_cache
+**/__pycache__
+**/tests

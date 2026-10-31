@@ -1,29 +1,42 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
+import { fileURLToPath } from 'node:url'
+
+// Renders the mermaid blocks of SEQUENCE_DIAGRAMS.md to SVG + PNG. Playwright comes from
+// frontend/node_modules (run `cd frontend && npm ci` first); mermaid comes from the pinned CDN build below.
+const USAGE = 'Usage: node scripts/parse_and_render_diagrams.mjs   (needs frontend/node_modules: cd frontend && npm ci; and Microsoft Edge)'
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 const require = createRequire(import.meta.url)
-const playwrightPath = path.resolve('frontend/node_modules/@playwright/test')
-const { chromium } = require(playwrightPath)
+const playwrightPath = path.join(ROOT, 'frontend/node_modules/@playwright/test')
+const docPath = path.join(ROOT, 'docs/architecture/SEQUENCE_DIAGRAMS.md')
+const outputDir = path.join(ROOT, 'docs/architecture/diagrams')
 
-const docPath = path.resolve('docs/architecture/SEQUENCE_DIAGRAMS.md')
-const outputDir = path.resolve('docs/architecture/diagrams')
+for (const [needed, label] of [[playwrightPath, '@playwright/test in frontend/node_modules'], [docPath, docPath]]) {
+  if (!fs.existsSync(needed)) {
+    console.error(`Missing ${label}.\n${USAGE}`)
+    process.exit(1)
+  }
+}
+const { chromium } = require(playwrightPath)
 
 if (!fs.existsSync(outputDir)) {
   fs.mkdirSync(outputDir, { recursive: true })
 }
 
 const titles = [
+  // null: a brand v2 consumer flow (section 7, diagrams 1, 2 and 4), kept as Mermaid source only, never rendered.
   { id: '01-high-level-closed-loop', title: 'High-Level 5-Subsystem Closed-Loop Overview' },
   { id: '02-seq1-assessment-telemetry-streaming', title: 'Sequence 1: Assessment Execution & Telemetry Streaming (M1 → M3)' },
   { id: '03-seq2-latent-representation-encoding', title: 'Sequence 2: Latent Representation Encoding & Task Blueprints Cache (M3 → M5)' },
   { id: '04-seq3-prototype-explainability-xai', title: 'Sequence 3: State Transition & Prototype Explainability XAI (M3 → M2)' },
   { id: '05-seq4-low-latency-task-cache', title: 'Sequence 4: Low-Latency Task Next & Runtime Adaptive Execution (M5 → M1)' },
   { id: '06-seq5-profile-ingestion-dashboard', title: 'Sequence 5: Profile Ingestion, Radar Chart & Dashboard Analytics (M3 & M2 → M4)' },
-  { id: '07-consumer-ux-flow', title: 'Consumer UX Flow: First Click to De-Cluttered Dashboard' },
-  { id: '08-emily-emotion-color-adaptation', title: 'EMILY Behavioral Emotion Tracking & Human-Approved Color Adaptation' },
+  null,
+  null,
   { id: '09-telemetry-jepa-cache', title: 'Assessment Telemetry, Brain Twin SAT-JEPA, and Task Cache' },
-  { id: '10-ai-coach-guardrails-collab', title: 'Explainable AI Coach, Non-Clinical Firewall & Collaboration Scorer' },
+  null,
   { id: '11-human-ux-review-jargon-gate', title: 'Human-in-the-Loop UX Review & Jargon Gate Workflow' },
 ]
 
@@ -35,6 +48,10 @@ let index = 0
 
 while ((match = mermaidRegex.exec(content)) !== null) {
   const code = match[1].trim()
+  if (titles[index] === null) {
+    index++
+    continue
+  }
   const meta = titles[index] || { id: `diagram_${index + 1}`, title: `Diagram ${index + 1}` }
   diagrams.push({
     ...meta,
@@ -58,7 +75,7 @@ async function run() {
     <html>
     <head>
       <meta charset="utf-8">
-      <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js"></script>
       <style>
         body {
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;

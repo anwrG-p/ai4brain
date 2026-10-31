@@ -1,5 +1,7 @@
 # 06. Dashboard (`/dashboard`) · HERO PAGE
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: `/dashboard` is **Home**: Momo, one Loti line, the 5-skill chart, the progress curve. Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 ## Purpose, user moment, rubric criteria
 - **Purpose**: The central command center of **SynapseTwin** (Layer C + Brain Twin + Layer B summary + 0–100 Collaboration Score), uniting the `<UncertaintyRadar />`, the longitudinal **Growth & Uncertainty Fan Chart** (`<ProjectionFanChart />`), the **Session Fatigue & Time-of-Day Heatmap**, the **AI Collaboration Score Summary Card**, and today's top **Explainable AI Coach Insight** (`<WhyThisPanel />`) on a disciplined, scannable 12-column grid.
 - **User / Evaluator Moment**: The flagship screen of the demo video (`0:45–1:45`) and the primary destination when a judge clicks **"Load Youssef (Calibrated Twin)"** or **"Load Salma (Hatched Twin)"**. Must survive a freeze-frame with zero visual clutter and maximum rubric density.

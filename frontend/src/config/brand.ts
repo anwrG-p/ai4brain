@@ -5,6 +5,5 @@ export const BRAND_CONFIG = {
   challengeBadge: 'Personal Cognitive Twin',
   tagline: 'Your uncertainty-aware, non-clinical cognitive growth companion.',
   version: '1.0.0-phase1',
-  nonClinicalNotice:
-    'BRIAN is an educational cognitive training and self-reflection tool, not a medical or clinical diagnostic device.',
+  nonClinicalNotice: 'For training and self-reflection. Not a medical tool.',
 } as const

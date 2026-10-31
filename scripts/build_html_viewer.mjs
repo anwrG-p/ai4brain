@@ -1,21 +1,30 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const docPath = path.resolve('docs/architecture/SEQUENCE_DIAGRAMS.md')
-const diagramsDir = path.resolve('docs/architecture/diagrams')
-const outputPath = path.resolve('docs/architecture/sequence_diagrams_viewer.html')
+// Paths are relative to the repo root, whatever the working directory. No dependencies.
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const docPath = path.join(ROOT, 'docs/architecture/SEQUENCE_DIAGRAMS.md')
+const diagramsDir = path.join(ROOT, 'docs/architecture/diagrams')
+const outputPath = path.join(ROOT, 'docs/architecture/sequence_diagrams_viewer.html')
+
+if (!fs.existsSync(docPath)) {
+  console.error(`Missing ${docPath}.\nUsage: node scripts/build_html_viewer.mjs   (reads docs/architecture/SEQUENCE_DIAGRAMS.md and diagrams/, writes sequence_diagrams_viewer.html)`)
+  process.exit(1)
+}
 
 const diagramsMeta = [
+  // null: a brand v2 consumer flow (section 7, diagrams 1, 2 and 4), kept as Mermaid source only, never rendered.
   { id: '01-high-level-closed-loop', num: 'Overview', title: '5-Subsystem Closed-Loop Overview', category: 'Core Architecture' },
   { id: '02-seq1-assessment-telemetry-streaming', num: 'Seq 1', title: 'Assessment Execution & Telemetry Streaming (M1 → M3)', category: 'Core Architecture' },
   { id: '03-seq2-latent-representation-encoding', num: 'Seq 2', title: 'Latent Representation Encoding & Task Blueprints Cache (M3 → M5)', category: 'Core Architecture' },
   { id: '04-seq3-prototype-explainability-xai', num: 'Seq 3', title: 'State Transition & Prototype Explainability XAI (M3 → M2)', category: 'Core Architecture' },
   { id: '05-seq4-low-latency-task-cache', num: 'Seq 4', title: 'Low-Latency Task Next & Runtime Adaptive Execution (M5 → M1)', category: 'Core Architecture' },
   { id: '06-seq5-profile-ingestion-dashboard', num: 'Seq 5', title: 'Profile Ingestion, Radar Chart & Dashboard Analytics (M3 & M2 → M4)', category: 'Core Architecture' },
-  { id: '07-consumer-ux-flow', num: 'UX Flow 1', title: 'Consumer UX Flow: First Click to De-Cluttered Dashboard', category: 'Consumer UX & Governance' },
-  { id: '08-emily-emotion-color-adaptation', num: 'UX Flow 2', title: 'EMILY Behavioral Emotion Tracking & Human-Approved Color Adaptation', category: 'Consumer UX & Governance' },
+  null,
+  null,
   { id: '09-telemetry-jepa-cache', num: 'UX Flow 3', title: 'Assessment Telemetry, Brain Twin SAT-JEPA, and Task Cache', category: 'Consumer UX & Governance' },
-  { id: '10-ai-coach-guardrails-collab', num: 'UX Flow 4', title: 'Explainable AI Coach, Non-Clinical Firewall & Collaboration Scorer', category: 'Consumer UX & Governance' },
+  null,
   { id: '11-human-ux-review-jargon-gate', num: 'UX Flow 5', title: 'Human-in-the-Loop UX Review & Jargon Gate Workflow', category: 'Consumer UX & Governance' },
 ]
 
@@ -28,16 +37,18 @@ while ((match = mermaidRegex.exec(content)) !== null) {
   mermaidCodes.push(match[1].trim())
 }
 
-const diagrams = diagramsMeta.map((meta, i) => {
+// Index i still lines up with the i-th mermaid block; null entries are skipped.
+const diagrams = diagramsMeta.flatMap((meta, i) => {
+  if (!meta) return []
   const svgPath = path.join(diagramsDir, `${meta.id}.svg`)
   const svgContent = fs.existsSync(svgPath) ? fs.readFileSync(svgPath, 'utf8') : ''
-  return {
+  return [{
     ...meta,
     code: mermaidCodes[i] || '',
     svg: svgContent,
     svgFile: `diagrams/${meta.id}.svg`,
     pngFile: `diagrams/${meta.id}.png`,
-  }
+  }]
 })
 
 const html = `<!DOCTYPE html>

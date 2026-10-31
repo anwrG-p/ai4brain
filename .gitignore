@@ -53,3 +53,5 @@ out/
 *.swo
 .DS_Store
 .gstack/
+# Fitted clusters (python -m clustering_engine.fit)
+models/clustering/

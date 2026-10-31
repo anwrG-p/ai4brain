@@ -5,6 +5,7 @@ import fixtures from './tasks/fixtures.json'
 import { getUserId } from './tasks/taskSource'
 import { tracker } from './telemetry/tracker'
 import type { TaskPayload, TelemetryEvent } from './telemetry/types'
+import { begin } from '../../tests/exerciseFrame'
 
 const stroop = (fixtures as TaskPayload[]).find((t) => t.schema_type === 'stroop')!
 
@@ -30,13 +31,21 @@ const answer = () => act(() => void fireEvent.pointerDown(screen.getAllByRole('b
 
 test('mock mode with schemaType stroop renders the Stroop exercise inside a timed-trial container', async () => {
   render(host(0))
-  const region = await screen.findByRole('region', { name: 'Color naming' })
+  const region = await begin('Color Clash')
   expect(region.closest('[data-timed-trial="true"]')).not.toBeNull()
+})
+
+test('the task opens on its instruction screen: no exercise and no event until Begin', async () => {
+  render(host(0))
+  expect(await screen.findByRole('heading', { name: 'Color Clash' })).toBeInTheDocument()
+  expect(screen.queryByRole('region', { name: 'Color Clash' })).toBeNull()
+  expect(pushed).toHaveLength(0)
+  await begin('Color Clash')
 })
 
 test('an answer pushes an event whose dimension comes from the task payload (R1)', async () => {
   render(host(0))
-  await screen.findByRole('region', { name: 'Color naming' })
+  await begin('Color Clash')
   answer()
   expect(pushed).toHaveLength(1)
   expect(pushed[0]).toMatchObject({
@@ -49,10 +58,10 @@ test('an answer pushes an event whose dimension comes from the task payload (R1)
 
 test('bumping attempt fetches a fresh task: new task_id and item_id, same session (R3)', async () => {
   const { rerender } = render(host(0))
-  await screen.findByRole('region', { name: 'Color naming' })
+  await begin('Color Clash')
   answer()
   rerender(host(1))
-  await waitFor(() => expect(screen.getByRole('region', { name: 'Color naming' })).toBeInTheDocument())
+  await begin('Color Clash') // a fresh task opens on its instruction screen again
   // The new task mounts from scratch, so its first trial is trial 0 again.
   await waitFor(() => expect(screen.getAllByRole('button')).not.toHaveLength(0))
   answer()
@@ -69,11 +78,11 @@ test('bumping attempt fetches a fresh task: new task_id and item_id, same sessio
 
 test('a remount with the same attempt still gets a new task_id (page remounts restart attempt at 0)', async () => {
   const first = render(host(0))
-  await screen.findByRole('region', { name: 'Color naming' })
+  await begin('Color Clash')
   answer()
   first.unmount()
   render(host(0))
-  await screen.findByRole('region', { name: 'Color naming' })
+  await begin('Color Clash')
   answer()
   const [a, b] = pushed as [TelemetryEvent, TelemetryEvent]
   expect(b.task_id).not.toBe(a.task_id)
@@ -95,7 +104,7 @@ test('unmounting during an in-flight fetch never calls onError and never renders
   const loading = render(host(1, onError))
   loading.unmount()
   await act(async () => pending[1]!(new Response(JSON.stringify(stroop), { status: 200 })))
-  expect(screen.queryByRole('region', { name: 'Color naming' })).toBeNull()
+  expect(screen.queryByRole('region', { name: 'Color Clash' })).toBeNull()
   expect(onError).not.toHaveBeenCalled()
   expect(errSpy).not.toHaveBeenCalled()
 })
@@ -107,7 +116,7 @@ test('real mode keeps the generator task_id and reports a failed fetch through o
     vi.fn(async () => new Response(JSON.stringify({ ...stroop, task_id: 'gen-42' }), { status: 200 })),
   )
   render(host(0))
-  await screen.findByRole('region', { name: 'Color naming' })
+  await begin('Color Clash')
   answer()
   expect(pushed[0]?.task_id).toBe('gen-42')
 
@@ -115,4 +124,18 @@ test('real mode keeps the generator task_id and reports a failed fetch through o
   const onError = vi.fn()
   render(host(1, onError))
   await waitFor(() => expect(onError).toHaveBeenCalledWith('GET /v1/tasks/next failed: HTTP 503'))
+})
+
+test('prepare reshapes the fetched task, and onTask hears the task that runs (its final task_id)', async () => {
+  const onTask = vi.fn()
+  const prepare = (t: TaskPayload): TaskPayload => {
+    const p = t.params as { trials: unknown[] }
+    return { ...t, params: { ...p, trials: p.trials.slice(0, 1) } }
+  }
+  render(<ExerciseHost schemaType="stroop" attempt={0} onDone={vi.fn()} onError={vi.fn()} prepare={prepare} onTask={onTask} />)
+  await begin('Color Clash')
+  expect(screen.getByRole('progressbar', { name: 'Progress' })).toHaveAttribute('aria-valuemax', '1')
+  answer()
+  expect(onTask).toHaveBeenCalledTimes(1)
+  expect(onTask.mock.calls[0]![0]).toBe(pushed[0]!.task_id)
 })

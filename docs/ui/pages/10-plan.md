@@ -1,5 +1,7 @@
 # Page 10 — Plan & Adaptive Exercises (`/plan`) Specification
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: `/plan` redirects to **Train**. Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 - **Page Name & Route**: Plan & Adaptive Exercises (`/plan`)
 - **Wave & Priority**: Wave 2 · **Must** (`P1` Adaptive Training & Staircase Derivation)
 - **Branch**: `ui/page-10-plan`

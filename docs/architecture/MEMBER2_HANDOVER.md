@@ -1,4 +1,12 @@
-# HANDOVER.md — Member 2: AI Coach Collaboration Engine & Natural-Language Feedback (Layer B)
+# HANDOVER.md — Member 2: AI Coach Collaboration Engine & Natural-Language Feedback
+
+> **Current state (2026-10-31).** The coach is **Loti**. The package is mounted in the one server through `ai_coach/api.py` (`backend/app/main.py`). Since this handover:
+> - **Safety:** the output guardrail no longer rewrites words ("dementia" was turned into "cognitive endurance challenge"); a reply that trips a rule is withheld whole. Two input gates run before any LLM: `crisis_check` (crisis line and emergency services) and `health_signpost` ("I can't assess health. A doctor can."). See the module docstring of `ai_coach/safety_guardrails.py`.
+> - **R14:** Loti stays scripted in the frontend until the LLM backup crisis classifier runs on every message, after the keyword gate, with a configured key and `VITE_LOTI_COACH=on`. `POST /v1/coach/chat` and `GET /v1/coach/collaboration-score` answer 501 until BE-06.
+> - **Wording:** explanations stay at exercise level: no "improved" and no percentages until a calibrated reliable-change gate exists (`ai_coach/xai_explainer.py`).
+> - **No emotion input:** the coach never receives Momo's mood ([ADR 0002](../adr/0002-no-server-side-emotion-inference.md)).
+>
+> Sections 2 and 6 below are the original handover and are partly superseded by these points.
 
 **Branch:** `feature/member2-ai-coach-engine`  
 **Author:** AI Software Engineer on behalf of Member 2  
@@ -9,9 +17,9 @@
 
 ## 1. Executive Summary
 
-Member 2 is responsible for **Layer B** of the AI4Brain platform. This module implements:
+Member 2 is responsible for the AI coach of the AI4Brain platform. This module implements:
 1. **Conversational AI Coach Agent (`AICoachAgent`):** Natural-language guidance, cognitive strategy coaching, and task adaptation explanations.
-2. **Explainability Injection Engine (`XAIExplainer`):** Ingests the prototype differential vector $\Delta c$ and transition events from Member 3 to justify task parameter adjustments (e.g., *"We adjusted task pacing because your working memory stability improved by 20%"*).
+2. **Explainability Injection Engine (`XAIExplainer`):** Ingests the prototype differential vector $\Delta c$ and transition events from Member 3 to justify task parameter adjustments (e.g., *"We adjusted the working memory pacing and added an item to remember. Your last few rounds were steady."*).
 3. **Dynamic AI Collaboration Scorer (`CollaborationScorer`):** Computes the composite collaboration score ($S_{\text{collab}} \in [0, 100]$) weighted across five canonical dimensions:
    $$S_{\text{collab}} = \sum_{i=1}^5 w_i(s_t) \cdot V_i, \quad \sum_{i=1}^5 w_i = 1.0$$
    Weights $w_i(s_t)$ dynamically adapt to the user's active GMM cluster archetype ($K=9$).
@@ -21,7 +29,7 @@ Member 2 is responsible for **Layer B** of the AI4Brain platform. This module im
 
 ## 2. Directory Structure & Deliverables
 
-To guarantee 100% interoperability across the codebase, deliverables are available both as the `ai_coach` package and re-exported at `src/coach/` (as specified in `README.md` lines 103–109):
+To guarantee 100% interoperability across the codebase, deliverables are available both as the `ai_coach` package and re-exported at `src/coach/` (as specified in the original plan, now [TEAM_PLAN.md](TEAM_PLAN.md)):
 
 ```
 ai4brain/
@@ -61,7 +69,7 @@ event = StateBusEvent(
     transition_occurred=True,
     active_cluster_id=3,  # int in 0..8 (3x3 GMM archetype)
     delta_vector={
-        "working_memory": 0.20,       # +20% improvement
+        "working_memory": 0.20,       # direction only; never shown as a percentage
         "pattern_induction": 0.15,
         "executive_function": -0.10,
         "spatial_orientation": 0.05,
@@ -147,6 +155,6 @@ All 15 test cases validate:
 ## 6. Edge Cases & Operational Notes
 
 1. **Diagnostic Inquiries:** If a user asks *"Do I have ADHD?"* or *"Am I bipolar?"*, `is_diagnostic_inquiry()` flags the prompt, and `wrap_with_disclaimer_if_needed()` appends a disclaimer clarifying that the platform is non-clinical.
-2. **Deficit Language Sanitization:** If an LLM response contains terms like `"patient"`, `"cognitive deficit"`, or `"dysfunction"`, `SafetyGuardrailEngine.sanitize()` automatically translates them to `"learner"`, `"targeted growth opportunity"`, and `"suboptimal strategy"`.
+2. **Banned terms in a reply:** if an LLM reply contains a banned term (`ai_coach/banned_terms.json`), `SafetyGuardrailEngine.sanitize()` withholds the whole reply and sends a fixed, pre-checked fallback. It no longer substitutes words.
 3. **Offline / Fallback Resilience:** `AICoachAgent` runs fully offline using deterministic cognitive fitness heuristics when no external LLM API key is present. If an external LLM callable is provided and fails, it automatically degrades gracefully to the local engine.
 4. **Cluster Index Clamping:** Any cluster ID passed outside the range $[0, 8]$ is safely clamped to cluster 4 (balanced intermediate archetype).

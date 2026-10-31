@@ -1,0 +1,207 @@
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react'
+import { MessageCircle } from 'lucide-react'
+import { Loti, type CharacterSize, type LotiPose } from '../../components/features/characters'
+import { Button } from '../../components/ui/Button'
+import { useLotiSession } from './lotiSession'
+import { scriptedBrain } from './scriptedBrain'
+import { useLotiActions } from './useLotiActions'
+import type { LotiAction, LotiBrain, LotiChoice, LotiContext, LotiMessage } from './types'
+
+/** How long Loti's talk pose plays as a bubble enters: the mouth flap, 340 ms x 6 (tokens.css). */
+export const TALK_MS = 2040
+
+export interface LotiBubblesProps {
+  context: LotiContext
+  brain?: LotiBrain
+  /** Overrides the default side effects (navigate, set a goal). */
+  onAction?: ((action: LotiAction) => void) | undefined
+  /** Start from the session talk's open question (one started on another page) instead of a fresh opening. */
+  resume?: boolean
+  /** Starts as one clickable line (Home): the talk opens when the line is clicked. */
+  collapsed?: boolean
+  className?: string
+}
+
+/** dismissed: "Not now", the same bubble resumes. ended: the talk closed in place, it starts over. */
+type Paused = 'dismissed' | 'ended' | null
+
+/* One bubble at a time beside a small Loti. "Not now" cuts Loti off; the talk resumes from the
+   same bubble. When a talk ends without leaving the page, a quiet "Talk to Loti" button keeps
+   focus off <body> and starts a new talk. Every pick is recorded in the session talk
+   (lotiSession), so /coach continues it; "Not now" stays local to this page. */
+export function LotiBubbles({ context, brain = scriptedBrain, onAction, resume = false, collapsed = false, className = '' }: LotiBubblesProps) {
+  const runDefault = useLotiActions()
+  const run = onAction ?? runDefault
+  const record = useLotiSession((s) => s.record)
+  // ponytail: the opening is read once per mount; a context change mid-talk does not restart it.
+  const [message, setMessage] = useState<LotiMessage | null>(
+    () => (resume ? useLotiSession.getState().current : null) ?? brain.opening(context),
+  )
+  const [paused, setPaused] = useState<Paused>(null)
+  const [closed, setClosed] = useState(collapsed)
+  const [turn, setTurn] = useState(0)
+  const [talking, setTalking] = useState(true)
+  const focusNext = useRef<'chips' | 'resume' | null>(null)
+  const chipsRef = useRef<HTMLDivElement>(null)
+  const resumeRef = useRef<HTMLButtonElement>(null)
+  const textId = useId()
+
+  // Each bubble entry (a new turn) plays the talk pose once, then Loti settles into the bubble's pose.
+  useEffect(() => {
+    const t = window.setTimeout(() => setTalking(false), TALK_MS)
+    return () => window.clearTimeout(t)
+  }, [turn])
+
+  useEffect(() => {
+    if (focusNext.current === 'chips') chipsRef.current?.querySelector('button')?.focus()
+    if (focusNext.current === 'resume') resumeRef.current?.focus()
+    focusNext.current = null
+  }, [turn, paused])
+
+  const enter = (next: LotiMessage | null) => {
+    if (!next) {
+      end()
+      return
+    }
+    setMessage(next)
+    setPaused(null)
+    setTalking(true)
+    setTurn((t) => t + 1)
+    focusNext.current = 'chips'
+  }
+
+  function end() {
+    setMessage(null)
+    setPaused('ended')
+    focusNext.current = 'resume'
+  }
+
+  if (paused) {
+    const carryOn = () => enter(paused === 'dismissed' ? message : brain.opening(context))
+    return (
+      <div className={className}>
+        <Button
+          ref={resumeRef}
+          variant="ghost"
+          size="sm"
+          onClick={carryOn}
+          leftIcon={<MessageCircle size={16} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" />}
+        >
+          {paused === 'dismissed' ? 'Continue with Loti' : 'Talk to Loti'}
+        </Button>
+      </div>
+    )
+  }
+
+  if (!message) return null
+
+  // Collapsed: Loti and the line only, the whole bubble one button (Dashboard doc: "text bubbles you
+  // can click on to start a convo"). Opening it replays the bubble with its chips.
+  if (closed) {
+    return (
+      <section aria-label="Loti" className={`flex items-end gap-3 ${className}`}>
+        <Loti key={turn} size="sm" pose={talking ? 'talk' : (message.pose ?? 'idle')} className="shrink-0" />
+        <button
+          type="button"
+          onClick={() => {
+            setClosed(false)
+            enter(message)
+          }}
+          className="tactile-card focus-ring inline-flex max-w-md cursor-pointer items-center gap-3 px-4 py-3 text-left font-sans text-base text-ink hover:border-border-strong"
+        >
+          {message.text}
+          <MessageCircle size={16} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0 text-brand" />
+        </button>
+      </section>
+    )
+  }
+
+  const pick = (choice: LotiChoice) => {
+    const next = brain.respond(message.id, choice.id, context)
+    record(message, choice, next)
+    if (choice.action && choice.action.kind !== 'reply') run(choice.action)
+    enter(next)
+  }
+
+  const dismiss = () => {
+    setPaused('dismissed')
+    focusNext.current = 'resume'
+  }
+
+  const closing = message.choices.length === 0
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape') return
+    e.stopPropagation()
+    if (closing) end()
+    else dismiss()
+  }
+
+  // Every reply button is described by the bubble text, so a focused chip reads the question even
+  // when the polite announcement is dropped (focus moves) or the bubble remounts on resume.
+  return (
+    <section aria-label="Loti" onKeyDown={onKeyDown} className={`flex items-end gap-3 ${className}`}>
+      <Loti key={turn} size="sm" pose={talking ? 'talk' : (message.pose ?? 'idle')} className="shrink-0" />
+      <div className="tactile-card max-w-md px-4 py-3">
+        <p id={textId} aria-live="polite" aria-atomic="true" className="font-sans text-base text-ink">
+          {message.text}
+        </p>
+        <div ref={chipsRef} role="group" aria-label="Reply to Loti" className="mt-3 flex flex-wrap gap-2">
+          {message.choices.map((choice) => (
+            <Button key={choice.id} variant="secondary" size="sm" aria-describedby={textId} onClick={() => pick(choice)}>
+              {choice.label}
+            </Button>
+          ))}
+          {closing ? (
+            <Button variant="secondary" size="sm" aria-describedby={textId} onClick={end}>
+              Okay
+            </Button>
+          ) : (
+            <Button variant="ghost" size="sm" aria-describedby={textId} onClick={dismiss}>
+              Not now
+            </Button>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+export interface LotiSaysProps {
+  children: ReactNode
+  pose?: LotiPose
+  size?: CharacterSize
+  className?: string
+  /** Passthroughs for a page's own entrance motion (Welcome): on Loti's wrapper and on the bubble. */
+  lotiClassName?: string
+  bubbleClassName?: string
+  /** Measures Loti's wrapper (Welcome's eyes that follow the mouse). */
+  lotiRef?: Ref<HTMLDivElement>
+  /** Loti's idle (spec R8): the breath on an HTML wrapper (tokens.css .anim-breathe) and the blink. */
+  alive?: boolean
+  look?: [number, number]
+}
+
+/** One static line from Loti: the character above a bubble, no chips and no controls. For a screen
+    whose only action is the page's own button (Welcome). */
+export function LotiSays({
+  children,
+  pose = 'idle',
+  size = 'sm',
+  className = '',
+  lotiClassName,
+  bubbleClassName = '',
+  lotiRef,
+  alive = false,
+  look,
+}: LotiSaysProps) {
+  return (
+    <div className={`flex flex-col items-center gap-3 text-center ${className}`}>
+      <div ref={lotiRef} className={lotiClassName}>
+        <div className={alive ? 'anim-breathe' : undefined}>
+          <Loti pose={pose} size={size} alive={alive} look={look} />
+        </div>
+      </div>
+      <div className={`tactile-card max-w-md px-5 py-4 ${bubbleClassName}`}>{children}</div>
+    </div>
+  )
+}

@@ -1,5 +1,7 @@
 # Page 09 Specification — AI Coach & Explainable Strategy Studio (`HERO`, `/coach`)
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: `/coach` is the **Loti** tab: scripted bubbles and answer chips. Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 **Route:** `/coach`  
 **Priority:** `Must` · **HERO SCREEN**  
 **Branch:** `ui/page-09-ai-coach`  

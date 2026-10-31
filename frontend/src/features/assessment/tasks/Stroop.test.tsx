@@ -191,9 +191,10 @@ test('a detail-0 click with no preceding keydown answers even after a repeating 
   expect(pushed).toHaveLength(2)
 })
 
-test('the instruction is the non-voice one (voice is not ported)', () => {
+// The instruction lives on ExerciseFrame's instruction screen (ExerciseFrame.test.tsx), not here.
+test('the trial area repeats no instruction and asks for no voice', () => {
   setup(params([conflict]))
-  expect(screen.getByText('Pick the color of the ink, not the word.')).toBeTruthy()
+  expect(screen.queryByText('Pick the color of the ink, not the word.')).toBeNull()
   expect(screen.queryByText(/aloud/)).toBeNull()
 })
 
@@ -213,6 +214,8 @@ const HEX_OR_FN = /#[0-9a-fA-F]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\s*\(/
 
 test('the ink palette holds theme tokens only, no raw colour values', () => {
   expect(Object.keys(INK).sort()).toEqual(['blue', 'green', 'red', 'yellow'])
+  // Red has its own pure-red pair: --color-danger reads rose in dark (brand v2 ticket 06).
+  expect(INK.red).toBe('var(--color-stroop-red)')
   for (const v of Object.values(INK)) {
     expect(v).toMatch(/^var\(--[a-z0-9-]+\)$/)
     expect(v).not.toMatch(HEX_OR_FN)

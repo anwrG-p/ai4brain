@@ -1,6 +1,6 @@
 # 01: Research logging fixes (in `assessment_engine/`)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: —
 Spec: `../spec.md` (D4). Evidence: `docs/research/2026-10-30-member1-evidence-review.md` §1.1, §1.2, §1.3, §1.4, §1.5
 
@@ -38,3 +38,7 @@ Work in `assessment_engine/client` and the module docs.
 ## Done when
 
 `npx vitest run`, `npm run build` and `npx oxlint` are all clean in `assessment_engine/client`. Commit with no AI attribution.
+
+## Comments
+
+- 2026-10-31 (TD-03 tracker hygiene): Done in a42bbbf..c8d5150, review clean (member1-ui-integration ledger).
