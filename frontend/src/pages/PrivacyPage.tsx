@@ -428,7 +428,7 @@ function ConsentLine() {
           onClick={() => setOpen((o) => !o)}
           className="focus-ring rounded-sm font-semibold text-ink-muted underline underline-offset-2 hover:text-ink"
         >
-          Change my choice
+          {consent === 'pending' ? 'Choose' : 'Change my choice'}
         </button>
       </p>
       {open && (

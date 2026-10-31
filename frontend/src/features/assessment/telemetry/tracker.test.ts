@@ -899,6 +899,101 @@ describe('Tracker', () => {
       expect(beacon).toHaveBeenCalledOnce()
     })
 
+    // Declined or purged in tab B: tab A, already running exercises while granted, must stop too.
+    describe('another tab changes the choice', () => {
+      const otherTab = (storage: ReturnType<typeof memStorage>, value: string | null) => {
+        if (value === null) storage.removeItem(CONSENT_KEY)
+        else storage.setItem(CONSENT_KEY, value)
+        window.dispatchEvent(new StorageEvent('storage', { key: CONSENT_KEY, newValue: value }))
+      }
+
+      test('granted → denied: the buffer is cleared and nothing more is sent by any path', async () => {
+        const storage = memStorage()
+        const fetchFn = okFetch()
+        const beacon = vi.fn((_url: string, _data: Blob) => true)
+        const t = make({ fetchFn, beacon, storage })
+        t.push(full(1))
+        otherTab(storage, 'denied')
+        expect(t.getStatus()).toMatchObject({ consent: 'denied', queuedCount: 0 })
+        expect(storage.getItem(KEY)).toBeNull()
+        for (let i = 2; i < 30; i++) t.push(full(i))
+        await trySendEverything(t)
+        expect(fetchFn).not.toHaveBeenCalled()
+        expect(beacon).not.toHaveBeenCalled()
+        expect(storage.getItem(KEY)).toBeNull()
+      })
+
+      test('granted → removed (a purge): pending, the buffer is cleared, nothing is sent', async () => {
+        const storage = memStorage()
+        const fetchFn = okFetch()
+        const beacon = vi.fn((_url: string, _data: Blob) => true)
+        const t = make({ fetchFn, beacon, storage })
+        t.push(full(1))
+        otherTab(storage, null)
+        expect(t.getStatus()).toMatchObject({ consent: 'pending', queuedCount: 0 })
+        t.push(full(2))
+        await trySendEverything(t)
+        expect(fetchFn).not.toHaveBeenCalled()
+        expect(beacon).not.toHaveBeenCalled()
+        expect(t.getStatus().queuedCount).toBe(1) // held again, as for any pending user
+      })
+
+      // key null: the other tab cleared all of storage.
+      test.each([KEY, null])('a purge in another tab (key %s) while this one is pending drops what this tab held', (key) => {
+        const storage = memStorage({}, null)
+        const t = make({ fetchFn: okFetch(), beacon: vi.fn(), storage })
+        t.push(full(1))
+        storage.removeItem(KEY) // the other tab's clear(); the consent key was already absent
+        window.dispatchEvent(new StorageEvent('storage', { key, newValue: null }))
+        expect(t.getStatus()).toMatchObject({ consent: 'pending', queuedCount: 0 })
+        expect(storage.getItem(KEY)).toBeNull()
+      })
+
+      test('pending → granted: the held events are sent', async () => {
+        const storage = memStorage({}, null)
+        const fetchFn = okFetch()
+        const t = make({ fetchFn, beacon: vi.fn(), storage })
+        t.push(full(1))
+        otherTab(storage, 'granted')
+        await vi.advanceTimersByTimeAsync(0)
+        expect(sent(fetchFn)).toEqual([1])
+      })
+
+      test('other keys are ignored, and destroy removes the listener', () => {
+        const storage = memStorage()
+        const t = make({ fetchFn: okFetch(), beacon: vi.fn(), storage })
+        t.push(full(1))
+        window.dispatchEvent(new StorageEvent('storage', { key: 'something_else', newValue: 'x' }))
+        expect(t.getStatus()).toMatchObject({ consent: 'granted', queuedCount: 1 })
+        t.destroy()
+        otherTab(storage, 'denied')
+        expect(t.getStatus()).toMatchObject({ consent: 'granted', queuedCount: 1 })
+      })
+    })
+
+    test.each(['denyConsent', 'resetConsent'] as const)(
+      '%s during an in-flight flush: no later fetch or beacon',
+      async (method) => {
+        let resolve!: (r: Response) => void
+        let body: string | undefined
+        const fetchFn = vi.fn((_url: string, init?: RequestInit) => {
+          body = String(init?.body)
+          return new Promise<Response>((r) => (resolve = r))
+        })
+        const beacon = vi.fn((_url: string, _data: Blob) => true)
+        const t = make({ fetchFn, beacon })
+        t.push(full(1))
+        const p = t.flush()
+        t[method]()
+        t.push(full(2))
+        resolve(new Response(JSON.stringify({ accepted: (JSON.parse(String(body)) as unknown[]).length }), { status: 202 }))
+        await p
+        await trySendEverything(t)
+        expect(fetchFn).toHaveBeenCalledTimes(1)
+        expect(beacon).not.toHaveBeenCalled()
+      },
+    )
+
     test('resetConsent goes back to pending, forgets the stored choice, and holds new events', async () => {
       const storage = memStorage()
       const fetchFn = okFetch()

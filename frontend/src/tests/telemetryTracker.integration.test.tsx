@@ -82,6 +82,8 @@ describe('UI telemetry goes through the Tracker', () => {
     renderShell()
     const banner = screen.getByText(/Offline Mode Active/i).closest('[role="status"]')
     expect(banner).not.toHaveTextContent(/sync/i)
+    expect(banner).not.toHaveTextContent(/Ready/i) // nothing is ready to go out yet
+    expect(banner).toHaveTextContent('Saved on this device (2)')
   })
 
   it('after a decline there is no offline banner: nothing is kept to send', () => {
@@ -121,6 +123,13 @@ describe('UI telemetry goes through the Tracker', () => {
     expect(screen.getByText(line)).toBeInTheDocument()
     // Only the quiet link is visible; the two equal choices sit behind it.
     expect(screen.queryByRole('button', { name: /^Share my answers$/i })).not.toBeInTheDocument()
+  })
+
+  it('before any choice the link reads "Choose"', () => {
+    statusWith('pending')
+    renderPrivacy()
+    expect(screen.getByRole('button', { name: /^Choose$/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Change my choice/i })).not.toBeInTheDocument()
   })
 
   it('"Change my choice" reveals two equal choices that call the tracker', () => {

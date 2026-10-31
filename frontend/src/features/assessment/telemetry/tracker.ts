@@ -109,6 +109,8 @@ const STORAGE_KEY = 'synapsetwin_telemetry_queue_v2'
 const OLD_STORAGE_KEY = 'synapsetwin_telemetry_queue'
 // Holds 'granted' or 'denied'; absent (or anything else) means pending.
 const CONSENT_KEY = 'synapsetwin_consent_v1'
+const asConsent = (v: string | null | undefined): Consent =>
+  v === 'granted' || v === 'denied' ? v : 'pending'
 
 // Reading window.localStorage itself throws when site data is blocked.
 function defaultStorage(): StorageLike | null {
@@ -180,6 +182,24 @@ export class Tracker {
     this.isOnline = false
     this.notify()
   }
+  // Another tab declined, purged (key removed) or accepted: this tab follows at once, so a tab
+  // mid-exercise stops sending and stops rewriting the queue the other tab just cleared.
+  // key null means that tab cleared all of storage.
+  private onStorage = (e: StorageEvent) => {
+    // While pending, the queue only disappears elsewhere through a purge (clear()); without this,
+    // this tab would write its held, purged events back and send them after a later accept.
+    // ponytail: while granted, tabs still share one queue key last-writer-wins, as before.
+    const purged = this.store((s) => s.getItem(STORAGE_KEY)) == null
+    if ((e.key === STORAGE_KEY || e.key === null) && this.consent === 'pending' && purged && this.buffer.length)
+      this.clear()
+    if (e.key !== CONSENT_KEY && e.key !== null) return
+    const next = asConsent(this.store((s) => s.getItem(CONSENT_KEY)))
+    if (next === this.consent) return
+    this.consent = next
+    this.schedule()
+    if (next === 'granted') return void this.flush()
+    this.clear() // denied, or pending after a purge: drop what this tab held
+  }
 
   constructor(opts: TrackerOpts = {}) {
     this.endpoint = opts.endpoint ?? '/v1/telemetry/event'
@@ -195,8 +215,7 @@ export class Tracker {
     this.flushMs = opts.flushMs ?? 2000
     this.maxBackoffMs = opts.maxBackoffMs ?? 60_000
     this.store((s) => s.removeItem(OLD_STORAGE_KEY))
-    const stored = this.store((s) => s.getItem(CONSENT_KEY))
-    this.consent = stored === 'granted' || stored === 'denied' ? stored : 'pending'
+    this.consent = asConsent(this.store((s) => s.getItem(CONSENT_KEY)))
     // Read before restoring: a restored full batch flushes at once, and only if granted.
     if (this.consent === 'denied') this.store((s) => s.removeItem(STORAGE_KEY))
     else this.add(this.restore())
@@ -205,6 +224,7 @@ export class Tracker {
       window.addEventListener('pagehide', this.onPageHide)
       window.addEventListener('online', this.onOnline)
       window.addEventListener('offline', this.onOffline)
+      window.addEventListener('storage', this.onStorage)
     }
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', this.onVisibility)
   }
@@ -382,6 +402,7 @@ export class Tracker {
       window.removeEventListener('pagehide', this.onPageHide)
       window.removeEventListener('online', this.onOnline)
       window.removeEventListener('offline', this.onOffline)
+      window.removeEventListener('storage', this.onStorage)
     }
     if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', this.onVisibility)
   }

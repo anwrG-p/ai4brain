@@ -8,7 +8,6 @@ import type {
   CollaborationScoreResult,
   DimensionEstimate,
   TaskPayload,
-  TelemetryEvent,
 } from '../../types'
 import type { PersonaId } from '../../state/useAppStore'
 import {
@@ -68,27 +67,6 @@ export const apiClient = {
         usingMocks: true,
       }
     }
-  },
-
-  /**
-   * Member 1 Telemetry Event Ingestion (POST /v1/telemetry/event)
-   */
-  async postTelemetryEvent(
-    events: TelemetryEvent | TelemetryEvent[],
-  ): Promise<{ accepted: number }> {
-    const batch = Array.isArray(events) ? events : [events]
-    if (USE_MOCKS) {
-      return { accepted: batch.length }
-    }
-    const res = await fetch(`${API_BASE}/v1/telemetry/event`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(batch),
-    })
-    if (!res.ok) {
-      throw new Error(`Telemetry ingestion failed with HTTP ${res.status}`)
-    }
-    return (await res.json()) as { accepted: number }
   },
 
   /**

@@ -123,8 +123,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </span>
             )}
           </span>
+          {/* Pending: nothing is ready to go out, it is only kept here. */}
           <Badge tone="warning" glyph="⚡">
-            Queue Ready ({queueStatus.queuedCount} / {queueStatus.maxCapacity})
+            {queueStatus.consent === 'granted'
+              ? `Queue Ready (${queueStatus.queuedCount} / ${queueStatus.maxCapacity})`
+              : `Saved on this device (${queueStatus.queuedCount})`}
           </Badge>
         </div>
       )}
