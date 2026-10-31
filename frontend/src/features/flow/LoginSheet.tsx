@@ -18,28 +18,24 @@ export interface LoginSheetProps {
 const FOCUSABLE = 'a[href], button:not([disabled]), input, select, textarea, iframe, [tabindex]:not([tabindex="-1"])'
 
 const LINE = {
-  results: {
-    google: 'Sign in to keep your results, or carry on as a guest.',
-    guest: "Let's keep your results. You can carry on as a guest.",
-  },
-  welcome: {
-    google: 'Welcome back! Sign in to see your space.',
-    guest: "Welcome back! Sign-in isn't set up here yet, so carry on as a guest.",
-  },
+  results: 'Sign in to keep your results, or carry on as a guest.',
+  welcome: 'Welcome back! Sign in to see your space.',
 }
 
 /* A modal sheet: a bottom sheet on phones, a centred card from sm up. Two steps at most, each with
-   one message and one choice (rules 13, 14). Escape or the close button leaves it; focus stays
-   inside while it is open and goes back to the opener after. */
+   one message and one choice (rules 13, 14). The sign-in step exists only with Google sign-in
+   (VITE_GOOGLE_CLIENT_ID): without it there is nothing to sign in with, so Results opens straight
+   on the consent choice and Welcome offers no sign-in at all. Escape or the close button leaves it;
+   focus stays inside while it is open and goes back to the opener after. */
 export function LoginSheet({ askConsent, onClose, onFinish }: LoginSheetProps) {
-  const [step, setStep] = useState<'login' | 'consent'>('login')
+  const hasGoogle = googleClientId() !== null
+  const [step, setStep] = useState<'login' | 'consent'>(askConsent && !hasGoogle ? 'consent' : 'login')
   const loginUser = useAppStore((s) => s.loginUser)
   const panel = useRef<HTMLDivElement>(null)
   const consentHeading = useRef<HTMLHeadingElement>(null)
   const lineId = useId()
   const consentId = useId()
-  const hasGoogle = googleClientId() !== null
-  const line = LINE[askConsent ? 'results' : 'welcome'][hasGoogle ? 'google' : 'guest']
+  const line = LINE[askConsent ? 'results' : 'welcome']
 
   useEffect(() => {
     const opener = document.activeElement
@@ -94,18 +90,18 @@ export function LoginSheet({ askConsent, onClose, onFinish }: LoginSheetProps) {
         onKeyDown={onKeyDown}
         className="relative w-full max-w-md rounded-t-2xl border border-border bg-surface px-6 pt-6 pb-8 shadow-(--shadow-elevation) outline-none sm:rounded-2xl"
       >
+        <Button variant="ghost" size="sm" aria-label="Close" onClick={onClose} className="absolute top-2 end-2">
+          <X size={20} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" />
+        </Button>
         {step === 'login' ? (
           <div className="flex flex-col items-center gap-5">
-            <Button variant="ghost" size="sm" aria-label="Close" onClick={onClose} className="absolute top-2 end-2">
-              <X size={20} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" />
-            </Button>
             {/* No bubble box here: the sheet is already the container (anti-slop rule 6). */}
             <Loti pose="happy" size="md" />
             <p id={lineId} className="max-w-xs text-center text-lg text-ink">
               {line}
             </p>
             {hasGoogle && <GoogleButton onProfile={google} />}
-            <Button variant={hasGoogle ? 'ghost' : 'primary'} size={hasGoogle ? 'md' : 'lg'} onClick={signedIn}>
+            <Button variant="ghost" size="md" onClick={signedIn}>
               Continue as guest
             </Button>
           </div>

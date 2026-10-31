@@ -1,15 +1,20 @@
 import { usingMocks } from '../assessment/tasks/taskSource'
 import { isValidTrial } from '../assessment/tasks/Ufov'
-import type { MstParams, NBackParams, SchemaType, TaskPayload, UfovParams } from '../assessment/telemetry/types'
+import type { MstParams, NBackParams, SchemaType, StroopParams, TaskPayload, UfovParams } from '../assessment/telemetry/types'
 
-/** The five baseline exercises, in order (spec IA): Logic Web, Memory Gauntlet, Strategic Blueprint,
-    Perceptual Radar, Precision Archive. */
-export const BASELINE_SCHEMAS: readonly SchemaType[] = ['relational', 'n_back', 'tower', 'ufov', 'mst']
+/** The six baseline exercises, in order: Logic Web, Memory Gauntlet, Strategic Blueprint, Color Clash,
+    Perceptual Radar, Precision Archive. Color Clash gives Impulse Control a first score (user
+    decision in ticket 07c; ticket 07's brief listed five). */
+export const BASELINE_SCHEMAS: readonly SchemaType[] = ['relational', 'n_back', 'tower', 'stroop', 'ufov', 'mst']
 
-/** Test hook (e2e): `?fast=1` shortens every baseline exercise so a full run takes seconds. Mock
-    tasks only, so it can never touch a real task from the server (VITE_USE_MOCKS=false). */
+/** Test hook (e2e): `?fast=1` shortens every baseline exercise so a full run takes seconds. It needs
+    all three: the query, mock tasks (so it never touches a real task from the server,
+    VITE_USE_MOCKS=false) and a test build: Vitest (MODE "test") or a build made with VITE_E2E=1,
+    which only Playwright's webServer does (playwright.config.ts, into dist-e2e). A normal build
+    ignores the query. */
 export function isFastRun(search: string): boolean {
-  return usingMocks() && new URLSearchParams(search).get('fast') === '1'
+  const testBuild = import.meta.env.VITE_E2E === '1' || import.meta.env.MODE === 'test'
+  return testBuild && usingMocks() && new URLSearchParams(search).get('fast') === '1'
 }
 
 /** Fewer trials and short time limits; trials still run and record real events. Tower needs a
@@ -26,6 +31,10 @@ export function fastTask(task: TaskPayload): TaskPayload {
     }
     case 'tower':
       return { ...task, params: { ...p, time_limit_ms: 500 } }
+    case 'stroop': {
+      const q = p as unknown as StroopParams
+      return { ...task, params: { ...q, time_limit_ms: 800, trials: q.trials.slice(0, 3) } }
+    }
     case 'ufov': {
       const q = p as unknown as UfovParams
       return { ...task, params: { ...q, trials: q.trials.filter(isValidTrial).slice(0, 1) } }

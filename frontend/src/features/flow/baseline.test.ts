@@ -17,6 +17,15 @@ describe('the ?fast=1 test hook', () => {
     expect(isFastRun('?fast=1')).toBe(false)
   })
 
+  it('needs a test build too: off in a normal build with mocks, on in an e2e build (VITE_E2E=1)', () => {
+    vi.stubEnv('MODE', 'production')
+    expect(isFastRun('?fast=1')).toBe(false)
+    vi.stubEnv('VITE_E2E', '1')
+    expect(isFastRun('?fast=1')).toBe(true)
+    vi.stubEnv('VITE_USE_MOCKS', 'false') // never against the real server, even in an e2e build
+    expect(isFastRun('?fast=1')).toBe(false)
+  })
+
   it('shortens every baseline exercise and keeps at least one trial', () => {
     for (const s of BASELINE_SCHEMAS) {
       const full = fixture(s)
@@ -27,10 +36,15 @@ describe('the ?fast=1 test hook', () => {
     }
     expect(fastTask(fixture('tower')).params).toMatchObject({ time_limit_ms: 500 })
     expect(fastTask(fixture('relational')).params).toMatchObject({ n_trials: 2, time_limit_ms: 800 })
+    expect(fastTask(fixture('stroop')).params).toMatchObject({ time_limit_ms: 800 })
+  })
+
+  it('has six exercises, Color Clash 4th (Impulse Control gets a first score)', () => {
+    expect(BASELINE_SCHEMAS).toEqual(['relational', 'n_back', 'tower', 'stroop', 'ufov', 'mst'])
   })
 
   it('leaves other exercises alone', () => {
-    const stroop = fixture('stroop')
-    expect(fastTask(stroop)).toBe(stroop)
+    const matrix = fixture('matrix')
+    expect(fastTask(matrix)).toBe(matrix)
   })
 })
