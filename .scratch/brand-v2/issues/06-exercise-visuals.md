@@ -1,6 +1,6 @@
 # 06: Exercise visuals (jsPsych-style screens, brand v2, consumer names)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 01
 Spec: `../spec.md` (Brand system, IA exercise names, Anti-slop rules 6, 10, 11). Landing doc: "WORK ON THE VISUALS FOR THE TESTS (take jspsych into consideration)".
 

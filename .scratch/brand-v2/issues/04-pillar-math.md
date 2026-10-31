@@ -1,6 +1,6 @@
 # 04: Pillar math and local session store (pure, tested)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: —
 Spec: `../spec.md` (R5, U5). Source: `docs/Rou7 zebda cognitive intelligence.docx`.
 

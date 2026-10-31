@@ -1,6 +1,6 @@
 # 02: Characters (Loti, Dolphin, Momo)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 01
 Spec: `../spec.md` (R1, Design intelligence: clay belongs to characters; Anti-slop rules 2, 9, 10)
 

@@ -1,6 +1,6 @@
 # 01: Brand tokens v2
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: —
 Spec: `../spec.md` (Brand system, Design intelligence, Anti-slop rules 1, 2, 6, 9; Constraints)
 

@@ -1,6 +1,6 @@
 # 10: Verify, anti-slop audit, screenshots, DEC-011, docs
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 01–09
 Spec: `../spec.md` ("Constraints", "Anti-slop rules")
 

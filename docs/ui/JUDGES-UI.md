@@ -1,5 +1,7 @@
 # Jury Rubric-to-UI Proof Matrix (`docs/ui/JUDGES-UI.md`)
 
+> **Brand v2 (2026-10-31, DEC-011).** This file describes the build before brand v2. Pages, components and screenshots it names (PrivacyCenter, certificates and receipts, Layer D, the design-system page and others) are gone. The current design and routes are in [`docs/design/BRAND-V2.md`](../design/BRAND-V2.md). `docs/ui/screenshots/` now holds only brand v2 screenshots; the old ones are in the repository history at commit `8b8c859`.
+
 This document maps every official evaluation criterion (Phase 1 = 60%, Phase 2 = 40%) to the exact screen, signature component, code path, and verification screenshot in our repository.
 
 | Criterion | Final Weight | What the UI Proves | Primary Route(s) & Signature Component(s) | Screenshot Proof Path | Status |

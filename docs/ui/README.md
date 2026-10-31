@@ -1,5 +1,7 @@
 # UI Documentation Index (`docs/ui/README.md`)
 
+> **Brand v2 (2026-10-31, DEC-011).** This file describes the build before brand v2. Pages, components and screenshots it names (PrivacyCenter, certificates and receipts, Layer D, the design-system page and others) are gone. The current design and routes are in [`docs/design/BRAND-V2.md`](../design/BRAND-V2.md). `docs/ui/screenshots/` now holds only brand v2 screenshots; the old ones are in the repository history at commit `8b8c859`.
+
 Welcome to the frontend, UI, UX, and visual analytics documentation for our **CISTAC 1.0 — AI4Brain "Cognitive Growth Agent"** entry.
 
 > **For Evaluators & Jury Members**: Start with **[`JUDGES-UI.md`](./JUDGES-UI.md)** for a direct mapping from every official Phase 1 (60%) and Phase 2 (40%) scoring criterion to the exact route, signature component, and verification screenshot that proves it.

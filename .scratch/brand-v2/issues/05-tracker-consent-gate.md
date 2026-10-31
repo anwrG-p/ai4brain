@@ -1,6 +1,6 @@
 # 05: Tracker consent gate (hold until accept)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: —
 Spec: `../spec.md` (R3, U4)
 

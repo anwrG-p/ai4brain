@@ -1,6 +1,6 @@
 # 09: App shell and cleanup
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 02, 03
 Spec: `../spec.md` (U1, R6, R7, IA nav, Anti-slop rules — esp. 13: every page ≤ 3 blocks above the fold, details behind one disclosure)
 

@@ -1,5 +1,7 @@
 # Agent Evaluation & Audit Handoff Guide (`docs/ui/AGENT-EVALUATION-HANDOFF.md`)
 
+> **Brand v2 (2026-10-31, DEC-011).** This file describes the build before brand v2. Pages, components and screenshots it names (PrivacyCenter, certificates and receipts, Layer D, the design-system page and others) are gone. The current design and routes are in [`docs/design/BRAND-V2.md`](../design/BRAND-V2.md). `docs/ui/screenshots/` now holds only brand v2 screenshots; the old ones are in the repository history at commit `8b8c859`.
+
 This guide is designed for any secondary AI agent, external code auditor, or competition evaluator assessing the frontend implementation of **SynapseTwin (CISTAC 1.0 AI4Brain)**.
 
 ---

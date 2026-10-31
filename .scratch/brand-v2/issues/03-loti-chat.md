@@ -1,6 +1,6 @@
 # 03: Loti chat (bubbles, scripted brain, coach adapter stub)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 02
 Spec: `../spec.md` (R2, U5, Anti-slop rule 4). Source: `docs/Loti interface.docx`.
 

@@ -1,5 +1,7 @@
 # UI Sprint State (`docs/ui/STATE.md`)
 
+> **Brand v2 (2026-10-31, DEC-011).** This file describes the build before brand v2. Pages, components and screenshots it names (PrivacyCenter, certificates and receipts, Layer D, the design-system page and others) are gone. The current design and routes are in [`docs/design/BRAND-V2.md`](../design/BRAND-V2.md). `docs/ui/screenshots/` now holds only brand v2 screenshots; the old ones are in the repository history at commit `8b8c859`.
+
 **2026-10-25 11:15 (UTC+1)** | **Branch:** `ui/main` | **Milestone Release Tag:** [`ui-v1.0-phase1`](https://github.com/anwrG-p/ai4brain/releases/tag/ui-v1.0-phase1) | **Status:** 100% COMPLETE (19/19 Pages Shipped)
 
 ## Done: pages, with commit or tag
