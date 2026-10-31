@@ -1,0 +1,525 @@
+"""Synthetic telemetry: simulated users playing the eight exercises over many sessions (BE-08).
+
+    python -m data.synthetic.generate --users N --sessions M --seed S --out DIR
+
+Output, in the layout POST /v1/telemetry/event writes (assessment_engine/api/routes/telemetry.py):
+- DIR/<user_id>.jsonl: one TelemetryEvent per line (validated by that model, dumped by it) plus
+  `received_at`. Files are rewritten, not appended, so a seed always gives the same bytes.
+- DIR/_truth/<user_id>.json: the ground truth behind the user (abilities, practice level, session
+  flags). It sits outside the ingest glob (*.jsonl) so nothing reads it as telemetry.
+
+The model. Sources are docs/research/2026-10-31-improvement-opportunities.md areas 1-3 unless
+noted. Evidence marks follow that doc: H primary/meta-analysis, M single study, J judgement,
+⚠ cited from memory.
+- Latent ability: one z-score per pillar (focus, agility, impulse, memory, visual), sharing a
+  general factor with correlation `ability_corr` (the positive manifold; the value is J).
+- Practice: a retest gain that rises over sessions and stops after the 3rd one (Scharfen et al.
+  2018, 122 studies: "no further gain after the 3rd administration", H). The level after n sessions
+  is 1 - exp(-n / practice_tau); tau = 2/3 puts 95% of the gain at the 3rd session. The size,
+  `practice_gain` in ability SDs, is J.
+- Forgetting: `forgetting_per_day` shrinks the practice gain (never the ability) between sessions.
+  Scharfen 2018 finds retest gains depend on the retest interval but gives no rate, so it defaults
+  to 0. Idle days do not lower ability: R11 dropped the "decay if idle" line, which has no source.
+- Reliability: trial-level noise everywhere (binomial accuracy, ex-Gaussian RTs). The Stroop RT
+  cost, a difference score, gets its between-person spread solved from `stroop_cost_reliability`
+  so its retest reliability lands near .6 (Hedge et al. 2018, via area 1, H).
+- Low effort: a share `low_effort_rate` of sessions has fast RTs, chance accuracy and timeouts.
+  The default .07 is the share Zorowitz et al. 2023 flagged on chance accuracy alone (H).
+- Time of day: performance drops by up to `tod_amplitude` SD away from a personal peak hour
+  (synchrony effect; Schmidt et al. 2007, Cogn Neuropsychol ⚠; the size is J).
+- Schedule: at most one session a day, about `sessions_per_week` a week, so days get skipped
+  (3/week: Lampit et al. 2014 found more added nothing, H).
+- Day-to-day state: a session-wide shift of `state_sd` SD (J).
+
+ponytail: one n-back stream, no device or input-kind context, no voice, hours treated as UTC.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import random
+import sys
+from dataclasses import dataclass
+from datetime import date, datetime, time, timedelta, timezone
+from pathlib import Path
+
+from assessment_engine.api.routes.telemetry import TelemetryEvent
+
+PILLARS = ("focus", "agility", "impulse", "memory", "visual")
+
+# Stroop block (fixtures.json: 4 inks, 3000 ms). Trials per condition and the per-trial RT noise
+# set how noisy one session's cost is; the cost's between-person spread is solved from them.
+STROOP_PER_CONDITION = 24
+STROOP_SIGMA_MS = 80.0
+STROOP_TAU_MS = 80.0
+STROOP_EXPECTED_ACCURACY = 0.9  # rough share of correct trials, which are the ones the cost uses
+STROOP_COST_MS = 110.0  # cost at ability 0 (J)
+STROOP_COST_FLOOR_MS = 15.0
+
+LOW_EFFORT_TIMEOUT = 0.25  # share of timed trials a low-effort session lets run out (J)
+
+
+@dataclass(frozen=True)
+class Params:
+    ability_corr: float = 0.3
+    practice_gain: float = 0.4
+    practice_gain_sd: float = 0.1
+    practice_tau: float = 2 / 3
+    forgetting_per_day: float = 0.0
+    state_sd: float = 0.25
+    tod_amplitude: float = 0.2
+    low_effort_rate: float = 0.07
+    sessions_per_week: float = 3.0
+    stroop_cost_reliability: float = 0.6
+    start: date = date(2026, 1, 5)
+
+    def __post_init__(self):
+        checks = {
+            "ability_corr": 0 <= self.ability_corr < 1,
+            "practice_tau": self.practice_tau > 0,
+            "forgetting_per_day": self.forgetting_per_day >= 0,
+            "low_effort_rate": 0 <= self.low_effort_rate <= 1,
+            "sessions_per_week": 0 < self.sessions_per_week <= 7,
+            "stroop_cost_reliability": 0 < self.stroop_cost_reliability < 1,
+        }
+        bad = [k for k, ok in checks.items() if not ok]
+        if bad:
+            raise ValueError(f"out of range: {', '.join(bad)}")
+
+
+def stroop_cost_slope(p: Params) -> float:
+    """ms of Stroop cost per ability SD, so that retest reliability = signal / (signal + noise).
+    Noise: the variance of a difference of two condition means over the correct trials."""
+    n = STROOP_PER_CONDITION * STROOP_EXPECTED_ACCURACY
+    noise = (STROOP_SIGMA_MS**2 + STROOP_TAU_MS**2) * 2 / n
+    between = 1 + p.practice_gain_sd**2
+    r = p.stroop_cost_reliability
+    return math.sqrt(r * noise / ((1 - r) * between))
+
+
+def _p(theta: float, difficulty: float, chance: float, slope: float = 1.2) -> float:
+    """P(correct): chance plus a logistic in ability minus item difficulty."""
+    return chance + (1 - chance) / (1 + math.exp(-slope * (theta - difficulty)))
+
+
+def _rt(rng: random.Random, mean_ms: float, theta: float, sigma: float | None = None, tau: float | None = None) -> float:
+    """Ex-Gaussian RT with mean `mean_ms` at ability 0, faster with ability."""
+    m = mean_ms * math.exp(-0.1 * theta)
+    sigma = 0.12 * mean_ms if sigma is None else sigma
+    tau = 0.15 * mean_ms if tau is None else tau
+    return max(150.0, m - tau + rng.gauss(0, sigma) + rng.expovariate(1 / tau))
+
+
+def _iso_ms(t: datetime) -> str:
+    """client_ts as the browser's Date.toISOString writes it."""
+    return t.strftime("%Y-%m-%dT%H:%M:%S.") + f"{t.microsecond // 1000:03d}Z"
+
+
+class _Session:
+    def __init__(self, rng, user_id, session_id, index, start, theta, low, stroop_cost):
+        self.rng = rng
+        self.user_id = user_id
+        self.session_id = session_id
+        self.index = index
+        self.clock = start
+        self.theta = theta
+        self.low = low
+        self.stroop_cost = stroop_cost
+        self.events: list[dict] = []
+
+    def lazy(self, limit_ms: float | None) -> float | None:
+        """A low-effort answer: None when the trial runs out, else a fast RT."""
+        if limit_ms is not None and self.rng.random() < LOW_EFFORT_TIMEOUT:
+            return None
+        return self.rng.uniform(150, 400)
+
+    def block(self, schema: str, number: int, dimension: str) -> _Block:
+        self.clock += timedelta(seconds=self.rng.uniform(10, 40))
+        return _Block(self, f"syn-{schema}-{self.index:03d}-{number}", dimension)
+
+
+class _Block:
+    """One task_id; mirrors the frontend TrialRecorder (error_burst runs within it)."""
+
+    def __init__(self, session: _Session, task_id: str, dimension: str):
+        self.s = session
+        self.task_id = task_id
+        self.dimension = dimension
+        self.burst = 0
+        self.trials = 0
+
+    def emit(self, correct: bool, rt_ms: float, *, score: float | None = None, first_press_ms: float | None = -1.0, meta: dict | None = None) -> None:
+        """`first_press_ms` -1 means "the response itself"; None means no key or pointer press."""
+        s = self.s
+        rng = s.rng
+        rt = round(min(600_000.0, max(0.0, rt_ms)), 1)
+        press = rt if first_press_ms == -1.0 else first_press_ms
+        self.burst = 0 if correct else self.burst + 1
+        # Pointer answers add moves, so jitter (std of input gaps) is non-zero; a single key gives 0.
+        jitter = round(rng.lognormvariate(math.log(40), 0.5), 1) if press is not None and rng.random() < 0.35 else 0.0
+        s.clock += timedelta(milliseconds=rt)
+        s.events.append(
+            {
+                "user_id": s.user_id,
+                "session_id": s.session_id,
+                "task_id": self.task_id,
+                "trial_index": self.trials,
+                "dimension": self.dimension,
+                "score_norm": float(score if score is not None else (1.0 if correct else 0.0)),
+                "response_time_ms": rt,
+                "error_flag": not correct,
+                "error_burst": self.burst,
+                "hesitation_jitter": jitter,
+                "keystroke_latency_ms": None if press is None else round(press, 1),
+                "trial_meta": {"item_id": f"{self.task_id}:{self.trials}", **(meta or {})},
+                "voice_opt_in": False,
+                "voice_latency_ms": None,
+                "vocal_pace_hz": None,
+                "client_ts": _iso_ms(s.clock),
+            }
+        )
+        self.trials += 1
+        s.clock += timedelta(milliseconds=rng.uniform(300, 700))
+
+
+# --- the eight exercises (payload shapes and trial_meta keys as the frontend logs them) ----------
+
+NBACK_INTERVAL_MS = 2000.0
+NBACK_TYPES = ["target", "standard", "lure_minus", "lure_plus", "switch"]
+NBACK_DIFFICULTY = {"target": -0.3, "standard": -2.0, "lure_minus": 0.0, "lure_plus": 0.0, "switch": 0.3}
+
+
+def _nback(s: _Session) -> None:
+    rng, b = s.rng, s.block("nback", 0, "working_memory")
+    for _ in range(20):
+        kind = rng.choices(NBACK_TYPES, weights=[0.3, 0.35, 0.1, 0.1, 0.15])[0]
+        target = kind == "target"
+        if s.low:
+            rt = s.lazy(None) if rng.random() < 0.4 else None
+            pressed = rt is not None
+        else:
+            theta = s.theta["agility" if kind == "switch" else "focus"]
+            ok = rng.random() < _p(theta, NBACK_DIFFICULTY[kind], 0.5)
+            pressed = target == ok
+            rt = min(NBACK_INTERVAL_MS - 50, _rt(rng, 650, theta)) if pressed else None
+        b.emit(
+            pressed == target,
+            NBACK_INTERVAL_MS if rt is None else rt,
+            first_press_ms=-1.0 if pressed else None,
+            meta={"trial_type": kind, "rule": "position", "stream": "position"},
+        )
+
+
+def _stroop(s: _Session) -> None:
+    rng, b = s.rng, s.block("stroop", 0, "executive_function")
+    limit = 3000.0
+    order = [True] * STROOP_PER_CONDITION + [False] * STROOP_PER_CONDITION
+    rng.shuffle(order)
+    for congruent in order:
+        meta = {"congruent": congruent}
+        if s.low:
+            rt = s.lazy(limit)
+            ok = rng.random() < 0.25
+        else:
+            ok = rng.random() < _p(s.theta["impulse"], -2.5 if congruent else -1.6, 0.25)
+            rt = _rt(rng, 650, s.theta["agility"], STROOP_SIGMA_MS, STROOP_TAU_MS) + (0 if congruent else s.stroop_cost)
+            rt = None if rt >= limit else rt
+        if rt is None:
+            b.emit(False, limit, first_press_ms=None, meta=meta)
+        else:
+            b.emit(ok, rt, meta=meta)
+
+
+def _matrix(s: _Session) -> None:
+    rng, limit = s.rng, 30_000.0
+    for n in range(4):  # one item per task, as the payload has
+        b = s.block("matrix", n, "pattern_induction")
+        if s.low:
+            rt, ok = s.lazy(limit), rng.random() < 0.25
+        else:
+            theta = s.theta["focus"]
+            ok = rng.random() < _p(theta, rng.uniform(-1.0, 1.5), 0.25)
+            rt = _rt(rng, 9000, theta)
+            rt = None if rt >= limit else rt
+        if rt is None:
+            b.emit(False, limit, first_press_ms=None)
+        else:
+            b.emit(ok, rt)
+
+
+def _relational(s: _Session) -> None:
+    rng, b, limit = s.rng, s.block("relational", 0, "pattern_induction"), 15_000.0
+    for _ in range(8):
+        hops = rng.choice([1, 2, 3])
+        inverted = rng.random() < 0.3
+        meta = {"hops": hops, "inverted": inverted, "level": hops - 1}
+        if s.low:
+            rt, ok = s.lazy(limit), rng.random() < 0.5
+        else:
+            theta = s.theta["focus"]
+            ok = rng.random() < _p(theta, -1.5 + 0.6 * hops + 0.4 * inverted, 0.5)
+            rt = _rt(rng, 2000 + 1500 * hops, theta)
+            rt = None if rt >= limit else rt
+        if rt is None:
+            b.emit(False, limit, first_press_ms=None, meta=meta)
+        else:
+            b.emit(ok, rt, meta=meta)
+
+
+def _tower(s: _Session) -> None:
+    rng, limit = s.rng, 60_000.0
+    for n in range(2):
+        b = s.block("tower", n, "executive_function")
+        l_min = rng.choice([3, 4, 5])
+        if s.low:
+            planning = rng.uniform(300, 1500)
+            solved = rng.random() < 0.1
+            l_user = l_min + rng.randint(3, 12)
+            window = planning + l_user * rng.uniform(250, 500)
+            conflict = rng.uniform(150, 400)
+        else:
+            focus, impulse = s.theta["focus"], s.theta["impulse"]
+            planning = _rt(rng, 9000 + 2000 * (l_min - 3), focus)
+            solved = rng.random() < _p(focus, -1.5 + 0.4 * (l_min - 3), 0.0)
+            minimal = rng.random() < _p(impulse, -0.5 + 0.3 * (l_min - 3), 0.0)
+            l_user = l_min + (0 if solved and minimal else rng.randint(1, 6) if solved else rng.randint(2, 10))
+            window = planning + l_user * _rt(rng, 1200, focus)
+            conflict = _rt(rng, 1800, impulse)
+        if window >= limit:
+            solved, window = False, limit
+        b.emit(
+            solved and l_user == l_min,
+            window,
+            score=min(1.0, l_min / l_user) if solved else 0.0,
+            first_press_ms=planning,
+            meta={
+                "l_min": l_min,
+                "l_user": l_user,
+                "predicted_moves": max(0, l_min + round(rng.gauss(0, 1))),
+                "planning_time_ms": round(planning, 1),
+                "conflict_latency_ms": round(conflict, 1),
+                "solved": solved,
+            },
+        )
+
+
+UFOV_GRID_MS = [17, 25, 36, 52, 76, 111, 162, 236, 343, 500]  # fixtures.json duration_grid_ms
+
+
+def _ufov(s: _Session) -> None:
+    """2-down 1-up staircase on the grid; the last event carries the threshold estimate."""
+    rng, b = s.rng, s.block("ufov", 0, "processing_speed")
+    theta = s.theta["visual"]
+    threshold = min(500.0, max(17.0, 110 * math.exp(-0.5 * theta)))
+    step, streak, shown_log = 6, 0, []
+    trials = 16
+    for i in range(trials):
+        requested = UFOV_GRID_MS[step]
+        frames = max(1, round(requested * 60 / 1000))
+        shown = round(frames * 1000 / 60, 1)
+        shown_log.append(shown)
+        if s.low:
+            central_ok, peripheral_ok = rng.random() < 0.5, rng.random() < 1 / 8
+            rt = rng.uniform(150, 400)
+        else:
+            central_ok = rng.random() < _p(theta, -2.5, 0.5)
+            seen = 1 / (1 + math.exp(-(math.log(shown) - math.log(threshold)) / 0.3))
+            peripheral_ok = rng.random() < 1 / 8 + 7 / 8 * seen
+            rt = _rt(rng, 2200, theta)
+        correct = central_ok and peripheral_ok
+        meta = {
+            "requested_ms": requested,
+            "shown_ms": shown,
+            "frames": frames,
+            "similarity": 0.5,
+            "mask_noise": 0.5,
+            "central_ok": central_ok,
+            "peripheral_ok": peripheral_ok,
+        }
+        if i == trials - 1:
+            tail = shown_log[-8:]
+            meta["quest_threshold_ms"] = round(math.exp(sum(map(math.log, tail)) / len(tail)), 1)
+        b.emit(correct, rt, first_press_ms=rt * 0.55, meta=meta)
+        if correct:
+            streak += 1
+            if streak == 2:
+                step, streak = max(0, step - 1), 0
+        else:
+            step, streak = min(len(UFOV_GRID_MS) - 1, step + 1), 0
+
+
+MST_EXPECTED = {"old": "old", "lure": "similar", "new": "new"}
+
+
+def _mst(s: _Session) -> None:
+    rng, b, limit = s.rng, s.block("mst", 0, "episodic_memory"), 5000.0
+    items = ["old"] * 4 + ["lure"] * 4 + ["new"] * 4
+    rng.shuffle(items)
+    theta = s.theta["memory"]
+    for kind in items:
+        delta = round(rng.uniform(0.1, 0.6), 2) if kind == "lure" else 0
+        if s.low:
+            rt = s.lazy(limit)
+            response = rng.choice(["old", "similar", "new"])
+        else:
+            if kind == "old":
+                hit = rng.random() < _p(theta, -1.2, 1 / 3)
+                response = "old" if hit else rng.choices(["similar", "new"], [0.7, 0.3])[0]
+            elif kind == "lure":
+                hit = rng.random() < _p(theta, 0.8 - 2 * delta, 1 / 3)
+                response = "similar" if hit else rng.choices(["old", "new"], [0.8, 0.2])[0]
+            else:
+                hit = rng.random() < _p(theta, -2.0, 1 / 3)
+                response = "new" if hit else rng.choices(["similar", "old"], [0.7, 0.3])[0]
+            rt = _rt(rng, 1400, theta)
+            rt = None if rt >= limit else rt
+        if rt is None:
+            b.emit(False, limit, first_press_ms=None, meta={"kind": kind, "delta": delta, "response": "none"})
+        else:
+            b.emit(response == MST_EXPECTED[kind], rt, meta={"kind": kind, "delta": delta, "response": response})
+
+
+def _rotation(s: _Session) -> None:
+    rng, b, limit = s.rng, s.block("rotation", 0, "spatial_orientation"), 7000.0
+    theta = s.theta["visual"]
+    for _ in range(12):
+        angle = rng.choice([0, 60, 120, 180, 240, 300])
+        mirrored = rng.random() < 0.5
+        turn = min(angle, 360 - angle)
+        meta = {"angle_deg": angle, "mirrored": mirrored}
+        if s.low:
+            rt, ok = s.lazy(limit), rng.random() < 0.5
+        else:
+            ok = rng.random() < _p(theta, -2.0 + turn / 150, 0.5)
+            rt = _rt(rng, 1000 + 9 * turn, theta)
+            rt = None if rt >= limit else rt
+        if rt is None:
+            b.emit(False, limit, first_press_ms=None, meta=meta)
+        else:
+            b.emit(ok, rt, meta=meta)
+
+
+EXERCISES = [_nback, _stroop, _matrix, _relational, _tower, _ufov, _mst, _rotation]
+
+
+# --- users and sessions ---------------------------------------------------------------------------
+
+
+def user_id(seed: int, index: int) -> str:
+    return f"syn-s{seed}-u{index:05d}"
+
+
+def simulate_user(seed: int, index: int, sessions: int, params: Params = Params()) -> tuple[list[dict], dict]:
+    """One user's events (dicts in TelemetryEvent's field order) and ground truth. The user's
+    random stream depends only on (seed, index), so a user is the same however many are made."""
+    p = params
+    rng = random.Random(f"synapsetwin:{seed}:{index}")
+    uid = user_id(seed, index)
+    g = rng.gauss(0, 1)
+    ability = {k: round(math.sqrt(p.ability_corr) * g + math.sqrt(1 - p.ability_corr) * rng.gauss(0, 1), 4) for k in PILLARS}
+    gain = max(0.0, rng.gauss(p.practice_gain, p.practice_gain_sd))
+    peak = rng.gauss(15, 3) % 24
+    preferred = rng.uniform(7, 22)
+    train_prob = min(0.9, max(0.1, rng.gauss(p.sessions_per_week / 7, 0.1)))
+    slope = stroop_cost_slope(p)
+
+    events: list[dict] = []
+    truth_sessions = []
+    day, last_day, level = rng.randrange(3), None, 0.0
+    for k in range(sessions):
+        if k:
+            day += 1
+            while rng.random() >= train_prob:
+                day += 1
+        if last_day is not None:
+            level *= math.exp(-p.forgetting_per_day * (day - last_day))
+        hour = min(23.5, max(6.0, rng.gauss(preferred, 1.5)))
+        state = rng.gauss(0, p.state_sd)
+        low = rng.random() < p.low_effort_rate
+        tod = -p.tod_amplitude * (1 - math.cos(2 * math.pi * (hour - peak) / 24)) / 2
+        practice = gain * level
+        theta = {k2: ability[k2] + practice + state + tod for k2 in PILLARS}
+        # The cost carries no state or time-of-day term, so its retest noise is the trial noise
+        # stroop_cost_slope() was solved for.
+        cost = max(STROOP_COST_FLOOR_MS, STROOP_COST_MS - slope * (ability["agility"] + practice))
+        start = datetime.combine(p.start + timedelta(days=day), time(), tzinfo=timezone.utc) + timedelta(hours=hour)
+        sid = f"{uid}-{k:03d}"
+        # Trials draw from their own stream, so outcomes never shift the schedule: changing a
+        # parameter that only alters trials (forgetting, say) keeps every user's days and flags.
+        trials_rng = random.Random(f"synapsetwin:{seed}:{index}:{k}")
+        s = _Session(trials_rng, uid, sid, k, start, theta, low, cost)
+        for exercise in EXERCISES:
+            exercise(s)
+        events += s.events
+        truth_sessions.append(
+            {
+                "session_id": sid,
+                "day": day,
+                "date": (p.start + timedelta(days=day)).isoformat(),
+                "hour": round(hour, 2),
+                "gap_days": 0 if last_day is None else day - last_day,
+                "practice_level": round(level, 4),
+                "practice_gain": round(practice, 4),
+                "state": round(state, 4),
+                "tod_shift": round(tod, 4),
+                "low_effort": low,
+                "stroop_cost_ms": round(cost, 1),
+                "received_at": (s.clock + timedelta(seconds=2)).isoformat(),
+            }
+        )
+        level = 1 - (1 - level) * math.exp(-1 / p.practice_tau)
+        last_day = day
+
+    truth = {
+        "user_id": uid,
+        "ability": ability,
+        "practice_gain": round(gain, 4),
+        "chronotype_peak_hour": round(peak, 2),
+        "preferred_hour": round(preferred, 2),
+        "train_prob": round(train_prob, 4),
+        "sessions": truth_sessions,
+    }
+    return events, truth
+
+
+def generate(users: int, sessions: int, seed: int, out: str | Path, params: Params = Params()) -> dict:
+    """Writes every user's JSONL (each event validated by TelemetryEvent) and ground truth."""
+    if users < 1 or sessions < 1:
+        raise ValueError("users and sessions must be at least 1")
+    out = Path(out)
+    (out / "_truth").mkdir(parents=True, exist_ok=True)
+    total = 0
+    for i in range(users):
+        events, truth = simulate_user(seed, i, sessions, params)
+        received = {t["session_id"]: t["received_at"] for t in truth["sessions"]}
+        uid = truth["user_id"]
+        # newline="\n": the same bytes on every OS, so a seed is reproducible across machines.
+        with open(out / f"{uid}.jsonl", "w", encoding="utf-8", newline="\n") as f:
+            for raw in events:
+                e = TelemetryEvent.model_validate(raw)
+                line = {**e.model_dump(mode="json"), "received_at": received[e.session_id]}
+                f.write(json.dumps(line, allow_nan=False) + "\n")
+        (out / "_truth" / f"{uid}.json").write_text(json.dumps(truth, indent=1) + "\n", encoding="utf-8", newline="\n")
+        total += len(events)
+    return {"users": users, "sessions": sessions, "events": total, "out": str(out)}
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(prog="python -m data.synthetic.generate", description=__doc__.split("\n\n")[0])
+    ap.add_argument("--users", type=int, required=True)
+    ap.add_argument("--sessions", type=int, required=True)
+    ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--out", type=Path, required=True, help="e.g. data/raw/synthetic (gitignored)")
+    ap.add_argument("--low-effort-rate", type=float, default=Params.low_effort_rate)
+    ap.add_argument("--forgetting-per-day", type=float, default=Params.forgetting_per_day)
+    a = ap.parse_args(argv)
+    params = Params(low_effort_rate=a.low_effort_rate, forgetting_per_day=a.forgetting_per_day)
+    summary = generate(a.users, a.sessions, a.seed, a.out, params)
+    print(f"{summary['events']} events for {summary['users']} users x {summary['sessions']} sessions -> {summary['out']}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
