@@ -27,7 +27,8 @@ export function isPillarId(value: unknown): value is PillarId {
    docs/research/2026-10-30-member1-evidence-review.md sections 1.1-1.3.
 
    OSPAN                 n-back d' on the rule stream (log-linear correction, Hautus 1995), switch
-                         trials left out, floored at 0 when hit rate <= false-alarm rate;
+                         trials left out, floored at 0 when hit rate <= false-alarm rate; a
+                         press on an other-stream match is a false alarm (R16);
                          (A) d' 0 -> 0, d' 4 -> 100
    OTS_Planning          tower: (A) 0.8 x share solved in minimum moves + 0.2 x planning speed on
                          those, (A) planning 0 s -> 1, 30 s -> 0

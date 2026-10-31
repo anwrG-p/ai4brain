@@ -36,15 +36,22 @@ function Stroop() {
   )
 }
 
-// Memory Gauntlet: a square lights up in the grid, step by step; the third lands where the first
-// did, with the same letter (a match 2 steps back).
-function NBack() {
+// Memory Gauntlet: a square lights up in the grid, step by step; the last lands where the first did,
+// with the same symbol (a match n steps back, the task's n). The sequence always spans the same time.
+const NBACK_FILL: [number, string][] = [
+  [5, 'B'],
+  [7, 'C'],
+  [2, 'D'],
+  [6, 'E'],
+  [4, 'F'],
+  [8, 'G'],
+  [1, 'H'],
+  [3, 'J'],
+]
+function NBack({ n = 2 }: { n?: number }) {
   const cell = (k: number): [number, number] => [53 + (k % 3) * 19, 3 + Math.floor(k / 3) * 25]
-  const steps: [number, string][] = [
-    [0, 'A'],
-    [5, 'B'],
-    [0, 'A'],
-  ]
+  const steps: [number, string][] = [[0, 'A'], ...NBACK_FILL.slice(0, Math.max(0, n - 1)), [0, 'A']]
+  const last = steps.length - 1
   return (
     <>
       {Array.from({ length: 9 }, (_, k) => {
@@ -54,8 +61,8 @@ function NBack() {
       {steps.map(([k, l], i) => {
         const [x, y] = cell(k)
         return (
-          <g key={i} className="anim-demo-seq" style={at(i * 2)}>
-            <rect x={x} y={y} width={16} height={22} rx={3} fill={i === 2 ? MARK : SHAPE} />
+          <g key={i} className="anim-demo-seq" style={at((i * 4) / last)}>
+            <rect x={x} y={y} width={16} height={22} rx={3} fill={i === last ? MARK : SHAPE} />
             <text x={x + 8} y={y + 16} fontSize={12} fill="var(--color-canvas)" {...TEXT}>
               {l}
             </text>
@@ -162,7 +169,7 @@ function Matrix() {
   )
 }
 
-const DEMOS: Record<SchemaType, () => ReactNode> = {
+const DEMOS: Record<SchemaType, (p: { n?: number }) => ReactNode> = {
   stroop: Stroop,
   n_back: NBack,
   mental_rotation: Rotation,
@@ -173,11 +180,12 @@ const DEMOS: Record<SchemaType, () => ReactNode> = {
   matrix: Matrix,
 }
 
-export function ExerciseDemo({ schema }: { schema: SchemaType }) {
+/** `n`: the n-back distance the Memory Gauntlet demo draws (its caption names it). */
+export function ExerciseDemo({ schema, n }: { schema: SchemaType; n?: number }) {
   const Demo = DEMOS[schema]
   return (
     <svg aria-hidden="true" data-demo={schema} viewBox="0 0 160 80" width={160} height={80} className="mx-auto block select-none">
-      <Demo />
+      <Demo n={n} />
     </svg>
   )
 }

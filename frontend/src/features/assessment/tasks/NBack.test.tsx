@@ -69,7 +69,7 @@ test('3 dual-stream trials emit 6 events, one per stream, with trial_meta.stream
 })
 
 test('A on a lure_minus with answer.position false scores 0; RT is from that trial onset', () => {
-  setup(params([trial({ trial_type: 'lure_minus', answer: { position: false, symbol: true } })]))
+  setup(params([trial({ trial_type: 'lure_minus', answer: { position: false, symbol: false } })]))
   advance(300)
   key('a')
   advance(500)
@@ -78,8 +78,76 @@ test('A on a lure_minus with answer.position false scores 0; RT is from that tri
   const [pos, sym] = pushed
   expect(pos).toMatchObject({ score_norm: 0, error_flag: true, response_time_ms: 300, keystroke_latency_ms: 300 })
   expect(pos!.trial_meta).toMatchObject({ trial_type: 'lure_minus', stream: 'position' })
-  expect(sym).toMatchObject({ score_norm: 1, response_time_ms: 800, keystroke_latency_ms: 300 })
-  expect(sym!.trial_meta).toMatchObject({ trial_type: 'lure_minus', stream: 'symbol' })
+  // L is the off-rule key under the position rule: its press is wrong on its own event. RT is per stream.
+  expect(sym).toMatchObject({ score_norm: 0, error_flag: true, response_time_ms: 800, keystroke_latency_ms: 300 })
+  expect(sym!.trial_meta).toMatchObject({ trial_type: 'standard', stream: 'symbol' })
+})
+
+// R16: only the rule's stream counts, as the hint says. A match on the other stream is a lure.
+test('rule symbol, place matches 2 back: A is a false alarm, on the rule event and on its own', () => {
+  setup(params([trial({ rule: 'symbol', answer: { position: true, symbol: false } })]))
+  advance(300)
+  key('a')
+  advance(1700)
+  const [pos, sym] = pushed
+  expect(sym).toMatchObject({ score_norm: 0, error_flag: true, response_time_ms: 300 })
+  expect(sym!.trial_meta).toMatchObject({ trial_type: 'standard', rule: 'symbol', stream: 'symbol' })
+  expect(pos).toMatchObject({ score_norm: 0, error_flag: true, response_time_ms: 300 })
+  expect(pos!.trial_meta).toMatchObject({ trial_type: 'lure_stream', rule: 'symbol', stream: 'position' })
+})
+
+test('rule symbol, place matches 2 back: no press is a correct rejection on both events', () => {
+  setup(params([trial({ rule: 'symbol', answer: { position: true, symbol: false } })]))
+  advance(2000)
+  expect(pushed.map((e) => [e.trial_meta?.stream, e.error_flag, e.response_time_ms])).toEqual([
+    ['position', false, 2000],
+    ['symbol', false, 2000],
+  ])
+  expect(pushed[0]!.trial_meta?.trial_type).toBe('lure_stream')
+})
+
+test('rule position, both streams match: A alone is a hit; the symbol match expects no L', () => {
+  setup(params([trial({ trial_type: 'target', answer: { position: true, symbol: true } })]))
+  advance(400)
+  key('a')
+  advance(1600)
+  const [pos, sym] = pushed
+  expect(pos).toMatchObject({ score_norm: 1, error_flag: false, response_time_ms: 400 })
+  expect(pos!.trial_meta).toMatchObject({ trial_type: 'target', stream: 'position' })
+  expect(sym).toMatchObject({ score_norm: 1, error_flag: false, response_time_ms: 2000 })
+  expect(sym!.trial_meta).toMatchObject({ trial_type: 'lure_stream', stream: 'symbol' })
+})
+
+test('rule symbol: L on a symbol match is a hit; adding A makes the trial wrong', () => {
+  const target = trial({ rule: 'symbol', trial_type: 'target', answer: { position: false, symbol: true } })
+  setup(params([target, target]))
+  advance(500)
+  key('l')
+  advance(1500)
+  advance(200)
+  key('l')
+  advance(100)
+  key('a')
+  advance(1700)
+  expect(pushed.map((e) => [e.trial_index, e.trial_meta?.stream, e.error_flag])).toEqual([
+    [0, 'position', false],
+    [0, 'symbol', false],
+    [1, 'position', true],
+    [1, 'symbol', true],
+  ])
+  expect(pushed[1]!.response_time_ms).toBe(500)
+  expect(pushed[3]!.response_time_ms).toBe(200) // the rule key's own press
+})
+
+test('parity: L is the rule key (even number); A is off-rule', () => {
+  setup(params([trial({ rule: 'parity', symbol: '4', answer: { position: true, symbol: true } })]))
+  advance(300)
+  key('l')
+  advance(1700)
+  const [pos, sym] = pushed
+  expect(sym).toMatchObject({ error_flag: false, response_time_ms: 300 })
+  expect(pos).toMatchObject({ error_flag: false, response_time_ms: 2000 })
+  expect(pos!.trial_meta).toMatchObject({ trial_type: 'lure_stream', rule: 'parity', stream: 'position' })
 })
 
 test('a held A (key repeat) and a second press count as one response, the first', () => {
@@ -131,7 +199,7 @@ test('onDone fires once after the last trial', () => {
 })
 
 test('on-screen buttons respond by pointer, only for the listed streams', () => {
-  setup(params([trial({ answer: { symbol: true } })], ['symbol']))
+  setup(params([trial({ rule: 'symbol', answer: { symbol: true } })], ['symbol']))
   expect(screen.queryByRole('button', { name: 'Position match (A)' })).toBeNull()
   advance(250)
   act(() => void fireEvent.pointerDown(screen.getByRole('button', { name: 'Symbol match (L)' })))
@@ -162,7 +230,7 @@ test('hiding the page aborts the current trial; it resumes at the next trial', (
 })
 
 test('a keyboard-activated stream button (click, detail 0) responds; Ctrl+A does not', () => {
-  setup(params([trial({ answer: { position: true, symbol: true } })]))
+  setup(params([trial({ rule: 'symbol', answer: { position: true, symbol: true } })]))
   advance(200)
   act(() => void fireEvent.keyDown(window, { key: 'a', ctrlKey: true }))
   const btn = screen.getByRole('button', { name: 'Symbol match (L)' })
@@ -170,7 +238,7 @@ test('a keyboard-activated stream button (click, detail 0) responds; Ctrl+A does
   act(() => void fireEvent.click(btn, { detail: 0 }))
   advance(1800)
   expect(pushed).toHaveLength(2)
-  expect(pushed[0]).toMatchObject({ score_norm: 0, response_time_ms: 2000 }) // position: Ctrl+A ignored
+  expect(pushed[0]).toMatchObject({ score_norm: 1, response_time_ms: 2000 }) // position (off-rule): Ctrl+A ignored
   expect(pushed[1]).toMatchObject({ score_norm: 1, response_time_ms: 200 })
 })
 

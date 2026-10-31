@@ -10,7 +10,7 @@ import { EXERCISE_NAME } from '../names'
 
 type Response = 'old' | 'similar' | 'new'
 const EXPECTED = { old: 'old', lure: 'similar', new: 'new' } as const
-const KEYS: Record<string, Response> = { '1': 'old', '2': 'similar', '3': 'new' }
+export const KEYS: Record<string, Response> = { '1': 'old', '2': 'similar', '3': 'new' }
 // ponytail: the mst contract has no time_limit_ms, so test trials use a fixed limit; add one to the
 // contract if Member 5 wants control.
 const TEST_MS = 5000

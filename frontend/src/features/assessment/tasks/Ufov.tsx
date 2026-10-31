@@ -18,7 +18,8 @@ const RING_PX = [0, 60, 115, 165]
 const TARGET_RING = 2
 const BLOB_R = 10
 const CELL = 10 // mask noise cell size (px)
-const DIR_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8']
+export const LETTER_KEYS = ['A', 'B']
+export const DIR_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8']
 // Answer pad: a 240 px square of 44 px buttons (the tactile-btn minimum); directions on a 96 px ring.
 const PAD = 240
 const BTN = 44
@@ -227,7 +228,7 @@ export function Ufov({ params, recorder, onDone, raf = defaultRaf }: TaskProps<U
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
       const k = e.key.toUpperCase()
-      if (k === 'A' || k === 'B') press('central', k)
+      if (LETTER_KEYS.includes(k)) press('central', k)
       else if (DIR_KEYS.includes(e.key)) press('dir', Number(e.key) - 1)
     }
     window.addEventListener('keydown', onKey)

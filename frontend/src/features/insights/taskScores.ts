@@ -160,9 +160,11 @@ const isSwitch = (e: TelemetryEvent) => e.trial_meta?.trial_type === 'switch'
 const isTarget = (e: TelemetryEvent) => e.trial_meta?.trial_type === 'target'
 
 /** d' on the n-back rule stream (only its answer follows trial_type: target <-> respond), switch
-    trials left out, floored at 0 when the raw hit rate is not above the raw false-alarm rate (the
-    log-linear correction alone would give a non-responder a small positive d'). Null without both
-    signal and noise trials.
+    trials left out. Signal = a rule-stream match (target); noise = every other non-switch trial,
+    other-stream lures included. NBack.tsx marks the rule event wrong on any off-rule press (R16), so
+    a press on an other-stream match is a false alarm here. Floored at 0 when the raw hit rate is
+    not above the raw false-alarm rate (the log-linear correction alone would give a non-responder
+    a small positive d'). Null without both signal and noise trials.
     ponytail: 'parity' rule events have no stream to score and are skipped. */
 function nbackDPrime(nb: TelemetryEvent[]): number | null {
   const scored = ruleStream(nb).filter((e) => !isSwitch(e))
@@ -178,8 +180,9 @@ function nbackDPrime(nb: TelemetryEvent[]): number | null {
 /** 0 at chance accuracy (1 in 4 inks) or below, 1 at perfect accuracy. */
 const stroopGate = (st: TelemetryEvent[]) => clamp01((share(st, ok) - STROOP_CHANCE) / (1 - STROOP_CHANCE))
 
-/** Accuracy on the trial right after an error, within each task. A trial (n-back logs one event
-    per stream) is wrong when any of its events is. Tasks played at chance or below (n-back d' 0,
+/** Accuracy on the trial right after an error, within each task. A trial is wrong when any of its
+    events is; n-back logs one event per stream, and only its rule-stream event (which carries the
+    trial's verdict, off-rule presses included) is read. Tasks played at chance or below (n-back d' 0,
     Stroop accuracy <= 1 in 4) are left out: a non-responder's next n-back trial is "correct" by
     withholding, which is not recovery. */
 function errorRecovery(events: readonly TelemetryEvent[]): InputScore | null {
@@ -189,8 +192,10 @@ function errorRecovery(events: readonly TelemetryEvent[]): InputScore | null {
   let recovered = 0
   for (const taskEvents of byTask.values()) {
     if (atChance(taskEvents)) continue
+    const first = taskEvents[0]
+    const read = first && schemaOf(first) === 'n_back' ? ruleStream(taskEvents) : taskEvents
     const trials = new Map<number, boolean>()
-    for (const e of taskEvents) trials.set(e.trial_index, (trials.get(e.trial_index) ?? true) && ok(e))
+    for (const e of read) trials.set(e.trial_index, (trials.get(e.trial_index) ?? true) && ok(e))
     const seq = [...trials.entries()].sort((x, y) => x[0] - y[0]).map(([, correct]) => correct)
     for (let k = 1; k < seq.length; k++) {
       if (seq[k - 1]) continue

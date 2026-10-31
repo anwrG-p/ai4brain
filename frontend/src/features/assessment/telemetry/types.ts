@@ -149,10 +149,24 @@ export type NBackParams = {
     pos: [number, number] | null
     symbol: string | null
     rule: 'position' | 'symbol' | 'parity'
+    // The trial's kind on the rule's stream (a parity rule is answered on the symbol stream).
     trial_type: 'target' | 'standard' | 'lure_minus' | 'lure_plus' | 'switch'
+    // Per-stream data: the true n-back match on each stream (parity: "the symbol is even"). Only the
+    // rule's stream expects a press (R16, as the hint says); a true answer on the other stream is a lure.
     answer: { position?: boolean; symbol?: boolean }
   }[]
 }
+
+/* N-back events (NBack.tsx), one per stream per trial; trial_meta keys unchanged: trial_type, rule,
+   stream. Meaning since R16 (scoring follows the on-screen hint):
+   - Rule-stream event (stream = the rule's stream; symbol for parity): trial_type is the payload's.
+     error_flag is the trial's verdict: false only when the rule key was pressed exactly on a rule-
+     stream match AND the off-rule key was not pressed. response_time_ms is the rule key's press, else
+     the off-rule press, else interval_ms.
+   - Off-rule event: expects no press. trial_type is 'lure_stream' when that stream matched n back
+     (an other-stream lure), else 'standard'; error_flag means its key was pressed (a false alarm).
+   Before R16 every event was scored against answer[stream] and carried the payload's trial_type. */
+export type NBackEventTrialType = NBackParams['trials'][number]['trial_type'] | 'lure_stream'
 
 export type StroopParams = {
   colors: string[]

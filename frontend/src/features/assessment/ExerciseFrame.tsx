@@ -17,7 +17,7 @@ import { ExerciseDemo } from './ExerciseDemo'
 import { stepParts } from './howToPlay'
 import { introFor, OWN_FIXATION, trialCount, type Intro } from './exercises'
 import { tracker } from './telemetry/tracker'
-import type { SchemaType, TaskPayload } from './telemetry/types'
+import type { NBackParams, SchemaType, TaskPayload } from './telemetry/types'
 
 export const FIXATION_MS = 500
 
@@ -106,8 +106,22 @@ function useFocusOnMount<T extends HTMLElement>() {
 // A held Enter clicks a focused button again on every repeat; it must not skip the end card.
 const noRepeat = (e: ReactKeyboardEvent<HTMLButtonElement>) => e.repeat && e.preventDefault()
 
-// A step's text with its keys as keycaps ("press [A]").
+// A step's text with its keys as keycaps ("press [A]"). When the step ends on a keycap, its last word,
+// the keycap(s) and the closing punctuation stay on one line, so a keycap never wraps alone at 375 px.
 function Step({ text }: { text: string }) {
+  const cut = text.search(/\S+\s+\S*\[[^\]]+\]\S*$/)
+  if (cut < 0) return <Keycaps text={text} />
+  return (
+    <>
+      <Keycaps text={text.slice(0, cut)} />
+      <span data-nowrap className="whitespace-nowrap">
+        <Keycaps text={text.slice(cut)} />
+      </span>
+    </>
+  )
+}
+
+function Keycaps({ text }: { text: string }) {
   return stepParts(text).map((part, k) =>
     typeof part === 'string' ? (
       part
@@ -122,7 +136,7 @@ function Step({ text }: { text: string }) {
 // The instruction screen (INT-1 item 13: "add some explanation to the games", kept short): the name
 // and its line; how to play in 2-3 numbered steps; the demo with a caption; the pillar it trains; one
 // closed "More about this". The copy is in howToPlay.ts. Begin is the only button.
-function Instructions({ schema, intro, onBegin }: { schema: SchemaType; intro: Intro; onBegin: () => void }) {
+function Instructions({ schema, intro, n, onBegin }: { schema: SchemaType; intro: Intro; n?: number; onBegin: () => void }) {
   // Focused Begin: native Space/Enter activate it; the window listener covers an unfocused page.
   const begin = useFocusOnMount<HTMLButtonElement>()
   // A plain div, not a region: the exercise's own region carries the same name. Each exercise opens
@@ -142,7 +156,7 @@ function Instructions({ schema, intro, onBegin }: { schema: SchemaType; intro: I
       </ol>
       {/* The example: decorative, as the steps already say it. */}
       <div aria-hidden="true" className="flex flex-col items-center gap-1">
-        <ExerciseDemo schema={schema} />
+        <ExerciseDemo schema={schema} n={n} />
         <p data-demo-caption className="text-sm text-ink-muted">
           {intro.caption}
         </p>
@@ -285,7 +299,14 @@ export function ExerciseFrame({ task, onDone, onBlockEnd, children }: Props) {
 
   switch (phase) {
     case 'intro':
-      return <Instructions schema={task.schema_type} intro={intro} onBegin={begin} />
+      return (
+        <Instructions
+          schema={task.schema_type}
+          intro={intro}
+          n={task.schema_type === 'n_back' ? (task.params as NBackParams).n : undefined}
+          onBegin={begin}
+        />
+      )
     case 'fixation':
       // R9: the cross appears at once, at full contrast for all of its 500 ms (jsPsych convention).
       return (

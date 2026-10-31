@@ -8,7 +8,7 @@ import { CellsView } from './svg'
 import { EXERCISE_NAME } from '../names'
 
 type Answer = RotationParams['trials'][number]['answer']
-const KEYS: Record<string, Answer> = { f: 'same', j: 'different' }
+export const KEYS: Record<string, Answer> = { f: 'same', j: 'different' }
 
 // Mental rotation: is the right shape the left one turned (same) or a mirror image (different)?
 export function MentalRotation({ params, recorder, onDone }: TaskProps<RotationParams>) {

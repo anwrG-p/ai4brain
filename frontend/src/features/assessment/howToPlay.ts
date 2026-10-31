@@ -22,15 +22,20 @@ export function howToPlay(task: TaskPayload): HowToPlay | null {
   const p = task.params
   switch (task.schema_type as SchemaType) {
     case 'n_back': {
-      // NBack.tsx: one answer per stream; a press is right exactly when that stream matches n back.
+      // NBack.tsx (R16): only the stream of the rule shown above the grid counts. Its key (A = place,
+      // L = symbol) is right exactly on a match n back; a match on the other stream is a lure, so
+      // any other press is wrong. With one stream there is only its rule.
       const { n, streams } = p as NBackParams
+      const both = streams.includes('position') && streams.includes('symbol')
       return {
-        steps: [
-          ...(streams.includes('position') ? [`Place matches ${n} back? Tap or press [A].`] : []),
-          ...(streams.includes('symbol') ? [`Symbol matches ${n} back? Tap or press [L].`] : []),
-          'No match? Do nothing.',
-        ],
-        caption: 'Same place and letter, 2 back',
+        steps: both
+          ? [`Place rule: same place ${n} back? Tap [A].`, `Symbol rule: same symbol ${n} back? Tap [L].`, 'Anything else? Do nothing.']
+          : [
+              ...(streams.includes('position') ? [`Place matches ${n} back? Tap or press [A].`] : []),
+              ...(streams.includes('symbol') ? [`Symbol matches ${n} back? Tap or press [L].`] : []),
+              'No match? Do nothing.',
+            ],
+        caption: `Same place and symbol, ${n} back`, // ExerciseDemo draws a match n back
         pillar: 'agility',
         more: ['It measures how much you hold in mind.', 'Sometimes the rule switches partway through.'],
       }
