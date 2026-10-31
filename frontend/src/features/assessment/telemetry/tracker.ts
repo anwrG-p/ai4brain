@@ -109,6 +109,8 @@ const STORAGE_KEY = 'synapsetwin_telemetry_queue_v2'
 const OLD_STORAGE_KEY = 'synapsetwin_telemetry_queue'
 // Holds 'granted' or 'denied'; absent (or anything else) means pending.
 const CONSENT_KEY = 'synapsetwin_consent_v1'
+// The privacy page's export and delete read these (features/privacy/myData.ts).
+export { STORAGE_KEY as QUEUE_KEY, CONSENT_KEY }
 const asConsent = (v: string | null | undefined): Consent =>
   v === 'granted' || v === 'denied' ? v : 'pending'
 

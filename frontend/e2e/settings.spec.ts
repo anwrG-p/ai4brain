@@ -47,4 +47,22 @@ test.describe('Page 14: Settings (/settings)', () => {
     await page.getByRole('radio', { name: 'Light (Playful Lab)' }).click()
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
   })
+
+  test('theme radios: one Tab stop, arrow keys choose; the motion row is a ≥44 px target', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    await page.goto('/settings', { waitUntil: 'networkidle' })
+    const light = page.getByRole('radio', { name: 'Light (Playful Lab)' })
+    const dark = page.getByRole('radio', { name: 'Dark (Night Lab)' })
+    await light.focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(dark).toBeFocused()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+    await page.keyboard.press('Tab') // leaves the group in one step
+    const motion = page.getByRole('switch', { name: 'Reduce motion' })
+    await expect(motion).toBeFocused()
+    const box = await motion.boundingBox()
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
+    await page.keyboard.press('Space')
+    await expect(motion).toHaveAttribute('aria-checked', 'true')
+  })
 })
