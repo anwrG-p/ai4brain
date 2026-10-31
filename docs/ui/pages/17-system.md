@@ -231,15 +231,15 @@ Page 17 provides 3 dedicated system views accessible via tabs or URL params:
 
 ## 10. Definition of Done Checklist (10 Items)
 
-- [x] **DoD 01**: Author [`ErrorBoundary.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/components/layout/ErrorBoundary.tsx) to catch unhandled React rendering errors.
-- [x] **DoD 02**: Author [`SystemPage.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/pages/SystemPage.tsx) supporting 404, Offline, and Error Boundary sub-views.
-- [x] **DoD 03**: Wire `/system`, `/system/404`, `/system/offline`, `/system/error`, and catch-all `*` in [`App.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/App.tsx).
+- [x] **DoD 01**: Author `frontend/src/components/layout/ErrorBoundary.tsx` to catch unhandled React rendering errors.
+- [x] **DoD 02**: Author `frontend/src/pages/SystemPage.tsx` supporting 404, Offline, and Error Boundary sub-views.
+- [x] **DoD 03**: Wire `/system`, `/system/404`, `/system/offline`, `/system/error`, and catch-all `*` in `frontend/src/App.tsx`.
 - [x] **DoD 04**: Implement interactive 404 wayfinder with quick-jump navigation cards and companion Mascot.
 - [x] **DoD 05**: Implement live Offline Resilience hub with telemetry queue counter, simulation controls, and sync animation.
 - [x] **DoD 06**: Implement Error Boundary test bench with interactive simulated crash trigger and copy diagnostic JSON action.
 - [x] **DoD 07**: Render keyboard-scrollable Diagnostic & Recovery Log Table (`role="region"` with `tabIndex={0}`).
 - [x] **DoD 08**: Add unit test in `designSystem.test.tsx` verifying 404 navigation, offline queue simulation, and error boundary recovery.
-- [x] **DoD 09**: Author Playwright E2E suite [`system.spec.ts`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/e2e/system.spec.ts) verifying all 3 viewports (375, 768, 1440 px), dark mode, and 0 `axe-core` violations.
+- [x] **DoD 09**: Author Playwright E2E suite `frontend/e2e/system.spec.ts` verifying all 3 viewports (375, 768, 1440 px), dark mode, and 0 `axe-core` violations.
 - [x] **DoD 10**: Pass all QA checks (`npm run qa:checks`) with 0 errors, 0 overflow, and save 5 verification screenshots to `docs/ui/screenshots/17-system-*.png`.
 
 ---

@@ -58,10 +58,16 @@ def test_duplicates_are_pointers(pointer, canonical):
     assert len(text.splitlines()) <= 5
 
 
+TEXT_SUFFIXES = {".md", ".html", ".svg", ".txt", ".json", ".py"}
+
+
 def test_no_links_to_another_machine():
+    """A file:/// link points at one person's disk, so it is broken for everyone else."""
+    docs_text = [p for p in DOCS.rglob("*") if p.is_file() and p.suffix.lower() in TEXT_SUFFIXES]
     offenders = [
-        md.relative_to(ROOT).as_posix()
-        for md in [ROOT / "GLOSSARY.md", DOCS / "TASKS_AND_DIMENSIONS.md", DOCS / "README.md", *(DOCS / "ux-pipeline").rglob("*.md")]
-        if "Users/Smida" in md.read_text(encoding="utf-8")
+        f"{p.relative_to(ROOT).as_posix()}:{n}"
+        for p in [ROOT / "README.md", ROOT / "GLOSSARY.md", *docs_text]
+        for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1)
+        if "file:///" in line.lower()
     ]
     assert offenders == []

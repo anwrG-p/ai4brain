@@ -200,7 +200,7 @@
 ---
 
 ## 10. Definition of Done Checklist (10 Items)
-- [x] **DoD 01**: Author [`PrivacyCenter.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/components/signature/PrivacyCenter.tsx) and [`PrivacyPage.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/pages/PrivacyPage.tsx) matching design tokens and 12-column desktop / 1-column mobile layouts.
+- [x] **DoD 01**: Author `frontend/src/components/signature/PrivacyCenter.tsx` and `frontend/src/pages/PrivacyPage.tsx` matching design tokens and 12-column desktop / 1-column mobile layouts.
 - [x] **DoD 02**: Prominently display Non-Biometric Hardware Lock Banner with physical disconnection guarantee.
 - [x] **DoD 03**: Render granular consent controls with equal-prominence "Reject All Optional" and "Restore Defaults" buttons.
 - [x] **DoD 04**: Implement "What the AI Sees" live telemetry JSON inspector updating dynamically when toggles change.

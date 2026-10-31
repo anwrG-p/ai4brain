@@ -195,16 +195,16 @@ Page 19 completes **SynapseTwin's 4-Layer Architecture** with **Layer D**:
 
 ## 9. Definition of Done Checklist (10 Items)
 
-- [x] **DoD 01**: Author [`LayerDPage.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/pages/LayerDPage.tsx) matching design tokens and semantic classes.
+- [x] **DoD 01**: Author `frontend/src/pages/LayerDPage.tsx` matching design tokens and semantic classes.
 - [x] **DoD 02**: Render Multimodal Voice Coaching Studio with play/pause, animated SVG waveform, and synchronized live transcript.
 - [x] **DoD 03**: Render Voice Pace (`0.85x`, `1.0x`, `1.25x`) and Timbre selectors.
 - [x] **DoD 04**: Render Counterfactual "What-If" Scenario Simulator with parameter controls (Intensity, Sleep, Rest Days).
 - [x] **DoD 05**: Render Cognitive Fatigue & Burnout Risk gauge with proactive recovery advice.
 - [x] **DoD 06**: Render Comparative 4-Week Projected Impact cards with Bayesian credible intervals.
 - [x] **DoD 07**: Render Accessible Counterfactual Impact Matrix Table (`role="region"` with `tabIndex={0}`) scaling with active dimension preset.
-- [x] **DoD 08**: Wire route `/layer-d` in [`App.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/App.tsx) and navigation link in [`AppShell.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/components/layout/AppShell.tsx).
-- [x] **DoD 09**: Append 22nd unit test in [`frontend/src/tests/designSystem.test.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/tests/designSystem.test.tsx).
-- [x] **DoD 10**: Create Playwright E2E suite [`frontend/e2e/layerD.spec.ts`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/e2e/layerD.spec.ts), verify 0 `axe-core` violations, 0 horizontal overflow, and save 6 screenshots to `docs/ui/screenshots/19-layer-d-*.png`.
+- [x] **DoD 08**: Wire route `/layer-d` in `frontend/src/App.tsx` and navigation link in `frontend/src/components/layout/AppShell.tsx`.
+- [x] **DoD 09**: Append 22nd unit test in `frontend/src/tests/designSystem.test.tsx`.
+- [x] **DoD 10**: Create Playwright E2E suite `frontend/e2e/layerD.spec.ts`, verify 0 `axe-core` violations, 0 horizontal overflow, and save 6 screenshots to `docs/ui/screenshots/19-layer-d-*.png`.
 
 ---
 
@@ -231,9 +231,9 @@ Page 19 completes **SynapseTwin's 4-Layer Architecture** with **Layer D**:
   - axe-core accessibility audit: **0 violations** in Light and Dark themes.
   - Responsive layout verified at `375px`, `768px`, and `1440px` viewports (0 horizontal overflow).
   - 6 captured visual verification screenshots:
-    1. [`docs/ui/screenshots/19-layer-d-desktop-overview.png`](file:///c:/Users/Smida/Desktop/CISTAC/docs/ui/screenshots/19-layer-d-desktop-overview.png)
-    2. [`docs/ui/screenshots/19-layer-d-voice-playing.png`](file:///c:/Users/Smida/Desktop/CISTAC/docs/ui/screenshots/19-layer-d-voice-playing.png)
-    3. [`docs/ui/screenshots/19-layer-d-scenario-simulation.png`](file:///c:/Users/Smida/Desktop/CISTAC/docs/ui/screenshots/19-layer-d-scenario-simulation.png)
-    4. [`docs/ui/screenshots/19-layer-d-impact-table.png`](file:///c:/Users/Smida/Desktop/CISTAC/docs/ui/screenshots/19-layer-d-impact-table.png)
-    5. [`docs/ui/screenshots/19-layer-d-night-lab.png`](file:///c:/Users/Smida/Desktop/CISTAC/docs/ui/screenshots/19-layer-d-night-lab.png)
-    6. [`docs/ui/screenshots/19-layer-d-mobile.png`](file:///c:/Users/Smida/Desktop/CISTAC/docs/ui/screenshots/19-layer-d-mobile.png)
+    1. `docs/ui/screenshots/19-layer-d-desktop-overview.png`
+    2. `docs/ui/screenshots/19-layer-d-voice-playing.png`
+    3. `docs/ui/screenshots/19-layer-d-scenario-simulation.png`
+    4. `docs/ui/screenshots/19-layer-d-impact-table.png`
+    5. `docs/ui/screenshots/19-layer-d-night-lab.png`
+    6. `docs/ui/screenshots/19-layer-d-mobile.png`

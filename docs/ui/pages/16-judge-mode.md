@@ -177,7 +177,7 @@
 ---
 
 ## 10. Definition of Done Checklist (10 Items)
-- [x] **DoD 01**: Author [`JudgeModeDock.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/components/signature/JudgeModeDock.tsx) and [`JudgeModePage.tsx`](file:///c:/Users/Smida/Desktop/CISTAC/frontend/src/pages/JudgeModePage.tsx) matching design tokens.
+- [x] **DoD 01**: Author `frontend/src/components/signature/JudgeModeDock.tsx` and `frontend/src/pages/JudgeModePage.tsx` matching design tokens.
 - [x] **DoD 02**: Render 6 seeded persona switcher with 1-click state transition and badge updates.
 - [x] **DoD 03**: Render Fault Injection & Stress Studio with offline mode and LLM-down toggles.
 - [x] **DoD 04**: Render Dimension Generalisation switcher (3, 6, 7, 8, 10 dims).
