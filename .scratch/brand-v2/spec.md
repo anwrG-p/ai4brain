@@ -1,7 +1,7 @@
 # Spec: Brand v2: Loti, sky blue and coral, simple flow, new dashboard
 
 Status: ready-for-agent
-Owner: Member 1 (Mazen), with team agreement. The PR goes to the UI owner for review (DEC-001).
+Owner: Mazen, who is responsible for the frontend and is the only reviewer and approver (DEC-001 ownership is resolved: there is no separate UI owner to wait for).
 Date: 2026-10-31
 Branch: `feat/ui-calm-clean` (continues it)
 Sources: `docs/Doc visual identity.docx`, `docs/Landing page.docx`, `docs/Dashboard.docx`, `docs/Loti interface.docx`, `docs/doc na9chet.docx`, `docs/Rou7 zebda cognitive intelligence.docx`. Extracted text is quoted where it binds.
@@ -158,6 +158,12 @@ The skill's "App Store landing" pattern (ratings, stars, device mockups) is also
       - No paragraph longer than 2 lines.
       - When in doubt, leave it out.
     - **Accessibility features stay** (the table view, labels, screen-reader summaries), but they are compact or visually hidden. They do not add visible bulk.
+14. **Few buttons (user, 2026-10-31: "we don't need many buttons as it was").**
+    - Each screen has **one primary button**, and at most **two other visible controls**, rendered as quiet text links or ghost buttons.
+    - Other actions go behind one "More" menu or disclosure, or are removed.
+    - No button rows, no duplicate CTAs, no "Back to X" button when the nav already covers it.
+    - Inside an exercise, the only buttons are the answer controls the task needs, plus Pause or Exit.
+    - Judge and evaluator controls exist only with `?judge=1` (R6).
 
 ## Information architecture
 
