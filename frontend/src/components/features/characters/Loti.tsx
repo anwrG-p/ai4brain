@@ -28,7 +28,8 @@ export interface LotiProps {
   /** Accessible name; defaults to a description of the pose. */
   title?: string
   className?: string
-  /** The nearly imperceptible idle (spec R8): a slow breath and an occasional blink. Off by default. */
+  /** The nearly imperceptible idle (spec R8): an occasional blink. Off by default. The slow breath is
+      not here: animating the SVG repaints it each frame, so LotiSays breathes an HTML wrapper. */
   alive?: boolean
   /** Where the eyes look, in viewBox units (about ±3). Overrides the pose's own gaze. */
   look?: [number, number]
@@ -106,7 +107,7 @@ export function Loti({ pose = 'idle', size = 'md', title, className, alive = fal
 
       <ContactShadow id={id('shadow')} cx={84} cy={151} rx={36} ry={5} />
 
-      <g className={idle('breathe')}>
+      <g>
         {/* Arms sit behind the body so only the rounded tips show. */}
         {[armL, armR].map((a, i) => (
           <g key={i} className={i === 1 && pose === 'wave' ? anim('wave') : undefined} style={{ transformOrigin: '126px 90px' }}>

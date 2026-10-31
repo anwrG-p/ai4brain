@@ -195,13 +195,18 @@ describe('reduced motion', () => {
 
 // Spec R8: the one idle a character may have, opt-in; and a gaze the page can steer.
 describe('Loti idle and gaze (ticket 07b)', () => {
-  it('is still by default; `alive` adds the breath and the blink', () => {
+  it('is still by default; `alive` adds the blink only (the breath lives on an HTML wrapper, LotiSays)', () => {
     const still = render(<Loti pose="idle" />)
-    expect(still.container.querySelector('.char-anim-breathe, .char-anim-blink')).toBeNull()
+    expect(still.container.querySelector('.char-anim-blink')).toBeNull()
     still.unmount()
     const { container } = render(<Loti pose="idle" alive />)
-    expect(container.querySelector('.char-anim-breathe')).not.toBeNull()
+    expect(container.querySelector('[class*="breathe"]')).toBeNull()
     expect(container.querySelector('.char-anim-blink')).not.toBeNull()
+  })
+
+  it('tokens.css keeps no SVG breath and no override for it', () => {
+    const css = readFileSync(path.resolve(__dirname, '../../../styles/tokens.css'), 'utf8')
+    expect(css).not.toMatch(/char-breathe|char-anim-breathe/)
   })
 
   it('drops the idle under reduced motion', () => {
