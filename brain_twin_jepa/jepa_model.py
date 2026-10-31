@@ -1,6 +1,7 @@
 """SAT-JEPA brain twin (Member 3, README "Soft-Anchored Temporal JEPA"; ticket BE-10).
 
-One step is one SESSION. Each session is a feature vector x_t (`session_matrix`):
+One step is one SESSION. Each session is a feature vector x_t (`session_matrix`), built from BE-07's
+`features.session_features` (`session_record`):
 - the 5 pillar scores (0-100 scaled to 0-1; 0 when missing);
 - the 5 pillar coverages (0-1), which also mark the missing scores;
 - the gap since the previous session, log1p(days) / log1p(28);
@@ -25,11 +26,14 @@ The loss is the JEPA latent loss, plus the anchor loss on f_θ(x_t), plus the re
 prediction against the pillar scores h sessions later.
 
 Forecasts (`BrainTwin.forecast`) are about scores ON THESE EXERCISES: practice improves the
-exercises, nothing more (research area 3). The interval comes from residuals on held-out synthetic
-users (train.py `fit_interval`). Its variance is a + b·h per pillar, with b > 0, so the range widens
-with the horizon. Then a split-conformal scale sets its coverage. The coverage measured on other
-held-out users ships with every forecast as evidence. It is evidence about synthetic data, not
-real users, and the forecast says so.
+exercises, nothing more (research area 3). The interval comes from residuals on held-out users
+(train.py `fit_interval`). Its variance is a + b·h per pillar, with b > 0, so the range widens with
+the horizon. Then a split-conformal scale sets its coverage.
+
+Shadow mode (R17). Every forecast says `validated: false` until `validate.py`'s promotion gate has
+passed on real users. The payload also names where its calibration came from (`source`). It says
+the coverage is marginal (pooled over users, not per user). It says whether this context length
+and horizon lie inside the calibrated range; outside it, the payload makes no coverage claim.
 """
 
 from __future__ import annotations
@@ -46,6 +50,8 @@ import numpy as np
 import torch
 from torch import nn
 
+from brain_twin_jepa.features import session_features
+
 PILLARS = ("focus", "agility", "impulse", "memory", "visual")
 N_PILLARS = len(PILLARS)
 N_FEATURES = 2 * N_PILLARS + 3  # scores, coverages, gap, tod sin, tod cos
@@ -53,15 +59,31 @@ GAP_SCALE_DAYS = 28.0
 
 EMA_TAU = 0.996
 MIN_SESSIONS = 3  # R11: the projection starts at session 3
-H_MAX = 6  # the furthest horizon (in sessions) the interval is calibrated for
+H_MAX = 6  # the furthest horizon (in sessions) the model forecasts
 DEFAULT_LEVEL = 0.8
 # The latent term is a ratio near 1 at start, the score terms are squared errors on a 0-1 scale
 # near .05; at weight 1 the latent term crowds out the forecast (MAE 16.6 vs 15.4 points, 600 users, 1500 steps).
 JEPA_WEIGHT = 0.1
 DEFAULT_CHECKPOINT = Path(__file__).resolve().parents[1] / "models" / "checkpoints" / "sat_jepa.pt"
+COVERAGE_SCOPE = (
+    "marginal: the share of forecasts, pooled over held-out users, whose later score fell inside "
+    "the interval; not a guarantee for any one user"
+)
 
 
 # --- features --------------------------------------------------------------------------------------
+
+
+def session_record(session: Any) -> dict:
+    """A BE-07 session (`telemetry_io.Session`: `session_id`, `events`, `started_at`) as the record
+    `session_matrix` reads: pillar scores and coverages from `features.session_features`."""
+    pillars = session_features(session.events)["pillars"]
+    return {
+        "session_id": session.session_id,
+        "started_at": session.started_at,
+        "pillars": {p: pillars[p]["score"] for p in PILLARS},
+        "coverage": {p: pillars[p]["coverage"] for p in PILLARS},
+    }
 
 
 def _get(record: Any, key: str) -> Any:
@@ -71,7 +93,7 @@ def _get(record: Any, key: str) -> Any:
 def session_matrix(history: Sequence[Any]) -> tuple[np.ndarray, np.ndarray]:
     """(x [T, N_FEATURES], y [T, 5]) for sessions in time order. y is the pillar score / 100, NaN
     where the pillar has no score. A record has `started_at` (aware datetime), `pillars`
-    ({pillar: 0-100 or None}) and `coverage` ({pillar: 0-1}), as attributes or keys."""
+    ({pillar: 0-100 or None}) and `coverage` ({pillar: 0-1}), as keys or attributes."""
     x = np.zeros((len(history), N_FEATURES), dtype=np.float32)
     y = np.full((len(history), N_PILLARS), np.nan, dtype=np.float32)
     prev: datetime | None = None
@@ -110,7 +132,7 @@ def _mlp(i: int, hidden: int, o: int) -> nn.Sequential:
 
 class LeakyIntegrator(nn.Module):
     """s̄_t = a ⊙ s̄_{t-1} + (1 - a) ⊙ e_t, s̄_1 = e_1; a = sigmoid(logit), one per latent unit.
-    Causal: s̄_t depends on sessions 1..t only."""
+    Causal: s̄_t depends on sessions 1..t only (so padding after a history never changes it)."""
 
     def __init__(self, dim: int, leak: float = 0.7):
         super().__init__()
@@ -163,26 +185,37 @@ class SATJEPA(nn.Module):
         n = torch.full(sbar.shape[:1], x.shape[1], dtype=torch.float32)
         return self.readout(self.predict(sbar, n, h))
 
-    def losses(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, torch.Tensor]:
-        """x [B, T, D], y [B, T, 5] (NaN = no score). Every (t, h) with t + h < T and h <= H_MAX."""
+    def losses(self, x: torch.Tensor, y: torch.Tensor, lengths: torch.Tensor | None = None) -> dict[str, torch.Tensor]:
+        """x [B, T, D], y [B, T, 5] (NaN = no score), lengths [B] (sessions per user; padding after
+        them, default all T). Every (t, h) with t + h < length and h <= H_MAX."""
+        B, T = x.shape[:2]
+        lengths = torch.full((B,), T) if lengths is None else lengths
         mask = ~torch.isnan(y)
         y0 = torch.nan_to_num(y)
         e = self.context_encoder(x)
         sbar = self.integrator(e)
         with torch.no_grad():
             z = self.target_encoder(x)
+        real = torch.arange(T)[None, :] < lengths[:, None]  # [B, T]
         anchor = _masked_mse(self.readout(e), y0, mask)
         # The latent error relative to the target's spread: scale-free, so the term cannot drop by
         # shrinking the latent, and it reads the same while the EMA target's scale drifts.
-        spread = z.flatten(0, 1).var(dim=0).mean().clamp(min=1e-6)
+        spread = z[real].var(dim=0).mean().clamp(min=1e-6) if real.sum() > 1 else torch.tensor(1.0)
         jepa, fc = [], []
-        T = x.shape[1]
         for h in range(1, min(H_MAX, T - 1) + 1):
-            n = torch.arange(1, T - h + 1).expand(x.shape[0], -1)
+            valid = real[:, h:]  # the target session exists (so does its context)
+            if not valid.any():
+                continue
+            n = torch.arange(1, T - h + 1).expand(B, -1)
             zhat = self.predict(sbar[:, : T - h], n, h)
-            jepa.append(((zhat - z[:, h:]) ** 2).mean() / spread)
+            jepa.append(((zhat - z[:, h:]) ** 2).mean(-1)[valid].mean() / spread)
             fc.append(_masked_mse(self.readout(zhat), y0[:, h:], mask[:, h:]))
-        out = {"jepa": torch.stack(jepa).mean(), "anchor": anchor, "forecast": torch.stack(fc).mean()}
+        zero = anchor * 0
+        out = {
+            "jepa": torch.stack(jepa).mean() if jepa else zero,
+            "anchor": anchor,
+            "forecast": torch.stack(fc).mean() if fc else zero,
+        }
         out["total"] = JEPA_WEIGHT * out["jepa"] + out["anchor"] + out["forecast"]
         return out
 
@@ -198,12 +231,20 @@ def _masked_mse(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) ->
 @dataclass
 class Calibration:
     """Interval half-width for pillar p at horizon h, in score points: z[p] * sqrt(a[p] + b[p] * h).
-    `coverage[p][h-1]` is the share of held-out users' later scores the interval covered."""
+
+    Calibrated range: contexts of `n_min`..`n_max` sessions and horizons 1..`h_max`, the ones the
+    calibration users had. `coverage[p][h-1]` is the share of held-out forecasts the interval
+    covered (`scope`); `source` says whose data that was."""
 
     level: float
     a: list[float]
     b: list[float]
     z: list[float]
+    source: str = "unknown"
+    scope: str = COVERAGE_SCOPE
+    n_min: int = MIN_SESSIONS
+    n_max: int = MIN_SESSIONS
+    h_max: int = H_MAX
     coverage: list[list[float]] = field(default_factory=list)
     coverage_overall: list[float] = field(default_factory=list)
     held_out_users: int = 0
@@ -212,12 +253,20 @@ class Calibration:
     def half_width(self, k: int, h: int) -> float:
         return self.z[k] * math.sqrt(self.a[k] + self.b[k] * h)
 
+    def covers(self, n: int, h: int) -> bool:
+        return self.n_min <= n <= self.n_max and 1 <= h <= self.h_max
+
 
 class BrainTwin:
     def __init__(self, model: SATJEPA, calibration: Calibration, meta: dict | None = None):
         self.model = model.eval()
         self.calibration = calibration
         self.meta = meta or {}
+
+    @property
+    def validated(self) -> bool:
+        """True only after validate.py's promotion gate passed on real users (R17)."""
+        return (self.meta.get("validation") or {}).get("validated") is True
 
     def forecast(self, history: Sequence[Any], h: int) -> dict:
         """Per-pillar mean and interval for the session h sessions after the last one in `history`
@@ -246,18 +295,30 @@ class BrainTwin:
                 "high": round(min(100.0, m + w), 1),
                 "half_width": round(w, 2),
             }
+        calibrated = cal.covers(len(history), h)
+        evidence: dict[str, Any] = {
+            "source": cal.source,
+            "calibrated": calibrated,
+            "range": {"sessions": [cal.n_min, cal.n_max], "h": [1, cal.h_max]},
+        }
+        if calibrated:
+            evidence.update(
+                scope=cal.scope,
+                held_out_users=cal.held_out_users,
+                coverage_at_h={p: cal.coverage[k][h - 1] for k, p in enumerate(PILLARS)} if cal.coverage else None,
+                coverage=dict(zip(PILLARS, cal.coverage_overall, strict=True)) if cal.coverage_overall else None,
+            )
+        else:
+            evidence["note"] = "outside the calibrated range: no coverage claim for this forecast"
         return {
             "status": "ok",
+            "validated": self.validated,
+            "calibrated": calibrated,
             "h": h,
             "sessions": len(history),
             "level": cal.level,
             "pillars": pillars,
-            "calibration": {
-                "data": "synthetic users (BE-08 generator), not real users",
-                "held_out_users": cal.held_out_users,
-                "coverage_at_h": {p: cal.coverage[k][h - 1] for k, p in enumerate(PILLARS)} if cal.coverage else None,
-                "coverage": dict(zip(PILLARS, cal.coverage_overall, strict=True)) if cal.coverage_overall else None,
-            },
+            "calibration": evidence,
         }
 
     def save(self, path: str | Path) -> Path:
@@ -280,7 +341,7 @@ class BrainTwin:
 def _not_enough_data(history: Sequence[Any], h: int) -> dict | None:
     """ValueError for a horizon outside 1..H_MAX; the not_enough_data answer below MIN_SESSIONS."""
     if not isinstance(h, int) or isinstance(h, bool) or not 1 <= h <= H_MAX:
-        raise ValueError(f"h must be an integer from 1 to {H_MAX} sessions (the calibrated range)")
+        raise ValueError(f"h must be an integer from 1 to {H_MAX} sessions")
     if len(history) < MIN_SESSIONS:
         return {"status": "not_enough_data", "sessions": len(history), "min_sessions": MIN_SESSIONS}
     return None

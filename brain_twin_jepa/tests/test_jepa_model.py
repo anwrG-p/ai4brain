@@ -4,41 +4,60 @@ from datetime import datetime, timedelta, timezone
 
 import numpy as np
 import pytest
-import torch
 
-from brain_twin_jepa import jepa_model
-from brain_twin_jepa.jepa_model import (
+torch = pytest.importorskip("torch")
+
+from brain_twin_jepa import jepa_model  # noqa: E402
+from brain_twin_jepa.jepa_model import (  # noqa: E402
+    COVERAGE_SCOPE,
     EMA_TAU,
     H_MAX,
     MIN_SESSIONS,
     N_FEATURES,
     PILLARS,
+    SATJEPA,
     BrainTwin,
     Calibration,
     LeakyIntegrator,
-    SATJEPA,
     session_matrix,
+    session_record,
 )
-from brain_twin_jepa.session_adapter import SessionRecord
+from brain_twin_jepa.telemetry_io import group_sessions  # noqa: E402
+from data.synthetic.generate import simulate_user  # noqa: E402
 
 T0 = datetime(2026, 3, 2, 18, 0, tzinfo=timezone.utc)
 
 
-def record(i: int, gap_days: float = 2.0, score: float = 60.0, missing: tuple = ()) -> SessionRecord:
-    return SessionRecord(
-        session_id=f"s{i}",
-        started_at=T0 + timedelta(days=gap_days * i),
-        pillars={p: (None if p in missing else score) for p in PILLARS},
-        coverage={p: (0.0 if p in missing else 1.0) for p in PILLARS},
-    )
+def record(i: int, gap_days: float = 2.0, score: float = 60.0, missing: tuple = ()) -> dict:
+    return {
+        "session_id": f"s{i}",
+        "started_at": T0 + timedelta(days=gap_days * i),
+        "pillars": {p: (None if p in missing else score) for p in PILLARS},
+        "coverage": {p: (0.0 if p in missing else 1.0) for p in PILLARS},
+    }
 
 
-def history(n: int, **kw) -> list[SessionRecord]:
+def history(n: int, **kw) -> list[dict]:
     return [record(i, **kw) for i in range(n)]
 
 
-def flat_calibration() -> Calibration:
-    return Calibration(level=0.8, a=[100.0] * 5, b=[10.0] * 5, z=[1.28] * 5)
+def calibration(**kw) -> Calibration:
+    base = {"level": 0.8, "a": [100.0] * 5, "b": [10.0] * 5, "z": [1.28] * 5, "source": "test fixture", "n_min": 3, "n_max": 8}
+    return Calibration(**{**base, **kw})
+
+
+def twin(**kw) -> BrainTwin:
+    torch.manual_seed(0)
+    return BrainTwin(SATJEPA(latent=8, hidden=16), calibration(**kw))
+
+
+def test_session_record_uses_be07_features():
+    events, truth = simulate_user(0, 3, 2)
+    recs = [session_record(s) for s in group_sessions(events)]
+    assert [r["session_id"] for r in recs] == [s["session_id"] for s in truth["sessions"]]
+    for r in recs:
+        assert all(0 <= r["pillars"][p] <= 100 for p in PILLARS)
+        assert set(r["coverage"]) == set(PILLARS)
 
 
 def test_session_matrix_shapes_and_values():
@@ -63,6 +82,20 @@ def test_network_shapes():
     losses = m.losses(x, torch.rand(3, 7, 5))
     assert set(losses) == {"jepa", "anchor", "forecast", "total"}
     assert all(v.shape == () for v in losses.values())
+
+
+def test_losses_ignore_padding_after_a_short_history():
+    torch.manual_seed(0)
+    m = SATJEPA(latent=8, hidden=16)
+    x, y = torch.rand(2, 8, N_FEATURES), torch.rand(2, 8, 5)
+    lengths = torch.tensor([8, 5])
+    y[1, 5:] = float("nan")
+    base = m.losses(x, y, lengths)
+    x2 = x.clone()
+    x2[1, 5:] = 123.0  # garbage in the padding changes nothing
+    padded = m.losses(x2, y, lengths)
+    for k in base:
+        assert torch.allclose(base[k], padded[k]), k
 
 
 def test_ema_update_is_exact():
@@ -107,11 +140,10 @@ def test_leaky_integrator_formula_and_causality():
 
 
 def test_fewer_than_three_sessions_is_not_enough_data():
-    twin = BrainTwin(SATJEPA(latent=8, hidden=16), flat_calibration())
+    t = twin()
     for n in range(MIN_SESSIONS):
-        out = twin.forecast(history(n), 1)
-        assert out == {"status": "not_enough_data", "sessions": n, "min_sessions": 3}
-    assert twin.forecast(history(3), 1)["status"] == "ok"
+        assert t.forecast(history(n), 1) == {"status": "not_enough_data", "sessions": n, "min_sessions": 3}
+    assert t.forecast(history(3), 1)["status"] == "ok"
 
 
 def test_module_forecast_needs_no_checkpoint_for_not_enough_data(monkeypatch, tmp_path):
@@ -123,23 +155,49 @@ def test_module_forecast_needs_no_checkpoint_for_not_enough_data(monkeypatch, tm
 
 
 @pytest.mark.parametrize("h", [0, H_MAX + 1, 1.5, True])
-def test_horizon_outside_the_calibrated_range_is_rejected(h):
-    twin = BrainTwin(SATJEPA(latent=8, hidden=16), flat_calibration())
-    with pytest.raises(ValueError):
-        twin.forecast(history(5), h)
+def test_horizon_outside_1_to_h_max_is_rejected(h):
+    with pytest.raises(ValueError, match="h must be an integer from 1 to 6"):
+        twin().forecast(history(5), h)
+
+
+def test_payload_is_shadow_mode_with_source_and_marginal_scope():
+    out = twin(coverage=[[0.8] * H_MAX] * 5, coverage_overall=[0.8] * 5, held_out_users=40).forecast(history(4), 2)
+    assert out["validated"] is False and out["calibrated"] is True
+    ev = out["calibration"]
+    assert ev["source"] == "test fixture"
+    assert ev["scope"] == COVERAGE_SCOPE and ev["scope"].startswith("marginal")
+    assert "not a guarantee for any one user" in ev["scope"]
+    assert ev["coverage_at_h"] == {p: 0.8 for p in PILLARS}
+
+
+@pytest.mark.parametrize("n, h", [(9, 1), (12, 3), (4, 5)])
+def test_outside_the_calibrated_range_makes_no_coverage_claim(n, h):
+    t = twin(n_max=8, h_max=4, coverage=[[0.8] * 4] * 5, coverage_overall=[0.8] * 5)
+    out = t.forecast(history(n), h)
+    assert out["status"] == "ok" and out["calibrated"] is False and out["validated"] is False
+    ev = out["calibration"]
+    assert ev["calibrated"] is False and ev["range"] == {"sessions": [3, 8], "h": [1, 4]}
+    assert not {"coverage", "coverage_at_h", "held_out_users", "scope"} & set(ev)
+
+
+def test_validated_only_from_the_promotion_metadata():
+    t = twin()
+    assert t.forecast(history(4), 1)["validated"] is False
+    t.meta = {"validation": {"validated": "yes"}}  # anything but True stays false
+    assert t.forecast(history(4), 1)["validated"] is False
+    t.meta = {"validation": {"validated": True}}
+    assert t.forecast(history(4), 1)["validated"] is True
 
 
 def test_a_pillar_never_scored_gets_no_forecast():
-    twin = BrainTwin(SATJEPA(latent=8, hidden=16), flat_calibration())
-    out = twin.forecast(history(4, missing=("memory",)), 2)
+    out = twin().forecast(history(4, missing=("memory",)), 2)
     assert out["pillars"]["memory"] is None
     assert out["pillars"]["focus"] is not None
 
 
 def test_checkpoint_round_trip(tmp_path):
-    torch.manual_seed(3)
-    twin = BrainTwin(SATJEPA(latent=8, hidden=16), flat_calibration(), {"note": "test"})
-    path = twin.save(tmp_path / "ckpt" / "twin.pt")
-    loaded = BrainTwin.load(path)
-    assert loaded.forecast(history(5), 3) == twin.forecast(history(5), 3)
-    assert loaded.meta == {"note": "test"}
+    t = twin(coverage=[[0.8] * H_MAX] * 5, coverage_overall=[0.8] * 5)
+    t.meta = {"note": "test", "validation": {"validated": False}}
+    loaded = BrainTwin.load(t.save(tmp_path / "ckpt" / "twin.pt"))
+    assert loaded.forecast(history(5), 3) == t.forecast(history(5), 3)
+    assert loaded.meta == t.meta and loaded.calibration == t.calibration
