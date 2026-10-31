@@ -17,6 +17,9 @@ services:
       # GET /v1/user/export or `docker compose cp backend:/data/telemetry ./out`. Retention:
       # docker compose exec backend python -m backend.app.privacy.retention --days 30
       - telemetry:/data/telemetry
+      # GET /v1/tasks/next's per-user registry (seen filter, session answers); same reasoning.
+      - task_registry:/data/task_registry
 
 volumes:
   telemetry:
+  task_registry:

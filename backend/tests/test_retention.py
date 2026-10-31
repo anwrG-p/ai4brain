@@ -162,7 +162,7 @@ def test_cli_runs_from_the_repo_root(tmp_path):
     )
     assert out.returncode == 0, out.stderr
     assert json.loads(out.stdout) == {
-        "files": 1, "kept": 1, "dropped": 1, "undated": 0, "removed_files": 0}
+        "files": 1, "kept": 1, "dropped": 1, "undated": 0, "removed_files": 0, "registries_removed": 0}
 
 
 @pytest.mark.parametrize("days", ["0", "-1", "x"])

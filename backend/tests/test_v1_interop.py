@@ -16,10 +16,6 @@ def test_health_check():
     assert response.json()["status"] == "OPERATIONAL"
 
 
-def test_v1_tasks_next():
-    assert client.get("/v1/tasks/next?user_id=test_user").status_code == 501
-
-
 def test_v1_dashboard_profile():
     response = client.get("/v1/dashboard/profile?user_id=test_user")
     assert response.status_code == 200

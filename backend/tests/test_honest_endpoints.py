@@ -33,7 +33,6 @@ def assert_no_region_names(payload) -> None:
 # --- 501 until the module behind the route exists ------------------------------------------------
 
 NOT_YET = [
-    ("get", "/v1/tasks/next", {"params": {"user_id": "u1"}}, "task service not available yet"),
     ("post", "/v1/coach/chat", {"json": {"user_id": "u1", "user_prompt": "hi"}}, "coach not available yet"),
     (
         "get",
