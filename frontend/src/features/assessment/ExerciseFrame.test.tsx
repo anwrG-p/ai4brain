@@ -240,3 +240,73 @@ test('an unknown exercise skips the frame and runs as before', () => {
   expect(screen.getByText('raw task')).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Begin' })).toBeNull()
 })
+
+// Motion pass (ticket 07b, spec R8): motion lives on the instruction, fixation and end screens,
+// never on the stimulus. The motion lock ([data-timed-trial]) wraps the exercise only.
+test.each(Object.keys(EXERCISE_NAME))('%s: the instruction screen has a small animated demo, hidden from screen readers', (schema) => {
+  const { container } = setup(schema as SchemaType)
+  const demo = container.querySelector(`[data-demo="${schema}"]`)
+  expect(demo).not.toBeNull()
+  expect(demo).toHaveAttribute('aria-hidden', 'true')
+  expect(demo!.querySelector('[class*="anim-demo-"]')).not.toBeNull()
+  expect(screen.getAllByRole('button')).toHaveLength(1) // still Begin only
+})
+
+test('the motion lock wraps the exercise only: not the instruction, the dots or the end card', () => {
+  const task = byType('matrix')
+  const { container } = render(
+    <ExerciseFrame task={task} onDone={vi.fn()}>
+      {(end) => (
+        <section aria-label="Pattern Puzzle">
+          <button type="button" onClick={end}>
+            finish
+          </button>
+        </section>
+      )}
+    </ExerciseFrame>,
+  )
+  const locked = () => container.querySelector('[data-timed-trial="true"]')
+  expect(locked()).toBeNull()
+  expect(container.firstElementChild).toHaveClass('anim-slide-in') // a new exercise slides in from the right
+  space()
+  expect(screen.getByRole('img', { name: 'Look at the cross' })).toHaveClass('anim-fix-in')
+  advance(FIXATION_MS)
+  expect(locked()).toContainElement(screen.getByRole('region', { name: 'Pattern Puzzle' }))
+  expect(locked()).not.toContainElement(screen.getByRole('progressbar', { name: 'Progress' }))
+  // The trial area itself never animates in: the first stimulus shows at full strength at once.
+  expect(container.querySelector('[class*="anim-"]')).toBeNull()
+  act(() => void fireEvent.click(screen.getByRole('button', { name: 'finish' })))
+  expect(locked()).toBeNull()
+})
+
+test('a filled progress dot pops once (its class appears with the fill)', () => {
+  setup('stroop')
+  space()
+  advance(FIXATION_MS)
+  const bar = screen.getByRole('progressbar', { name: 'Progress' })
+  expect(bar.querySelector('.anim-dot-pop')).toBeNull()
+  act(() => void fireEvent.pointerDown(screen.getAllByRole('button')[0]!))
+  expect(bar.querySelectorAll('[data-dot="done"].anim-dot-pop')).toHaveLength(1)
+})
+
+test('the end card: Loti pops in happy with one burst of 6 to 8 sparkles, hidden from screen readers', () => {
+  const task = byType('matrix')
+  const { container } = render(
+    <ExerciseFrame task={task} onDone={vi.fn()}>
+      {(end) => (
+        <button type="button" onClick={end}>
+          finish
+        </button>
+      )}
+    </ExerciseFrame>,
+  )
+  space()
+  advance(FIXATION_MS)
+  act(() => void fireEvent.click(screen.getByRole('button', { name: 'finish' })))
+  expect(screen.getByRole('img', { name: 'Loti is happy' }).closest('.anim-pop')).not.toBeNull()
+  const burst = container.querySelector('[data-burst]')
+  expect(burst).toHaveAttribute('aria-hidden', 'true')
+  const n = burst!.querySelectorAll('.anim-sparkle').length
+  expect(n).toBeGreaterThanOrEqual(6)
+  expect(n).toBeLessThanOrEqual(8)
+})

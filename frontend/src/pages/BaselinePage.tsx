@@ -114,13 +114,18 @@ export default function BaselinePage() {
   )
 }
 
-// "1 of 5" with a thin bar of five segments.
+// "1 of 5" with a thin bar of five segments; the next one fills from the left as an exercise ends
+// (a transform transition, off under reduced motion). The text is what screen readers hear.
 function StepIndicator({ step }: { step: number }) {
   return (
     <div className="flex items-center gap-3">
       <div aria-hidden="true" className="flex gap-1">
         {BASELINE_SCHEMAS.map((s, k) => (
-          <span key={s} className={`h-1 w-6 rounded-pill ${k <= step ? 'bg-brand' : 'bg-border'}`} />
+          <span key={s} data-step={k <= step ? 'on' : 'off'} className="h-1 w-6 overflow-hidden rounded-pill bg-border">
+            <span
+              className={`block h-full w-full origin-left bg-brand transition-transform duration-400 ease-out motion-reduce:transition-none ${k <= step ? 'scale-x-100' : 'scale-x-0'}`}
+            />
+          </span>
         ))}
       </div>
       <p className="text-sm font-medium text-ink tabular-nums">

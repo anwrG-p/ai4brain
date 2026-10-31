@@ -59,6 +59,7 @@ Each ruling ends with what it costs if it turns out to be wrong.
   - *(If wrong: swap the data source.)*
 - **R6. Evaluator and judge tools** survive only behind `?judge=1`, never visible otherwise. This keeps the CISTAC demo controls without cluttering real users' screens. *(If wrong: delete them.)*
 - **R7. Tests that pinned the old design's content are rewritten** for the new pages (team-approved redesign). DEC-007's "keep selectors" is superseded by DEC-011 for the redesigned pages. Theme-toggle names and the e2e axe/overflow checks stay.
+- **R8 (user, 2026-10-31): Welcome and exercises should feel more dynamic.** Characters may have a nearly-imperceptible idle (breathing, blink); event motion is richer. Trial stimuli and timing stay untouched — motion lives in transitions, instruction demos, presses and end cards. *(If wrong: delete the `anim-*` classes; every one is off under reduced motion already.)*
 
 ## Brand system (binding)
 
@@ -120,7 +121,7 @@ The skill's "App Store landing" pattern (ratings, stars, device mockups) is also
 
 **UX** (skill `ux` domain):
 - Every flow has Skip and Back. No forced, unskippable tours.
-- Continuous animation is for loading only. Characters are **still when idle** and animate on events: greeting, a celebration, a mood change.
+- Continuous animation is for loading only. Characters are **still when idle** (R8 allows a nearly imperceptible breathing and blink) and animate on events: greeting, a celebration, a mood change.
 - Use ease-out on enter and ease-in on exit, never linear. Respect reduced motion.
 
 **Typography.** Quicksand (headings) with Inter (body and UI), per the brand doc. The skill's alternative was Nunito + DM Sans; the brand doc wins. Quicksand is a rounded display face, so use it only for headings of 20 px and up. All small UI text is Inter.
@@ -136,7 +137,7 @@ The skill's "App Store landing" pattern (ratings, stars, device mockups) is also
 7. **No all-caps eyebrow labels** above every heading, and no badge piles.
 8. **No emoji as icons.** Use one icon family: Lucide, round caps, 1.75 px stroke, sizes 16, 20 or 24.
 9. **Clay or 3D depth only on characters and illustrations, plus at most the primary CTA.**
-10. **Motion only with meaning:** an entrance, a celebration, a state change. Idle loops are none or nearly imperceptible.
+10. **Motion only with meaning:** an entrance, a celebration, a state change, a press, or a short demo of what an exercise asks (R8). Idle loops are none or nearly imperceptible: a character's breathing and blink at most (R8). Nothing near a trial stimulus moves while a trial runs, except the progress dots.
 11. **One primary action per screen.** Layout follows a 4/8 spacing rhythm and a max-width; no edge-to-edge text.
 12. **Real content only.** Any number on screen comes from data or is clearly labelled as an example. No placeholder lorem, no fake progress.
 13. **Need-to-know only (user, 2026-10-31: "many infos make the site bulky and the user don't need them").** The default view shows only what helps the user act right now. Everything else is behind one quiet "More" or "Details" control, or removed.

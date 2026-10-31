@@ -75,7 +75,8 @@ export function ExerciseHost({ schemaType, attempt, onDone, onBlockEnd, onError,
   const skip = useCallback(() => cb.current.onError('This exercise could not be shown.'), [])
 
   return (
-    <div data-timed-trial="true" className="w-full min-w-0">
+    // The motion lock ([data-timed-trial]) sits on the exercise itself, inside ExerciseFrame.
+    <div className="w-full min-w-0">
       {run ? (
         <SkipOnError key={run.task.task_id} taskId={run.task.task_id} onSkip={skip}>
           <ExerciseFrame task={run.task} onDone={done} onBlockEnd={blockEnd}>

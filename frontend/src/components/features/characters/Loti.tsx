@@ -28,6 +28,10 @@ export interface LotiProps {
   /** Accessible name; defaults to a description of the pose. */
   title?: string
   className?: string
+  /** The nearly imperceptible idle (spec R8): a slow breath and an occasional blink. Off by default. */
+  alive?: boolean
+  /** Where the eyes look, in viewBox units (about ±3). Overrides the pose's own gaze. */
+  look?: [number, number]
 }
 
 const LABEL: Record<LotiPose, string> = {
@@ -58,14 +62,15 @@ const ARMS: Record<LotiPose, [Arm, Arm]> = {
   wave: [ARM_DOWN_L, { cx: 140, cy: 66, deg: 28 }],
 }
 
-export function Loti({ pose = 'idle', size = 'md', title, className }: LotiProps) {
+export function Loti({ pose = 'idle', size = 'md', title, className, alive = false, look: gaze }: LotiProps) {
   const id = useCharIds('loti')
   const animate = useCharacterMotion()
   const anim = (name: string) => (animate ? `char-anim-${name}` : undefined)
   const sky = ramp('sky')
   const coral = ramp('coral')
   const [armL, armR] = ARMS[pose]
-  const look: [number, number] = pose === 'think' ? [2.5, -3] : [0, 0]
+  const look: [number, number] = gaze ?? (pose === 'think' ? [2.5, -3] : [0, 0])
+  const idle = (name: string) => (alive ? anim(name) : undefined)
 
   return (
     <CharacterSvg label={title ?? LABEL[pose]} width={CHARACTER_PX[size]} viewBox="0 0 160 160" aspect={1} className={className}>
@@ -101,51 +106,53 @@ export function Loti({ pose = 'idle', size = 'md', title, className }: LotiProps
 
       <ContactShadow id={id('shadow')} cx={84} cy={151} rx={36} ry={5} />
 
-      {/* Arms sit behind the body so only the rounded tips show. */}
-      {[armL, armR].map((a, i) => (
-        <g key={i} className={i === 1 && pose === 'wave' ? anim('wave') : undefined} style={{ transformOrigin: '126px 90px' }}>
-          <ellipse cx={a.cx} cy={a.cy} rx={8.5} ry={13} transform={`rotate(${a.deg} ${a.cx} ${a.cy})`} fill={url(id('body'))} />
+      <g className={idle('breathe')}>
+        {/* Arms sit behind the body so only the rounded tips show. */}
+        {[armL, armR].map((a, i) => (
+          <g key={i} className={i === 1 && pose === 'wave' ? anim('wave') : undefined} style={{ transformOrigin: '126px 90px' }}>
+            <ellipse cx={a.cx} cy={a.cy} rx={8.5} ry={13} transform={`rotate(${a.deg} ${a.cx} ${a.cy})`} fill={url(id('body'))} />
+          </g>
+        ))}
+
+        {/* The curl of light: Loti's silhouette mark. */}
+        <path d="M79 34 C74 22 80 11 91 11 C100 11 102 21 94 24" {...line(7)} stroke={sky.mid} />
+        <path d="M80 26 C79 19 83 14 89 13" {...line(2)} stroke={GLINT} opacity={0.6} />
+
+        <path d={BODY} fill={url(id('body'))} />
+
+        <g clipPath={url(id('clip'))}>
+          {/* Matte key-light sheen, broad and soft. */}
+          <ellipse cx={58} cy={54} rx={28} ry={17} transform="rotate(-32 58 54)" fill={url(id('sheen'))} />
+
+          {/* The coral core, glowing inside the clay, well below the mouth. */}
+          <g className={pose === 'happy' ? anim('pulse') : undefined}>
+            <circle cx={80} cy={CORE_Y} r={19} fill={url(id('window'))} />
+            <circle cx={80} cy={CORE_Y} r={pose === 'happy' ? 19 : 14} fill={url(id('glow'))} />
+            <circle cx={80} cy={CORE_Y} r={10} fill={url(id('heart'))} />
+            <circle cx={80} cy={CORE_Y} r={10} fill={sky.mid} opacity={0.08} />
+          </g>
         </g>
-      ))}
 
-      {/* The curl of light: Loti's silhouette mark. */}
-      <path d="M79 34 C74 22 80 11 91 11 C100 11 102 21 94 24" {...line(7)} stroke={sky.mid} />
-      <path d="M80 26 C79 19 83 14 89 13" {...line(2)} stroke={GLINT} opacity={0.6} />
-
-      <path d={BODY} fill={url(id('body'))} />
-
-      <g clipPath={url(id('clip'))}>
-        {/* Matte key-light sheen, broad and soft. */}
-        <ellipse cx={58} cy={54} rx={28} ry={17} transform="rotate(-32 58 54)" fill={url(id('sheen'))} />
-
-        {/* The coral core, glowing inside the clay, well below the mouth. */}
-        <g className={pose === 'happy' ? anim('pulse') : undefined}>
-          <circle cx={80} cy={CORE_Y} r={19} fill={url(id('window'))} />
-          <circle cx={80} cy={CORE_Y} r={pose === 'happy' ? 19 : 14} fill={url(id('glow'))} />
-          <circle cx={80} cy={CORE_Y} r={10} fill={url(id('heart'))} />
-          <circle cx={80} cy={CORE_Y} r={10} fill={sky.mid} opacity={0.08} />
+        {/* The face sits high, so the mouth never meets the core. */}
+        <g transform={`translate(0 ${FACE_LIFT})`}>
+          <ellipse cx={49} cy={94} rx={8} ry={5} fill={url(id('cheek'))} />
+          <ellipse cx={111} cy={94} rx={8} ry={5} fill={url(id('cheek'))} />
+          <LotiFace pose={pose} look={look} talkClass={anim('talk')} blinkClass={idle('blink')} />
         </g>
+
+        {pose === 'think' && (
+          <g className={anim('think')}>
+            <circle cx={123} cy={36} r={3} fill={url(id('body'))} />
+            <circle cx={134} cy={23} r={4.5} fill={url(id('body'))} />
+            <circle cx={148} cy={10} r={6.5} fill={url(id('body'))} />
+          </g>
+        )}
       </g>
-
-      {/* The face sits high, so the mouth never meets the core. */}
-      <g transform={`translate(0 ${FACE_LIFT})`}>
-        <ellipse cx={49} cy={94} rx={8} ry={5} fill={url(id('cheek'))} />
-        <ellipse cx={111} cy={94} rx={8} ry={5} fill={url(id('cheek'))} />
-        <LotiFace pose={pose} look={look} talkClass={anim('talk')} />
-      </g>
-
-      {pose === 'think' && (
-        <g className={anim('think')}>
-          <circle cx={123} cy={36} r={3} fill={url(id('body'))} />
-          <circle cx={134} cy={23} r={4.5} fill={url(id('body'))} />
-          <circle cx={148} cy={10} r={6.5} fill={url(id('body'))} />
-        </g>
-      )}
     </CharacterSvg>
   )
 }
 
-function LotiFace({ pose, look, talkClass }: { pose: LotiPose; look: [number, number]; talkClass?: string }) {
+function LotiFace({ pose, look, talkClass, blinkClass }: { pose: LotiPose; look: [number, number]; talkClass?: string; blinkClass?: string }) {
   if (pose === 'happy') {
     return (
       <g>
@@ -157,8 +164,10 @@ function LotiFace({ pose, look, talkClass }: { pose: LotiPose; look: [number, nu
   }
   return (
     <g>
-      <Eye cx={63} cy={80} rx={6} ry={8} look={look} />
-      <Eye cx={97} cy={80} rx={6} ry={8} look={look} />
+      <g className={blinkClass}>
+        <Eye cx={63} cy={80} rx={6} ry={8} look={look} />
+        <Eye cx={97} cy={80} rx={6} ry={8} look={look} />
+      </g>
       {pose === 'idle' && <path d="M72 95 Q80 101 88 95" {...line(3.5)} />}
       {pose === 'think' && <path d="M75 98 Q80 96 87 96" {...line(3.5)} />}
       {pose === 'wave' && <OpenMouth d="M72 93 Q80 95 88 93 Q86 103 80 103 Q74 103 72 93 Z" />}

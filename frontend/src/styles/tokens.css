@@ -214,6 +214,11 @@
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in: cubic-bezier(0.55, 0, 1, 0.45);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  /* Event motion (ticket 07b, spec R8): enter 200–400 ms ease-out, exit about two thirds, ease-in. */
+  --duration-press: 100ms;
+  --duration-enter: 320ms;
+  --duration-exit: 220ms;
+  --duration-word: 35ms;
 }
 
 [data-theme="dark"] {
@@ -821,6 +826,28 @@ html[data-theme="dark"][data-emotion="fatigued"] {
   animation: char-mood 560ms var(--ease-out) 1;
 }
 
+/* The one idle a character may have (spec R8): a nearly imperceptible breath and an occasional blink.
+   Opt-in per use (Loti's `alive` prop), off under reduced motion and in timed trials (lock below). */
+@keyframes char-breathe {
+  0%, 100% { transform: scale(1, 1); }
+  50% { transform: scale(1.01, 1.025); }
+}
+.char-anim-breathe {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: char-breathe 4200ms var(--ease-in-out) infinite;
+}
+
+@keyframes char-blink {
+  0%, 94%, 100% { transform: scaleY(1); }
+  97% { transform: scaleY(0.1); }
+}
+.char-anim-blink {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: char-blink 5200ms var(--ease-in-out) 1200ms infinite;
+}
+
 /* characters: motion lock */
 @media (prefers-reduced-motion: reduce) {
   [class*="char-anim-"],
@@ -834,4 +861,209 @@ html[data-theme="dark"][data-emotion="fatigued"] {
 [data-timed-trial="true"] [class*="char-anim-"],
 [data-timed-trial="true"] [class*="char-anim-"] > * {
   animation: none !important;
+}
+
+/* Motion pass (ticket 07b, spec R8). Transform and opacity only; ease-out to enter, ease-in to exit.
+   Every anim-* class is off under reduced motion (lock at the end of this block). None of them sits
+   on a trial stimulus: ExerciseFrame keeps [data-timed-trial] on the exercise alone, so the motion
+   lives on the instruction, fixation and end screens, the progress dots and presses. */
+
+/* Welcome: Loti rises with a small overshoot (and waves once landed), the bubble follows, its words
+   reveal one by one, then Start. The timeline is ~1.3 s; Start leaves in 300 ms (80 + 220). */
+@keyframes anim-rise {
+  0% { opacity: 0; transform: translateY(24px) scale(0.96); }
+  60% { opacity: 1; transform: translateY(-4px) scale(1.01); }
+  100% { opacity: 1; transform: none; }
+}
+.anim-rise {
+  animation: anim-rise 400ms var(--ease-out) both;
+}
+.anim-rise .char-anim-wave {
+  animation-delay: var(--duration-slow);
+}
+
+@keyframes anim-bubble {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+.anim-bubble {
+  transform-origin: 50% 0;
+  animation: anim-bubble var(--duration-enter) var(--ease-out) 350ms both;
+}
+
+@keyframes anim-word {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.anim-word {
+  display: inline-block;
+  animation: anim-word 240ms var(--ease-out) both;
+  animation-delay: calc(450ms + var(--i, 0) * var(--duration-word));
+}
+
+@keyframes anim-fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+.anim-cta {
+  animation: anim-fade-up var(--duration-enter) var(--ease-out) 900ms both;
+}
+
+@keyframes anim-page-exit {
+  to { opacity: 0; transform: translateY(-8px); }
+}
+.anim-page-exit {
+  pointer-events: none;
+  animation: anim-page-exit var(--duration-exit) var(--ease-in) 80ms both;
+}
+
+/* Press: a 0.97 scale while held. Outside trials on the screen's own buttons (Start, Begin, Continue). */
+.anim-press {
+  transition-property: background-color, border-color, color, opacity, transform;
+}
+.anim-press:active:not(:disabled) {
+  transform: scale(0.97);
+  transition-duration: var(--duration-press);
+}
+
+/* Inside a trial, the answer buttons get the same press, and only them: a button that draws part of
+   the stimulus (a Tower peg, a Pattern Puzzle piece, any button holding an SVG) never moves. The
+   answer is already recorded on pointerdown, so the press cannot change what is measured.
+   No correctness feedback (it would change the assessment). */
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-reduced-motion="true"]) [data-timed-trial="true"] .tactile-btn:not(:has(svg)) {
+    transition: transform var(--duration-press) var(--ease-out) !important;
+  }
+  :root:not([data-reduced-motion="true"]) [data-timed-trial="true"] .tactile-btn:not(:has(svg)):active:not(:disabled) {
+    transform: scale(0.97) !important;
+  }
+}
+
+/* Exercise frame: a new exercise's instruction slides in from the right; the fixation cross scales
+   in (its 500 ms are unchanged); a filled progress dot pops; the end card's Loti pops in with one
+   burst of sparkles. The trial area itself never animates in. */
+@keyframes anim-slide-in {
+  from { opacity: 0; transform: translateX(32px); }
+  to { opacity: 1; transform: none; }
+}
+.anim-slide-in {
+  animation: anim-slide-in var(--duration-enter) var(--ease-out) both;
+}
+
+@keyframes anim-fix-in {
+  from { opacity: 0; transform: scale(0.5); }
+  to { opacity: 1; transform: none; }
+}
+.anim-fix-in {
+  animation: anim-fix-in 200ms var(--ease-out) both;
+}
+
+@keyframes anim-dot-pop {
+  0% { transform: scale(0.6); }
+  60% { transform: scale(1.4); }
+  100% { transform: none; }
+}
+.anim-dot-pop {
+  animation: anim-dot-pop 240ms var(--ease-out) both;
+}
+
+@keyframes anim-pop {
+  0% { opacity: 0; transform: scale(0.6); }
+  60% { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: none; }
+}
+.anim-pop {
+  animation: anim-pop 360ms var(--ease-out) both;
+}
+
+/* Hidden at rest, so with motion off the burst simply never shows. */
+@keyframes anim-sparkle {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.4); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--sx), var(--sy)) scale(1); }
+}
+.anim-sparkle {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: anim-sparkle 700ms var(--ease-out) 150ms both;
+}
+
+/* Instruction demos: short loops of what the exercise shows (ExerciseDemo.tsx). The resting state
+   (motion off) is a still picture of the same thing; .demo-later layers stay hidden at rest. */
+.demo-later {
+  opacity: 0;
+}
+
+@keyframes anim-demo-cycle {
+  0% { opacity: 0; }
+  6%, 30% { opacity: 1; }
+  36%, 100% { opacity: 0; }
+}
+.anim-demo-cycle {
+  animation: anim-demo-cycle 3000ms var(--ease-in-out) infinite both;
+  animation-delay: calc(var(--i, 0) * 1000ms);
+}
+
+@keyframes anim-demo-seq {
+  0% { opacity: 0; transform: scale(0.8); }
+  10%, 80% { opacity: 1; transform: none; }
+  90%, 100% { opacity: 0; transform: none; }
+}
+.anim-demo-seq {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: anim-demo-seq 3200ms var(--ease-out) infinite both;
+  animation-delay: calc(var(--i, 0) * 400ms);
+}
+
+@keyframes anim-demo-turn {
+  0%, 20% { transform: rotate(0deg); }
+  45%, 70% { transform: rotate(90deg); }
+  95%, 100% { transform: rotate(0deg); }
+}
+.anim-demo-turn {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: anim-demo-turn 3000ms var(--ease-in-out) infinite;
+}
+
+/* One short flash every 2.4 s (well under 3 flashes a second). */
+@keyframes anim-demo-flash {
+  0%, 30% { opacity: 0; }
+  32%, 42% { opacity: 1; }
+  44%, 100% { opacity: 0; }
+}
+.anim-demo-flash {
+  animation: anim-demo-flash 2400ms var(--ease-in-out) infinite both;
+}
+
+@keyframes anim-demo-move {
+  0%, 15% { opacity: 1; transform: none; }
+  30% { transform: translate(0, -24px); }
+  55% { transform: translate(56px, -24px); }
+  70%, 88% { opacity: 1; transform: translate(56px, 12px); }
+  96% { opacity: 0; transform: translate(56px, 12px); }
+  97% { opacity: 0; transform: none; }
+  100% { opacity: 1; transform: none; }
+}
+.anim-demo-move {
+  animation: anim-demo-move 3200ms var(--ease-in-out) infinite;
+}
+
+/* motion pass: lock */
+@media (prefers-reduced-motion: reduce) {
+  [class*="anim-"] {
+    animation: none !important;
+  }
+  .anim-press:active:not(:disabled) {
+    transform: none !important;
+  }
+}
+
+[data-reduced-motion="true"] [class*="anim-"] {
+  animation: none !important;
+}
+[data-reduced-motion="true"] .anim-press:active:not(:disabled) {
+  transform: none !important;
 }

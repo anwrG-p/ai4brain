@@ -224,3 +224,30 @@ describe('Mascot wrapper', () => {
     expect(screen.queryByRole('img')).toBeNull()
   })
 })
+
+// Spec R8: the one idle a character may have, opt-in; and a gaze the page can steer.
+describe('Loti idle and gaze (ticket 07b)', () => {
+  it('is still by default; `alive` adds the breath and the blink', () => {
+    const still = render(<Loti pose="idle" />)
+    expect(still.container.querySelector('.char-anim-breathe, .char-anim-blink')).toBeNull()
+    still.unmount()
+    const { container } = render(<Loti pose="idle" alive />)
+    expect(container.querySelector('.char-anim-breathe')).not.toBeNull()
+    expect(container.querySelector('.char-anim-blink')).not.toBeNull()
+  })
+
+  it('drops the idle under reduced motion', () => {
+    act(() => useAppStore.getState().setReducedMotion(true))
+    const { container } = render(<Loti pose="idle" alive />)
+    expect(container.querySelector(ANIM)).toBeNull()
+  })
+
+  it('`look` moves both eyes', () => {
+    const { container } = render(<Loti pose="idle" look={[2, -1]} />)
+    const eyes = [...container.querySelectorAll('ellipse[rx="6"][ry="8"]')].map((e) => [e.getAttribute('cx'), e.getAttribute('cy')])
+    expect(eyes).toEqual([
+      ['65', '79'],
+      ['99', '79'],
+    ])
+  })
+})

@@ -26,6 +26,10 @@ async function checkViewports(page: Page, theme: 'light' | 'dark') {
 }
 
 test.describe('Page 01: Welcome (/)', () => {
+  // The entrance fades text in over ~1.3 s; axe would read its contrast mid-fade. Pinned here as well
+  // as in playwright.config.ts, so the checks always see the page at rest.
+  test.use({ reducedMotion: 'reduce' })
+
   test('Loti, one Start button, one link; axe light and dark; no overflow at 375/768/1440', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
     await expect(page.getByRole('img', { name: /Loti/ }).first()).toBeVisible()

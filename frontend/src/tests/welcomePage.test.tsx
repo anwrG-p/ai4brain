@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '../state/useAppStore'
 import { App } from '../App'
@@ -18,6 +18,8 @@ describe('Welcome (/): Loti, one button, one link', () => {
   })
   afterEach(() => {
     vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+    act(() => useAppStore.getState().setReducedMotion(false))
   })
 
   it('shows Loti with one bubble', async () => {
@@ -36,7 +38,10 @@ describe('Welcome (/): Loti, one button, one link', () => {
 
   it('keeps the visible copy to 40 words or fewer', async () => {
     const main = await renderWelcome()
-    const words = (main.textContent ?? '').split(/\s+/).filter(Boolean)
+    // The word reveal draws an aria-hidden copy beside the screen-reader text: count each word once.
+    const copy = main.cloneNode(true) as HTMLElement
+    copy.querySelectorAll('[aria-hidden="true"]').forEach((n) => n.remove())
+    const words = (copy.textContent ?? '').split(/\s+/).filter(Boolean)
     expect(words.length).toBeLessThanOrEqual(40)
   })
 
@@ -54,6 +59,7 @@ describe('Welcome (/): Loti, one button, one link', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start' }))
     expect(await screen.findByText('1 of 5', { exact: false })).toBeInTheDocument()
     expect(window.location.pathname).toBe('/baseline')
+    await screen.findByRole('heading', { name: 'Logic Web' }) // the first exercise has loaded
   })
 
   it('"I already have an account" opens the login sheet: guest only, no Google without a client id', async () => {
@@ -77,5 +83,72 @@ describe('Welcome (/): Loti, one button, one link', () => {
     await renderWelcome()
     fireEvent.click(screen.getByRole('button', { name: 'I already have an account' }))
     expect(screen.getByTestId('google-signin')).toBeInTheDocument()
+  })
+
+  // Motion pass (ticket 07b, spec R8).
+  it('reveals the bubble word by word on screen, with the full text in the DOM for screen readers from the start', async () => {
+    const main = await renderWelcome()
+    const line = 'Want to see how your mind works today? It takes about 5 minutes.'
+    expect(screen.getByRole('heading', { level: 1, name: "Hi, I'm Loti." })).toBeInTheDocument()
+    expect(within(main).getByText(line)).toHaveClass('sr-only')
+    const shown = main.querySelectorAll('[aria-hidden="true"] .anim-word')
+    expect(Array.from(shown, (w) => w.textContent).join(' ')).toBe(`Hi, I'm Loti. ${line}`)
+    expect(within(main).getByRole('img', { name: /Loti/ }).closest('.anim-rise')).not.toBeNull()
+  })
+
+  it('Start: Loti turns happy, the page leaves, then the baseline opens', async () => {
+    const main = await renderWelcome()
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+    expect(within(main).getByRole('img', { name: 'Loti is happy' })).toBeInTheDocument()
+    expect(main.querySelector('.anim-page-exit')).not.toBeNull()
+    expect(window.location.pathname).toBe('/') // the exit plays first (300 ms at most)
+    expect(await screen.findByText('1 of 5', { exact: false })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/baseline')
+    await screen.findByRole('heading', { name: 'Logic Web' }) // the first exercise has loaded
+  })
+
+  it('reduced motion: nothing animates and Start goes at once', async () => {
+    act(() => useAppStore.getState().setReducedMotion(true))
+    const main = await renderWelcome()
+    expect(main.querySelector('[class*="anim-"]')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+    expect(window.location.pathname).toBe('/baseline')
+    await screen.findByRole('heading', { name: 'Logic Web' })
+  })
+
+  const eyeX = (main: HTMLElement) =>
+    Number(within(main).getByRole('img', { name: /Loti/ }).querySelector('ellipse[rx="6"][ry="8"]')!.getAttribute('cx'))
+  const finePointer = (reduce: boolean) =>
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes('pointer: fine') || (reduce && query.includes('reduce')),
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    )
+
+  it("Loti's eyes follow a mouse pointer", async () => {
+    finePointer(false)
+    const main = await renderWelcome()
+    const x0 = eyeX(main)
+    act(() => void fireEvent.mouseMove(window, { clientX: 2000, clientY: 0 }))
+    expect(eyeX(main)).toBeGreaterThan(x0)
+  })
+
+  it("reduced motion: Loti's eyes stay still", async () => {
+    finePointer(true)
+    const main = await renderWelcome()
+    const x0 = eyeX(main)
+    act(() => void fireEvent.mouseMove(window, { clientX: 2000, clientY: 0 }))
+    expect(eyeX(main)).toBe(x0)
+  })
+
+  it("touch (no fine pointer): Loti's eyes stay still", async () => {
+    const main = await renderWelcome() // jsdom has no matchMedia: treated as no fine pointer
+    const x0 = eyeX(main)
+    act(() => void fireEvent.mouseMove(window, { clientX: 2000, clientY: 0 }))
+    expect(eyeX(main)).toBe(x0)
   })
 })

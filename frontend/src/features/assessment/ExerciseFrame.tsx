@@ -1,9 +1,20 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from 'react'
 import { Loti } from '../../components/features/characters/Loti'
+import { useCharacterMotion } from '../../components/features/characters/shared'
 import { Button } from '../../components/ui/Button'
+import { ExerciseDemo } from './ExerciseDemo'
 import { introFor, OWN_FIXATION, trialCount, type Intro } from './exercises'
 import { tracker } from './telemetry/tracker'
-import type { TaskPayload } from './telemetry/types'
+import type { SchemaType, TaskPayload } from './telemetry/types'
 
 export const FIXATION_MS = 500
 
@@ -56,7 +67,8 @@ function useTrialsDone(taskId: string) {
   return done
 }
 
-// Small dots, n of N. They change only when a trial ends.
+// Small dots, n of N. They change only when a trial ends; a dot pops once as it fills (the only
+// motion near a running trial, spec R8).
 // ponytail: one dot per trial, wrapping; a block of 60+ trials would want a bar instead.
 function ProgressDots({ done, total }: { done: number; total: number }) {
   const n = Math.min(done, total)
@@ -74,7 +86,7 @@ function ProgressDots({ done, total }: { done: number; total: number }) {
         <span
           key={k}
           data-dot={k < n ? 'done' : 'todo'}
-          className={`size-2 rounded-pill ${k < n ? 'bg-brand' : 'border border-border-strong'}`}
+          className={`size-2 rounded-pill ${k < n ? 'anim-dot-pop bg-brand' : 'border border-border-strong'}`}
         />
       ))}
     </div>
@@ -91,13 +103,15 @@ function useFocusOnMount<T extends HTMLElement>() {
 // A held Enter clicks a focused button again on every repeat; it must not skip the end card.
 const noRepeat = (e: ReactKeyboardEvent<HTMLButtonElement>) => e.repeat && e.preventDefault()
 
-function Instructions({ intro, onBegin }: { intro: Intro; onBegin: () => void }) {
+function Instructions({ schema, intro, onBegin }: { schema: SchemaType; intro: Intro; onBegin: () => void }) {
   // Focused Begin: native Space/Enter activate it; the window listener covers an unfocused page.
   const begin = useFocusOnMount<HTMLButtonElement>()
-  // A plain div, not a region: the exercise's own region carries the same name.
+  // A plain div, not a region: the exercise's own region carries the same name. Each exercise opens
+  // here, so its slide-in from the right is also the move from one exercise to the next.
   return (
-    <div className="mx-auto flex max-w-md flex-col items-center gap-6 py-8 text-center">
+    <div className="anim-slide-in mx-auto flex max-w-md flex-col items-center gap-6 py-8 text-center">
       <div className="space-y-2">
+        <ExerciseDemo schema={schema} />
         <h2 className="font-display text-2xl font-bold text-ink">
           {intro.name}
         </h2>
@@ -118,13 +132,24 @@ function Instructions({ intro, onBegin }: { intro: Intro; onBegin: () => void })
         </ul>
       )}
       <div className="flex flex-col items-center gap-2">
-        <Button ref={begin} size="lg" onClick={onBegin} onKeyDown={noRepeat}>
+        <Button ref={begin} size="lg" className="anim-press" onClick={onBegin} onKeyDown={noRepeat}>
           Begin
         </Button>
         <p className="text-sm text-ink-muted">
           or press <kbd className={KEYCAP}>Space</kbd>
         </p>
       </div>
+    </div>
+  )
+}
+
+// The exercise under the motion lock: tokens.css stops every animation and transition inside
+// [data-timed-trial] (only an answer button's press survives). It wraps the exercise alone, so the
+// frame's own screens and the dots can move. Nothing here animates in: the first stimulus shows at once.
+function Locked({ children }: { children: ReactNode }) {
+  return (
+    <div data-timed-trial="true" className="flex w-full min-w-0 flex-col items-center">
+      {children}
     </div>
   )
 }
@@ -136,18 +161,43 @@ function TrialArea({ done, total, children }: { done: number; total: number; chi
   return (
     <div ref={area} tabIndex={-1} className="flex w-full flex-col items-center gap-4 outline-none">
       <ProgressDots done={done} total={total} />
-      {children}
+      <Locked>{children}</Locked>
     </div>
+  )
+}
+
+// One burst of sparkles around Loti, played once (they rest hidden). Character colours, decorative.
+const SPARKLES: [number, number, string][] = [
+  [-30, -20, 'var(--char-sky)'],
+  [0, -34, 'var(--char-coral)'],
+  [30, -20, 'var(--char-amber)'],
+  [36, 8, 'var(--char-sky)'],
+  [22, 30, 'var(--char-coral)'],
+  [-22, 30, 'var(--char-amber)'],
+  [-36, 8, 'var(--char-coral)'],
+]
+
+function Burst() {
+  return (
+    <svg data-burst aria-hidden="true" viewBox="-48 -48 96 96" width={96} height={96} className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 overflow-visible">
+      {SPARKLES.map(([x, y, fill], k) => (
+        <circle key={k} cx={0} cy={0} r={3} fill={fill} className="anim-sparkle" style={{ '--sx': `${x}px`, '--sy': `${y}px` } as CSSProperties} />
+      ))}
+    </svg>
   )
 }
 
 function EndCard({ onContinue }: { onContinue: () => void }) {
   const cont = useFocusOnMount<HTMLButtonElement>()
+  const motion = useCharacterMotion()
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-4 py-8 text-center">
-      <Loti pose="happy" size="sm" />
+      <div className="anim-pop relative">
+        <Loti pose="happy" size="sm" />
+        {motion && <Burst />}
+      </div>
       <p className="font-display text-2xl font-bold text-ink">Nice work</p>
-      <Button ref={cont} size="lg" onClick={onContinue} onKeyDown={noRepeat}>
+      <Button ref={cont} size="lg" className="anim-press" onClick={onContinue} onKeyDown={noRepeat}>
         Continue
       </Button>
     </div>
@@ -192,15 +242,15 @@ export function ExerciseFrame({ task, onDone, onBlockEnd, children }: Props) {
 
   useStartKeys(!intro ? null : phase === 'intro' ? begin : phase === 'end' ? finish : null)
 
-  if (!intro) return <>{children(onDone)}</>
+  if (!intro) return <Locked>{children(onDone)}</Locked>
 
   switch (phase) {
     case 'intro':
-      return <Instructions intro={intro} onBegin={begin} />
+      return <Instructions schema={task.schema_type} intro={intro} onBegin={begin} />
     case 'fixation':
       return (
         <div className="flex min-h-64 items-center justify-center">
-          <span role="img" aria-label="Look at the cross" className="select-none text-5xl font-bold text-ink">
+          <span role="img" aria-label="Look at the cross" className="anim-fix-in select-none text-5xl font-bold text-ink">
             +
           </span>
         </div>
