@@ -1,4 +1,7 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { DESIGN_SYSTEM_CONTRAST_PAIRS } from '../../../styles/token-metadata'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { TrialRecorder, tracker } from '../telemetry/tracker'
 import type { StroopParams, TelemetryEvent } from '../telemetry/types'
@@ -212,8 +215,36 @@ test('Stroop events carry no voice fields (D1)', () => {
 
 const HEX_OR_FN = /#[0-9a-fA-F]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\s*\(/
 
+test('black (the server cvd_safe preset) has its own token and a light plate in both themes', () => {
+  const cvd = { colors: ['blue', 'yellow', 'red', 'black'], trials: [{ word: 'BLUE', ink: 'black', answer: 'black' }], time_limit_ms: 3000 }
+  setup(cvd)
+  const word = screen.getByText('BLUE')
+  expect(word.style.color).toBe('var(--color-stroop-black)')
+  // No dark surface can carry black at 4.5:1, so a block with black draws its stimuli on the light
+  // tokens (audited: light-stroop-black-*). The plate is fixed for the block, never per trial.
+  expect(word.closest('[data-theme="light"][data-stroop-plate]')).not.toBeNull()
+  cleanup()
+  setup(params([conflict]))
+  expect(screen.getByText('RED').closest('[data-theme]')).toBeNull()
+})
+
+test('the black token is audited in the light block (where the plate draws it)', () => {
+  const css = readFileSync(path.resolve(__dirname, '../../../styles/tokens.css'), 'utf8')
+  const light = css.slice(css.indexOf(':root,'), css.indexOf('[data-theme="dark"] {'))
+  expect(light).toMatch(/--color-stroop-black: #[0-9A-F]{6};/)
+  const pairs = DESIGN_SYSTEM_CONTRAST_PAIRS.filter((p) => p.fgName === '--color-stroop-black')
+  expect(pairs.map((p) => `${p.theme} ${p.bgName}`).sort()).toEqual(['light --color-surface', 'light --color-surface-raised'])
+  for (const p of pairs) expect(p.minRequired).toBe(4.5)
+})
+
+// Dark mode has no shadows (1 px borders only); the light plate must not bring its light shadow along.
+test('the plate drops its elevation shadow in dark mode', () => {
+  const css = readFileSync(path.resolve(__dirname, '../../../styles/tokens.css'), 'utf8').replace(/\r\n/g, '\n')
+  expect(css).toMatch(/\[data-theme="dark"\] \[data-stroop-plate\] \{\s*box-shadow: none;\s*\}/)
+})
+
 test('the ink palette holds theme tokens only, no raw colour values', () => {
-  expect(Object.keys(INK).sort()).toEqual(['blue', 'green', 'red', 'yellow'])
+  expect(Object.keys(INK).sort()).toEqual(['black', 'blue', 'green', 'red', 'yellow'])
   // Red has its own pure-red pair: --color-danger reads rose in dark (brand v2 ticket 06).
   expect(INK.red).toBe('var(--color-stroop-red)')
   for (const v of Object.values(INK)) {

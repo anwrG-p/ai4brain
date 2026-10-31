@@ -1,6 +1,6 @@
 # Quality Assurance & Verification Log (`docs/ui/QA-log.md`)
 
-> **History.** A record of the UI before brand v2 (BRIAN, the Doodle design, 19 pages, 7 dimensions). Entries are kept as written; later work supersedes them. Current: the [root README](../../README.md), the [glossary](../../docs/GLOSSARY.md) and `docs/design/BRAND-V2.md`.
+> **History.** A record of the UI before brand v2 (BRIAN, the Doodle design, 19 pages, 7 dimensions; replaced on 2026-10-31, DEC-011). Entries are kept as written; later work supersedes them. Current: the [root README](../../README.md), the [glossary](../../docs/GLOSSARY.md) and `docs/design/BRAND-V2.md`. Its screenshots were replaced by brand v2 ones in `docs/ui/screenshots/`; the old ones are in the repository history at commit `8b8c859`.
 
 Every automated check and manual critique round is logged here with computed numbers.
 

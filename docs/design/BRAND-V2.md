@@ -27,7 +27,9 @@ A calm, friendly training app on a **classroom board**. The page is a wooden fra
 | App shell: header, 4 tabs, footer, judge tools | `frontend/src/components/layout/AppShell.tsx` |
 | Mood listener (feeds Momo) | `frontend/src/components/layout/EmotionListener.tsx` |
 
-**Board background.** `body` is the wood (`--color-wood`). `#root` is the board (`--color-canvas` plus the dot grid, rounded and clipped). Don't paint an opaque page background inside `#root`, or it hides the board.
+**Board background.** `body` is the wood (`--color-wood`). `#root` is the board (`--color-canvas` plus the dot grid, rounded and clipped). Don't paint an opaque page background inside `#root`, or it hides the board. In dark mode the cards (`--color-surface`, `-raised`, `--color-border`, `--color-brand-subtle`) are green slate, the chalkboard's own hue; a test keeps them within 30° of it.
+
+**Theme on load.** An inline script in `index.html` applies the stored theme (`synapsetwin_theme_v1`) before the first paint, so a reload never flashes light. There is no CSP today; if one is added, allow that script by its hash.
 
 ## 4. Routing
 
@@ -51,10 +53,10 @@ Returning devices (at least one saved session) go straight to Home: `/` and `/ba
 | `/baseline` | Baseline | 6 exercises in a row with a "1 of 6" bar: Logic Web, Memory Gauntlet, Color Clash, Strategic Blueprint, Perceptual Radar, Precision Archive | `pages/BaselinePage.tsx`, `features/flow/baseline.ts` |
 | `/results` | Results | Blurred 5-skill chart → Dolphin → **Save my answers** / **Keep them on this device only** (equal weight) → reveal → **Go to my space** | `pages/ResultsPage.tsx`, `features/flow/LoginSheet.tsx` |
 | `/dashboard` | Home | Greeting + Momo + one Loti line, **Start today's session**, 5-skill chart (+ "View as table"). Below: progress curve, then "Further explore my training" (heatmap, goals, why Loti picked this) | `pages/DashboardPage.tsx`, `features/insights/*` |
-| `/train` | Train | Loti line; 5 skills, each listing its exercises; one primary Start on the weakest skill. `?pillar=<id>` focuses a skill | `pages/TrainPage.tsx`, `features/train/catalog.ts` |
-| `/task/:dimId?schema=<type>` | Exercise | One exercise in the exercise frame; the end card returns to Train | `pages/TaskRunnerPage.tsx`, `features/assessment/*` |
+| `/train` | Train | Loti line; 5 skills, each listing its exercises; one primary Start on the weakest skill (the same weakest as Home and Loti: `weakestPillar` in `features/insights/dashboard.ts`). `?pillar=<id>` focuses a skill | `pages/TrainPage.tsx`, `features/train/catalog.ts` |
+| `/task/:dimId?schema=<type>` | Exercise | One exercise in the exercise frame: Exit and Begin on the instruction screen, Pause from Begin on; the end card returns to Train | `pages/TaskRunnerPage.tsx`, `features/assessment/*` |
 | `/coach` | Loti | The conversation (resumes where you left off), answer chips, quiet "Start over" | `pages/CoachPage.tsx`, `features/loti/*` |
-| `/you` | You | Your name, then Privacy · Settings · How we calculate this | `pages/YouPage.tsx` |
+| `/you` | You | Your name ("Guest"), then Privacy · Settings · How we calculate this. No sign-in row (R13) | `pages/YouPage.tsx` |
 | `/privacy` | Privacy | Consent status + change, what we record (one sentence), Export my data, Delete my data | `pages/PrivacyPage.tsx`, `features/privacy/myData.ts` |
 | `/settings` | Settings | Theme, Reduce motion | `pages/SettingsPage.tsx` |
 | `/methodology` | How we calculate this | Plain intro; 5 closed topics with the real formulas and constants, imported from code | `pages/MethodologyPage.tsx` |
@@ -108,11 +110,16 @@ Hiding the tab during the fixation or the trials pauses the run. A paused attemp
 - **R12:** score ranges appear only in "View as table"; no projection bands.
 - **R13:** stay anonymous.
 - **R14:** no AI-generated Loti replies for users until a second, AI-based crisis check exists.
+- **R15:** (server) unbuilt endpoints answer "not available yet" instead of inventing data.
+- **R16:** Memory Gauntlet scoring follows its hint: only the current rule's stream expects an answer.
 - **Background:** the classroom board.
+
+The decision record is **DEC-011** in `docs/ui/DECISIONS.md` (supersedes DEC-010, and DEC-007 for these pages).
 
 ## 8. Checks
 ```
 cd frontend
 npm run qa:checks        # lint:tokens, lint:copy, check:contrast, vitest, build
-npx playwright test      # e2e (axe in light and dark at 375/768/1440, no overflow)
+npx playwright test      # e2e (axe in light and dark at 375/768/1440, no overflow, word budgets)
 ```
+The repo config uses the Chrome channel. On a machine without Chrome, run the same specs through a local config with `channel: 'msedge'`. Screenshots in `docs/ui/screenshots/` come from these specs when the shot folders (`SHOTS_DIR`, `FLOW_SHOT_DIR`, `DASH_SHOT_DIR`, `TRAIN_SHOTS_DIR`) point there.

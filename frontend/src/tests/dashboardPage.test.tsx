@@ -259,7 +259,8 @@ describe('Home (/dashboard)', () => {
     seed(later)
     renderHome()
     fireEvent.click(screen.getByRole('button', { name: 'Further explore my training' }))
-    expect(screen.getByText(/^Deep Memory 60 → goal 58 · reached$/)).toBeInTheDocument()
+    // Reached keeps its starting point in view: from 48 to 60.
+    expect(screen.getByText(/^Deep Memory 48 → 60 · goal 58 reached$/)).toBeInTheDocument()
   })
 
   it('motion: the blocks enter in sequence and the radar grows once; none with reduced motion', () => {

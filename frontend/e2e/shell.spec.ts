@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 import path from 'node:path'
-import { closeJudgeMode, openJudgeMode } from './testUtils'
+import { closeJudgeMode, openJudgeMode, FULL_PAGE_CSS } from './testUtils'
 
 // Screenshots go to SHOTS_DIR when set, else to the test's own output folder (never docs/).
 const shot = (name: string) => path.join(process.env.SHOTS_DIR ?? test.info().outputPath(), name)
@@ -36,6 +36,16 @@ test.describe('App shell (ticket 09a)', () => {
         expect(axe.violations).toEqual([])
         expect(await noOverflow(page)).toBe(true)
 
+        // Touch targets (UI/UX Pro Max §2): below lg (touch layouts, bottom tabs) every header control
+        // is at least 44 px tall and wide. The desktop top nav is for a pointer (WCAG 2.5.8: 24 px).
+        const small = await page.evaluate(() =>
+          [...document.querySelectorAll('header a[href], header button')]
+            .map((el) => ({ name: el.getAttribute('aria-label') ?? el.textContent, r: el.getBoundingClientRect() }))
+            .filter(({ r }) => r.width > 0 && (r.width < 44 || r.height < 44))
+            .map(({ name, r }) => `${name} ${r.width}x${r.height}`),
+        )
+        if (width < 1024) expect(small).toEqual([])
+
         await page.goto('/dashboard', { waitUntil: 'networkidle' })
         await setTheme(page, theme) // a full load starts in the default theme
         await page.screenshot({ path: shot(`shell-${width}-${theme}.png`) })
@@ -52,6 +62,17 @@ test.describe('App shell (ticket 09a)', () => {
         expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(height)
       })
     }
+    // Results needs a saved session (else it goes to /): one, as the baseline writes it.
+    test(`at ${width}px /results (blurred, before the data choice) is no taller than the viewport`, async ({ page }) => {
+      const scores = { OSPAN: 58, OTS_Planning: 52, FluidMatrices: 60, MST_LDI: 40, UFOV_SOA: 64, ANT_Conflict: 44 }
+      const inputs = Object.fromEntries(Object.entries(scores).map(([k, score]) => [k, { score, trials: 40 }]))
+      const value = JSON.stringify({ version: 1, sessions: [{ id: 'one', at: new Date().toISOString(), inputs }] })
+      await page.addInitScript((v) => window.localStorage.setItem('synapsetwin_sessions_v1', v), value)
+      await page.setViewportSize({ width, height })
+      await page.goto('/results', { waitUntil: 'networkidle' })
+      await expect(page.getByRole('heading', { level: 1, name: 'Your results are ready' })).toBeVisible()
+      expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(height)
+    })
   }
 
   test('the phone tabs sit on the board, inside the wood frame; header, footer and tabs are the board', async ({ page }) => {
@@ -108,7 +129,7 @@ test.describe('App shell (ticket 09a)', () => {
     // Remembered: a plain in-app URL keeps judge mode on.
     await page.goto('/dashboard', { waitUntil: 'networkidle' })
     await expect(page.getByRole('region', { name: 'Judge tools' })).toBeVisible()
-    await page.screenshot({ path: shot('judge-tools-1440.png'), fullPage: true })
+    await page.screenshot({ path: shot('judge-tools-1440.png'), fullPage: true, style: FULL_PAGE_CSS })
 
     await closeJudgeMode(page)
     await expect(page.getByRole('region', { name: 'Judge tools' })).toHaveCount(0)

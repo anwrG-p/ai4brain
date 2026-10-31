@@ -70,6 +70,7 @@ Every non-trivial frontend, UX, design-system, and contract decision is recorded
 
 ## DEC-007: Consumer Visual Hierarchy, Floating Judge Quick-Bar & Progressive Disclosure
 - **Date**: 2026-10-25
+- **Status**: **Superseded by DEC-011 for the redesigned pages** (2026-10-31).
 - **Context**: Transitioning SynapseTwin from a feature-complete engineering build to an Apple Design Award / Brilliant.org consumer product while keeping 100% test compatibility.
 - **Options**:
   1. Keep the 23-button header wall and flat heavy 2px borders everywhere.
@@ -129,7 +130,7 @@ Every non-trivial frontend, UX, design-system, and contract decision is recorded
 
 ## DEC-010: "Calm & Clean" Design System (Lexend, Indigo, One Soft Elevation)
 - **Date**: 2026-10-30
-- **Status**: **Accepted by the team, pending the UI owner** (DEC-001: the UI team owns `frontend/**`).
+- **Status**: **Superseded by DEC-011** (2026-10-31). Was: accepted by the team, pending the UI owner.
 - **Context**: The team finds the Doodle UI too bulky: cursive Delius type, hard offset shadows, 2 px borders, dot grids, wood and podium textures, decorative mascots, too much copy and too many steps. Evidence: `docs/research/2026-10-30-ui-simplification-review.md` §1 and §3. Spec: `.scratch/ui-calm-clean/spec.md`.
 - **Choice**: Flat, minimal "Calm & Clean" system. It **supersedes the Doodle / Delius direction** (DEC-006's display pairing and DEC-007's offset-shadow and gradient tokens):
   - **Type**: Lexend for display and body (400/500/600/700, self-hosted via `@fontsource/lexend`, as DEC-006 and DEC-008 already chose), JetBrains Mono for tabular numbers. Delius is removed.
@@ -138,3 +139,41 @@ Every non-trivial frontend, UX, design-system, and contract decision is recorded
   - **Background**: plain canvas. Dot grids, the dashed scrollbar track, gradients, wood and podium textures are removed.
   - **Kept**: the class names and component APIs (`.tactile-card`, `.tactile-btn`, `.editorial-card`, `.hero-card`, `.focus-ring`, Button / Card / Badge props) and every DEC-007 selector; only their visuals change. The reduced-motion and timed-trial locks are kept.
 - **Why**: Visual complexity hurts first impressions more than colour choice does; a flat system with one primary colour, Lexend and generous whitespace lowers clutter and keeps the WCAG AA guarantees in both themes.
+
+---
+
+## DEC-011: Brand v2 (Loti, Sky Blue and Coral, Simple Flow, New Dashboard)
+- **Date**: 2026-10-31
+- **Status**: **Accepted** by Mazen, the frontend owner and only reviewer (DEC-001's ownership question is closed: there is no separate UI owner).
+- **Supersedes**: **DEC-010** in full, and **DEC-007** for the redesigned pages (Welcome, Baseline, Results, Home, Train, Loti, You, Privacy, Settings, How we calculate this, the exercise frame and the system pages). DEC-007's selector-keeping promise no longer binds those pages; the theme-toggle names and the e2e axe and overflow checks stay.
+- **Context**: The team's brand documents (`docs/Doc visual identity.docx`, `Landing page.docx`, `Dashboard.docx`, `Loti interface.docx`, `doc na9chet.docx`, `Rou7 zebda cognitive intelligence.docx`) set a new identity and flow. Spec: `.scratch/brand-v2/spec.md`. Design and route map: `docs/design/BRAND-V2.md`.
+- **Choice**:
+  - **Look**: sky blue (`--color-brand`) with coral for milestones, Quicksand headings (20 px and up) and Inter text, pill buttons, one soft elevation, Lucide icons with round caps. The page is a **classroom board**: a wood frame, with a dotted whiteboard in light mode and a green chalkboard in dark mode. In dark mode the cards are green slate, the board's own hue.
+  - **Characters** (drawn SVG, one component each): Loti the guide, the Dolphin for celebrations, Momo for mood.
+  - **Flow**: Welcome → Baseline (6 exercises) → Results (blurred → Dolphin → data choice → reveal) → Home. A returning device goes straight to Home.
+  - **Nav**: 4 tabs, Home · Train · Loti · You.
+  - **Rules**: the 14 anti-slop rules in the spec, enforced by tests where a test can see them (`lint:tokens`, `lint:copy`, `check:contrast`, word budgets, button counts, axe).
+- **User decisions** (2026-10-31):
+  - **U1**: the old technical panels leave the UI entirely (live JSON, contracts, evaluator and inspector panels, QUEST+ and persona switchers).
+  - **U2**: characters are drawn by us, SVG/React.
+  - **U3**: scope is everything, the Loti chat included.
+  - **U4**: consent at login: the tests run first, and answers stay on the device until the user accepts.
+  - **U5**: consumer wording: no brain regions, chemical claims or "Verified Neuroplastic Gain" in the UI; formulas live only on "How we calculate this".
+- **Rulings** (each with its cost if wrong):
+  - **R1** Characters: one component each with a pose or mood prop; gentle motion that respects reduced motion. *(One SVG swap.)*
+  - **R2** Loti chat: short bubbles with answer chips, dismissable; a scripted `LotiBrain`, plus a coach adapter stub that makes no network call. Voice and 3D are out of scope. *(An LLM adapter later.)*
+  - **R3** Consent gate in the tracker: events are held on the device until Accept, which flushes them; Decline clears them, and results still show. *(A small tracker change.)*
+  - **R4** Google login only when `VITE_GOOGLE_CLIENT_ID` is set; otherwise guest only, never a fake button. *(Config.)*
+  - **R5** Dashboard data is real and local: per-exercise scores stored on the device (versioned, purged with the privacy delete), pillar math in pure tested functions. *(Swap the data source for Member 3's profile.)*
+  - **R6** Evaluator and judge tools only with `?judge=1`. *(Delete them.)*
+  - **R7** Tests that pinned the old design were rewritten for the new pages. *(None: the redesign is approved.)*
+  - **R8** Livelier Welcome and exercise screens: motion lives in transitions, demos, presses and end cards; characters may breathe and blink, barely. Nothing moves near a running trial. *(Delete the `anim-*` classes.)*
+  - **R9** The fixation "+" appears at once, at full contrast for its 500 ms (jsPsych convention).
+  - **R10** The baseline has 6 exercises; Color Clash runs 3rd.
+  - **R11** No "If you pause" line and no idle decay; the projection appears from session 3.
+  - **R12** Score ranges appear only in "View as table" ("62 · likely 55–69"); the radar shows one number; no projection bands.
+  - **R13** Users stay anonymous: no accounts. The Google button stays gated off, and `/you` has no sign-in row.
+  - **R14** No AI-generated Loti replies for users until a second, AI-based crisis check runs on every message; the keyword gate is a floor, not a guarantee.
+  - **R15** (server) The `/api/*` routes are unmounted; endpoints that are not built answer "not available yet" (501) instead of inventing data.
+  - **R16** Memory Gauntlet scoring follows its hint: only a match in the current rule's stream expects an answer; a match in the other stream is a lure.
+- **Why**: The brand documents ask for a calm, friendly product carried by characters, not panels. Need-to-know screens, one primary action and honest local numbers keep it simple and truthful (DEC-008), and the WCAG AA guarantees hold in both themes (112 audited colour pairs).

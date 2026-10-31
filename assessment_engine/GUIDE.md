@@ -41,8 +41,8 @@ Everything I built is in `assessment_engine/`, except the maintained client, whi
 
 | Folder | Role |
 |---|---|
-| `api/` | Python **FastAPI** server that **receives** telemetry and saves it |
-| `frontend/src/features/assessment/` (repo root) | **The maintained client**: the 8 exercises, the tracker and the task source, running inside the team UI (SynapseTwin) at `/task/:dimId` |
+| `backend/app/` (repo root) | The one Python **FastAPI** server (BE-00). Its `api/routes/v1_telemetry.py` **receives** telemetry and saves it. It replaced `assessment_engine/api/` |
+| `frontend/src/features/assessment/` (repo root) | **The maintained client**: the 8 exercises, the tracker and the task source, running inside the team UI (SynapseTwin): in the first-visit baseline (`/baseline`) and from the Train page (`/task/:dimId`). See §4.5 |
 | `client/` | **Frozen reference**: the original standalone React + TypeScript app (Vite). Only it has the voice opt-in |
 | `README.md` | Contracts + run commands |
 | `HANDOVER.md` | Notes for teammates' agents |
@@ -53,13 +53,13 @@ Everything I built is in `assessment_engine/`, except the maintained client, whi
 
 Following a single answer through the system is the fastest way to understand the code:
 
-1. **`ExerciseHost.tsx`** (mounted by the UI's `TaskRunnerPage`) asks `taskSource.ts` for the next task (`GET /v1/tasks/next`, or a built-in fixture in mock mode). In the frozen `client/`, `App.tsx` plays this role.
+1. **`ExerciseHost.tsx`** (mounted by the UI's `BaselinePage` or `TaskRunnerPage`) asks `taskSource.ts` for the next task (`GET /v1/tasks/next`, or a built-in fixture in mock mode). In the frozen `client/`, `App.tsx` plays this role.
 2. **`TaskRunner.tsx`** looks at `schema_type` (e.g. `"stroop"`) and mounts the matching screen (`Stroop.tsx`).
 3. The screen calls **`recorder.start(i)`** when the stimulus appears. That moment is time zero.
 4. While the user thinks, **`useInputCapture`** quietly records every key press, mouse press and (throttled) mouse movement into the recorder. That data becomes *hesitation* and *keystroke latency*.
 5. The user answers. The screen compares the answer with the **correct answer that came inside the task JSON** (the client never works out the truth itself) and calls **`recorder.finish({correct, meta})`**.
 6. `finish()` builds one **telemetry event** and hands it to **`tracker.push(event)`**. `push` returns instantly: no waiting on the network.
-7. The **Tracker** batches events and sends them every 2 s, or when 20 are waiting, or when the page is hidden or closed (via `sendBeacon`).
+7. The **Tracker** holds the event on the device until the user agrees to share (the consent gate, §4.1). From then on it batches events and sends them every 2 s, or when 20 are waiting, or when the page is hidden or closed (via `sendBeacon`).
 8. On the server, **`backend/app/api/routes/v1_telemetry.py`** validates the batch strictly and appends one JSON line per event to `data/raw/telemetry/<user_id>.jsonl`.
 9. Member 3 reads those files.
 
@@ -114,23 +114,25 @@ The paths below are relative to `frontend/src/features/assessment/`, the maintai
 - **It uses `sendBeacon` on `pagehide` and when the page becomes hidden.** The browser delivers these even while the tab is closing.
 - **A rejected batch (4xx) is dropped, not retried forever.** One broken event would otherwise block every event behind it. Network errors, 5xx, 408 and 429 are retried.
 - Duplicates can happen (a beacon while a normal send is in flight), so Member 3 dedupes on `(session_id, item_id, stream)`.
+- **Nothing leaves the device before consent** (spec R3, U4). The consent is `pending` until the user chooses on the Results page (or later on `/privacy`). While pending, events are buffered and kept in `localStorage` but never sent, on every path: timer, batch size, back online, `pagehide`, hidden tab. "Save my answers" (`grantConsent`) releases and flushes them; "Keep them on this device only" (`denyConsent`) clears them and sends nothing. The choice is stored as `synapsetwin_consent_v1`.
 - **In the UI it is the single telemetry sink.** The buffer is mirrored to `localStorage`, so pending events survive a reload. `subscribe`/`getStatus` feed the offline banner its real pending count, and the Privacy page's purge calls `tracker.clear()`. The UI's old `telemetryQueue.ts` was deleted.
 
 ### 4.2 Getting tasks: `tasks/taskSource.ts`, `TaskRunner.tsx`, `ExerciseHost.tsx`
 
 - `fetchNextTask` calls Member 5's API and **validates** the reply: a known `schema_type`, one of the 6 dimensions, and a `task_id` of at most 48 characters. Anything invalid shows a "try again" screen instead of sending events that the server would reject.
 - **Mock mode** is the UI default (`VITE_USE_MOCKS` unset; set it to `false` for real tasks). The page picks the fixture: the dimension's first exercise, or the one named by `?schema=<schema_type>`. Use it while Member 5's API doesn't exist. (The frozen `client/` uses `VITE_MOCK_TASKS=1` and plays the fixtures in order.)
-- `getUserId` creates an anonymous random ID kept in the browser (no login yet).
+- `getUserId` creates an anonymous random ID kept in the browser. Users stay anonymous (R13): there are no accounts.
 - `ExerciseHost.tsx` fetches one task, gives it its own `TrialRecorder` (with the payload's `dimension`, never the UI registry's), and wraps the exercise in an error boundary (`SkipOnError`): a broken task shows the page's retry screen instead of blanking the app.
-- **Pause = unmount.** Escape, the pause button or a tab blur unmounts the exercise; the unfinished trial is never sent. Resume fetches a fresh task with a new `task_id`, so `item_id`s never repeat.
+- `ExerciseFrame.tsx` wraps each exercise in jsPsych-style screens: instruction (how to play from `howToPlay.ts`, a small demo, Begin) → a 500 ms fixation "+" → the trials with progress dots → an end card. The exercise mounts only when the trials start, so no event is recorded on the instruction or fixation screens.
+- **Pause = unmount.** Escape, the Pause button (shown after Begin) or a hidden tab unmounts a started block; the unfinished attempt is never scored or sent. Resume fetches a fresh task with a new `task_id`, so `item_id`s never repeat.
 
 ### 4.3 The 8 exercises: `tasks/*.tsx`
 
-The README's 4 assessment tests come first, then the brief's 5 training exercises. The interference N-back covers both.
+The README's 4 assessment tests come first, then the brief's 5 training exercises. The interference N-back covers both. Users see consumer names (`names.ts`): Memory Gauntlet (n_back), Color Clash (stroop), Pattern Puzzle (matrix), Shape Turn (mental_rotation), Logic Web (relational), Strategic Blueprint (tower), Perceptual Radar (ufov), Precision Archive (mst).
 
 | Screen | Dimension | What the user does | Extra telemetry (`trial_meta`) |
 |---|---|---|---|
-| **NBack** | working_memory | Watches a 3×3 grid + a symbol; presses **A** if the position matches n steps back and **L** if the symbol does. Some trials are **lures** (match n−1 or n+1 back) and some **switch the rule** | `trial_type`, `rule`, `stream`; **2 events per trial** (one per stream) |
+| **NBack** | working_memory | Watches a 3×3 grid + a symbol; presses **A** if the position matches n steps back and **L** if the symbol does. Some trials are **lures** (match n−1 or n+1 back) and some **switch the rule** | `trial_type`, `rule`, `stream`; **2 events per trial** (one per stream). Scoring follows the on-screen hint (R16): only the rule's stream expects a press, and that event carries the trial's verdict |
 | **Stroop** | executive_function | Word "RED" printed in blue → pick the **ink** colour (keys 1–9) | `congruent` |
 | **Matrix** | pattern_induction | 3×3 pattern with one gap → pick the missing piece | — |
 | **MentalRotation** | spatial_orientation | Two block shapes: same shape rotated (**F**) or a mirror image (**J**)? | `angle_deg`, `mirrored` |
@@ -138,6 +140,8 @@ The README's 4 assessment tests come first, then the brief's 5 training exercise
 | **Tower** | executive_function | Predict the move count first, then move discs to match the goal | `l_min`, `l_user`, `planning_time_ms`, `conflict_latency_ms`, … |
 | **Ufov** | processing_speed | A display flashes very briefly → name the centre letter **and** where the outer target was | `requested_ms`, **`shown_ms`**, `frames`, … |
 | **Mst** | episodic_memory | Study shapes, then judge each test shape: **old**, **similar** (slightly changed) or **new** | `kind`, `delta`, `response` |
+
+**N-back rule-stream scoring (R16).** The rule's stream is `NBACK_RULE_STREAM[rule]` (`telemetry/types.ts`): `position` → position, `symbol` and `parity` → symbol. The rule-stream event's `error_flag` is the trial's verdict: right only when the rule key's press-or-withhold matches `answer[rule stream]` and the other key was not pressed, so an off-rule press makes a noise trial a false alarm and a target trial a miss. The off-rule event expects no press; its `trial_type` is `lure_stream` when that stream matched n back, else `standard`. `answer` stays per stream. The UI's scores (`features/insights/taskScores.ts`) read the rule stream only.
 
 `svg.tsx` draws all the shapes from numbers, never HTML, so a task payload can never inject code. `frames.ts` measures the screen's refresh rate for UFOV.
 
@@ -150,7 +154,14 @@ Two different tools, used for two different goals:
 
 **Why UFOV timing is special.** A screen only changes on a refresh (every 16.7 ms at 60 Hz, 8.3 ms at 120 Hz). Asking for 50 ms really means "show for N whole frames". So UFOV logs **`shown_ms`** (what was actually on screen, measured from `requestAnimationFrame` timestamps), and QUEST+ learns from `shown_ms`, not from the requested value.
 
-### 4.5 Voice opt-in: `voice/` (frozen `client/` only)
+### 4.5 Where the exercises appear in the UI
+
+- **First visit:** `/` (Welcome) → **`/baseline`**, six exercises in a row (Logic Web, Memory Gauntlet, Color Clash, Strategic Blueprint, Perceptual Radar, Precision Archive; `features/flow/baseline.ts`) → `/results`, where the consent choice is made → Home (`/dashboard`). The baseline's scores are saved on the device as one session.
+- **Returning devices** (one saved session or more) skip Welcome and the baseline and land on Home; `/baseline?again=1` retakes it.
+- **Train (`/train`):** every exercise, listed under the skill it trains. A row opens `/task/:dimId?schema=<schema_type>`; a finished run is saved as a session and reaches Home.
+- **Judge mode (`?judge=1`):** the task runner's evaluator controls switch exercise, dimension and stage.
+
+### 4.6 Voice opt-in: `voice/` (frozen `client/` only)
 
 Voice is **not shipped in the UI** (decision D1): the UI never asks for the microphone and always sends `voice_opt_in: false`. What follows describes the frozen `client/`.
 
@@ -185,9 +196,9 @@ Voice is **not shipped in the UI** (decision D1): the UI never asks for the micr
 # UI (terminal 2): mock tasks are the default
 cd frontend
 npm run dev                                                  # http://localhost:5173 (or the next free port)
-# open /task/inhibition_control, or /task/visuospatial_planning_gf?schema=tower
+# open /baseline (the first-visit flow), /train, or /task/visuospatial_planning_gf?schema=tower
 npm run qa:checks     # lint:tokens, lint:copy, check:contrast, vitest, build
-npm run qa:e2e        # Playwright; its config uses the Chrome channel, so Chrome must be installed
+npm run qa:e2e        # Playwright; its config uses the Chrome channel (on a machine without Chrome, run it through a local config with channel 'msedge')
 ```
 
 To see the data your answers produce, open `data\raw\telemetry\<id>.jsonl` at the repo root after playing a few trials.
@@ -203,7 +214,7 @@ These are listed in full in `README.md` → "Open questions":
 1. **Field names**: the root README spells the event two ways; I used `score_norm / response_time_ms / error_flag / hesitation_jitter`. Member 3 must agree.
 2. **6 dimensions, not 4**: I added `processing_speed` (UFOV) and `episodic_memory` (MST).
 3. **Task JSON format**: Member 5 must produce exactly the `params` shapes in `types.ts`, including the answers.
-4. **Integration with the new UI** (`frontend/`): done. The exercises run at `/task/:dimId`, my Tracker replaced the UI's own telemetry queue, and every trial is accepted by the server (0 × 422 in the end-to-end smoke). That smoke used the mock task fixtures only: `GET /v1/tasks/next` does not exist yet, so real generated tasks are untested. Still open: the UI owner has to accept the proposed DEC entry in `docs/ui/DECISIONS.md`, and Member 5 should say whether `GET /v1/tasks/next` takes a `schema_type` filter.
+4. **Integration with the new UI** (`frontend/`): done. The exercises run in the baseline and at `/task/:dimId`, my Tracker replaced the UI's own telemetry queue, and every trial is accepted by the server (0 × 422 in the end-to-end smoke). That smoke used the mock task fixtures only: `GET /v1/tasks/next` does not exist yet, so real generated tasks are untested. The brand v2 direction is DEC-011 (accepted). Still open: DEC-009 in `docs/ui/DECISIONS.md` is still marked "proposed", and Member 5 should say whether `GET /v1/tasks/next` takes a `schema_type` filter.
 
 ---
 

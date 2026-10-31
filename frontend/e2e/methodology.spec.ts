@@ -1,6 +1,7 @@
 import path from 'node:path'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
+import { FULL_PAGE_CSS } from './testUtils'
 
 // SHOTS_DIR lets a local run write its screenshots elsewhere.
 const SCREENSHOT_DIR = process.env.SHOTS_DIR ?? path.resolve(process.cwd(), '../docs/ui/screenshots')
@@ -74,7 +75,7 @@ async function checkViewports(page: Page, theme: 'light' | 'dark', state: 'close
     expect(axe.violations, `axe at ${vp.width}px (${theme}, ${state})`).toEqual([])
     await page.screenshot({
       path: path.join(SCREENSHOT_DIR, `15-methodology-${theme}-${state}-${vp.width}.png`),
-      fullPage: true,
+      fullPage: true, style: FULL_PAGE_CSS,
     })
   }
 }

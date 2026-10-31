@@ -1,6 +1,6 @@
 # Rubric criteria mapped to screens
 
-Brand v2 screens. Routes and files: `docs/design/BRAND-V2.md`. Add `?judge=1` to any URL to show the evaluator tools (Simulate offline, the human review gate, stage and preset controls); `?judge=0` hides them. Without the flag, none of them render.
+Brand v2 screens. Routes and files: `docs/design/BRAND-V2.md`. Add `?judge=1` to any URL to show the evaluator tools (Simulate offline, the human review gate, stage and preset controls); `?judge=0` hides them. Without the flag, none of them render. Brand v2 screenshots of these screens are in `docs/ui/screenshots/` (decision DEC-011).
 
 | Criterion (weight) | Where to look | Proof in code |
 | :--- | :--- | :--- |

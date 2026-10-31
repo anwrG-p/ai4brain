@@ -86,6 +86,9 @@ export default function TaskRunnerPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   // The exercise reached its end card: the block is finished and only waits for Continue.
   const [blockEnded, setBlockEnded] = useState(false)
+  // Begin was pressed: Pause shows only while the block runs (Begin to the end card), so the
+  // instruction screen keeps Begin plus Exit and the end card Continue plus Exit (rule 14).
+  const [blockStarted, setBlockStarted] = useState(false)
   const [showTable, setShowTable] = useState(false)
   // Every event of the current run, from the tracker (R5). A new task (a start, a resume, another
   // dimension) and a pause both start it over, so a discarded attempt is never scored or shown.
@@ -120,6 +123,7 @@ export default function TaskRunnerPage() {
   const run = useCallback(() => {
     setAttempt((a) => a + 1)
     setBlockEnded(false)
+    setBlockStarted(false)
     setStage('running')
   }, [])
   // A new dimension (Back/Forward, the switcher, a link) is a new block: reset while rendering,
@@ -130,9 +134,11 @@ export default function TaskRunnerPage() {
     setRunEvents([])
     setAttempt((a) => a + 1)
     setBlockEnded(false)
+    setBlockStarted(false)
     setStage('running')
   }
   const handleBlockEnd = useCallback(() => setBlockEnded(true), [])
+  const handleBlockStart = useCallback(() => setBlockStarted(true), [])
   // The result screen. Only a run that reached its end card is saved, once, and only its own
   // task's events (like BaselinePage); a judge jump mid-run shows the summary without saving.
   const complete = useCallback(() => {
@@ -200,9 +206,11 @@ export default function TaskRunnerPage() {
               Exit
             </Link>
             {judge && <span className="font-mono-tabular text-xs text-ink-muted">Recorded: {totals.n}</span>}
-            <Button variant="ghost" size="sm" onClick={pause} aria-label="Pause trial" leftIcon={<Pause size={16} {...ICON} />}>
-              Pause
-            </Button>
+            {blockStarted && !blockEnded && (
+              <Button variant="ghost" size="sm" onClick={pause} aria-label="Pause trial" leftIcon={<Pause size={16} {...ICON} />}>
+                Pause
+              </Button>
+            )}
           </div>
 
           <ExerciseHost
@@ -211,6 +219,7 @@ export default function TaskRunnerPage() {
             onDone={complete}
             onTask={onTask}
             onBlockEnd={handleBlockEnd}
+            onBlockStart={handleBlockStart}
             onError={handleError}
           />
         </div>

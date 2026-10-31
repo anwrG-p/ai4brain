@@ -32,12 +32,8 @@ function read(key: string): unknown {
    hard-coded defaults (a fixed receipt id, telemetry "on") would contradict the real consent choice. */
 export const APP_FIELDS = ['userProfile', 'isAuthenticated', 'theme', 'reducedMotion'] as const
 type AppState = ReturnType<typeof useAppStore.getState>
-const pick = (s: AppState) => ({
-  userProfile: s.userProfile,
-  isAuthenticated: s.isAuthenticated,
-  theme: s.theme,
-  reducedMotion: s.reducedMotion,
-})
+type AppFields = Pick<AppState, (typeof APP_FIELDS)[number]>
+const pick = (s: AppState) => Object.fromEntries(APP_FIELDS.map((k) => [k, s[k]])) as AppFields
 
 export interface MyData {
   exportedAt: string
@@ -46,7 +42,7 @@ export interface MyData {
   /** Loti's talk for this tab, from its store (what is on screen, even if storage is blocked). */
   lotiTalk: LotiTalk
   /** The profile and the two real settings. */
-  app: Pick<AppState, (typeof APP_FIELDS)[number]>
+  app: AppFields
 }
 
 export function collectMyData(now = new Date()): MyData {

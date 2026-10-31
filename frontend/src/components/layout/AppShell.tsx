@@ -74,7 +74,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Link
               to={isFlowRoute ? '/' : '/dashboard'}
               aria-label={`${BRAND_CONFIG.productName} Home`}
-              className="focus-ring rounded-md flex items-center text-ink no-underline shrink-0"
+              className="focus-ring rounded-md flex min-h-11 min-w-11 items-center justify-center text-ink no-underline shrink-0"
             >
               {/* Symbol only on phones so the header fits 375 px; viewBox cropped to the lockup's ink */}
               <BrianLogo variant="symbol" size={40} aria-hidden="true" className="sm:hidden" />

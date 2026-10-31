@@ -103,6 +103,18 @@ describe('TaskRunnerPage mounts the real exercises', () => {
     expect(screen.queryByText(/Recorded:|Zero-Distraction/i)).toBeNull()
   })
 
+  it('the instruction screen has no Pause (rule 14: Begin plus Exit); Begin brings it, Resume hides it again', async () => {
+    renderAt('/task/episodic_pattern_separation')
+    expect(await screen.findByRole('button', { name: 'Begin' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Pause trial' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'Exit' })).toBeInTheDocument()
+    await begin('Precision Archive')
+    fireEvent.click(screen.getByRole('button', { name: 'Pause trial' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Resume' }))
+    expect(await screen.findByRole('button', { name: 'Begin' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Pause trial' })).toBeNull()
+  })
+
   it('?schema= picks the exercise of the current dimension; judge buttons switch it (R2)', async () => {
     renderAt('/task/visuospatial_planning_gf?schema=tower&judge=1')
     expect(await begin('Strategic Blueprint')).toBeInTheDocument()
@@ -288,14 +300,11 @@ describe('TaskRunnerPage mounts the real exercises', () => {
     expect(useSessionStore.getState().sessions).toHaveLength(1)
   })
 
-  it('Escape or Pause on the end card completes the block instead of pausing it', async () => {
+  it('the end card has no Pause (Continue and Exit only); Escape there completes the block instead of pausing it', async () => {
     await finishMatrixBlock()
+    expect(screen.queryByRole('button', { name: 'Pause trial' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'Exit' })).toBeInTheDocument()
     fireEvent.keyDown(window, { key: 'Escape' })
-    expect(paused()).toBeNull()
-    expect(completed()).toBeInTheDocument()
-    cleanup()
-    await finishMatrixBlock()
-    fireEvent.click(screen.getByRole('button', { name: 'Pause trial' }))
     expect(paused()).toBeNull()
     expect(completed()).toBeInTheDocument()
   })

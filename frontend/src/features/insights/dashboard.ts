@@ -25,12 +25,14 @@ export function currentPillars(sessions: readonly SessionRecord[]): Pillars {
   return out
 }
 
-/** The lowest measured pillar, or undefined when none is measured. */
-export function weakestPillar(pillars: Pillars): PillarId | undefined {
-  let best: PillarId | undefined
+/** The lowest measured pillar among `among` (default all), or null when none of them is measured;
+    ties keep the pillar order. The one weakest pillar of the app: Home, Loti and Train use it. */
+export function weakestPillar(pillars: Pillars, among: readonly PillarId[] = PILLAR_IDS): PillarId | null {
+  let best: PillarId | null = null
   for (const id of PILLAR_IDS) {
     const s = pillars[id].score
-    if (s !== null && (best === undefined || s < pillars[best].score!)) best = id
+    if (s === null || !among.includes(id)) continue
+    if (best === null || s < pillars[best].score!) best = id
   }
   return best
 }
@@ -110,7 +112,7 @@ export function curveWindow(history: readonly HistoryPoint[], now: Date) {
 /* Past results per exercise and week, for the heatmap behind "Further explore my training". Each input
    belongs to the exercise it is measured in (pillars.ts header). ErrorRecovery spans every exercise,
    so it is left out. ponytail: FluidMatrices mixes Pattern Puzzle and Logic Web; it is shown as Logic
-   Web, the one in the five-exercise session. */
+   Web, the one in the six-exercise baseline. */
 const INPUT_EXERCISE: Partial<Record<InputId, SchemaType>> = {
   OSPAN: 'n_back',
   DCCS_SwitchCost: 'n_back',
@@ -164,7 +166,7 @@ export function exerciseWeeks(sessions: readonly SessionRecord[]) {
 }
 
 /** Where "Start today's session" goes: training for the weakest measured pillar (/train?pillar=),
-    or the five-exercise baseline when nothing is measured yet. */
+    or the six-exercise baseline (R10) when nothing is measured yet. */
 export function sessionPath(weakest: PillarId | undefined): string {
   return weakest ? `/train?pillar=${weakest}` : '/baseline'
 }

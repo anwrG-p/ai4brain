@@ -37,7 +37,7 @@
 
   --font-display: 'Quicksand', 'Inter', system-ui, sans-serif;
   --font-sans: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
 
   --radius-sm: 8px;
   --radius-md: 14px;
@@ -46,10 +46,6 @@
   --radius-2xl: 28px;
   --radius-pill: 9999px;
 
-  --color-emotion-accent: var(--color-emotion-accent);
-  --color-emotion-tint: var(--color-emotion-tint);
-  --color-emotion-glow: var(--color-emotion-glow);
-  --color-emotion-badge: var(--color-emotion-badge);
 }
 
 :root,
@@ -113,6 +109,9 @@
      (CIEDE2000 25.7 vs the coral fill, 10.2 vs accent-strong). 5.88:1 on surface. Anti-Red is
      about mood colour, not this stimulus. */
   --color-stroop-red: #C8102E;
+  /* Stroop "black" ink (the server's cvd_safe preset). Light block only: Stroop draws a block with
+     black on a light plate ([data-theme="light"] on its card) in both themes. */
+  --color-stroop-black: #111111;
 
   /* Home: the board (--color-canvas, #root) takes a faint tint from Momo's mood; calm keeps the plain
      board, and the wood frame never changes. Never red. Text on them is audited in token-metadata.ts. */
@@ -185,16 +184,10 @@
   --char-shadow: #1D4F78;
   --char-shadow-alpha: 0.28;
 
-  /* EMILY Emotion Adaptive Color Tokens (Default: Calm Flow) */
-  --color-emotion-accent: #0D9488;
-  --color-emotion-tint: #F2F9F8;
-  --color-emotion-glow: rgba(13, 148, 136, 0.12);
-  --color-emotion-badge: #0D9488;
-
   /* Typography Families: Quicksand for headings of 20 px and up, Inter for everything else */
   --font-display: 'Quicksand', 'Inter', system-ui, sans-serif;
   --font-sans: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
 
   /* Typography Scale (12 / 14 / 16 / 18 / 20 / 24 / 32 px) */
   --text-xs: 0.75rem;
@@ -247,18 +240,19 @@
 }
 
 [data-theme="dark"] {
-  /* Brand v2 semantic colour roles (dark) */
+  /* Brand v2 semantic colour roles (dark). Cards are green slate, the hue of the chalkboard
+     (--color-canvas), lifted a step and edged by --color-border: no navy on the board. */
   --color-canvas: #162621;
   --color-wood: #6E3F1F;
-  --color-surface: #122130;
-  --color-surface-raised: #1A2D40;
+  --color-surface: #1A2D28;
+  --color-surface-raised: #1D312B;
   --color-ink: #F2F8FC;
   --color-ink-muted: #A9C1D6;
-  --color-border: #2A4157;
+  --color-border: #2B463F;
   --color-border-strong: #8FB0CC;
   --color-brand: #7CC4F2;
   --color-brand-hover: #A5D6F6;
-  --color-brand-subtle: #15304A;
+  --color-brand-subtle: #183533;
   --color-brand-ink: #0B1622;
   --color-brand-vivid: #7CC4F2;
   --color-secondary: #C5D8E8;
@@ -274,7 +268,7 @@
   --color-danger: #F28B9E;
   --color-danger-subtle: #3A1A24;
   --color-info: #7CC4F2;
-  --color-info-subtle: #15304A;
+  --color-info-subtle: #183533;
 
   --pillar-focus: #8ECDF5;
   --pillar-agility: #2E9E84;
@@ -293,7 +287,7 @@
   --dim-8: #E0B48A;
   --dim-9: #34D399;
   --dim-10: #F472B6;
-  /* Stroop red (dark): 5.39:1 on surface; dark danger #F28B9E reads rose. */
+  /* Stroop red (dark): 4.78:1 on surface, 4.54:1 on raised; dark danger #F28B9E reads rose. */
   --color-stroop-red: #FF5C5C;
 
   --color-canvas-happy: #202622;
@@ -316,7 +310,7 @@
 
   --uncertainty-band-fill: rgba(124, 196, 242, 0.15);
   --uncertainty-low-stroke: #A9C1D6;
-  --uncertainty-low-tint: #1A2D40;
+  --uncertainty-low-tint: #1D312B;
 
   /* Dark theme: a 1 px border only, no shadow */
   --shadow-elevation: none;
@@ -337,112 +331,6 @@
   --char-mist-lo: #8C9FB0;
   --char-shadow: #000000;
   --char-shadow-alpha: 0.75;
-
-  /* EMILY Dark Emotion Adaptive Color Tokens (Default: Calm Flow) */
-  --color-emotion-accent: #4FD1C5;
-  --color-emotion-tint: #162432;
-  --color-emotion-glow: rgba(79, 209, 197, 0.14);
-  --color-emotion-badge: #4FD1C5;
-}
-
-/* ==========================================================================
-   EMILY Emotion-Adaptive Color Coding (Circumplex Affective Model)
-   Light Mode & Default Fallback
-   ========================================================================== */
-
-:root[data-emotion="calm_flow"],
-[data-theme="light"][data-emotion="calm_flow"],
-html[data-emotion="calm_flow"]:not([data-theme="dark"]) {
-  /* Deep Teal / Sage Green (Parasympathetic balance & clarity) */
-  --color-emotion-accent: #0D9488;
-  --color-emotion-tint: #F2F9F8;
-  --color-emotion-glow: rgba(13, 148, 136, 0.14);
-  --color-emotion-badge: #0D9488;
-}
-
-:root[data-emotion="energized"],
-[data-theme="light"][data-emotion="energized"],
-html[data-emotion="energized"]:not([data-theme="dark"]) {
-  /* Warm Terracotta Amber (High self-efficacy) */
-  --color-emotion-accent: #D96B43;
-  --color-emotion-tint: #FDF6F0;
-  --color-emotion-glow: rgba(217, 107, 67, 0.15);
-  --color-emotion-badge: #D96B43;
-}
-
-:root[data-emotion="frustrated"],
-[data-theme="light"][data-emotion="frustrated"],
-html[data-emotion="frustrated"]:not([data-theme="dark"]) {
-  /* Counter-Regulatory Tranquil Eucalyptus Sage (Anti-Red Policy: Never #DC2626) */
-  --color-emotion-accent: #4D9078;
-  --color-emotion-tint: #F1F7F4;
-  --color-emotion-glow: rgba(77, 144, 120, 0.14);
-  --color-emotion-badge: #4D9078;
-}
-
-:root[data-emotion="hesitant"],
-[data-theme="light"][data-emotion="hesitant"],
-html[data-emotion="hesitant"]:not([data-theme="dark"]) {
-  /* Calm Sky & Warm Honey (Cognitive grounding) */
-  --color-emotion-accent: #2F7AB0;
-  --color-emotion-tint: #EEF5FB;
-  --color-emotion-glow: rgba(47, 122, 176, 0.14);
-  --color-emotion-badge: #D97706;
-}
-
-:root[data-emotion="fatigued"],
-[data-theme="light"][data-emotion="fatigued"],
-html[data-emotion="fatigued"]:not([data-theme="dark"]) {
-  /* Dusk Slate & Revitalizing Mint (Circadian recovery) */
-  --color-emotion-accent: #5A7186;
-  --color-emotion-tint: #F1F5F8;
-  --color-emotion-glow: rgba(90, 113, 134, 0.14);
-  --color-emotion-badge: #5A7186;
-}
-
-/* ==========================================================================
-   EMILY Emotion-Adaptive Color Coding (Dark Mode)
-   ========================================================================== */
-
-[data-theme="dark"][data-emotion="calm_flow"],
-html[data-theme="dark"][data-emotion="calm_flow"] {
-  --color-emotion-accent: #4FD1C5;
-  --color-emotion-tint: #162432;
-  --color-emotion-glow: rgba(79, 209, 197, 0.16);
-  --color-emotion-badge: #4FD1C5;
-}
-
-[data-theme="dark"][data-emotion="energized"],
-html[data-theme="dark"][data-emotion="energized"] {
-  --color-emotion-accent: #F5A65B;
-  --color-emotion-tint: #2B1D19;
-  --color-emotion-glow: rgba(245, 166, 91, 0.16);
-  --color-emotion-badge: #F5A65B;
-}
-
-[data-theme="dark"][data-emotion="frustrated"],
-html[data-theme="dark"][data-emotion="frustrated"] {
-  /* Counter-Regulatory Soft Mint Sage in Dark Mode (Anti-Red Policy) */
-  --color-emotion-accent: #68D391;
-  --color-emotion-tint: #15271F;
-  --color-emotion-glow: rgba(104, 211, 145, 0.16);
-  --color-emotion-badge: #68D391;
-}
-
-[data-theme="dark"][data-emotion="hesitant"],
-html[data-theme="dark"][data-emotion="hesitant"] {
-  --color-emotion-accent: #90CDF4;
-  --color-emotion-tint: #1A2536;
-  --color-emotion-glow: rgba(144, 205, 244, 0.16);
-  --color-emotion-badge: #FBBF24;
-}
-
-[data-theme="dark"][data-emotion="fatigued"],
-html[data-theme="dark"][data-emotion="fatigued"] {
-  --color-emotion-accent: #A3BBD0;
-  --color-emotion-tint: #1A2330;
-  --color-emotion-glow: rgba(163, 187, 208, 0.16);
-  --color-emotion-badge: #A3BBD0;
 }
 
 @layer base {
@@ -554,25 +442,6 @@ html[data-theme="dark"][data-emotion="fatigued"] {
   .focus-ring:focus-visible {
     outline: 2px solid var(--color-brand);
     outline-offset: 2px;
-  }
-
-  /* ponytail: neutralized until tickets 03/06 remove the remaining <div className="doodle-tape" /> usages */
-  .doodle-tape {
-    display: none;
-  }
-
-  /* EMILY Emotion-Adaptive Utility Classes */
-  .border-emotion-accent {
-    border-color: var(--color-emotion-accent);
-  }
-  .bg-emotion-tint {
-    background-color: var(--color-emotion-tint);
-  }
-  .text-emotion-accent {
-    color: var(--color-emotion-accent);
-  }
-  .shadow-emotion-glow {
-    box-shadow: 0 0 14px var(--color-emotion-glow);
   }
 }
 
@@ -764,18 +633,9 @@ html[data-theme="dark"][data-emotion="fatigued"] {
   animation: char-mood 560ms var(--ease-out) 1;
 }
 
-/* The one idle a character may have (spec R8): a nearly imperceptible breath and an occasional blink.
-   Opt-in per use (Loti's `alive` prop), off under reduced motion and in timed trials (lock below). */
-@keyframes char-breathe {
-  0%, 100% { transform: scale(1, 1); }
-  50% { transform: scale(1.01, 1.025); }
-}
-.char-anim-breathe {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-  animation: char-breathe 4200ms var(--ease-in-out) infinite;
-}
-
+/* The SVG idle a character may have (spec R8): an occasional blink. Opt-in per use (Loti's `alive`
+   prop), off under reduced motion and in timed trials (lock below). The breath is .anim-breathe on
+   an HTML wrapper. */
 @keyframes char-blink {
   0%, 94%, 100% { transform: scaleY(1); }
   97% { transform: scaleY(0.1); }
@@ -784,6 +644,12 @@ html[data-theme="dark"][data-emotion="fatigued"] {
   transform-box: fill-box;
   transform-origin: center;
   animation: char-blink 5200ms var(--ease-in-out) 1200ms infinite;
+}
+
+/* Stroop's light plate (a Color Clash block with black ink) keeps dark mode's no-shadow rule: the
+   light tokens it carries would otherwise bring the light elevation along. */
+[data-theme="dark"] [data-stroop-plate] {
+  box-shadow: none;
 }
 
 /* characters: motion lock */
@@ -823,8 +689,7 @@ html[data-theme="dark"][data-emotion="fatigued"] {
 }
 
 /* Loti's breath on an HTML wrapper (LotiSays `alive`), so the browser composites it instead of
-   repainting the SVG each frame. Loti's own `alive` breath on its SVG group is turned off inside it,
-   which leaves the blink. */
+   repainting the SVG each frame. Loti's own `alive` adds only the blink. */
 @keyframes anim-breathe {
   0%, 100% { transform: scale(1, 1); }
   50% { transform: scale(1.01, 1.025); }
@@ -832,9 +697,6 @@ html[data-theme="dark"][data-emotion="fatigued"] {
 .anim-breathe {
   transform-origin: 50% 100%;
   animation: anim-breathe 4200ms var(--ease-in-out) infinite;
-}
-.anim-breathe .char-anim-breathe {
-  animation: none;
 }
 
 @keyframes anim-bubble {

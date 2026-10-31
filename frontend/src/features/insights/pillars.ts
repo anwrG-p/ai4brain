@@ -144,38 +144,11 @@ export function unifiedScore(pillars: Record<PillarId, PillarScore>): number | n
   return scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null
 }
 
-/* Training: which exercise practises each pillar. Schemas in order of preference, after the doc's
-   inputs (focus: tower then the reasoning tasks, then n-back for OSPAN; agility: n-back switches,
-   Stroop, Logic Web; impulse: Stroop, then tower execution). The first schema some dimension of the
-   ACTIVE preset offers wins; `prefer` breaks ties between dimensions sharing that schema. */
-const PILLAR_PRACTICE: Record<PillarId, { schemas: readonly TaskSchemaType[]; prefer?: readonly string[] }> = {
-  focus: { schemas: ['tower', 'relational', 'matrix', 'n_back'] },
-  agility: { schemas: ['n_back', 'stroop', 'relational'], prefer: ['cognitive_flexibility'] },
-  // Both spellings: the 6-dimension preset renames inhibition_control.
-  impulse: { schemas: ['stroop', 'tower'], prefer: ['inhibition_control', 'inhibitory_control'] },
-  memory: { schemas: ['mst'] },
-  visual: { schemas: ['ufov'] },
-}
-
 export type Training = { dimId: string; schema: TaskSchemaType }
 
-/** The dimension of the active preset that has `schema` (preferring the ids in `prefer`), or null. */
-export function dimensionFor(
-  schema: TaskSchemaType,
-  preset: DimensionPresetKey = '7',
-  prefer: readonly string[] = [],
-): Training | null {
-  const dims = getDimensionsByPreset(preset).filter((d) => d.schemaTypes.includes(schema))
-  const dim = dims.find((d) => prefer.includes(d.id)) ?? dims[0]
+/** The first dimension of the active preset that has `schema`, or null. Which exercise practises a
+    pillar is the Train catalog's call (TRAIN_EXERCISES, features/train/catalog.ts). */
+export function dimensionFor(schema: TaskSchemaType, preset: DimensionPresetKey = '7'): Training | null {
+  const dim = getDimensionsByPreset(preset).find((d) => d.schemaTypes.includes(schema))
   return dim ? { dimId: dim.id, schema } : null
-}
-
-/** Where to practise a pillar under the active preset, or null when the preset has no fitting exercise. */
-export function pillarTraining(pillar: PillarId, preset: DimensionPresetKey = '7'): Training | null {
-  const { schemas, prefer } = PILLAR_PRACTICE[pillar]
-  for (const schema of schemas) {
-    const t = dimensionFor(schema, preset, prefer)
-    if (t) return t
-  }
-  return null
 }

@@ -58,7 +58,7 @@ export default function DashboardPage() {
   const pillars = useMemo(() => currentPillars(sessions), [sessions])
   const improved = useMemo(() => improvedPillars(sessions), [sessions])
   const history = useMemo(() => unifiedHistory(sessions), [sessions])
-  const weakest = weakestPillar(pillars)
+  const weakest = weakestPillar(pillars) ?? undefined
   const goalList = useMemo(() => goalLines({ year: goalYear, goals, bases }, pillars, now), [goalYear, goals, bases, pillars, now])
   const goalLevels = Object.fromEntries(goalList.flatMap((g) => (g.goal === null ? [] : [[g.pillar, g.goal]])))
   const start = sessionPath(weakest)
@@ -200,11 +200,13 @@ function Why({ weakest, pillars, improved }: { weakest: PillarId | undefined; pi
 }
 
 /* Each goal against its own pillar, from the score it had when the goal was set (ticket 08 review):
-   "Deep Memory 52 → goal 62". Never shown as met when set; only its own pillar can meet it. */
+   "Deep Memory 52 → goal 62". Never shown as met when set; only its own pillar can meet it. Met, it
+   keeps its starting point in view: "Deep Memory 52 → 64 · goal 62 reached". */
 function goalText(g: GoalLine): string {
   const label = PILLAR_LABELS[g.pillar]
-  if (g.goal === null) return `${label}: +${g.target}, from your first score`
-  return `${label} ${round(g.current ?? g.base!)} → goal ${round(g.goal)}${g.reached ? ' · reached' : ''}`
+  if (g.goal === null) return `${label}: +${g.target} from its first score`
+  if (g.reached) return `${label} ${round(g.base!)} → ${round(g.current!)} · goal ${round(g.goal)} reached`
+  return `${label} ${round(g.current ?? g.base!)} → goal ${round(g.goal)}`
 }
 
 function Goals({

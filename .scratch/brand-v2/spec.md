@@ -1,6 +1,6 @@
 # Spec: Brand v2: Loti, sky blue and coral, simple flow, new dashboard
 
-Status: ready-for-agent
+Status: resolved
 Owner: Mazen, who is responsible for the frontend and is the only reviewer and approver (DEC-001 ownership is resolved: there is no separate UI owner to wait for).
 Date: 2026-10-31
 Branch: `feat/ui-calm-clean` (continues it)
@@ -66,6 +66,8 @@ Each ruling ends with what it costs if it turns out to be wrong.
 - **R12 (user, 2026-10-31): score ranges only in "View as table".** The table reads "62 · likely 55–69"; the radar and the curve show one number per point, with no uncertainty or projection bands. *(If wrong: draw the bands behind a Details control, rule 13.)*
 - **R13 (user, 2026-10-31): stay anonymous; no real accounts.** The user is an anonymous device id; there is no account backend (BE-14 dropped), and the Google button stays gated off (R4). *(If wrong: an account backend and sign-in, a large change.)*
 - **R14 (controller, 2026-10-31): no user-facing LLM until a backup crisis classifier exists.** The keyword crisis gate is a floor, not a guarantee. No LLM path (the coach adapter, `VITE_LOTI_COACH`) may be enabled for users until an LLM-based backup crisis classifier runs on every message. Until then Loti stays scripted (R2). *(If wrong: enabling the LLM without the backup classifier risks missing a user in crisis.)*
+- **R15 (controller, 2026-10-31, server): no invented server data.** The `/api/*` routes are unmounted (their engines stay as a library); `GET /v1/tasks/next` and the coach chat answer 501 until they are built, and the profile answers "not enough data" until the pipeline runs. *(If wrong: remount them.)*
+- **R16 (user, 2026-10-31): Memory Gauntlet scoring follows its hint.** Only a match in the current rule's stream expects an answer; a match in the other stream is a lure, to withhold. *(If wrong: change the scoring and the hint together.)*
 
 ## Brand system (binding)
 
@@ -87,6 +89,8 @@ Every text pair must reach ≥ 4.5:1 and every boundary or graphic ≥ 3:1. Reco
 | accent (salmon/coral) | `#F2876B` as fill; text-safe `#B94A2F` | `#FF9F86` |
 | accent-ink | `#0F2233` on the fill | `#0B1622` |
 | success / warning / danger / info | calm, desaturated, each ≥ 4.5 as text; danger must not read as the coral accent | |
+
+As shipped (`tokens.css` is the source of truth): the light canvas is the white board `#FFFFFF` and the dark canvas the green chalkboard `#162621` (the classroom board). Ticket 10 moved the dark cards onto the board's hue: surface `#1A2D28`, surface-raised `#1D312B`, border `#2B463F`, brand-subtle `#183533`. The light brand fill is `#1E6FA8` (ticket 01).
 
 Rules:
 - Brand = calm and baseline. Coral = breakthroughs, human touchpoints, milestones, the active state of a chart.

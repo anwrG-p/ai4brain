@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import TrainPage from '../../pages/TrainPage'
 import { EXERCISE_NAME } from '../assessment/names'
+import { currentPillars, weakestPillar } from '../insights/dashboard'
 import { PILLAR_LABELS } from '../insights/pillars'
 import { useSessionStore } from '../insights/sessionStore'
 import { useAppStore } from '../../state/useAppStore'
@@ -116,6 +117,22 @@ describe('Train (/train)', () => {
     expect(within(visual).getByText('35')).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: 'Focus & Strategy' })).getByText('80')).toBeInTheDocument()
     expect(primaries(page).map((el) => el.getAttribute('aria-label'))).toEqual(['Start Perceptual Radar'])
+  })
+
+  // One weakest pillar app-wide: Train reads each pillar as last measured, like Home and Loti, so a
+  // later session that skipped a pillar does not blank it here.
+  it('agrees with Home and Loti: a later short session keeps the earlier scores', () => {
+    const later = { id: 's2', at: '2026-10-31T10:00:00.000Z', inputs: { MST_LDI: { score: 60, trials: 20 } } }
+    const sessions = [SESSION, later]
+    act(() => useSessionStore.setState({ sessions }))
+    renderTrain()
+    // Home's and Loti's weakest pillar, from the same helper; here it is Visual Radar, not Deep Memory.
+    const homeWeakest = weakestPillar(currentPillars(sessions))
+    expect(homeWeakest).toBe('visual')
+    expect(screen.getByText(`${PILLAR_LABELS[homeWeakest!]} could use some care today.`)).toBeInTheDocument()
+    expect(pillarHeadings()[0]).toBe(PILLAR_LABELS[homeWeakest!])
+    expect(within(screen.getByRole('region', { name: 'Visual Radar' })).getByText('35')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Deep Memory' })).getByText('60')).toBeInTheDocument()
   })
 
   it('?pillar= puts that pillar first, highlights it and moves focus to it', () => {
