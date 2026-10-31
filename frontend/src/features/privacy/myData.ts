@@ -1,15 +1,14 @@
 import { useAppStore } from '../../state/useAppStore'
-import { tracker } from '../assessment/telemetry/tracker'
-import { forgetUserId } from '../assessment/tasks/taskSource'
+import { CONSENT_KEY, QUEUE_KEY, tracker } from '../assessment/telemetry/tracker'
+import { forgetUserId, UID_KEY } from '../assessment/tasks/taskSource'
 import { GOALS_KEY, useGoalsStore } from '../insights/goals'
 import { SESSIONS_KEY, useSessionStore } from '../insights/sessionStore'
 
-/* Everything this device holds about the user, for "Export my data" and "Delete my data".
-   The tracker and the task source keep their keys private; tracker.test.ts and taskSource.ts pin
-   the same strings. */
-export const CONSENT_KEY = 'synapsetwin_consent_v1' // 'granted' | 'denied'; absent means not chosen yet
-export const QUEUE_KEY = 'synapsetwin_telemetry_queue_v2' // answers waiting to be sent
-export const UID_KEY = 'aura_uid' // the anonymous id
+/* Everything this device holds about the user, for "Export my data" and "Delete my data":
+   sessions, goals, the consent choice ('granted' | 'denied'; absent means not chosen yet), the
+   answers waiting to be sent, the anonymous id, and Loti's talk.
+   Excluded: the judge tool's sign-offs (cistac_ux_review_signoffs, HumanReviewGate), which hold
+   reviewers' notes about the UI, not anything about the user. */
 // ponytail: the Loti talk store (09c) lives on another branch; after the merge use
 // useLotiSession.getState().clear() for delete and its state for export instead of the raw key.
 export const LOTI_KEY = 'synapsetwin_loti_v1' // sessionStorage
@@ -31,13 +30,25 @@ function read(storage: () => Storage, key: string): unknown {
   }
 }
 
+/* The app store fields that are the user's: listed, not copied wholesale. The rest is demo or judge
+   state (persona, offline simulation, dimension preset) or the legacy consentPreferences, whose
+   hard-coded defaults (a fixed receipt id, telemetry "on") would contradict the real consent choice. */
+export const APP_FIELDS = ['userProfile', 'isAuthenticated', 'theme', 'reducedMotion'] as const
+type AppState = ReturnType<typeof useAppStore.getState>
+const pick = (s: AppState) => ({
+  userProfile: s.userProfile,
+  isAuthenticated: s.isAuthenticated,
+  theme: s.theme,
+  reducedMotion: s.reducedMotion,
+})
+
 export interface MyData {
   exportedAt: string
   consent: string
   localStorage: Record<string, unknown>
   sessionStorage: Record<string, unknown>
-  /** The profile and app settings: every non-function field of the app store. */
-  app: Record<string, unknown>
+  /** The profile and the two real settings. */
+  app: Pick<AppState, (typeof APP_FIELDS)[number]>
 }
 
 export function collectMyData(now = new Date()): MyData {
@@ -46,7 +57,7 @@ export function collectMyData(now = new Date()): MyData {
     consent: tracker.getStatus().consent,
     localStorage: Object.fromEntries(LOCAL_KEYS.map((k) => [k, read(() => localStorage, k)])),
     sessionStorage: { [LOTI_KEY]: read(() => sessionStorage, LOTI_KEY) },
-    app: Object.fromEntries(Object.entries(useAppStore.getState()).filter(([, v]) => typeof v !== 'function')),
+    app: pick(useAppStore.getState()),
   }
 }
 
@@ -60,7 +71,8 @@ export function downloadMyData(now = new Date()): void {
   document.body.appendChild(a)
   a.click()
   a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 0)
+  // Edge and Chrome start the download asynchronously; revoking at once can cancel it.
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 /* The privacy purge, on this device only (server-side deletion is Member 4's route): the queued

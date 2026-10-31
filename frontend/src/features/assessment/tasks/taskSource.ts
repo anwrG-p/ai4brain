@@ -71,7 +71,7 @@ export function newId(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-const UID_KEY = 'aura_uid'
+export const UID_KEY = 'aura_uid'
 // Used only when storage is unavailable, so the id is still stable for the page load.
 let memoryUserId: string | null = null
 

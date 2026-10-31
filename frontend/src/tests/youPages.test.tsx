@@ -3,10 +3,11 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { useAppStore } from '../state/useAppStore'
-import { tracker } from '../features/assessment/telemetry/tracker'
+import { CONSENT_KEY, QUEUE_KEY, tracker } from '../features/assessment/telemetry/tracker'
+import { UID_KEY } from '../features/assessment/tasks/taskSource'
 import { GOALS_KEY, useGoalsStore } from '../features/insights/goals'
 import { SESSIONS_KEY, useSessionStore } from '../features/insights/sessionStore'
-import { CONSENT_KEY, LOTI_KEY, QUEUE_KEY, UID_KEY } from '../features/privacy/myData'
+import { LOTI_KEY } from '../features/privacy/myData'
 import YouPage from '../pages/YouPage'
 import PrivacyPage from '../pages/PrivacyPage'
 import SettingsPage from '../pages/SettingsPage'
@@ -35,6 +36,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   vi.restoreAllMocks()
+  vi.unstubAllEnvs()
 })
 
 describe('You (/you)', () => {
@@ -66,7 +68,6 @@ describe('You (/you)', () => {
     const sheet = screen.getByRole('dialog')
     fireEvent.click(within(sheet).getByRole('button', { name: 'Continue as guest' }))
     expect(screen.queryByRole('dialog')).toBeNull()
-    vi.unstubAllEnvs()
   })
 
   it('keeps to 60 words and no technical words', () => {
@@ -176,11 +177,14 @@ describe('Privacy (/privacy)', () => {
     localStorage.setItem(UID_KEY, 'anon-1')
     sessionStorage.setItem(LOTI_KEY, '{"history":["hi"]}')
     let blob: Blob | undefined
-    const createObjectURL = vi.fn((b: Blob) => {
-      blob = b
+    // jsdom has no createObjectURL: stub it so it can be spied on; afterEach restores the spies.
+    URL.createObjectURL ??= () => ''
+    URL.revokeObjectURL ??= () => {}
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockImplementation((b) => {
+      blob = b as Blob
       return 'blob:x'
     })
-    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }))
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     renderPage(<PrivacyPage />)
     fireEvent.click(screen.getByRole('button', { name: 'Export my data' }))
@@ -202,10 +206,15 @@ describe('Privacy (/privacy)', () => {
     expect(data.localStorage[UID_KEY]).toBe('anon-1')
     expect(data.sessionStorage[LOTI_KEY]).toEqual({ history: ['hi'] })
     expect(data.consent).toBe('denied')
-    expect(data.app.userProfile).toEqual({ preferredName: 'Mazen', email: 'm@example.com', focusGoal: 'x' })
-    const storeFields = Object.entries(useAppStore.getState()).filter(([, v]) => typeof v !== 'function').map(([k]) => k)
-    expect(Object.keys(data.app).sort()).toEqual(storeFields.sort())
-    vi.unstubAllGlobals()
+    // Only the user's own fields: no demo/judge state, no legacy consent defaults (fake receipt id).
+    expect(data.app).toEqual({
+      userProfile: { preferredName: 'Mazen', email: 'm@example.com', focusGoal: 'x' },
+      isAuthenticated: true,
+      theme: 'light',
+      reducedMotion: false,
+    })
+    expect(text).not.toContain('consentReceiptId')
+    expect(text).not.toContain('CONSENT-ST-2026')
   })
 
   it('Escape closes the dialog', () => {
@@ -244,6 +253,35 @@ describe('Settings (/settings)', () => {
     fireEvent.click(motion)
     expect(useAppStore.getState().reducedMotion).toBe(true)
     expect(motion).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('theme radios are one Tab stop; arrow keys move and choose', () => {
+    renderPage(<SettingsPage />)
+    const light = screen.getByRole('radio', { name: 'Light (Playful Lab)' })
+    const dark = screen.getByRole('radio', { name: 'Dark (Night Lab)' })
+    expect(light).toHaveAttribute('tabindex', '0')
+    expect(dark).toHaveAttribute('tabindex', '-1')
+    light.focus()
+    fireEvent.keyDown(light, { key: 'ArrowRight' })
+    expect(useAppStore.getState().theme).toBe('dark')
+    expect(dark).toHaveFocus()
+    expect(dark).toHaveAttribute('tabindex', '0')
+    expect(light).toHaveAttribute('tabindex', '-1')
+    fireEvent.keyDown(dark, { key: 'ArrowDown' }) // wraps
+    expect(useAppStore.getState().theme).toBe('light')
+    expect(light).toHaveFocus()
+    fireEvent.keyDown(light, { key: 'ArrowUp' })
+    expect(useAppStore.getState().theme).toBe('dark')
+    fireEvent.keyDown(dark, { key: 'ArrowLeft' })
+    expect(useAppStore.getState().theme).toBe('light')
+  })
+
+  it('the whole Reduce motion row is the switch (a tap target of the full row)', () => {
+    renderPage(<SettingsPage />)
+    const motion = screen.getByRole('switch', { name: 'Reduce motion' })
+    expect(motion.closest('li')?.firstElementChild).toBe(motion)
+    expect(motion.className).toMatch(/\bw-full\b/)
+    expect(motion.className).toMatch(/\bmin-h-14\b/)
   })
 
   it('shows only real settings: no technical or unwired switches', () => {
