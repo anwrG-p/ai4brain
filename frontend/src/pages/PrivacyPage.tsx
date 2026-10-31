@@ -1,10 +1,7 @@
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 import { Button } from '../components/ui/Button'
-import { useAppStore } from '../state/useAppStore'
 import { tracker, type Consent } from '../features/assessment/telemetry/tracker'
-import { forgetUserId } from '../features/assessment/tasks/taskSource'
-import { useGoalsStore } from '../features/insights/goals'
-import { useSessionStore } from '../features/insights/sessionStore'
+import { deleteMyData, downloadMyData } from '../features/privacy/myData'
 
 const CONSENT_LINE: Record<Consent, string> = {
   pending: 'Not chosen yet. Your answers stay on this device.',
@@ -17,21 +14,9 @@ const currentConsent = () => tracker.getStatus().consent
 
 const QUIET = 'focus-ring inline-flex min-h-11 cursor-pointer items-center rounded-sm text-sm font-medium underline underline-offset-4'
 
-/* The privacy purge: everything this device holds about the user. The pending answers (the
-   tracker's queue), the consent choice (back to not chosen, so nothing is sent until they choose
-   again), the anonymous id, the finished sessions and goals, and the profile and app settings.
-   ponytail: device only; server-side deletion is Member 4's route. */
-function deleteMyData() {
-  useAppStore.getState().resetDemoState()
-  tracker.clear()
-  tracker.resetConsent()
-  forgetUserId()
-  useSessionStore.getState().clearSessions()
-  useGoalsStore.getState().clearGoals()
-}
-
 /* Privacy: the consent status in one line with one control to change it (R3, equal choices),
-   one sentence on what is recorded, and "Delete my data" behind a confirmation (rules 13, 14). */
+   one sentence on what is recorded, then two quiet links: "Export my data" (one JSON file) and
+   "Delete my data" behind a confirmation (rules 13, 14: no primary button, quiet controls only). */
 export default function PrivacyPage() {
   const consent = useSyncExternalStore(subscribeTracker, currentConsent)
   const [choosing, setChoosing] = useState(false)
@@ -74,11 +59,16 @@ export default function PrivacyPage() {
       <p className="text-base text-ink-muted">We record answer timing and accuracy only. No camera, no microphone.</p>
 
       <div>
-        <button type="button" onClick={() => setConfirming(true)} className={`${QUIET} text-danger`}>
-          Delete my data
-        </button>
+        <div className="flex flex-wrap gap-x-6">
+          <button type="button" onClick={() => downloadMyData()} className={`${QUIET} text-brand`}>
+            Export my data
+          </button>
+          <button type="button" onClick={() => setConfirming(true)} className={`${QUIET} text-danger`}>
+            Delete my data
+          </button>
+        </div>
         <p role="status" className="text-sm text-ink">
-          {deleted ? 'Your data is deleted.' : ''}
+          {deleted ? 'Deleted from this device.' : ''}
         </p>
       </div>
 

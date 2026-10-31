@@ -4,8 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { useAppStore } from '../state/useAppStore'
 import { tracker } from '../features/assessment/telemetry/tracker'
-import { useGoalsStore } from '../features/insights/goals'
-import { useSessionStore } from '../features/insights/sessionStore'
+import { GOALS_KEY, useGoalsStore } from '../features/insights/goals'
+import { SESSIONS_KEY, useSessionStore } from '../features/insights/sessionStore'
+import { CONSENT_KEY, LOTI_KEY, QUEUE_KEY, UID_KEY } from '../features/privacy/myData'
 import YouPage from '../pages/YouPage'
 import PrivacyPage from '../pages/PrivacyPage'
 import SettingsPage from '../pages/SettingsPage'
@@ -24,6 +25,8 @@ const TECHNICAL = /v1\/|QUEST|JSON|SAT-JEPA|contract|receipt|hash|SHA|endpoint|t
 const SESSION = { id: 's1', at: '2026-10-31T10:00:00Z', inputs: {} }
 
 beforeEach(() => {
+  localStorage.clear()
+  sessionStorage.clear()
   useSessionStore.getState().clearSessions()
   useGoalsStore.getState().clearGoals()
   useAppStore.getState().resetDemoState()
@@ -137,8 +140,72 @@ describe('Privacy (/privacy)', () => {
     expect(useAppStore.getState().isAuthenticated).toBe(false)
     expect(tracker.getStatus().consent).toBe('pending')
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(screen.getByRole('status')).toHaveTextContent('Your data is deleted.')
+    expect(screen.getByRole('status')).toHaveTextContent('Deleted from this device.')
     expect(screen.getByTestId('consent-line')).toHaveTextContent('Not chosen yet')
+  })
+
+  it('delete keeps the theme and reduce motion (preferences, not data) and clears Loti talk', () => {
+    act(() => {
+      useAppStore.getState().setTheme('dark')
+      useAppStore.getState().setReducedMotion(true)
+    })
+    sessionStorage.setItem(LOTI_KEY, '{"history":[]}')
+    renderPage(<PrivacyPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete my data' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(useAppStore.getState().theme).toBe('dark')
+    expect(useAppStore.getState().reducedMotion).toBe(true)
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveAttribute('data-reduced-motion', 'true')
+    expect(sessionStorage.getItem(LOTI_KEY)).toBeNull()
+  })
+
+  it('no fake certificate, hash or server claim after delete', () => {
+    const page = renderPage(<PrivacyPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete my data' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(page.textContent).not.toMatch(/certificate|SHA|hash|server|purged|permanent/i)
+  })
+
+  it('Export my data downloads one JSON file holding every device key and the profile', async () => {
+    useAppStore.getState().loginUser({ preferredName: 'Mazen', email: 'm@example.com', focusGoal: 'x' })
+    useSessionStore.getState().addSession(SESSION)
+    useGoalsStore.getState().setGoal('focus', 10)
+    act(() => tracker.denyConsent()) // the tracker itself writes the consent key
+    localStorage.setItem(QUEUE_KEY, '[{"event":"held"}]')
+    localStorage.setItem(UID_KEY, 'anon-1')
+    sessionStorage.setItem(LOTI_KEY, '{"history":["hi"]}')
+    let blob: Blob | undefined
+    const createObjectURL = vi.fn((b: Blob) => {
+      blob = b
+      return 'blob:x'
+    })
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }))
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    renderPage(<PrivacyPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Export my data' }))
+    expect(createObjectURL).toHaveBeenCalledTimes(1)
+    expect(click).toHaveBeenCalledTimes(1)
+    expect(blob?.type).toBe('application/json')
+    // jsdom's Blob: read it with jsdom's FileReader.
+    const text = await new Promise<string>((resolve) => {
+      const r = new FileReader()
+      r.onload = () => resolve(String(r.result))
+      r.readAsText(blob as Blob)
+    })
+    const data = JSON.parse(text)
+    expect(Object.keys(data.localStorage).sort()).toEqual([CONSENT_KEY, GOALS_KEY, QUEUE_KEY, SESSIONS_KEY, UID_KEY].sort())
+    expect(data.localStorage[SESSIONS_KEY].sessions[0].id).toBe('s1')
+    expect(data.localStorage[GOALS_KEY].goals).toEqual({ focus: 10 })
+    expect(data.localStorage[CONSENT_KEY]).toBe('denied')
+    expect(data.localStorage[QUEUE_KEY]).toEqual([{ event: 'held' }])
+    expect(data.localStorage[UID_KEY]).toBe('anon-1')
+    expect(data.sessionStorage[LOTI_KEY]).toEqual({ history: ['hi'] })
+    expect(data.consent).toBe('denied')
+    expect(data.app.userProfile).toEqual({ preferredName: 'Mazen', email: 'm@example.com', focusGoal: 'x' })
+    const storeFields = Object.entries(useAppStore.getState()).filter(([, v]) => typeof v !== 'function').map(([k]) => k)
+    expect(Object.keys(data.app).sort()).toEqual(storeFields.sort())
+    vi.unstubAllGlobals()
   })
 
   it('Escape closes the dialog', () => {
@@ -148,12 +215,13 @@ describe('Privacy (/privacy)', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('keeps to 60 words, 2 quiet controls and no technical words', () => {
+  it('keeps to 60 words, 3 quiet controls and no technical words', () => {
     const page = renderPage(<PrivacyPage />)
     expect(words(page)).toBeLessThanOrEqual(60)
     expect(page.textContent).not.toMatch(TECHNICAL)
     expect(Array.from(page.querySelectorAll('a, button')).map((b) => b.textContent?.trim())).toEqual([
       'Choose',
+      'Export my data',
       'Delete my data',
     ])
   })

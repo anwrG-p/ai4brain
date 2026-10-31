@@ -172,7 +172,7 @@ describe('UI telemetry goes through the Tracker', () => {
     )
     deleteMyData()
     expect(clear).toHaveBeenCalledOnce()
-    expect(screen.getByRole('status')).toHaveTextContent('Your data is deleted.')
+    expect(screen.getByRole('status')).toHaveTextContent('Deleted from this device.')
   })
 
   it('the privacy purge forgets the anonymous id, so later telemetry is not linked to it', () => {

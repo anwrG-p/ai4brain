@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
 // SHOTS_DIR sends the screenshots to a scratch folder instead of the docs.
@@ -62,7 +63,24 @@ test.describe('Page 13: Privacy (/privacy)', () => {
     await expect(page.getByTestId('consent-line')).toHaveText('Your answers are saved.')
   })
 
-  test('Delete my data asks first, then deletes; axe on the dialog in both themes', async ({ page }) => {
+  test('Export my data downloads one JSON file with every device key', async ({ page }) => {
+    await page.goto('/privacy', { waitUntil: 'networkidle' })
+    await page.getByRole('button', { name: 'Choose' }).click()
+    await page.getByRole('button', { name: 'Keep them on this device only' }).click()
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export my data' }).click()])
+    expect(download.suggestedFilename()).toMatch(/^my-data-\d{4}-\d{2}-\d{2}\.json$/)
+    const file = await download.path()
+    const data = JSON.parse(await readFile(file, 'utf8'))
+    expect(Object.keys(data.localStorage).sort()).toEqual(
+      ['aura_uid', 'synapsetwin_consent_v1', 'synapsetwin_goals_v1', 'synapsetwin_sessions_v1', 'synapsetwin_telemetry_queue_v2'],
+    )
+    expect(data.localStorage.synapsetwin_consent_v1).toBe('denied')
+    expect(Object.keys(data.sessionStorage)).toEqual(['synapsetwin_loti_v1'])
+    expect(data.app).toHaveProperty('userProfile')
+    expect(data.app).toHaveProperty('theme')
+  })
+
+  test('Delete my data asks first, then deletes; keeps the theme; axe on the dialog in both themes', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 })
     await page.goto('/privacy', { waitUntil: 'networkidle' })
     await page.getByRole('button', { name: 'Delete my data' }).click()
@@ -80,7 +98,8 @@ test.describe('Page 13: Privacy (/privacy)', () => {
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, '13-privacy-delete-dark-1440.png') })
     await dialog.getByRole('button', { name: 'Delete', exact: true }).click()
     await expect(dialog).toHaveCount(0)
-    await expect(page.getByText('Your data is deleted.')).toBeVisible()
+    await expect(page.getByText('Deleted from this device.')).toBeVisible()
     await expect(page.getByTestId('consent-line')).toHaveText(NOT_CHOSEN)
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark') // a preference, not data
   })
 })
