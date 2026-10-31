@@ -130,6 +130,12 @@
   --color-heat-2: #F2B39C;
   --color-heat-3: #DB7A59;
   --color-heat-4: #B94A2F;
+  /* Each step's printed value: ink on the pale steps, white on the deepest (>= 4.5:1, audited). */
+  --color-heat-ink-0: #0F2233;
+  --color-heat-ink-1: #0F2233;
+  --color-heat-ink-2: #0F2233;
+  --color-heat-ink-3: #0F2233;
+  --color-heat-ink-4: #FFFFFF;
 
   /* Uncertainty Tokens: a 15% band in the sky hue */
   --uncertainty-band-fill: rgba(43, 143, 214, 0.15);
@@ -295,11 +301,18 @@
   --color-canvas-frustrated: #212719;
   --color-canvas-focused: #132529;
 
+  /* Dark: brighter = higher. Two deep sky steps, then three light coral steps; no step sits at mid
+     lightness, where neither light nor dark text reaches 4.5:1 (the old muddy step 2). */
   --color-heat-0: #1E4A68;
-  --color-heat-1: #46555F;
-  --color-heat-2: #86675B;
-  --color-heat-3: #CC8169;
-  --color-heat-4: #FF9F86;
+  --color-heat-1: #3F6077;
+  --color-heat-2: #C47A63;
+  --color-heat-3: #E8937A;
+  --color-heat-4: #FFB39E;
+  --color-heat-ink-0: #F2F8FC;
+  --color-heat-ink-1: #F2F8FC;
+  --color-heat-ink-2: #0B1622;
+  --color-heat-ink-3: #0B1622;
+  --color-heat-ink-4: #0B1622;
 
   --uncertainty-band-fill: rgba(124, 196, 242, 0.15);
   --uncertainty-low-stroke: #A9C1D6;
@@ -1031,6 +1044,8 @@ body {
   background-size: 24px 24px;
   border: 2.5px solid var(--color-border-strong);
   border-radius: var(--radius-xl);
+  /* Keep the app's own backgrounds inside the board's rounded edge (ticket 08 review). */
+  overflow: clip;
 }
 
 @media (min-width: 640px) {
@@ -1050,8 +1065,8 @@ body {
 :root:has(.mood-tint-frustrated) { --color-canvas: var(--color-canvas-frustrated); }
 :root:has(.mood-tint-focused) { --color-canvas: var(--color-canvas-focused); }
 
-.heat-0 { background-color: var(--color-heat-0); }
-.heat-1 { background-color: var(--color-heat-1); }
-.heat-2 { background-color: var(--color-heat-2); }
-.heat-3 { background-color: var(--color-heat-3); }
-.heat-4 { background-color: var(--color-heat-4); }
+.heat-0 { background-color: var(--color-heat-0); color: var(--color-heat-ink-0); }
+.heat-1 { background-color: var(--color-heat-1); color: var(--color-heat-ink-1); }
+.heat-2 { background-color: var(--color-heat-2); color: var(--color-heat-ink-2); }
+.heat-3 { background-color: var(--color-heat-3); color: var(--color-heat-ink-3); }
+.heat-4 { background-color: var(--color-heat-4); color: var(--color-heat-ink-4); }

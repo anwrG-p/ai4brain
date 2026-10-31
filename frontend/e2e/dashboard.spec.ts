@@ -78,6 +78,12 @@ async function checkViewports(page: Page, where: string, info: TestInfo, name: s
   await page.setViewportSize(VIEWPORTS[0]!)
 }
 
+/** A Deep Memory goal of +10, set when Deep Memory was at `base` (stored as the goals slice does). */
+async function seedGoal(page: Page, base: number) {
+  const value = JSON.stringify({ version: 1, year: new Date().getFullYear(), goals: { memory: 10 }, bases: { memory: base } })
+  await page.addInitScript((v) => window.localStorage.setItem('synapsetwin_goals_v1', v), value)
+}
+
 async function checkHome(page: Page, info: TestInfo, n: number) {
   await seed(page, n)
   await page.goto('/dashboard', { waitUntil: 'networkidle' })
@@ -114,14 +120,18 @@ test.describe('Page 06: Home (/dashboard)', () => {
   })
 
   test('four sessions: the real curve and one dashed projection, a two-item legend; axe and overflow in light and dark', async ({ page }, info) => {
+    await seedGoal(page, 55) // Deep Memory's latest score in the 4-session seed
     await checkHome(page, info, 4)
     await expect(page.getByRole('list', { name: 'Line styles' }).getByRole('listitem')).toHaveText(['Your score', 'If you keep training'])
+    // The goal shows against its own pillar (explore is open by now), never on the overall curve.
+    await expect(page.getByRole('list', { name: 'Your goals this year' })).toHaveText('Deep Memory 55 → goal 65')
+    await expect(page.locator('[data-goal]')).toHaveCount(0)
     await expect(page.locator('[data-line="keep"]')).toHaveCount(1)
   })
 
   test('six sessions: the heatmap behind "Further explore"; axe and overflow in light and dark', async ({ page }, info) => {
     await checkHome(page, info, 6)
-    await expect(page.getByRole('table', { name: 'Past results by week' })).toBeVisible()
+    await expect(page.getByRole('grid', { name: 'Past results by week' })).toBeVisible()
     await expect(page.getByRole('list', { name: 'Score scale' })).toBeVisible()
   })
 

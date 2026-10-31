@@ -46,22 +46,36 @@ const tagLines = (k: number) => (k === 0 ? 1 : 2)
 const TAG_WIDTH = 92 // px, "improvement" at 14 px semibold
 const labelHeight = (k: number, tagged: boolean) => 2 * NAME_LINE + NUM_LINE + (tagged ? tagLines(k) * NAME_LINE : 0)
 
-function geometry(width: number, improved: ReadonlySet<PillarId>) {
-  const tagged = (k: number) => improved.has(PILLAR_IDS[k]!)
-  const side = tagged(1) || tagged(4) ? SIDE_ROOM_TAG : SIDE_ROOM
-  const r = Math.max(56, Math.min(140, (width - 2 * (side + GAP)) / (2 * COS18)))
+const R_MIN = 40
+const R_MIN_WITH_SIDE_TAGS = 64
+const SIN36 = Math.sin(Math.PI / 5)
+
+/** The radar's layout in real pixels for a box `width` wide. It always fits (`needed` <= width), so
+    the SVG never scales down: on a narrow box the side "Real improvement" tags are dropped first (the
+    table still says it), then the radius shrinks. Exported for tests. */
+export function radarGeometry(width: number, improved: ReadonlySet<PillarId>) {
+  const fit = (side: number) => (width - 2 * (side + GAP)) / (2 * COS18)
+  const sideTags = (improved.has(PILLAR_IDS[1]!) || improved.has(PILLAR_IDS[4]!)) && fit(SIDE_ROOM_TAG) >= R_MIN_WITH_SIDE_TAGS
+  const tagged = (k: number) => improved.has(PILLAR_IDS[k]!) && (sideTags || !isSide(k))
+  const side = sideTags ? SIDE_ROOM_TAG : SIDE_ROOM
+  const r = Math.max(R_MIN, Math.min(140, fit(side)))
   const top = labelHeight(0, tagged(0)) + GAP
   const cy = top + r
   const bottom = Math.max(labelHeight(2, tagged(2)), labelHeight(3, tagged(3))) + GAP
   const height = Math.ceil(cy + r * Math.cos(Math.PI / 5) + bottom + 4)
   const cx = width / 2
   const at = (k: number, rr: number): [number, number] => [cx + rr * Math.cos(angle(k)), cy + rr * Math.sin(angle(k))]
-  return { r, cx, cy, height, at, tagged }
+  // Half-widths the labels reach from the centre: the side labels, and a tagged bottom label.
+  const bottomX = r * SIN36
+  const lean = 2 * bottomX < TAG_WIDTH + 2 * GAP
+  const bottomReach = tagged(2) || tagged(3) ? (lean ? bottomX - 2 * GAP + TAG_WIDTH : bottomX + TAG_WIDTH / 2) : 0
+  const needed = Math.ceil(2 * Math.max(COS18 * r + GAP + side, bottomReach))
+  return { r, cx, cy, height, at, tagged, sideTags, needed }
 }
 
 const pts = (ps: [number, number][]) => ps.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
 
-type Geometry = ReturnType<typeof geometry>
+type Geometry = ReturnType<typeof radarGeometry>
 
 function AxisLabel({ k, pillar, score, g }: { k: number; pillar: PillarId; score: PillarScore; g: Geometry }) {
   const [vx, vy] = g.at(k, g.r)
@@ -133,15 +147,17 @@ export interface PillarRadarProps {
   tableToggle?: boolean
   /** The shape grows from the centre once, on mount (spec R8). */
   grow?: boolean
+  /** Goal levels per pillar (base + target): added to that pillar's table row ("· goal 62"). */
+  goals?: Partial<Record<PillarId, number>>
   className?: string
 }
 
-export function PillarRadar({ scores, improved = [], blurred = false, tableToggle = false, grow = false, className = '' }: PillarRadarProps) {
+export function PillarRadar({ scores, improved = [], blurred = false, tableToggle = false, grow = false, goals = {}, className = '' }: PillarRadarProps) {
   const [ref, width] = useWidth<HTMLDivElement>(400)
   const [showTable, setShowTable] = useState(false)
   const tableId = useId()
   const better = new Set(improved)
-  const g = geometry(width, better)
+  const g = radarGeometry(width, better)
   const measured = PILLAR_IDS.flatMap((p, k) => {
     const s = scores[p].score
     return s === null ? [] : [g.at(k, (g.r * Math.min(100, Math.max(0, s))) / 100)]
@@ -155,7 +171,7 @@ export function PillarRadar({ scores, improved = [], blurred = false, tableToggl
           width={width}
           height={g.height}
           viewBox={`0 0 ${width} ${g.height}`}
-          className={`block max-w-full select-none font-sans transition duration-500 ease-out motion-reduce:transition-none ${blurred ? 'blur-md' : ''}`}
+          className={`block h-auto max-w-full select-none font-sans transition duration-500 ease-out motion-reduce:transition-none ${blurred ? 'blur-md' : ''}`}
         >
           {[1 / 3, 2 / 3, 1].map((f) => (
             <polygon key={f} points={pts(PILLAR_IDS.map((_, k) => g.at(k, g.r * f)))} className="fill-none stroke-border" />
@@ -191,7 +207,7 @@ export function PillarRadar({ scores, improved = [], blurred = false, tableToggl
                       {PILLAR_LABELS[p]}
                     </th>
                     <td className={`py-1.5 pr-3 text-right tabular-nums ${better.has(p) ? 'text-accent-strong' : ''}`}>
-                      {scoreWithRange(scores[p]) + (better.has(p) ? ', real improvement' : '')}
+                      {scoreWithRange(scores[p]) + (goals[p] === undefined ? '' : ` · goal ${Math.round(goals[p]!)}`) + (better.has(p) ? ', real improvement' : '')}
                     </td>
                     {showTable && (
                       <td aria-hidden="true" className="w-24 py-1.5">

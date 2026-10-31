@@ -2,12 +2,14 @@ import { scaleLinear, scaleTime } from 'd3-scale'
 import { curveMonotoneX, line } from 'd3-shape'
 import { Loti } from '../../components/features/characters'
 import { curveWindow, type HistoryPoint } from './dashboard'
-import { isRealImprovement, projection } from './projection'
+import { projection } from './projection'
 import { useWidth } from './useWidth'
 
-/* The progress curve: the unified score as a smooth solid sky line, a goal as one thin horizontal
-   marker, coral only on the session where the change first became real (RCI >= 1.96). From the 3rd
-   session one dashed line, "If you keep training", projects ahead (the doc's asymptotic model).
+/* The progress curve: the unified score as a smooth solid sky line with one dot per session. From the
+   3rd session one dashed line, "If you keep training", projects ahead (the doc's asymptotic model).
+   Review fixes (ticket 08): no goal marker (a per-pillar goal on the overall score could look met on
+   the day it is set, or be met by another skill; goals show against their own pillar instead) and no
+   coral milestone (it applied pillar-level RCI settings to the overall score).
    User decision (2026-10-31): no "If you pause" line and no idle decay (no evidence for the rate, and
    it reads as a guilt penalty), and no projection on fewer than 3 points. The legend names the line
    styles (at most 2). No bands and no toggles (rule 13). Drawn in real pixels so text stays 14 px. */
@@ -26,11 +28,9 @@ const day = (ms: number) => new Date(ms).toLocaleDateString('en-GB', { day: 'num
 export interface ProgressCurveProps {
   history: readonly HistoryPoint[]
   now: Date
-  /** The goal as a level on the unified score, or null. */
-  goal: number | null
 }
 
-export function ProgressCurve({ history, now, goal }: ProgressCurveProps) {
+export function ProgressCurve({ history, now }: ProgressCurveProps) {
   const [ref, width] = useWidth<HTMLDivElement>(600)
 
   if (!history.length) {
@@ -57,14 +57,12 @@ export function ProgressCurve({ history, now, goal }: ProgressCurveProps) {
     .curve(curveMonotoneX)
   const actual = history.map((h) => ({ at: Date.parse(h.at), score: h.score }))
   const first = history[0]!.score
-  const milestone = history.findIndex((h) => isRealImprovement(h.score, first))
   const end = keep?.at(-1)
   const summary =
     (history.length === 1
       ? `Your score: ${Math.round(first)} after 1 session.`
       : `Your score went from ${Math.round(first)} to ${Math.round(last.score)} over ${history.length} sessions.`) +
-    (end ? ` If you keep training, about ${Math.round(end.score)} by ${day(end.at)}.` : '') +
-    (goal === null ? '' : ` Your goal is ${Math.round(goal)}.`)
+    (end ? ` If you keep training, about ${Math.round(end.score)} by ${day(end.at)}.` : '')
   const legend = [
     { label: 'Your score', dash: undefined, width: 3 },
     ...(keep ? [{ label: 'If you keep training', dash: DASHED, width: 2.5 }] : []),
@@ -82,23 +80,11 @@ export function ProgressCurve({ history, now, goal }: ProgressCurveProps) {
               </text>
             </g>
           ))}
-          {goal !== null && (
-            <g>
-              <line data-goal x1={M.left} x2={width - M.right} y1={y(goal)} y2={y(goal)} strokeWidth={1} className="stroke-border-strong" />
-              <text x={M.left + 4} y={y(goal) - 6} fontSize={TEXT} className="fill-ink-muted">
-                Your goal
-              </text>
-            </g>
-          )}
           {keep && <path data-line="keep" d={path(keep) ?? ''} fill="none" strokeWidth={2.5} strokeDasharray={DASHED} className="stroke-brand-vivid" />}
           <path data-line="actual" d={path(actual) ?? ''} fill="none" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" className="stroke-brand-vivid" />
-          {actual.map((p, i) =>
-            i === milestone ? (
-              <circle key={i} data-session data-milestone cx={x(p.at)} cy={y(p.score)} r={6} className="fill-accent-strong stroke-surface" strokeWidth={2} />
-            ) : (
-              <circle key={i} data-session cx={x(p.at)} cy={y(p.score)} r={4} className="fill-brand-vivid" />
-            ),
-          )}
+          {actual.map((p, i) => (
+            <circle key={i} data-session cx={x(p.at)} cy={y(p.score)} r={4} className="fill-brand-vivid" />
+          ))}
           <text x={M.left} y={HEIGHT - 8} fontSize={TEXT} className="fill-ink-muted">
             {day(win.start)}
           </text>
