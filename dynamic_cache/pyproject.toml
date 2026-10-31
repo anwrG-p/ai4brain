@@ -1,0 +1,25 @@
+# Makes dynamic_cache installable on its own (pip install ./dynamic_cache), so another backend can
+# import dynamic_cache.generators with its schema. The repo itself still runs from the root
+# requirements.txt and pytest.ini; this file is not needed for that.
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "synapsetwin-dynamic-cache"
+version = "0.1.0"
+description = "SynapseTwin task generators, solvers and task payload schema (BE-03)"
+requires-python = ">=3.11"
+dependencies = ["fastjsonschema==2.21.2"]
+
+[project.optional-dependencies]
+# dynamic_cache.api (the router) needs FastAPI; the generators do not.
+api = ["fastapi>=0.110"]
+
+[tool.setuptools]
+# This directory is the package itself, so map it explicitly; tests/ is left out.
+packages = ["dynamic_cache", "dynamic_cache.generators"]
+package-dir = { "dynamic_cache" = "." }
+
+[tool.setuptools.package-data]
+"dynamic_cache.generators" = ["task_payload.schema.json"]
