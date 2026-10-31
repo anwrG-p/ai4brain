@@ -1,170 +1,221 @@
-# Ticket BE-10 report: SAT-JEPA brain twin
+# Ticket BE-10 report: SAT-JEPA brain twin (after the review fix round)
 
 ## Branch and commits
 - Branch: `worktree-agent-abcde342e9ec768d4`, based on `ae67522` (the BE-PORT tip).
 - Commits:
-  - `9373880` feat(brain_twin_jepa): BE-10 SAT-JEPA brain twin with a calibrated forecast interval
+  - `9373880` feat: first version of the SAT-JEPA brain twin
+  - `e48f8d9` docs: first report (superseded by this one)
+  - `b6b0546` merge of `d9655cb` (BE-07: `telemetry_io.py`, `features.py`, golden vectors, from `feat/ui-calm-clean`)
+  - `4e8ffe0` fix: review round (shadow mode, promotion gate, BE-07 features, ragged histories)
   - this report
+
+## Headline (read this first)
+- **The twin runs in shadow mode (R17).**
+  - Every forecast says `validated: false`.
+  - Only `brain_twin_jepa/validate.py` can flip that, after passing its gate on real users. It has not been run on real users, because none exist yet.
+- **Its interval is calibrated on synthetic users.**
+  - At full scale (1000 users, untouched seed 2026), held-out coverage is 0.780–0.827 in every pillar × h cell against a nominal 0.80.
+  - The CI-test config (400 users, 400 steps) gets 0.744–0.833 per cell.
+- **Its forecasts are barely better than averaging the user's past sessions, and in the CI config they are worse:**
+  - **Full run (1000 users, 1500 steps):** the twin beats the mean of history by 0.55–0.90 points of MAE per h (15.9 vs 16.4–16.9).
+  - **CI-test config (400 users, 400 steps):** the twin is **worse than the mean of history by 1.4–1.5 points at every h** (MAE 18.0–18.5 vs 16.4–17.1).
+  - **Gate dry run on fresh synthetic users (seed 2027):** the full-run twin gains 0.41 points with 95% CI [−0.05, 0.90]. The gate refuses it, as it should.
 
 ## Files
 | File | What |
 |---|---|
-| `brain_twin_jepa/jepa_model.py` | Builds the per-session features (`session_matrix`). Holds `SATJEPA`, `LeakyIntegrator`, `Calibration`, `BrainTwin` (forecast, save, load) and the module-level `forecast(history, h, twin=None)`. |
-| `brain_twin_jepa/train.py` | Data (BE-08 in-process or `--data DIR`), training, interval fit, held-out coverage, naive-baseline MAE. CLI: `python -m brain_twin_jepa.train`. |
-| `brain_twin_jepa/session_adapter.py` | **ponytail:** a local stand-in for BE-07 (see Requests). |
-| `brain_twin_jepa/requirements.txt` | `--extra-index-url https://download.pytorch.org/whl/cpu` with `torch==2.14.1`. It resolved to `2.14.1+cpu` here. |
-| `brain_twin_jepa/tests/` | `conftest.py` (one shared small twin), `test_jepa_model.py`, `test_train.py`, `test_session_adapter.py`. 23 tests. |
+| `brain_twin_jepa/jepa_model.py` | Holds `session_record` (a BE-07 session → record), `session_matrix`, `SATJEPA`, `LeakyIntegrator`, `Calibration`, `BrainTwin` and the module-level `forecast()`. |
+| `brain_twin_jepa/train.py` | BE-07 data path (in-process BE-08 users, or `--data DIR --source LABEL`), ragged `to_tensors`, deterministic training, `forecasts` (one row per user × n × h, twin and naive residuals), `fit_interval`, `calibrate`, `coverage`, `fit`, CLI. |
+| `brain_twin_jepa/validate.py` | The promotion gate, with its CLI. |
+| `brain_twin_jepa/requirements.txt` | `--extra-index-url https://download.pytorch.org/whl/cpu`, `torch==2.14.1` (resolves to `2.14.1+cpu`). |
+| `brain_twin_jepa/tests/` | `conftest.py` (shared twin, lazy), `test_jepa_model.py`, `test_train.py`, `test_validate.py`. BE-07's `test_features.py` and `test_telemetry_io.py` come in with the merge. |
 
-There are no HTTP routes (BE-11 adds them), and `api.py` is untouched.
+- Deleted: `session_adapter.py` and `test_session_adapter.py`. BE-07 replaced them.
+- No HTTP routes (BE-11 adds them), and `api.py` is untouched.
 
-## Design
-- **Steps are sessions.** Each session is a 13-dimensional `x_t`:
-  - the 5 pillar scores (/100, 0 when missing)
-  - the 5 pillar coverages, which also flag the missing scores
-  - the gap since the previous session, `log1p(days)/log1p(28)`
-  - time of day, sin and cos of the start hour (UTC, as the generator writes it)
-- **Context encoder f_θ.** An MLP over one session: `e_t = f_θ(x_t)` (latent 16, hidden 64).
-- **Leaky integrator.** `s̄_t = a ⊙ s̄_{t-1} + (1 − a) ⊙ e_t`, with a learned leak `a` per latent unit; it ends at a ≈ 0.67–0.77.
-  - It steps per session, never per idle day, because there is no ground truth for idle decay (R11).
-  - Causality is tested.
-- **Target encoder f_θ̄.** An EMA of f_θ with **τ = 0.996**, updated after every optimiser step, with no gradients.
-- **OQ-7 settled in code.** τ = 0.996 belongs to the EMA (the README). The integrator's leak is learned, not 0.996.
-- **Predictor g_φ(s̄_t, n, h).** It predicts `f_θ̄(x_{t+h})`.
-  - `n` is the number of sessions seen, so the model can learn the practice curve that plateaus around session 3.
-  - `h` is counted in sessions (1–6), not in days.
-- **Readout (the "soft anchor").** A linear map from the latent to the 5 pillars.
-  - It is trained on `f_θ(x_t)` (anchor loss) and on `g_φ`'s prediction against the scores h sessions later (forecast loss).
-  - It keeps the latent tied to measured scores, so the latent cannot collapse to a constant.
-- **Loss.** `0.1 · JEPA + anchor + forecast`.
-  - The JEPA term is the latent MSE divided by the target latent's variance. That makes it scale-free, so it cannot drop by shrinking the latent.
-  - At weight 1, the JEPA term crowded out the forecast (MAE 16.6 against 15.4 for the mean of history), hence the 0.1.
-- **Interval** (`train.fit_interval`), per pillar:
-  1. Variance model `a + b·h`, fitted by weighted least squares on the calibration users' squared residuals.
-  2. `b ≥ 0.02 · mean variance`, so the interval always widens with h. This floor is a judgement call (no evidence that a forecast 6 sessions out is as certain as one 1 session out).
-  3. Then `z` = the split-conformal quantile of `|r| / sqrt(a + b·h)` at level 0.8.
-- **Data split.** Users are split 60/20/20 into train, calibration and test. Users, not forecasts, are the unit, because residuals within one user are correlated.
-- **`forecast(history, h)` returns:**
-  - `{"status": "not_enough_data", "sessions": n, "min_sessions": 3}` when n < 3 (R11, R15).
-  - `ValueError` for h outside 1..6, the calibrated range.
-  - Otherwise `{"status": "ok", "h", "sessions", "level": 0.8, "pillars": {p: {mean, low, high, half_width} | null}, "calibration": {...}}`:
-    - **`pillars`:** `low` and `high` are clipped to 0–100. `half_width` is the unclipped ±, which always widens with h. A pillar never scored in the history is `null` (R15).
-    - **`calibration`:** `data` says "synthetic users (BE-08 generator), not real users". It also carries `held_out_users`, `coverage_at_h` per pillar and `coverage` per pillar.
-- **Checkpoint.** Saved to `models/checkpoints/sat_jepa.pt` (gitignored, verified with `git check-ignore`). It holds config, state_dict, calibration and meta, and is loaded with `torch.load(weights_only=True)`.
+## Design (unchanged parts in brief)
+- **Session features.** Per session, built from BE-07's `features.session_features`:
+  - 5 pillar scores
+  - 5 coverages (with BE-07, agility coverage is 1.0)
+  - gap since the previous session, `log1p(days)/log1p(28)`
+  - time of day (sin and cos)
+- **Network.**
+  - Context encoder f_θ: an MLP per session.
+  - Leaky integrator: a learned leak per latent unit (0.68–0.79), stepped per session, never per idle day (R11).
+  - Target encoder: an EMA of f_θ, τ = 0.996 (OQ-7: 0.996 belongs to the EMA).
+  - Predictor g_φ(s̄_t, n, h).
+  - Linear pillar readout (the soft anchor).
+- **Loss.** `0.1 · JEPA (latent MSE / target variance) + anchor + forecast`.
+- **Interval.** Per pillar, variance `a + b·h` with `b ≥ 0.02 · mean variance`, so the range always widens. A judgement call. Then a split-conformal `z` at level 0.8.
 
-## Full training run (the evidence)
-Commands, from the repo root:
+## What the review round changed
+1. **Marginal coverage stated.** `Calibration.scope` / payload `calibration.scope` reads: "marginal: the share of forecasts, pooled over held-out users, whose later score fell inside the interval; not a guarantee for any one user". It is asserted in tests.
+2. **Data source label not hardcoded.**
+   - `fit` sets `Calibration.source` from the data's origin. In-process runs get `synthetic: BE-08 generator in-process (U users x S sessions, data_seed D)`.
+   - Supplied histories need a caller-supplied `source`; otherwise `fit` raises a `ValueError`. The CLI requires `--source` with `--data`.
+   - `forecast` reads the label from `Calibration`. `validate.py` stores the real-data label with the refitted calibration.
+3. **Calibrated range.**
+   - `Calibration` records `n_min..n_max`, the context lengths the calibration users had, and `h_max`.
+   - Outside that range the payload has `calibrated: false`, `calibration.calibrated: false`, the range and a note. It carries no `scope`, `coverage`, `coverage_at_h` or `held_out_users`. This is tested.
+   - h outside 1..6 is still a `ValueError`.
+4. **`validated` flag.**
+   - Every `ok` payload has `validated` (from `meta.validation.validated is True`) and `calibrated`.
+   - `fit` writes `validation: {validated: false}`. Only `validate.promote` writes `true`.
+5. **Promotion gate (`python -m brain_twin_jepa.validate --data DIR --source LABEL [--checkpoint] [--out] [--seed]`).**
+   - It reads real telemetry with BE-07's `read_sessions` and splits users 50/50, per user.
+   - On the calibration half it refits the interval with `calibrate` → `fit_interval`.
+   - Checks on the held-out half:
+     - at least 100 held-out users with 9+ sessions
+     - coverage within ±0.05 of nominal per pillar
+     - a paired per-user gain: the mean-of-history MAE minus the twin's MAE over the same cells, 2000 user-resampling bootstraps. The 95% CI must lie above 0 and the mean gain must be ≥ 1.0 point.
+   - Only if all checks pass does it save the refitted calibration plus `validation: {validated: true, ...evidence}`. Otherwise it prints each failed check, writes nothing and exits 1.
+   - Tests:
+     - it refuses on synthetic data for the margin
+     - each check alone fails the gate
+     - `promote` writes `validated` and the new source
+     - the CLI refusal leaves the checkpoint byte-identical
+6. **Swap to BE-07.** Merged `d9655cb`. Sessions now come from `telemetry_io.dedupe` / `group_sessions` (in-process) and `read_sessions` (`--data`), and features from `features.session_features`. The adapter and its tests are deleted. Retrained and recalibrated; numbers below.
+7. **Ragged histories.**
+   - `to_tensors` pads to the longest history: zeros in `x`, NaN in `y`, plus `lengths`.
+   - Losses mask the padding (tested: garbage in the padding changes no loss).
+   - `forecasts` uses only (n, h) where the target session exists.
+   - Short users don't abort `fit`: it raises only when no user has more than 3 sessions.
+   - Tested with users of 1, 2, 3 and 10–14 sessions.
+8. **Coverage test tolerance.** ±0.10 per pillar pooled over h, ±0.12 per cell.
+9. **Torch skip.**
+   - The conftest fixture imports `train` lazily behind `pytest.importorskip("torch")`.
+   - The three torch test modules call `pytest.importorskip("torch")`.
+   - Checked with torch blocked: 41 passed (BE-07), 3 modules skipped, no collection error.
+10. **Determinism.**
+    - Training runs under `torch.use_deterministic_algorithms(True)` and `set_num_threads(1)`, both restored afterwards.
+    - `torch.random.fork_rng()` wraps init and training, so the global RNG is untouched. This is tested.
+    - One thread also made full training faster: 14.5 s, down from 49 s.
+11. **Evidence seed.** The final evidence uses `data_seed` **2026**, untouched during development (seeds 0–3, 1, 5, 7, 11 and 99 were used in sweeps and tests). The gate dry run uses **2027**, also untouched.
+12. **`pytest.raises(..., match=...)`** throughout.
+
+## Full evidence run (untouched seed 2026)
 ```
-python -m data.synthetic.generate --users 1000 --sessions 14 --seed 0 --out data/raw/synthetic
-python -m brain_twin_jepa.train --data data/raw/synthetic
+python -m data.synthetic.generate --users 1000 --sessions 14 --seed 2026 --out data/raw/synthetic-2026
+python -m brain_twin_jepa.train --data data/raw/synthetic-2026 --source "synthetic: BE-08 generator CLI, 1000 users x 14 sessions, seed 2026 (untouched during development)"
 ```
-- Run conditions: 1000 users × 14 sessions (1,708,000 events), 600 train / 200 calibration / 200 test, 1500 steps, batch 64, AdamW lr 3e-3, seed 0, about 49 s on a laptop CPU.
-- The in-process path (`python -m brain_twin_jepa.train` with no `--data`) gave **the identical curve and table**. That is end-to-end evidence of determinism across both data paths.
+- Split: 600 train / 200 calibration / 200 test users.
+- Training: 1500 steps, batch 64, AdamW lr 3e-3, seed 0, 14.5 s training on CPU.
+- Checkpoint: `models/checkpoints/sat_jepa.pt` (gitignored), `validated: false`.
 
 ### Training curve (mean over each 100 steps)
 | step | total | jepa (normalised) | anchor | forecast |
 |---:|---:|---:|---:|---:|
-| 100 | 0.66117 | 3.28794 | 0.08674 | 0.24564 |
-| 200 | 0.13657 | 0.51201 | 0.01497 | 0.07039 |
-| 300 | 0.10450 | 0.42576 | 0.00562 | 0.05631 |
-| 400 | 0.09171 | 0.37516 | 0.00154 | 0.05266 |
-| 500 | 0.08590 | 0.33684 | 0.00088 | 0.05134 |
-| 600 | 0.08234 | 0.31403 | 0.00081 | 0.05012 |
-| 700 | 0.07970 | 0.28699 | 0.00080 | 0.05019 |
-| 800 | 0.07723 | 0.27670 | 0.00093 | 0.04863 |
-| 900 | 0.07546 | 0.26585 | 0.00079 | 0.04809 |
-| 1000 | 0.07469 | 0.26270 | 0.00060 | 0.04781 |
-| 1100 | 0.07567 | 0.26546 | 0.00070 | 0.04842 |
-| 1200 | 0.07417 | 0.26282 | 0.00061 | 0.04727 |
-| 1300 | 0.07423 | 0.26414 | 0.00049 | 0.04733 |
-| 1400 | 0.07568 | 0.27432 | 0.00049 | 0.04776 |
-| 1500 | 0.07530 | 0.27825 | 0.00034 | 0.04714 |
+| 100 | 0.67331 | 3.34316 | 0.09131 | 0.24768 |
+| 200 | 0.14206 | 0.53834 | 0.01636 | 0.07186 |
+| 300 | 0.10625 | 0.43118 | 0.00610 | 0.05703 |
+| 400 | 0.09637 | 0.39284 | 0.00186 | 0.05523 |
+| 500 | 0.09096 | 0.36232 | 0.00135 | 0.05337 |
+| 600 | 0.08796 | 0.34052 | 0.00106 | 0.05284 |
+| 700 | 0.08541 | 0.32490 | 0.00102 | 0.05190 |
+| 800 | 0.08330 | 0.31079 | 0.00081 | 0.05141 |
+| 900 | 0.08195 | 0.30273 | 0.00082 | 0.05085 |
+| 1000 | 0.08190 | 0.30119 | 0.00068 | 0.05110 |
+| 1100 | 0.08043 | 0.29888 | 0.00054 | 0.05000 |
+| 1200 | 0.07983 | 0.29545 | 0.00057 | 0.04971 |
+| 1300 | 0.08055 | 0.30277 | 0.00054 | 0.04973 |
+| 1400 | 0.08048 | 0.30470 | 0.00055 | 0.04946 |
+| 1500 | 0.08087 | 0.30575 | 0.00050 | 0.04980 |
 
-- The JEPA term bottoms out near step 1000 and drifts up slightly (0.263 → 0.278). That is the usual moving-target effect: the EMA target keeps changing.
-- The forecast term keeps falling. An MSE of 0.047 on a 0–1 scale is an RMSE of about 22 points. That is mostly session-to-session noise: within-user SD is 15–25 points per session.
+The JEPA term bottoms out around step 1200 and creeps up as the EMA target moves. The forecast term keeps falling slowly.
 
 ### Calibration table: held-out coverage at nominal 80%
-200 test users, 10,200 forecasts, contexts of at least 3 sessions.
+- 200 test users, 10,200 forecasts, contexts of 3–13 sessions, h = 1–6.
+- Coverage is marginal, pooled over users.
 
 | pillar | h=1 | h=2 | h=3 | h=4 | h=5 | h=6 | all | half-width h=1..6 (points) |
 |---|---:|---:|---:|---:|---:|---:|---:|---|
-| focus | 0.786 | 0.789 | 0.790 | 0.804 | 0.802 | 0.801 | 0.794 | 19.8..20.8 |
-| agility | 0.779 | 0.781 | 0.786 | 0.796 | 0.786 | 0.802 | 0.787 | 18.5..19.5 |
-| impulse | 0.784 | 0.783 | 0.793 | 0.796 | 0.795 | 0.801 | 0.791 | 17.3..18.1 |
-| memory | 0.779 | 0.780 | 0.781 | 0.782 | 0.781 | 0.795 | 0.782 | 34.8..36.5 |
-| visual | 0.758 | 0.760 | 0.768 | 0.776 | 0.771 | 0.785 | 0.768 | 11.7..12.3 |
+| focus | 0.780 | 0.792 | 0.790 | 0.795 | 0.796 | 0.792 | 0.790 | 19.9..21.0 |
+| agility | 0.786 | 0.793 | 0.797 | 0.794 | 0.806 | 0.811 | 0.796 | 23.3..24.5 |
+| impulse | 0.806 | 0.810 | 0.819 | 0.824 | 0.819 | 0.824 | 0.816 | 17.7..18.6 |
+| memory | 0.799 | 0.801 | 0.811 | 0.816 | 0.816 | 0.827 | 0.810 | 36.3..38.2 |
+| visual | 0.807 | 0.816 | 0.820 | 0.809 | 0.823 | 0.824 | 0.816 | 11.2..11.8 |
 
-- Every cell is within 0.758–0.804, so all are within ±0.10 of nominal. Most are within ±0.03.
-- With an earlier 70/15/15 split (90 calibration users), visual came out at 0.743 overall. That is why the split moved to 60/20/20 with 1000 users.
-
-### Forecast error vs a naive baseline (MAE, points, test users)
+### Forecast error vs the mean of history (MAE, points, the same 200 test users)
 | h | 1 | 2 | 3 | 4 | 5 | 6 |
 |---|---:|---:|---:|---:|---:|---:|
-| twin | 15.36 | 15.42 | 15.34 | 15.44 | 15.58 | 15.49 |
-| mean of history | 15.47 | 15.62 | 15.55 | 15.71 | 15.91 | 15.87 |
+| twin | 15.89 | 15.88 | 15.86 | 15.88 | 15.97 | 15.93 |
+| mean of history | 16.44 | 16.52 | 16.56 | 16.65 | 16.85 | 16.77 |
 
-The twin is better at every h, but only by 0.1–0.4 points. On this data the session noise dominates, and the best possible forecast is close to a shrunk mean of the history.
+### Promotion-gate dry run (untouched seed 2027, synthetic, not real users)
+```
+python -m data.synthetic.generate --users 300 --sessions 12 --seed 2027 --out data/raw/synthetic-2027
+python -m brain_twin_jepa.validate --data data/raw/synthetic-2027 --source "synthetic: BE-08 CLI seed 2027 (gate dry run, not real users)"
+```
+```
+held-out users 150 (eligible 150), coverage {'focus': 0.8113, 'agility': 0.806, 'impulse': 0.7918, 'memory': 0.8044, 'visual': 0.7617}
+gain over the mean of history: 0.41 points, 95% CI [-0.05, 0.9]
+NOT PROMOTED: the twin stays in shadow mode (validated: false). Failed checks:
+- the 95% interval of the gain over the mean of history [-0.05, 0.9] does not exclude 0
+- margin 0.41 points over the mean of history is below 1.0
+exit=1
+```
+The user-count and coverage checks passed. Visual (0.762) is the closest to the ±0.05 edge. Only the two gain checks failed.
 
-### Small-config robustness
-This is the CI test's config: default architecture, 400 users × 12 sessions, 400 steps, so 80 test users. It was run over 4 seeds:
-
-| seed | seconds | min cell | max cell |
-|---:|---:|---:|---:|
-| 0 | 12.1 | 0.722 | 0.828 |
-| 1 | 11.2 | 0.751 | 0.825 |
-| 2 | 10.3 | 0.768 | 0.841 |
-| 3 | 9.6 | 0.735 | 0.879 |
-
-- The test uses seed 0, the default, not the best seed.
-- Its tightest cell has a 2.2-point margin. The result is deterministic on a given platform. A float difference on another OS would move a handful of the roughly 300 forecasts per cell.
+## CI-test config (stated plainly)
+- Config: the shared fixture, `TrainConfig(users=400, sessions=12, data_seed=0, seed=0, steps=400)`, 80 test users, 3120 forecasts. It trains and calibrates in about 11 s, under an asserted budget of 120 s.
+- **Forecasts:** the twin is worse than the mean of history at every h:
+  - twin MAE: 18.25, 18.35, 18.01, 17.95, 18.06, 18.53
+  - mean of history: 16.84, 16.95, 16.56, 16.44, 16.66, 17.07
+  - That is 1.4–1.5 points worse. 400 steps are too few for the model to learn more than a noisy average.
+- **Coverage:** per cell 0.744–0.833. Per pillar overall: focus 0.769, agility 0.761, impulse 0.793, memory 0.811, visual 0.780.
+- **Gate:** run on 240 fresh synthetic users (seed 7), it refuses this twin. The gain is −1.27 points, 95% CI [−1.72, −0.81]. This is `test_refuses_when_the_margin_over_the_mean_of_history_is_too_small`.
+- **Why CI uses this config:** the CI tests check mechanics and calibration, not forecast quality. Forecast quality is exactly what the promotion gate exists to judge.
 
 ## Tests
-- `pytest -q` from the repo root: **881 passed, 1 xfailed, 0 warnings, 44 s**. The base had 858 passed.
-- `brain_twin_jepa/tests` alone: 23 passed in about 12 s. The shared twin trains and calibrates in about 10 s, under an asserted 120 s budget.
-- No slow marker was needed. It would also have meant registering a marker in the root `pytest.ini`, which this ticket does not own.
+- `pytest -q` from the repo root: **934 passed, 1 xfailed, 0 warnings, 51 s**.
+- `brain_twin_jepa/tests`: 76 passed in about 20 s (including BE-07's 41).
 
 ## Acceptance-criteria mapping
 | Criterion | Where | Test |
 |---|---|---|
-| context encoder f_θ, target EMA τ = 0.996, predictor g_φ, leaky integrator | `jepa_model.SATJEPA`, `LeakyIntegrator` | `test_network_shapes`, `test_leaky_integrator_formula_and_causality` |
-| inputs: 5 pillars + coverage + session gap + time of day | `jepa_model.session_matrix` | `test_session_matrix_shapes_and_values` |
-| shapes | | `test_network_shapes`, `test_session_matrix_shapes_and_values` |
-| EMA update exact | `SATJEPA.ema_update` | `test_ema_update_is_exact` (bitwise `torch.equal`), `test_target_encoder_gets_no_gradient` |
-| loss decreases on synthetic data | `train.train_model` | `test_loss_decreases_on_synthetic_data` (total, JEPA, anchor, forecast; first vs last window) |
-| seed determinism | `train.train_model` | `test_same_seed_same_weights_other_seed_other_weights`, plus the identical full runs on both data paths |
-| trains on BE-08 data; checkpoint in `models/checkpoints/` (gitignored) | `train.fit`, `main`, `directory_histories` | `test_cli_trains_and_writes_a_loadable_checkpoint`, `test_generator_files_read_back_as_the_same_sessions` |
-| `forecast(history, h)`: per-pillar mean and an interval that widens with h | `BrainTwin.forecast`, `jepa_model.forecast` | `test_interval_widens_with_h` |
-| calibration evidence returned and in this report | `forecast()["calibration"]`, tables above | `test_forecast_carries_its_calibration_evidence` |
+| f_θ, target EMA τ = 0.996, g_φ, leaky integrator | `SATJEPA`, `LeakyIntegrator` | `test_network_shapes`, `test_leaky_integrator_formula_and_causality` |
+| inputs: 5 pillars + coverage + gap + time of day (BE-07) | `session_record`, `session_matrix` | `test_session_record_uses_be07_features`, `test_session_matrix_shapes_and_values` |
+| shapes | | `test_network_shapes` |
+| EMA exact | `ema_update` | `test_ema_update_is_exact` (bitwise), `test_target_encoder_gets_no_gradient` |
+| loss decreases | `train_model` | `test_loss_decreases_on_synthetic_data` |
+| seed determinism | `train_model`, `deterministic()` | `test_same_seed_same_weights_other_seed_other_weights` (also: RNG, threads and the determinism switch are restored) |
+| trains on BE-08 data; checkpoint in `models/checkpoints/` | `fit`, `main`, `directory_histories` | `test_cli_trains_and_writes_a_loadable_checkpoint`, `test_generator_files_read_back_as_the_same_sessions` |
+| interval widens with h | `Calibration.half_width` | `test_interval_widens_with_h` |
 | fewer than 3 sessions: `not_enough_data` | `_not_enough_data` | `test_fewer_than_three_sessions_is_not_enough_data`, `test_module_forecast_needs_no_checkpoint_for_not_enough_data` |
-| held-out coverage within ±10% of nominal, in CI under a time budget | `train.coverage` | `test_held_out_coverage_is_within_ten_points_of_nominal` (every pillar × h cell plus overall, budget 120 s) |
-| torch pinned (CPU wheel) | `brain_twin_jepa/requirements.txt` | the root `pip install -r requirements.txt` resolved `2.14.1+cpu` |
+| held-out coverage near nominal, in CI under a budget | `coverage`, `measure` | `test_held_out_coverage_is_near_nominal` (±0.10 pooled, ±0.12 per cell, 120 s) |
+| review 1: marginal scope | `COVERAGE_SCOPE` | `test_payload_is_shadow_mode_with_source_and_marginal_scope`, `test_forecast_carries_its_calibration_evidence` |
+| review 2: source from the origin | `fit`, `synthetic_source`, `--source` | `test_fit_needs_a_source_for_supplied_histories_and_users_long_enough`, `test_cli_with_data_requires_a_source`, `test_fit_keeps_every_session...` |
+| review 3: calibrated range | `Calibration.covers` | `test_outside_the_calibrated_range_makes_no_coverage_claim` |
+| review 4: `validated` | `BrainTwin.validated` | `test_validated_only_from_the_promotion_metadata` |
+| review 5: promotion gate | `validate.py` | `test_validate.py` (4 tests) |
+| review 6: BE-07 swap | merge `b6b0546`, `session_record` | adapter tests removed; BE-07's tests pass |
+| review 7: ragged histories | `to_tensors`, masked `losses`, `forecasts` | `test_ragged_histories_are_padded_not_cut`, `test_fit_keeps_every_session_of_ragged_users_and_short_users_do_not_abort`, `test_losses_ignore_padding_after_a_short_history` |
+| torch CPU pin | `requirements.txt` | `pip install -r requirements.txt` resolved `2.14.1+cpu` |
 | no HTTP routes | `api.py` untouched | |
 
 ## Curl evidence
 Not applicable: BE-10 adds no routes (BE-11 does).
 
-## Limitations (honest)
-- **Synthetic only.** The coverage is measured on BE-08's synthetic users, whose noise model the interval learned. Real users may be noisier or heavy-tailed differently. The forecast says this in `calibration.data`. Recalibrate (`fit_interval` + `coverage`) on real held-out users once they exist.
-- **Marginal coverage, not per user.** About 80% of forecasts across users land in the interval. A very steady or very erratic user will see more or fewer.
-- **Small bias.** Mean residuals on test users are −2.4 to +1.2 points depending on the pillar. The forecast mean also drifts up by about 1 point over h = 1..6 where the synthetic truth is flat after session 3.
-- **Scope of the claim.** A forecast is about scores on these exercises (research area 3). It says nothing about cognition in general.
-- **Gaps as features only.** The gap enters only as an input feature; there is no decay with idle days (R11). If BE-08 is ever run with `--forgetting-per-day > 0`, the model would learn whatever that parameter encodes, which is still not ground truth.
-- **Time of day is UTC.** The local hour needs a tz from the client.
+## Limitations
+- **Synthetic only.** Every coverage and error number here comes from BE-08 synthetic users. The real-user verdict belongs to `validate.py`.
+- **Marginal coverage.** It is pooled over users; a steady or erratic user will see more or less.
+- **Small gain.** The full run's gain over the naive forecast (about 0.6–0.9 points, 0.41 on a fresh seed) does not reach the gate's 1-point margin, even on synthetic data. A promoted twin needs a better model or a different target, not a looser gate.
+- **Scope of the claim.** Forecasts are about scores on these exercises only (research area 3).
+- **Time of day is UTC.**
 
 ## Requests
-1. **BE-07: swap the adapter.** `brain_twin_jepa/session_adapter.py` is the `# ponytail:` local adapter.
-   - Replace `read_jsonl_dir` with BE-07's `read_events`, which dedupes.
-   - Replace `_task_scores` / `_pillar_scores` with BE-07's golden-vector port.
-   - The adapter leaves out `DCCS_SwitchCost` and `ErrorRecovery`, so its agility is ANT_Conflict alone (coverage .4), and agility and coverage differ from the frontend's.
-   - The twin needs only records with `started_at`, `pillars` and `coverage` (attributes or keys).
-   - After the swap: delete `session_adapter.py` and point `train.py` and `test_session_adapter.py` at BE-07, then retrain and re-run the calibration table.
-2. **BE-11.** Load once with `BrainTwin.load()` (or call `jepa_model.forecast(history, h)`).
-   - Map `not_enough_data` to the profile's `predictions` as-is.
-   - Map `FileNotFoundError` (no trained checkpoint) to 501.
-   - Map `ValueError` (h out of 1..6) to 422.
-   - Show `half_width` as the "likely" range (research area 2: numbers, not verbal hedges).
-   - The Docker image needs a checkpoint. Either train one at build or deploy time (about 1 min CPU), or mount `models/checkpoints/`.
-3. **DOC-1 / docs.**
-   - The README lists `src/brain_twin/jepa_model.py` as the deliverable path. The code lives at `brain_twin_jepa/jepa_model.py`.
-   - Record OQ-7's resolution: τ = 0.996 is the EMA; the integrator's leak is learned. SEQUENCE_DIAGRAMS' "leaky temporal filter (Tau = 0.996)" is therefore wrong.
-4. **BE-09.** For latents, use `SATJEPA.context(x)[:, -1]` (16-d smoothed state) from the BE-10 checkpoint.
-5. **TD-01 / CI.** The Python job now downloads the torch CPU wheel (about 200 MB). The pip cache in `ui-ci.yml` keys on `**/requirements.txt`, so it caches the wheel after the first run.
+1. **BE-11 (R17 shadow mode).**
+   - Compute the forecast and return it with `validated: false` and `calibration.source`. The UI shows measured values only.
+   - Map errors and statuses:
+     - `not_enough_data` → pass through
+     - missing checkpoint (`FileNotFoundError`) → 501
+     - h outside 1..6 (`ValueError`) → 422
+     - `calibrated: false` → show no range claim
+   - The Docker image needs a trained checkpoint, either trained at deploy (about 15 s training + data) or mounted.
+2. **Ops / Member 3.** Run `python -m brain_twin_jepa.validate --data <real export> --source "<label>"` once at least 200 real users have 9+ sessions (for 100 eligible held-out users). Promote only on exit 0.
+3. **DOC-1.**
+   - The README deliverable path `src/brain_twin/jepa_model.py` should read `brain_twin_jepa/jepa_model.py`.
+   - SEQUENCE_DIAGRAMS' "leaky temporal filter (Tau = 0.996)" is wrong: 0.996 is the EMA, and the leak is learned.
+   - Document R17 shadow mode.
+4. **BE-09.** For latents, use `SATJEPA.context(x)[:, -1]` (the 16-d smoothed state).
+5. **TD-01 / CI.** The Python job downloads the torch CPU wheel (about 200 MB); the pip cache keyed on `**/requirements.txt` holds it after the first run.
