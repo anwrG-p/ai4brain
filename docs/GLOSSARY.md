@@ -31,6 +31,9 @@ Use these preferred consumer terms across all pages, UI copy, and coach interact
 | **Visual Memory Clarity** | High-fidelity recognition distinguishing subtle visual variations from lures without false alarms. | Task cards, Skill arena (`episodic_pattern_separation`) |
 | **Wide-Angle Focus** | Simultaneous central and peripheral target discrimination under rapid presentation. | Task cards, Skill arena (`divided_perceptual_speed` / UFOV) |
 | **Distraction Shield** | Goal-directed stimulus selection while suppressing high-conflict surrounding clutter. | Task cards, Skill arena (`inhibition_control` / Flanker) |
+| **Mental Stamina** | The sustained capacity to keep high decision accuracy without fatigue across a session. | — |
+| **Memory Sharpness** | The quickness and fidelity of encoding, updating, and recalling active patterns across short delays. | — |
+| **Focus Consistency** | The stability and regularity of response timing across repeated trials without hesitation spikes. | — |
 | **Daily Energy & Focus Rhythm** | The natural cyclical variance in alertness, focus, and executive endurance across the day. | `/brain-twin` rhythm tab, Dashboard overview, Settings |
 | **Rest-Protected Streak (Zero-Guilt Continuity Strip)** | A continuous habit counter that automatically pauses during rest days without resetting. | Dashboard Section 3, Goals page, Habit contract cards |
 | **Calibration Session (Today's 2-Min Flow)** | A gamified, low-stakes micro-puzzle block designed to estimate current cognitive parameters. | Assessment Hub, Task Runner, Briefing modals |
@@ -52,6 +55,32 @@ Use these preferred consumer terms across all pages, UI copy, and coach interact
 | **0–100 AI Collaboration Score** | **Co-Pilot Synergy with Brian (0–100)** | `/coach` synergy panel (keeps small *"Experimental Model (Design proposal, not validated)"* tag for rubric compliance) |
 | **Episodic Pattern Separation / UFOV / Inhibitory Flanker** | **Visual Memory Clarity · Wide-Angle Focus · Distraction Shield** | Skill cards & practice arena details |
 | **Continuous Saccadic Drift / Fatigue Heatmap** | **Daily Energy & Focus Rhythm** | `/brain-twin` rhythm tab & collapsible deep telemetry drawer |
+
+## 2.2 Aliases to avoid, per term
+
+Merged from the former root `GLOSSARY.md`. Use the term on the left; never the aliases.
+
+| Term | _Avoid_ |
+| :--- | :--- |
+| **Personal Cognitive Twin** | SAT-JEPA Latent Twin State, Cognitive Digital Twin, Psychometric Predictive Agent, Latent Embedding Vector |
+| **Your Thinking Style** | SAT-JEPA Latent Twin State & Hysteresis, GMM Archetype Cluster (k=0..8), Latent Archetype Discovery, Clustering Class |
+| **Weekly Progress Boost** | Differential Vector Δc (+0.18), Delta C, Parameter Derivative, Latent Gradient |
+| **Auto-Paced to Your Flow Zone** | QUEST+ / Elo Psychometric Staircase Target, Adaptive Item Response Theory, Staircase Algorithm, Bayesian Target Level |
+| **Clarity Range (±%)** | Epistemic Uncertainty (±1.96σ CI), Uncertainty Polygon Error Bands, Standard Error of Measurement, Confidence Interval Margin |
+| **Calibration Confidence** (how well the twin knows your baseline, in %) | Posterior Entropy Reduction, QUEST+ Information Gain, Convergence Metric, Fit Parameter |
+| **✨ Why Brian Suggests This** | 5-Part Reasoning Trail (Telemetry -> Inference -> Counterfactual), Bayesian Evidence Chain, Audit DAG, Decision Trace |
+| **Co-Pilot Synergy with Brian (0–100)** | 0–100 AI Collaboration Score (raw title), Human-AI Alignment Index, Algorithmic Synergy Quotient |
+| **Visual Memory Clarity** | Episodic Pattern Separation, Mnemonic Similarity Task (MST), Dentate Gyrus Lure Rejection |
+| **Wide-Angle Focus** | Useful Field of View (UFOV), Divided Perceptual Speed, Visual Angle Threshold |
+| **Distraction Shield** | Inhibitory Flanker, Eriksen Flanker Task, Stroop Interference Quotient, Incongruency Suppression Cost |
+| **Mental Stamina** | Fatigue Resistance Index, Saccadic Velocity Attenuation, Time-on-Task Performance Decay |
+| **Memory Sharpness** | N-Back Working Memory Updating, Working Memory Buffer Capacity, Retrieval Latency Drift |
+| **Focus Consistency** | Reaction Time Jitter, Intra-individual Variability, Ex-Gaussian Tau Tail, Saccadic Latency Variance |
+| **Daily Energy & Focus Rhythm** | Continuous Saccadic Drift, Fatigue Heatmap, Circadian Oculomotor Matrix, Microsaccadic Jitter Map |
+| **Rest-Protected Streak** | Gamified Punishment Streak, Broken Streak, Lost Streak, Penalty Reset, Compulsory Daily Streak |
+| **Calibration Session** (a 90–120 s micro-round set) | Cognitive Assessment Battery, Psychometric Evaluation Exam, Testing Protocol, Diagnostic Run |
+| **BRIAN** | AI Evaluator, Diagnostic Avatar, Assessment Bot, Virtual Proctor |
+| **EMILY** | Passive Biometric Telemetry Harvester, Motor Tremor Tracker, Keystroke Dynamics Logger |
 
 ---
 

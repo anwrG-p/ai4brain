@@ -13,7 +13,7 @@ Welcome to the frontend, UI, UX, and visual analytics documentation for our **CI
 | **[`00-context.md`](./00-context.md)** | Official challenge rules, rubric weights, team architecture sync, and working agreements. | Active |
 | **[`01-ux-strategy.md`](./01-ux-strategy.md)** | Personas, $<3\text{-minute}$ first-insight flow, epistemic honesty principles, and non-clinical voice. | Active |
 | **[`02-design-system.md`](./02-design-system.md)** | OKLCH color tokens, Okabe-Ito WCAG 3:1 dimension palette, typography, spacing, motion, and contrast table. | In Progress (Sprint) |
-| **[`03-mascot.md`](./03-mascot.md)** | Original SVG mascot specification, 8 states, reduced-motion fallbacks, and hard exclusion rules. | Scheduled (Post-Dashboard) |
+| **`03-mascot.md`** | Original SVG mascot specification, 8 states, reduced-motion fallbacks, and hard exclusion rules. | Never written (the BRIAN mascot was retired in brand v2) |
 | **[`contracts.md`](./contracts.md)** | Full TypeScript API contract, bridge to `assessment_engine` & `README.md` endpoints, mock fixtures, and backend requests. | Active |
 | **[`DECISIONS.md`](./DECISIONS.md)** | Architectural, design, and scope decision log (Context, Options, Choice, Why). | Active |
 | **[`JUDGES-UI.md`](./JUDGES-UI.md)** | Official rubric-to-screen proof matrix with screenshot paths and verification instructions. | Active |
