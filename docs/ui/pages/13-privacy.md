@@ -183,11 +183,11 @@
 ---
 
 ## 9. Data Contracts & Backend Integration
-- **`DELETE /v1/user/telemetry`**:
-  - Request: Empty or `{ "purge_reason": "user_right_to_be_forgotten" }`.
-  - Response: `200 {"status": "purged", "purged_records": 142, "certificate_id": "CERT-PURGE-2026-8F4A"}`.
-- **`GET /v1/user/export`**:
-  - Response: Full JSON archive matching `cistac-v1.0` schema.
+- **`DELETE /v1/user/telemetry?user_id=<anonymous id>`** (`backend/app/api/routes/v1_privacy.py`):
+  - Response: `200 {"deleted_events": n, "deleted_files": n}`, counting only what was removed (`0, 0` when nothing was stored). Idempotent.
+  - `422` for a missing or unsafe id; `503` with `Retry-After: 1` when the telemetry store is busy.
+- **`GET /v1/user/export?user_id=<anonymous id>`**:
+  - Response: `200` raw JSONL (`application/x-ndjson`, one stored event per line, as an attachment); `404` when nothing is stored; `413` above 50 MB; `503` with `Retry-After: 1` when busy.
 - **`ConsentPreferences`** (from `frontend/src/store/useAppStore.ts`):
   - `coreTelemetry: true` (Locked)
   - `nonBiometricMode: true` (Locked)

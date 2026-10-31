@@ -69,9 +69,10 @@ Find your section and skip the rest.
 
 ## Member 4 (Dashboard & Privacy)
 
-- **Deleting a user's telemetry** (`DELETE /v1/user/telemetry`) = delete `{TELEMETRY_DIR}/{user_id}.jsonl`. Use the resolver `telemetry_dir()` in `backend/app/api/routes/v1_telemetry.py`, so your route and ingestion agree on the location. On the server, nothing else stores telemetry.
-- **The UI's purge is local only.** The Privacy page calls `tracker.clear()`, which drops the events still waiting on this device (memory and `localStorage`). It does not call your route yet; wire it in when the route exists.
-- **The 30-day retention job** works on the same files. Each line has a `received_at` UTC timestamp.
+- **The privacy routes exist** (BE-02, ported in BE-PORT). `DELETE /v1/user/telemetry?user_id=` removes `{TELEMETRY_DIR}/{user_id}.jsonl` and every `{user_id}.*` file and returns `{deleted_events, deleted_files}`. `GET /v1/user/export?user_id=` returns the stored JSONL (404 if none, 413 above 50 MB). Both answer 503 with `Retry-After: 1` when the telemetry lock stays busy. The logic is in `backend/app/privacy/telemetry_store.py` (no FastAPI); the routes are thin wrappers. On the server, nothing else stores telemetry.
+- **User ids are case-insensitive.** The store lowercases them (`user_key()`), so `U1` and `u1` share `u1.jsonl` on every filesystem.
+- **The UI's purge is local only.** The Privacy page calls `tracker.clear()`, which drops the events still waiting on this device (memory and `localStorage`). It does not call the delete route yet.
+- **The 30-day retention job** works on the same files under the same lock. Each line has a `received_at` UTC timestamp. Run it from the repo root: `python -m backend.app.privacy.retention --days 30`.
 - **Shared FastAPI app:** `backend/app/main.py` is the one API server (BE-00). It mounts one router per module; privacy routes go in `backend/app/api/routes/v1_privacy.py`. It also adds a custom 422 handler that leaves the rejected `input` out of the response, so NaN values don't turn into 500 errors. Keep that handler.
 - **Voice consent:** the UI ships without voice (D1), so there is no consent to manage there. The opt-in toggle exists only in the frozen `client/`. If voice comes back, your governance UI should own its consent; tell Member 1.
 - **Radar axes:** there are 6 dimensions; see Member 3's section.

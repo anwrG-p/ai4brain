@@ -1,14 +1,13 @@
-import json
-import os
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
-# The anonymous device id (R13) and the session id. user_id is also a file name: no dots or slashes.
-ID_PATTERN = r"^[A-Za-z0-9_-]{1,64}$"
+from app.privacy.telemetry_store import ID_PATTERN, LockTimeout, append_events
+
+# The anonymous device id (R13) and the session id. user_id is also a file name: no dots or
+# slashes. The store lowercases it, so u1 and U1 are one user.
 Id = Annotated[str, StringConstraints(pattern=ID_PATTERN)]
 MetaKey = Annotated[str, StringConstraints(pattern=r"^[a-z0-9_]{1,32}$")]
 MetaValue = Annotated[str, StringConstraints(max_length=64)] | int | float | bool
@@ -56,29 +55,18 @@ class TelemetryEvent(BaseModel):
 Batch = Annotated[list[TelemetryEvent], Field(max_length=100)]
 
 # Mounted by app/main.py. The frontend tracker (frontend/src/features/assessment/telemetry) posts here.
+# Thin wrapper: the append, the lock and the id lowercasing live in app.privacy.telemetry_store.
 router = APIRouter()
-
-# routes/ -> api/ -> app/ -> backend/ -> repo root, whose data/raw/* is gitignored.
-REPO_ROOT = Path(__file__).resolve().parents[4]
-
-
-def telemetry_dir() -> Path:
-    env = os.environ.get("TELEMETRY_DIR")
-    return Path(env) if env else REPO_ROOT / "data" / "raw" / "telemetry"
 
 
 @router.post("/v1/telemetry/event", status_code=202)
-async def ingest(body: TelemetryEvent | Batch) -> dict[str, int]:
+def ingest(body: TelemetryEvent | Batch) -> dict[str, int]:
+    # Sync handler, so it runs in the threadpool: waiting on the lock never stalls the event loop.
     events = body if isinstance(body, list) else [body]
-    out_dir = telemetry_dir()
-    out_dir.mkdir(parents=True, exist_ok=True)
-    received_at = datetime.now(timezone.utc).isoformat()
-    # ponytail: sync appends inside an async handler are serialized on the event loop, so lines
-    # never interleave within one uvicorn worker; Redis Streams if multiple workers.
-    for e in events:
-        line = json.dumps(
-            {**e.model_dump(mode="json"), "received_at": received_at}, allow_nan=False
+    try:
+        accepted = append_events(e.model_dump(mode="json") for e in events)
+    except LockTimeout:
+        raise HTTPException(
+            status_code=503, detail="telemetry store busy", headers={"Retry-After": "1"}
         )
-        with open(out_dir / f"{e.user_id}.jsonl", "a", encoding="utf-8") as f:
-            f.write(line + "\n")
-    return {"accepted": len(events)}
+    return {"accepted": accepted}

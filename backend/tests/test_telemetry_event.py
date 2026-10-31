@@ -132,7 +132,7 @@ def test_trial_meta_long_string_rejected(client, tmp_path):
 def test_default_telemetry_dir_is_repo_root_data_raw(monkeypatch):
     from pathlib import Path
 
-    from app.api.routes.v1_telemetry import telemetry_dir
+    from app.privacy.telemetry_store import telemetry_dir
 
     monkeypatch.delenv("TELEMETRY_DIR", raising=False)
     repo_root = Path(__file__).resolve().parents[2]
@@ -142,7 +142,7 @@ def test_default_telemetry_dir_is_repo_root_data_raw(monkeypatch):
 
 
 def test_telemetry_dir_env_overrides(monkeypatch, tmp_path):
-    from app.api.routes.v1_telemetry import telemetry_dir
+    from app.privacy.telemetry_store import telemetry_dir
 
     monkeypatch.setenv("TELEMETRY_DIR", str(tmp_path))
     assert telemetry_dir() == tmp_path

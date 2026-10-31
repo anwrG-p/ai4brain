@@ -17,7 +17,7 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, StringConstraints
 
-from app.api.routes.v1_telemetry import ID_PATTERN
+from app.privacy.telemetry_store import ID_PATTERN
 
 router = APIRouter(prefix="/v1", tags=["V1 Platform Contract"])
 
