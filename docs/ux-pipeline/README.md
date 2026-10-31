@@ -2,11 +2,11 @@
 
 This folder used to hold copies of the UX docs. The copies drifted (the `DECISIONS.md` copy stopped at DEC-008), so they were removed. Each link below points at the one maintained file.
 
-Brand v2 (Loti, Momo, Dolphin, 5 pillars) is specified in `.scratch/brand-v2/spec.md`. Several docs below still describe the earlier BRIAN / Doodle design; they are updated in ticket TD-04.
+Brand v2 (Loti, Dolphin, Momo, the 5 skills, the classroom board) is specified in `.scratch/brand-v2/spec.md` and summarised in [the design system](../design/DESIGN.md). Docs marked *History* at their top describe the earlier BRIAN / Doodle UI and are kept as a record.
 
 ## 1. Strategy and journey
 
-- [UX transformation plan](../design/UX_TRANSFORMATION_PLAN.md)
+- [UX transformation plan](../design/UX_TRANSFORMATION_PLAN.md) (history)
 - [UX strategy](../ui/01-ux-strategy.md)
 - [Challenge context](../ui/00-context.md)
 
@@ -15,11 +15,11 @@ Brand v2 (Loti, Momo, Dolphin, 5 pillars) is specified in `.scratch/brand-v2/spe
 - [Design system](../design/DESIGN.md)
 - [Design system contrast tables](../ui/02-design-system.md)
 - [Direction sprint (HTML)](../ui/direction-sprint.html)
-- Stitch exports (BRIAN brand, Doodle tokens, skill guidelines): [`stitch_designs/docs/`](../../stitch_designs/docs/)
+- Stitch exports from the earlier BRIAN / Doodle design (history): [`stitch_designs/docs/`](../../stitch_designs/docs/)
 
-## 3. Affective computing (EMILY)
+## 3. Mood guess (Momo, EMILY)
 
-- [EMILY behavioral emotion engine](../architecture/EMILY_BEHAVIORAL_EMOTION_ENGINE.md)
+- [EMILY: the on-device mood guess behind Momo](../architecture/EMILY_BEHAVIORAL_EMOTION_ENGINE.md) and [ADR 0002](../adr/0002-no-server-side-emotion-inference.md)
 
 ## 4. Contracts and architecture
 
@@ -38,4 +38,4 @@ Brand v2 (Loti, Momo, Dolphin, 5 pillars) is specified in `.scratch/brand-v2/spe
 
 ## 6. Page specifications
 
-All 19 page specs live in [`docs/ui/pages/`](../ui/pages/), from [01 Welcome](../ui/pages/01-welcome.md) to [19 Layer D](../ui/pages/19-layer-d.md).
+The 19 page specs of the earlier UI (history) live in [`docs/ui/pages/`](../ui/pages/), from [01 Welcome](../ui/pages/01-welcome.md) to [19 Layer D](../ui/pages/19-layer-d.md).
