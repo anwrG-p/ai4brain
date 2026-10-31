@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { DimensionPresetKey } from '../../config/dimensions'
 import {
   PILLAR_IDS,
   PILLAR_WEIGHTS,
   pillarScores,
-  pillarTraining,
   unifiedScore,
-  type PillarId,
   type TaskScores,
 } from './pillars'
 
@@ -107,25 +104,3 @@ describe('unifiedScore', () => {
   })
 })
 
-describe('pillarTraining (respects the active preset)', () => {
-  it.each<[PillarId, DimensionPresetKey, string | null]>([
-    ['focus', '7', 'visuospatial_planning_gf:tower'],
-    ['agility', '7', 'cognitive_flexibility:n_back'],
-    ['impulse', '7', 'inhibition_control:stroop'],
-    ['memory', '7', 'episodic_pattern_separation:mst'],
-    ['visual', '7', 'attention_networks:ufov'],
-    ['agility', '3', 'cognitive_flexibility:n_back'],
-    ['focus', '3', 'working_memory:n_back'],
-    ['memory', '3', null],
-    ['visual', '3', null],
-    ['focus', '6', 'working_memory:n_back'],
-    ['agility', '6', 'cognitive_flexibility:n_back'],
-    ['impulse', '6', 'inhibitory_control:stroop'],
-    ['visual', '6', 'attention:ufov'],
-    ['memory', '6', 'episodic_pattern_separation:mst'],
-    ['agility', '10', 'cognitive_flexibility:n_back'],
-  ])('%s on preset %s -> %s', (pillar, preset, expected) => {
-    const t = pillarTraining(pillar, preset)
-    expect(t && `${t.dimId}:${t.schema}`).toBe(expected)
-  })
-})

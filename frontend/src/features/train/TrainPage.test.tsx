@@ -118,6 +118,17 @@ describe('Train (/train)', () => {
     expect(primaries(page).map((el) => el.getAttribute('aria-label'))).toEqual(['Start Perceptual Radar'])
   })
 
+  // One weakest pillar app-wide: Train reads each pillar as last measured, like Home and Loti, so a
+  // later session that skipped a pillar does not blank it here.
+  it('agrees with Home and Loti: a later short session keeps the earlier scores', () => {
+    const later = { id: 's2', at: '2026-10-31T10:00:00.000Z', inputs: { MST_LDI: { score: 60, trials: 20 } } }
+    act(() => useSessionStore.setState({ sessions: [SESSION, later] }))
+    renderTrain()
+    expect(screen.getByText(`${PILLAR_LABELS.visual} could use some care today.`)).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Visual Radar' })).getByText('35')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Deep Memory' })).getByText('60')).toBeInTheDocument()
+  })
+
   it('?pillar= puts that pillar first, highlights it and moves focus to it', () => {
     act(() => useSessionStore.setState({ sessions: [SESSION] }))
     const page = renderTrain('/train?pillar=memory')

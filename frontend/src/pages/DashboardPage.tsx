@@ -58,7 +58,7 @@ export default function DashboardPage() {
   const pillars = useMemo(() => currentPillars(sessions), [sessions])
   const improved = useMemo(() => improvedPillars(sessions), [sessions])
   const history = useMemo(() => unifiedHistory(sessions), [sessions])
-  const weakest = weakestPillar(pillars)
+  const weakest = weakestPillar(pillars) ?? undefined
   const goalList = useMemo(() => goalLines({ year: goalYear, goals, bases }, pillars, now), [goalYear, goals, bases, pillars, now])
   const goalLevels = Object.fromEntries(goalList.flatMap((g) => (g.goal === null ? [] : [[g.pillar, g.goal]])))
   const start = sessionPath(weakest)

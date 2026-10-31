@@ -25,12 +25,14 @@ export function currentPillars(sessions: readonly SessionRecord[]): Pillars {
   return out
 }
 
-/** The lowest measured pillar, or undefined when none is measured. */
-export function weakestPillar(pillars: Pillars): PillarId | undefined {
-  let best: PillarId | undefined
+/** The lowest measured pillar among `among` (default all), or null when none of them is measured;
+    ties keep the pillar order. The one weakest pillar of the app: Home, Loti and Train use it. */
+export function weakestPillar(pillars: Pillars, among: readonly PillarId[] = PILLAR_IDS): PillarId | null {
+  let best: PillarId | null = null
   for (const id of PILLAR_IDS) {
     const s = pillars[id].score
-    if (s !== null && (best === undefined || s < pillars[best].score!)) best = id
+    if (s === null || !among.includes(id)) continue
+    if (best === null || s < pillars[best].score!) best = id
   }
   return best
 }
