@@ -125,7 +125,10 @@ def test_delete_rejects_ids_that_are_not_file_safe(client, monkeypatch, tmp_path
 
 def test_profile_never_returns_numbers_today(client):
     # Even with telemetry stored, nothing turns it into estimates yet.
-    client.post("/v1/telemetry/event", json=[{**EVENT, "user_id": "prof", "trial_index": i} for i in range(20)])
+    setup = client.post(
+        "/v1/telemetry/event", json=[{**EVENT, "user_id": "prof", "trial_index": i} for i in range(20)]
+    )
+    assert setup.status_code == 202
     r = client.get("/v1/dashboard/profile", params={"user_id": "prof"})
     assert r.status_code == 200
     assert r.json() == {"user_id": "prof", "status": "not_enough_data", "estimates": [], "snapshots": []}
