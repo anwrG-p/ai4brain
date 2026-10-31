@@ -10,10 +10,11 @@
 // <frontend dir> holds src/features/insights/{taskScores,pillars}.ts; it defaults to ./frontend.
 // The event sets below are fixed (seeded), so a regeneration only changes when the TS scorers do.
 //
-// The committed file was generated from wave-integration 8b8c859's frontend/src with taskScores.ts
-// replaced by the R16 version (rule-stream-only n-back: ErrorRecovery reads the rule stream, and
-// ruleStream keeps stream === RULE_STREAM[rule], parity -> symbol). The LF sha256 of both TS files
-// is under `source`. Once R16 is merged, `--check` against frontend/ must pass unchanged.
+// The committed file was generated from the frontend at cad4ad1 (feat/ui-calm-clean), which carries
+// R16: n-back is scored on the rule's stream only (taskScores.ts onRuleStream, by
+// telemetry/types.ts NBACK_RULE_STREAM, parity -> symbol; an unknown rule falls back to
+// stream === rule), and ErrorRecovery reads that stream. The LF sha256 of the TS files the scores
+// depend on is under `source`.
 //
 // Dedupe: the server stores events at least once (the client retries a batch), so each case is
 // scored after dropping repeats of (session_id, trial_meta.item_id, trial_meta.stream), first one
@@ -43,7 +44,8 @@ if (!existsSync(join(insights, 'taskScores.ts')) || !existsSync(join(insights, '
 const { taskScores } = await import(pathToFileURL(join(insights, 'taskScores.ts')).href)
 const { pillarScores, unifiedScore } = await import(pathToFileURL(join(insights, 'pillars.ts')).href)
 // LF-normalised, so a CRLF checkout hashes the same.
-const sha = (f) => createHash('sha256').update(readFileSync(join(insights, f), 'utf8').replace(/\r\n/g, '\n')).digest('hex')
+const SOURCES = ['insights/taskScores.ts', 'insights/pillars.ts', 'assessment/telemetry/types.ts']
+const sha = (f) => createHash('sha256').update(readFileSync(join(frontend, 'src', 'features', f), 'utf8').replace(/\r\n/g, '\n')).digest('hex')
 
 /** The dedupe contract (see the header). Events without item_id fall back to task_id:trial_index,
     which is how the client builds item_id. */
@@ -97,6 +99,7 @@ function ev(session, task, index, dimension, meta, { ok = true, rt = 600 } = {})
   }
 }
 
+// A copy of telemetry/types.ts NBACK_RULE_STREAM, so the event sets stay fixed whatever the frontend.
 const RULE_STREAM = { position: 'position', symbol: 'symbol', parity: 'symbol' }
 
 /** One n-back trial: one event per stream (R16 layout). `rule` decides the scored stream; the
@@ -226,7 +229,33 @@ add('nback_chance_nonresponder', 'Never presses: d prime floored at 0, switch co
     return nbackTrial('s_nr', 'nbn', i, { rule: i < 7 ? 'position' : 'symbol', type, ok: type !== 'target' })
   }).flat())
 
-add('stroop', 'Stroop RT cost on correct trials, gated by accuracy above chance; SST_SSRT proxy.', () =>
+add('nback_unknown_rule', 'Rules outside NBACK_RULE_STREAM fall back to stream === rule (strict: true !== 1).', () => {
+  const nb = (i, rule, stream, type, ok = true) =>
+    ev('s_unk', 'nbu', i, 'working_memory', { trial_type: type, rule, stream }, { ok, rt: type === 'target' && ok ? 540 : 1800 })
+  const events = []
+  for (let i = 0; i < 10; i++) {
+    const type = i % 3 === 1 ? 'target' : i === 9 ? 'switch' : 'standard'
+    events.push(nb(i, 'shape', 'shape', type, i !== 4 && i !== 6), nb(i, 'shape', 'position', 'standard'))
+  }
+  for (let i = 10; i < 14; i++) events.push(nb(i, 1, 1, i % 2 ? 'target' : 'standard', i !== 12), nb(i, 1, 'symbol', 'standard'))
+  for (let i = 14; i < 18; i++) events.push(nb(i, true, 1, i % 2 ? 'target' : 'standard', false), nb(i, true, true, i % 2 ? 'target' : 'standard'))
+  return events
+})
+
+add('error_recovery_stroop_chance_nback_counted', 'ErrorRecovery leaves out the Stroop task played at chance and still counts the n-back task.', () => [
+  ...Array.from({ length: 8 }, (_, i) =>
+    ev('s_erc', 'stx', i, 'executive_function', { congruent: i % 2 === 0 }, { ok: i === 1 || i === 3, rt: 700 }),
+  ),
+  ...nbackTrial('s_erc', 'nbx', 0, { rule: 'position', type: 'target' }),
+  ...nbackTrial('s_erc', 'nbx', 1, { rule: 'position', type: 'standard', ok: false, offOk: false }),
+  ...nbackTrial('s_erc', 'nbx', 2, { rule: 'position', type: 'target' }),
+  ...nbackTrial('s_erc', 'nbx', 3, { rule: 'position', type: 'target', ok: false }),
+  ...nbackTrial('s_erc', 'nbx', 4, { rule: 'position', type: 'target', ok: false }),
+  ...nbackTrial('s_erc', 'nbx', 5, { rule: 'position', type: 'standard' }),
+  ...nbackTrial('s_erc', 'nbx', 6, { rule: 'position', type: 'standard' }),
+])
+
+add('stroop','Stroop RT cost on correct trials, gated by accuracy above chance; SST_SSRT proxy.', () =>
   stroopRun('s_stroop', 'st1', 36), 21)
 
 add('stroop_at_chance', 'Stroop at exactly 1 in 4 accuracy: gate 0, so ANT_Conflict 0 although an RT cost exists.', () =>
@@ -311,7 +340,7 @@ const golden = {
   generated_by: 'scripts/golden/make_golden.mjs',
   tolerance: 1e-6,
   dedupe_key: ['session_id', 'trial_meta.item_id', 'trial_meta.stream'],
-  source: { 'taskScores.ts': sha('taskScores.ts'), 'pillars.ts': sha('pillars.ts') },
+  source: Object.fromEntries(SOURCES.map((f) => [f, sha(f)])),
   cases: cases.map((c) => {
     const unique = dedupe(c.events)
     const inputs = taskScores(unique)
@@ -330,7 +359,20 @@ if (check) {
       for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) walk(a[k], b[k], `${path}.${k}`)
     } else if (a !== b) diffs.push(`${path}: ${JSON.stringify(b)} != ${JSON.stringify(a)}`)
   }
-  committed.cases.forEach((c, i) => walk(c.expected, golden.cases[i]?.expected, c.name))
+  // Cases match by name, and the events must be the committed ones too: a changed event set is a
+  // regeneration, not a pass.
+  const fresh = new Map(golden.cases.map((c) => [c.name, c]))
+  for (const c of committed.cases) {
+    const g = fresh.get(c.name)
+    if (!g) {
+      diffs.push(`${c.name}: no longer generated`)
+      continue
+    }
+    if (JSON.stringify(g.events) !== JSON.stringify(c.events)) diffs.push(`${c.name}.events: differ from the committed events`)
+    walk(c.expected, g.expected, c.name)
+    fresh.delete(c.name)
+  }
+  for (const name of fresh.keys()) diffs.push(`${name}: not in the committed file`)
   if (diffs.length) {
     console.error(diffs.join('\n'))
     process.exit(1)

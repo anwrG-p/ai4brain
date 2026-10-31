@@ -1,8 +1,9 @@
 """Session features: a faithful Python port of the frontend's scorers.
 
 Ports `frontend/src/features/insights/taskScores.ts` (telemetry events -> the doc's 0-100 inputs)
-and `pillars.ts` (inputs -> the five pillars and the unified score), as of `wave-integration`
-8b8c859 plus ruling R16 (n-back scored on the rule's stream only, parity answered on `symbol`).
+and `pillars.ts` (inputs -> the five pillars and the unified score) as committed in cad4ad1
+(feat/ui-calm-clean), which carries ruling R16: n-back is scored on the rule's stream only
+(`telemetry/types.ts` NBACK_RULE_STREAM, parity answered on `symbol`).
 Every constant, gate and evaluation order matches the TS, so both sides agree to 1e-6 on
 `data/fixtures/golden_sessions.json` (generated from the TS by `scripts/golden/make_golden.mjs`).
 Neither file rounds: the UI rounds only for display.
@@ -36,8 +37,9 @@ PLAN_TIME_MAX_MS = 30_000  # half of the TOL-F 60 s limit
 UFOV_MIN_MS = 17  # one 60 Hz frame
 UFOV_MAX_MS = 500  # the top of the UFOV duration grid
 
-# R16: the stream whose key the rule's hint names (NBack.tsx RULE_STREAM); parity is answered with L.
-RULE_STREAM = {"position": "position", "symbol": "symbol", "parity": "symbol"}
+# R16: the stream whose key the rule's hint names (frontend `telemetry/types.ts` NBACK_RULE_STREAM);
+# parity is answered with L (symbol).
+NBACK_RULE_STREAM = {"position": "position", "symbol": "symbol", "parity": "symbol"}
 
 _MISSING = object()
 
@@ -141,17 +143,30 @@ def _input(fraction: float, trials: int) -> dict[str, Any]:
     return {"score": 100 * _clamp01(fraction), "trials": trials}
 
 
+def _js_strict_eq(a: Any, b: Any) -> bool:
+    """JS `a === b` on JSON values (`_MISSING` is undefined): bool is distinct from number, and
+    int 1 equals float 1.0."""
+    if a is _MISSING or b is _MISSING or a is None or b is None:
+        return a is b
+    if isinstance(a, bool) or isinstance(b, bool):
+        return isinstance(a, bool) and isinstance(b, bool) and a == b
+    if _is_number(a) and _is_number(b):
+        return a == b
+    return type(a) is type(b) and isinstance(a, str) and a == b
+
+
+def on_rule_stream(e: Event) -> bool:
+    """taskScores.ts `onRuleStream`: the n-back event on the stream whose key the rule's hint names
+    (NBACK_RULE_STREAM; symbol for parity). An unknown or non-string rule falls back to
+    `stream === rule`."""
+    m = _meta(e)
+    rule = m.get("rule", _MISSING)
+    want = NBACK_RULE_STREAM[rule] if isinstance(rule, str) and rule in NBACK_RULE_STREAM else rule
+    return _js_strict_eq(m.get("stream", _MISSING), want)
+
+
 def _rule_stream(nb: Iterable[Event]) -> list[Event]:
-    out = []
-    for e in nb:
-        m = _meta(e)
-        rule = m.get("rule", _MISSING)
-        # JS: stream === RULE_STREAM[String(rule)]; the map only holds strings.
-        target = RULE_STREAM.get(rule) if isinstance(rule, str) else None
-        stream = m.get("stream", _MISSING)
-        if target is not None and isinstance(stream, str) and stream == target:
-            out.append(e)
-    return out
+    return [e for e in nb if on_rule_stream(e)]
 
 
 def _is_switch(e: Event) -> bool:

@@ -8,9 +8,16 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.privacy.telemetry_store import append_events
+from app.privacy import telemetry_store
+from app.privacy.telemetry_store import EXPORT_MAX_BYTES, LockTimeout, append_events, telemetry_lock
 from brain_twin_jepa.features import session_features
-from brain_twin_jepa.telemetry_io import group_sessions, read_events, read_sessions
+from brain_twin_jepa.telemetry_io import (
+    READ_MAX_BYTES,
+    EventsTooLarge,
+    group_sessions,
+    read_events,
+    read_sessions,
+)
 
 GOLDEN = Path(__file__).resolve().parents[2] / "data" / "fixtures" / "golden_sessions.json"
 CASES = {c["name"]: c for c in json.loads(GOLDEN.read_text(encoding="utf-8"))["cases"]}
@@ -101,3 +108,21 @@ def test_ingest_to_features_round_trip_matches_golden(monkeypatch, tmp_path):
         assert math.isclose(got["inputs"][input_id]["score"], want["score"], abs_tol=1e-6)
         assert got["inputs"][input_id]["trials"] == want["trials"]
     assert math.isclose(got["unified"], case["expected"]["unified"], abs_tol=1e-6)
+
+
+def test_oversized_file_raises_a_clear_error(tmp_path):
+    assert READ_MAX_BYTES == EXPORT_MAX_BYTES
+    append_events([ev("s1", "t1", i, "2026-10-30T09:00:00Z") for i in range(3)], tmp_path)
+    size = (tmp_path / "u1.jsonl").stat().st_size
+    assert len(read_events("u1", tmp_path, max_bytes=size)) == 3  # at the limit is fine
+    with pytest.raises(EventsTooLarge, match="read limit"):
+        read_events("u1", tmp_path, max_bytes=size - 1)
+
+
+def test_busy_lock_raises_lock_timeout(monkeypatch, tmp_path):
+    append_events([ev("s1", "t1", 0, "2026-10-30T09:00:00Z")], tmp_path)
+    monkeypatch.setattr(telemetry_store, "LOCK_TIMEOUT_S", 0.05)
+    with telemetry_lock(tmp_path):
+        with pytest.raises(LockTimeout):
+            read_events("u1", tmp_path)
+    assert len(read_events("u1", tmp_path)) == 1  # free again once released

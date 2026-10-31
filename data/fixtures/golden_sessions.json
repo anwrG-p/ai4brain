@@ -8,8 +8,9 @@
     "trial_meta.stream"
   ],
   "source": {
-    "taskScores.ts": "90785277206272f7c0709da01576d9e7b4803f119778dd16dc14a994bd65a52c",
-    "pillars.ts": "9d288f744c3f726a8e1b5fde005e718abb9facf4a5b6e532fd615faad3a31a32"
+    "insights/taskScores.ts": "de5d88d03ef30ba3518c37c5466e6cbd90bf1f35488369840fab8947756f33b5",
+    "insights/pillars.ts": "e3de51c4a57f5dd3dc2d71a9b58926d25369bf7b12a6e2caee7f69db56d77b66",
+    "assessment/telemetry/types.ts": "b4e4627dfad6df8dd23e867bfc492391d020cb69ea0716f59e1d86a3cf553567"
   },
   "cases": [
     {
@@ -572,6 +573,183 @@
         {"user_id":"golden_user","session_id":"s_nr","task_id":"nbn","trial_index":18,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbn:18","trial_type":"standard","rule":"symbol","stream":"symbol"},"client_ts":"2026-10-30T09:00:57.000Z"},
         {"user_id":"golden_user","session_id":"s_nr","task_id":"nbn","trial_index":19,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbn:19","trial_type":"standard","rule":"symbol","stream":"position"},"client_ts":"2026-10-30T09:00:58.500Z"},
         {"user_id":"golden_user","session_id":"s_nr","task_id":"nbn","trial_index":19,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbn:19","trial_type":"standard","rule":"symbol","stream":"symbol"},"client_ts":"2026-10-30T09:01:00.000Z"}
+      ]
+    },
+    {
+      "name": "nback_unknown_rule",
+      "description": "Rules outside NBACK_RULE_STREAM fall back to stream === rule (strict: true !== 1).",
+      "expected": {
+        "unique_events": 36,
+        "inputs": {
+          "OSPAN": {
+            "score": 40.87512881611971,
+            "trials": 17
+          },
+          "DCCS_SwitchCost": {
+            "score": 100,
+            "trials": 11
+          },
+          "ErrorRecovery": {
+            "score": 100,
+            "trials": 3
+          }
+        },
+        "pillars": {
+          "focus": {
+            "score": 40.87512881611971,
+            "uncertainty": 50,
+            "coverage": 0.45,
+            "proxies": []
+          },
+          "agility": {
+            "score": 99.99999999999999,
+            "uncertainty": 45.45278709655485,
+            "coverage": 0.6000000000000001,
+            "proxies": []
+          },
+          "impulse": {
+            "score": null,
+            "uncertainty": 50,
+            "coverage": 0,
+            "proxies": []
+          },
+          "memory": {
+            "score": null,
+            "uncertainty": 50,
+            "coverage": 0,
+            "proxies": []
+          },
+          "visual": {
+            "score": null,
+            "uncertainty": 50,
+            "coverage": 0,
+            "proxies": []
+          }
+        },
+        "unified": 70.43756440805984
+      },
+      "events": [
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":0,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:0","trial_type":"standard","rule":"shape","stream":"shape"},"client_ts":"2026-10-30T09:00:01.500Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":0,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:0","trial_type":"standard","rule":"shape","stream":"position"},"client_ts":"2026-10-30T09:00:03.000Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":1,"dimension":"working_memory","score_norm":1,"response_time_ms":540,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:1","trial_type":"target","rule":"shape","stream":"shape"},"client_ts":"2026-10-30T09:00:04.500Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":1,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:1","trial_type":"standard","rule":"shape","stream":"position"},"client_ts":"2026-10-30T09:00:06.000Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":2,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:2","trial_type":"standard","rule":"shape","stream":"shape"},"client_ts":"2026-10-30T09:00:07.500Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":2,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:2","trial_type":"standard","rule":"shape","stream":"position"},"client_ts":"2026-10-30T09:00:09.000Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":3,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:3","trial_type":"standard","rule":"shape","stream":"shape"},"client_ts":"2026-10-30T09:00:10.500Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":3,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:3","trial_type":"standard","rule":"shape","stream":"position"},"client_ts":"2026-10-30T09:00:12.000Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":4,"dimension":"working_memory","score_norm":0,"response_time_ms":1800,"error_flag":true,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:4","trial_type":"target","rule":"shape","stream":"shape"},"client_ts":"2026-10-30T09:00:13.500Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":4,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:4","trial_type":"standard","rule":"shape","stream":"position"},"client_ts":"2026-10-30T09:00:15.000Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":5,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:5","trial_type":"standard","rule":"shape","stream":"shape"},"client_ts":"2026-10-30T09:00:16.500Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":5,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:5","trial_type":"standard","rule":"shape","stream":"position"},"client_ts":"2026-10-30T09:00:18.000Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":6,"dimension":"working_memory","score_norm":0,"response_time_ms":1800,"error_flag":true,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:6","trial_type":"standard","rule":"shape","stream":"shape"},"client_ts":"2026-10-30T09:00:19.500Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":6,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:6","trial_type":"standard","rule":"shape","stream":"position"},"client_ts":"2026-10-30T09:00:21.000Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":7,"dimension":"working_memory","score_norm":1,"response_time_ms":540,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:7","trial_type":"target","rule":"shape","stream":"shape"},"client_ts":"2026-10-30T09:00:22.500Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":7,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:7","trial_type":"standard","rule":"shape","stream":"position"},"client_ts":"2026-10-30T09:00:24.000Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":8,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:8","trial_type":"standard","rule":"shape","stream":"shape"},"client_ts":"2026-10-30T09:00:25.500Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":8,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:8","trial_type":"standard","rule":"shape","stream":"position"},"client_ts":"2026-10-30T09:00:27.000Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":9,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:9","trial_type":"switch","rule":"shape","stream":"shape"},"client_ts":"2026-10-30T09:00:28.500Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":9,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:9","trial_type":"standard","rule":"shape","stream":"position"},"client_ts":"2026-10-30T09:00:30.000Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":10,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:10","trial_type":"standard","rule":1,"stream":1},"client_ts":"2026-10-30T09:00:31.500Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":10,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:10","trial_type":"standard","rule":1,"stream":"symbol"},"client_ts":"2026-10-30T09:00:33.000Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":11,"dimension":"working_memory","score_norm":1,"response_time_ms":540,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:11","trial_type":"target","rule":1,"stream":1},"client_ts":"2026-10-30T09:00:34.500Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":11,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:11","trial_type":"standard","rule":1,"stream":"symbol"},"client_ts":"2026-10-30T09:00:36.000Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":12,"dimension":"working_memory","score_norm":0,"response_time_ms":1800,"error_flag":true,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:12","trial_type":"standard","rule":1,"stream":1},"client_ts":"2026-10-30T09:00:37.500Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":12,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:12","trial_type":"standard","rule":1,"stream":"symbol"},"client_ts":"2026-10-30T09:00:39.000Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":13,"dimension":"working_memory","score_norm":1,"response_time_ms":540,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:13","trial_type":"target","rule":1,"stream":1},"client_ts":"2026-10-30T09:00:40.500Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":13,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:13","trial_type":"standard","rule":1,"stream":"symbol"},"client_ts":"2026-10-30T09:00:42.000Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":14,"dimension":"working_memory","score_norm":0,"response_time_ms":1800,"error_flag":true,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:14","trial_type":"standard","rule":true,"stream":1},"client_ts":"2026-10-30T09:00:43.500Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":14,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:14","trial_type":"standard","rule":true,"stream":true},"client_ts":"2026-10-30T09:00:45.000Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":15,"dimension":"working_memory","score_norm":0,"response_time_ms":1800,"error_flag":true,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:15","trial_type":"target","rule":true,"stream":1},"client_ts":"2026-10-30T09:00:46.500Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":15,"dimension":"working_memory","score_norm":1,"response_time_ms":540,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:15","trial_type":"target","rule":true,"stream":true},"client_ts":"2026-10-30T09:00:48.000Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":16,"dimension":"working_memory","score_norm":0,"response_time_ms":1800,"error_flag":true,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:16","trial_type":"standard","rule":true,"stream":1},"client_ts":"2026-10-30T09:00:49.500Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":16,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:16","trial_type":"standard","rule":true,"stream":true},"client_ts":"2026-10-30T09:00:51.000Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":17,"dimension":"working_memory","score_norm":0,"response_time_ms":1800,"error_flag":true,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:17","trial_type":"target","rule":true,"stream":1},"client_ts":"2026-10-30T09:00:52.500Z"},
+        {"user_id":"golden_user","session_id":"s_unk","task_id":"nbu","trial_index":17,"dimension":"working_memory","score_norm":1,"response_time_ms":540,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbu:17","trial_type":"target","rule":true,"stream":true},"client_ts":"2026-10-30T09:00:54.000Z"}
+      ]
+    },
+    {
+      "name": "error_recovery_stroop_chance_nback_counted",
+      "description": "ErrorRecovery leaves out the Stroop task played at chance and still counts the n-back task.",
+      "expected": {
+        "unique_events": 22,
+        "inputs": {
+          "OSPAN": {
+            "score": 7.965984091135173,
+            "trials": 7
+          },
+          "ANT_Conflict": {
+            "score": 0,
+            "trials": 8
+          },
+          "SST_SSRT": {
+            "score": 50,
+            "trials": 4,
+            "proxy": true
+          },
+          "ErrorRecovery": {
+            "score": 66.66666666666666,
+            "trials": 3
+          }
+        },
+        "pillars": {
+          "focus": {
+            "score": 7.965984091135173,
+            "uncertainty": 50,
+            "coverage": 0.45,
+            "proxies": []
+          },
+          "agility": {
+            "score": 22.222222222222218,
+            "uncertainty": 49.70075058843173,
+            "coverage": 0.6000000000000001,
+            "proxies": []
+          },
+          "impulse": {
+            "score": 50,
+            "uncertainty": 50,
+            "coverage": 0.5,
+            "proxies": [
+              "SST_SSRT"
+            ]
+          },
+          "memory": {
+            "score": null,
+            "uncertainty": 50,
+            "coverage": 0,
+            "proxies": []
+          },
+          "visual": {
+            "score": null,
+            "uncertainty": 50,
+            "coverage": 0,
+            "proxies": []
+          }
+        },
+        "unified": 26.729402104452465
+      },
+      "events": [
+        {"user_id":"golden_user","session_id":"s_erc","task_id":"stx","trial_index":0,"dimension":"executive_function","score_norm":0,"response_time_ms":700,"error_flag":true,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"stx:0","congruent":true},"client_ts":"2026-10-30T09:00:01.500Z"},
+        {"user_id":"golden_user","session_id":"s_erc","task_id":"stx","trial_index":1,"dimension":"executive_function","score_norm":1,"response_time_ms":700,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"stx:1","congruent":false},"client_ts":"2026-10-30T09:00:03.000Z"},
+        {"user_id":"golden_user","session_id":"s_erc","task_id":"stx","trial_index":2,"dimension":"executive_function","score_norm":0,"response_time_ms":700,"error_flag":true,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"stx:2","congruent":true},"client_ts":"2026-10-30T09:00:04.500Z"},
+        {"user_id":"golden_user","session_id":"s_erc","task_id":"stx","trial_index":3,"dimension":"executive_function","score_norm":1,"response_time_ms":700,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"stx:3","congruent":false},"client_ts":"2026-10-30T09:00:06.000Z"},
+        {"user_id":"golden_user","session_id":"s_erc","task_id":"stx","trial_index":4,"dimension":"executive_function","score_norm":0,"response_time_ms":700,"error_flag":true,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"stx:4","congruent":true},"client_ts":"2026-10-30T09:00:07.500Z"},
+        {"user_id":"golden_user","session_id":"s_erc","task_id":"stx","trial_index":5,"dimension":"executive_function","score_norm":0,"response_time_ms":700,"error_flag":true,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"stx:5","congruent":false},"client_ts":"2026-10-30T09:00:09.000Z"},
+        {"user_id":"golden_user","session_id":"s_erc","task_id":"stx","trial_index":6,"dimension":"executive_function","score_norm":0,"response_time_ms":700,"error_flag":true,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"stx:6","congruent":true},"client_ts":"2026-10-30T09:00:10.500Z"},
+        {"user_id":"golden_user","session_id":"s_erc","task_id":"stx","trial_index":7,"dimension":"executive_function","score_norm":0,"response_time_ms":700,"error_flag":true,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"stx:7","congruent":false},"client_ts":"2026-10-30T09:00:12.000Z"},
+        {"user_id":"golden_user","session_id":"s_erc","task_id":"nbx","trial_index":0,"dimension":"working_memory","score_norm":1,"response_time_ms":520,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbx:0","trial_type":"target","rule":"position","stream":"position"},"client_ts":"2026-10-30T09:00:13.500Z"},
+        {"user_id":"golden_user","session_id":"s_erc","task_id":"nbx","trial_index":0,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbx:0","trial_type":"standard","rule":"position","stream":"symbol"},"client_ts":"2026-10-30T09:00:15.000Z"},
+        {"user_id":"golden_user","session_id":"s_erc","task_id":"nbx","trial_index":1,"dimension":"working_memory","score_norm":0,"response_time_ms":1800,"error_flag":true,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbx:1","trial_type":"standard","rule":"position","stream":"position"},"client_ts":"2026-10-30T09:00:16.500Z"},
+        {"user_id":"golden_user","session_id":"s_erc","task_id":"nbx","trial_index":1,"dimension":"working_memory","score_norm":0,"response_time_ms":1800,"error_flag":true,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbx:1","trial_type":"standard","rule":"position","stream":"symbol"},"client_ts":"2026-10-30T09:00:18.000Z"},
+        {"user_id":"golden_user","session_id":"s_erc","task_id":"nbx","trial_index":2,"dimension":"working_memory","score_norm":1,"response_time_ms":520,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbx:2","trial_type":"target","rule":"position","stream":"position"},"client_ts":"2026-10-30T09:00:19.500Z"},
+        {"user_id":"golden_user","session_id":"s_erc","task_id":"nbx","trial_index":2,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbx:2","trial_type":"standard","rule":"position","stream":"symbol"},"client_ts":"2026-10-30T09:00:21.000Z"},
+        {"user_id":"golden_user","session_id":"s_erc","task_id":"nbx","trial_index":3,"dimension":"working_memory","score_norm":0,"response_time_ms":1800,"error_flag":true,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbx:3","trial_type":"target","rule":"position","stream":"position"},"client_ts":"2026-10-30T09:00:22.500Z"},
+        {"user_id":"golden_user","session_id":"s_erc","task_id":"nbx","trial_index":3,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbx:3","trial_type":"standard","rule":"position","stream":"symbol"},"client_ts":"2026-10-30T09:00:24.000Z"},
+        {"user_id":"golden_user","session_id":"s_erc","task_id":"nbx","trial_index":4,"dimension":"working_memory","score_norm":0,"response_time_ms":1800,"error_flag":true,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbx:4","trial_type":"target","rule":"position","stream":"position"},"client_ts":"2026-10-30T09:00:25.500Z"},
+        {"user_id":"golden_user","session_id":"s_erc","task_id":"nbx","trial_index":4,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbx:4","trial_type":"standard","rule":"position","stream":"symbol"},"client_ts":"2026-10-30T09:00:27.000Z"},
+        {"user_id":"golden_user","session_id":"s_erc","task_id":"nbx","trial_index":5,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbx:5","trial_type":"standard","rule":"position","stream":"position"},"client_ts":"2026-10-30T09:00:28.500Z"},
+        {"user_id":"golden_user","session_id":"s_erc","task_id":"nbx","trial_index":5,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbx:5","trial_type":"standard","rule":"position","stream":"symbol"},"client_ts":"2026-10-30T09:00:30.000Z"},
+        {"user_id":"golden_user","session_id":"s_erc","task_id":"nbx","trial_index":6,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbx:6","trial_type":"standard","rule":"position","stream":"position"},"client_ts":"2026-10-30T09:00:31.500Z"},
+        {"user_id":"golden_user","session_id":"s_erc","task_id":"nbx","trial_index":6,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"nbx:6","trial_type":"standard","rule":"position","stream":"symbol"},"client_ts":"2026-10-30T09:00:33.000Z"}
       ]
     },
     {

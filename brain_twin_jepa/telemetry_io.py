@@ -21,17 +21,37 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from app.privacy.telemetry_store import telemetry_dir, telemetry_lock, user_key
+from app.privacy.telemetry_store import EXPORT_MAX_BYTES, telemetry_dir, telemetry_lock, user_key
 
 Event = dict[str, Any]
 
+# The same ceiling as export: 30 days of one user's events is far below it, so hitting it means a
+# runaway file, and the whole file is held in memory to parse it.
+READ_MAX_BYTES = EXPORT_MAX_BYTES
 
-def dedupe_key(e: Event) -> tuple[Any, Any, Any]:
+
+class EventsTooLarge(Exception):
+    """The user's file is over the read limit. HTTP callers answer 413 (as export does)."""
+
+
+def _typed(v: Any) -> tuple[str, Any]:
+    """A key part that compares like the JS side's JSON.stringify: True is not 1 (Python's
+    `True == 1` would merge them), while 1 and 1.0 are one number."""
+    if isinstance(v, bool):
+        return ("bool", v)
+    if isinstance(v, (int, float)):
+        return ("number", float(v))
+    if v is None:
+        return ("null", None)
+    return (type(v).__name__, v)
+
+
+def dedupe_key(e: Event) -> tuple[tuple[str, Any], ...]:
     m = e.get("trial_meta") or {}
     item = m.get("item_id")
     if item is None:
         item = f"{e.get('task_id')}:{e.get('trial_index')}"
-    return (e.get("session_id"), item, m.get("stream"))
+    return (_typed(e.get("session_id")), _typed(item), _typed(m.get("stream")))
 
 
 def dedupe(events: list[Event]) -> list[Event]:
@@ -47,20 +67,30 @@ def dedupe(events: list[Event]) -> list[Event]:
     return out
 
 
-def read_events(user_id: str, directory: Path | None = None) -> list[Event]:
+def read_events(
+    user_id: str, directory: Path | None = None, max_bytes: int | None = None
+) -> list[Event]:
     """The user's stored events in append order, deduplicated. [] when nothing is stored.
 
     Reads under the telemetry lock, so a delete or retention rewrite is never seen half done.
-    Raises ValueError for a bad id (user_key) and LockTimeout when the lock stays busy. A line
-    that is not a JSON object (a torn write) is skipped: it is not an event.
+    Raises ValueError for a bad id (user_key), EventsTooLarge above `max_bytes` (default
+    READ_MAX_BYTES), and LockTimeout when the lock stays busy (up to LOCK_TIMEOUT_S). A line that
+    is not a JSON object (a torn write) is skipped: it is not an event.
+
+    Sync and blocking (file I/O, and a lock wait of up to 10 s): call it from a sync route, which
+    FastAPI runs in its threadpool, or via `run_in_threadpool`; never directly inside `async def`.
     """
     key = user_key(user_id)
+    limit = READ_MAX_BYTES if max_bytes is None else max_bytes
     directory = directory or telemetry_dir()
     path = directory / f"{key}.jsonl"
     if not path.is_file():
         return []
     with telemetry_lock(directory):
         try:
+            size = path.stat().st_size
+            if size > limit:
+                raise EventsTooLarge(f"{size} bytes is over the {limit}-byte read limit")
             text = path.read_text(encoding="utf-8")
         except FileNotFoundError:  # deleted between the check and the lock
             return []
@@ -111,6 +141,8 @@ def group_sessions(events: list[Event]) -> list[Session]:
     return sorted(by_id.values(), key=lambda s: s.started_at)
 
 
-def read_sessions(user_id: str, directory: Path | None = None) -> list[Session]:
-    """read_events() grouped into sessions."""
-    return group_sessions(read_events(user_id, directory))
+def read_sessions(
+    user_id: str, directory: Path | None = None, max_bytes: int | None = None
+) -> list[Session]:
+    """read_events() grouped into sessions. Sync and blocking, like read_events."""
+    return group_sessions(read_events(user_id, directory, max_bytes))

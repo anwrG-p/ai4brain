@@ -8,7 +8,14 @@ import pytest
 
 from app.api.routes.v1_telemetry import TelemetryEvent
 from brain_twin_jepa import features
-from brain_twin_jepa.features import d_prime, probit, schema_of, session_features, task_scores
+from brain_twin_jepa.features import (
+    d_prime,
+    on_rule_stream,
+    probit,
+    schema_of,
+    session_features,
+    task_scores,
+)
 from brain_twin_jepa.telemetry_io import dedupe
 
 GOLDEN = Path(__file__).resolve().parents[2] / "data" / "fixtures" / "golden_sessions.json"
@@ -96,6 +103,11 @@ def test_nback_streams_of_one_trial_are_not_duplicates():
     a = _nb(0, "position", "position", "target")
     b = _nb(0, "position", "symbol", "standard")
     assert dedupe([a, b, dict(a)]) == [a, b]
+    # Keys compare as the JS JSON.stringify key does: stream true is not stream 1, 1 is 1.0.
+    t = _nb(1, True, True, "target")
+    one = _nb(1, True, 1, "standard")
+    one_f = _nb(1, True, 1.0, "standard")
+    assert dedupe([t, one, one_f]) == [t, one]
 
 
 def test_r16_parity_is_scored_on_the_symbol_stream():
@@ -140,3 +152,29 @@ def test_probit_and_number_rules():
     e = {"task_id": "r", "trial_index": 0, "dimension": "pattern_induction", "error_flag": False,
          "trial_meta": {"hops": True}}
     assert features._num(e, "hops") is None
+
+
+def test_unknown_rule_falls_back_to_stream_equals_rule_with_js_strict_equality():
+    def e(rule, stream):
+        return {"trial_meta": {"rule": rule, "stream": stream}}
+
+    assert on_rule_stream(e("parity", "symbol"))
+    assert not on_rule_stream(e("parity", "parity"))
+    assert on_rule_stream(e("shape", "shape"))  # not in NBACK_RULE_STREAM: stream === rule
+    assert not on_rule_stream(e("shape", "position"))
+    assert on_rule_stream(e(1, 1)) and on_rule_stream(e(1, 1.0))  # 1 === 1.0 in JS
+    assert not on_rule_stream(e(True, 1)) and not on_rule_stream(e(1, True))  # bool !== number
+    assert on_rule_stream(e(True, True))
+    assert on_rule_stream(e("toString", "toString"))  # own keys only (Object.hasOwn): falls back
+    assert not on_rule_stream({"trial_meta": {"stream": "position"}})  # undefined rule
+
+
+def test_error_recovery_skips_stroop_at_chance_but_counts_the_nback():
+    case = CASES["error_recovery_stroop_chance_nback_counted"]
+    stroop = [e for e in case["events"] if e["task_id"] == "stx"]
+    nback = [e for e in case["events"] if e["task_id"] == "nbx"]
+    # Alone, the at-chance Stroop task gives no ErrorRecovery although it has error -> correct pairs.
+    assert "ErrorRecovery" not in task_scores(stroop)
+    alone = task_scores(nback)["ErrorRecovery"]
+    together = task_scores(case["events"])["ErrorRecovery"]
+    assert together == alone == {"score": pytest.approx(200 / 3), "trials": 3}
