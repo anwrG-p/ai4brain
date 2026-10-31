@@ -83,7 +83,8 @@ describe('dead code (INT-1)', () => {
       .filter((f) => /\.tsx?$/.test(f) && !isTest(rel(f)))
       .map((f) => readFileSync(f, 'utf8'))
       .join('\n')
-    const unused = Object.keys(pkg.dependencies).filter((d) => !code.includes(`'${d}`))
+    // The package itself ('d') or a path inside it ('d/...'), never a longer name that starts with it.
+    const unused = Object.keys(pkg.dependencies).filter((d) => !code.includes(`'${d}'`) && !code.includes(`'${d}/`))
     expect(unused).toEqual([])
   })
 

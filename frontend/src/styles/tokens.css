@@ -646,6 +646,12 @@
   animation: char-blink 5200ms var(--ease-in-out) 1200ms infinite;
 }
 
+/* Stroop's light plate (a Color Clash block with black ink) keeps dark mode's no-shadow rule: the
+   light tokens it carries would otherwise bring the light elevation along. */
+[data-theme="dark"] [data-stroop-plate] {
+  box-shadow: none;
+}
+
 /* characters: motion lock */
 @media (prefers-reduced-motion: reduce) {
   [class*="char-anim-"],

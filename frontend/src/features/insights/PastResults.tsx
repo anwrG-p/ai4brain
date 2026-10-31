@@ -72,6 +72,18 @@ function Heatmap({ weeks, rows }: { weeks: number[]; rows: ExerciseRow[] }) {
     return () => ro.disconnect()
   }, [weeks.length])
 
+  // New data: the echo under the grid would describe an old value, so it clears. A new week moves
+  // the tab stop to it (where the weeks open), unless the user is moving around in the grid.
+  const sig = `${weeks.join()}|${rows.map((r) => `${r.schema}:${r.values.join()}`).join()}`
+  const seen = useRef({ sig, weeks: weeks.length })
+  useLayoutEffect(() => {
+    const before = seen.current
+    if (before.sig === sig) return
+    seen.current = { sig, weeks: weeks.length }
+    setSaid('')
+    if (weeks.length > before.weeks && !grid.current?.contains(document.activeElement)) setPos(([r]) => [r, weeks.length - 1])
+  }, [sig, weeks.length])
+
   const label = (r: number, c: number) => {
     const v = rows[r]!.values[c]
     return `${rows[r]!.name}, week of ${day(weeks[c]!)}: ${v === null || v === undefined ? 'no session' : Math.round(v)}`

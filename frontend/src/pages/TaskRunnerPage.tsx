@@ -85,8 +85,8 @@ export default function TaskRunnerPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   // The exercise reached its end card: the block is finished and only waits for Continue.
   const [blockEnded, setBlockEnded] = useState(false)
-  // Begin was pressed: Pause shows only from then on, so the instruction screen keeps Begin plus
-  // Exit (rule 14).
+  // Begin was pressed: Pause shows only while the block runs (Begin to the end card), so the
+  // instruction screen keeps Begin plus Exit and the end card Continue plus Exit (rule 14).
   const [blockStarted, setBlockStarted] = useState(false)
   const [showTable, setShowTable] = useState(false)
   // Every event of the current run, from the tracker (R5). A new task (a start, a resume, another
@@ -204,7 +204,7 @@ export default function TaskRunnerPage() {
               Exit
             </Link>
             {judge && <span className="font-mono-tabular text-xs text-ink-muted">Recorded: {totals.n}</span>}
-            {blockStarted && (
+            {blockStarted && !blockEnded && (
               <Button variant="ghost" size="sm" onClick={pause} aria-label="Pause trial" leftIcon={<Pause size={16} {...ICON} />}>
                 Pause
               </Button>

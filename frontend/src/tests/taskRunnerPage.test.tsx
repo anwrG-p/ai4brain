@@ -270,14 +270,11 @@ describe('TaskRunnerPage mounts the real exercises', () => {
     expect(useSessionStore.getState().sessions).toHaveLength(1)
   })
 
-  it('Escape or Pause on the end card completes the block instead of pausing it', async () => {
+  it('the end card has no Pause (Continue and Exit only); Escape there completes the block instead of pausing it', async () => {
     await finishMatrixBlock()
+    expect(screen.queryByRole('button', { name: 'Pause trial' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'Exit' })).toBeInTheDocument()
     fireEvent.keyDown(window, { key: 'Escape' })
-    expect(paused()).toBeNull()
-    expect(completed()).toBeInTheDocument()
-    cleanup()
-    await finishMatrixBlock()
-    fireEvent.click(screen.getByRole('button', { name: 'Pause trial' }))
     expect(paused()).toBeNull()
     expect(completed()).toBeInTheDocument()
   })

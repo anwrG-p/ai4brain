@@ -16,8 +16,9 @@ import { PILLAR_LABELS } from '../insights/pillars'
 import { ExerciseDemo } from './ExerciseDemo'
 import { stepParts } from './howToPlay'
 import { introFor, OWN_FIXATION, trialCount, type Intro } from './exercises'
+import { StimulusCard, usesLightPlate } from './tasks/Stroop'
 import { tracker } from './telemetry/tracker'
-import type { SchemaType, TaskPayload } from './telemetry/types'
+import type { SchemaType, StroopParams, TaskPayload } from './telemetry/types'
 
 export const FIXATION_MS = 500
 
@@ -295,15 +296,26 @@ export function ExerciseFrame({ task, onDone, onBlockEnd, onBlockStart, children
   switch (phase) {
     case 'intro':
       return <Instructions schema={task.schema_type} intro={intro} onBegin={begin} />
-    case 'fixation':
+    case 'fixation': {
       // R9: the cross appears at once, at full contrast for all of its 500 ms (jsPsych convention).
+      const cross = (
+        <span role="img" aria-label="Look at the cross" className="select-none text-5xl font-bold text-ink">
+          +
+        </span>
+      )
+      // A Color Clash block on the light plate shows its cross on that plate too (no luminance jump).
+      if (task.schema_type === 'stroop' && usesLightPlate((task.params as StroopParams).colors))
+        return (
+          <div data-block-running="true" className="flex min-h-64 w-full items-center justify-center">
+            <StimulusCard plate>{cross}</StimulusCard>
+          </div>
+        )
       return (
         <div data-block-running="true" className="flex min-h-64 items-center justify-center">
-          <span role="img" aria-label="Look at the cross" className="select-none text-5xl font-bold text-ink">
-            +
-          </span>
+          {cross}
         </div>
       )
+    }
     case 'trials':
       // No character and no decoration here: only the dots and the stimulus.
       return (

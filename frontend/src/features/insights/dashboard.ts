@@ -112,7 +112,7 @@ export function curveWindow(history: readonly HistoryPoint[], now: Date) {
 /* Past results per exercise and week, for the heatmap behind "Further explore my training". Each input
    belongs to the exercise it is measured in (pillars.ts header). ErrorRecovery spans every exercise,
    so it is left out. ponytail: FluidMatrices mixes Pattern Puzzle and Logic Web; it is shown as Logic
-   Web, the one in the five-exercise session. */
+   Web, the one in the six-exercise baseline. */
 const INPUT_EXERCISE: Partial<Record<InputId, SchemaType>> = {
   OSPAN: 'n_back',
   DCCS_SwitchCost: 'n_back',
@@ -166,7 +166,7 @@ export function exerciseWeeks(sessions: readonly SessionRecord[]) {
 }
 
 /** Where "Start today's session" goes: training for the weakest measured pillar (/train?pillar=),
-    or the five-exercise baseline when nothing is measured yet. */
+    or the six-exercise baseline (R10) when nothing is measured yet. */
 export function sessionPath(weakest: PillarId | undefined): string {
   return weakest ? `/train?pillar=${weakest}` : '/baseline'
 }

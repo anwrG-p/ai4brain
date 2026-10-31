@@ -82,6 +82,33 @@ describe('PastResults', () => {
     expect(cells().filter((c) => c.tabIndex === 0)).toEqual([cells()[19]])
   })
 
+  // A new week moves the tab stop to it, unless the user is in the grid; the echo never goes stale.
+  describe('when a new week arrives', () => {
+    const plusWeek = () => [...weeks(4), { id: 'new', at: new Date(NOW + WEEK).toISOString(), inputs: five(90) }]
+
+    it('moves the tab stop to the latest week when focus is outside the grid', () => {
+      const { container, rerender } = render(<PastResults sessions={weeks(4)} />)
+      const cells = () => [...container.querySelectorAll<HTMLElement>('[role="gridcell"]')]
+      act(() => cells()[3]!.focus())
+      fireEvent.keyDown(document.activeElement!, { key: 'Home' }) // the stop is now week 1
+      act(() => (document.activeElement as HTMLElement).blur())
+      rerender(<PastResults sessions={plusWeek()} />)
+      expect(cells().filter((c) => c.tabIndex === 0)).toEqual([cells()[4]]) // 5 weeks: row 1, week 5
+      expect(container.querySelector('[data-focus-echo]')!.textContent).toBe('')
+    })
+
+    it('keeps the tab stop under a user who is in the grid, and clears the stale echo', () => {
+      const { container, rerender } = render(<PastResults sessions={weeks(4)} />)
+      const cells = () => [...container.querySelectorAll<HTMLElement>('[role="gridcell"]')]
+      act(() => cells()[3]!.focus())
+      fireEvent.keyDown(document.activeElement!, { key: 'Home' })
+      expect(container.querySelector('[data-focus-echo]')!.textContent).not.toBe('')
+      rerender(<PastResults sessions={plusWeek()} />)
+      expect(cells().filter((c) => c.tabIndex === 0)).toEqual([cells()[0]])
+      expect(container.querySelector('[data-focus-echo]')!.textContent).toBe('')
+    })
+  })
+
   // A focused cell is announced once: by its own name. The line under the grid shows it for sighted
   // keyboard users and is hidden from screen readers (no second, live announcement).
   it('names each cell for screen readers and echoes the focused one visually; hovering shows a tooltip', () => {

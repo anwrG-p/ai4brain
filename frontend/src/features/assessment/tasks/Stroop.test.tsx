@@ -222,7 +222,7 @@ test('black (the server cvd_safe preset) has its own token and a light plate in 
   expect(word.style.color).toBe('var(--color-stroop-black)')
   // No dark surface can carry black at 4.5:1, so a block with black draws its stimuli on the light
   // tokens (audited: light-stroop-black-*). The plate is fixed for the block, never per trial.
-  expect(word.closest('[data-theme="light"]')).not.toBeNull()
+  expect(word.closest('[data-theme="light"][data-stroop-plate]')).not.toBeNull()
   cleanup()
   setup(params([conflict]))
   expect(screen.getByText('RED').closest('[data-theme]')).toBeNull()
@@ -235,6 +235,12 @@ test('the black token is audited in the light block (where the plate draws it)',
   const pairs = DESIGN_SYSTEM_CONTRAST_PAIRS.filter((p) => p.fgName === '--color-stroop-black')
   expect(pairs.map((p) => `${p.theme} ${p.bgName}`).sort()).toEqual(['light --color-surface', 'light --color-surface-raised'])
   for (const p of pairs) expect(p.minRequired).toBe(4.5)
+})
+
+// Dark mode has no shadows (1 px borders only); the light plate must not bring its light shadow along.
+test('the plate drops its elevation shadow in dark mode', () => {
+  const css = readFileSync(path.resolve(__dirname, '../../../styles/tokens.css'), 'utf8').replace(/\r\n/g, '\n')
+  expect(css).toMatch(/\[data-theme="dark"\] \[data-stroop-plate\] \{\s*box-shadow: none;\s*\}/)
 })
 
 test('the ink palette holds theme tokens only, no raw colour values', () => {

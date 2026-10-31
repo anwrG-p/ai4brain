@@ -5,7 +5,7 @@ import { ExerciseFrame, FIXATION_MS } from './ExerciseFrame'
 import fixtures from './tasks/fixtures.json'
 import { TaskRunner } from './tasks/TaskRunner'
 import { tracker, TrialRecorder } from './telemetry/tracker'
-import type { SchemaType, TaskPayload } from './telemetry/types'
+import type { SchemaType, StroopParams, TaskPayload } from './telemetry/types'
 
 const byType = (s: SchemaType) => (fixtures as TaskPayload[]).find((t) => t.schema_type === s)!
 
@@ -276,6 +276,21 @@ test('an unknown exercise ends its block before handing over, so its host still 
   // A second end (a late timer in the exercise) is a no-op: the block ended once.
   act(() => void fireEvent.click(screen.getByRole('button', { name: 'finish' })))
   expect(calls).toEqual(['blockEnd', 'done'])
+})
+
+// A Color Clash block with black ink runs on a light plate (Stroop.tsx); its fixation sits on the same
+// plate, so the first word brings no jump from the dark board to the white plate.
+test('Color Clash with black: the fixation is on the same light plate as the trials; without black, no plate', () => {
+  const stroop = byType('stroop')
+  const cvd = { ...stroop, params: { ...(stroop.params as StroopParams), colors: ['blue', 'yellow', 'red', 'black'] } } as TaskPayload
+  const { unmount } = render(<ExerciseFrame task={cvd} onDone={vi.fn()}>{() => <p>trials</p>}</ExerciseFrame>)
+  space()
+  const cross = screen.getByRole('img', { name: 'Look at the cross' })
+  expect(cross.closest('[data-stroop-plate][data-theme="light"]')).not.toBeNull()
+  unmount()
+  render(<ExerciseFrame task={stroop} onDone={vi.fn()}>{() => <p>trials</p>}</ExerciseFrame>)
+  space()
+  expect(screen.getByRole('img', { name: 'Look at the cross' }).closest('[data-stroop-plate]')).toBeNull()
 })
 
 test('an unknown exercise skips the frame and runs as before', () => {
