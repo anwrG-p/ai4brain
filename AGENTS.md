@@ -18,9 +18,9 @@ Single-context repo layout with canonical consumer vocabulary in `docs/GLOSSARY.
 
 ## Project Architecture & Engineering Notes
 
-- **Project**: CISTAC / SynapseTwin Cognitive Architecture & BRIAN Axolotl Twin UI.
-- **Frontend Stack**: Vite, React 18, TypeScript, Tailwind CSS with Doodle design token architecture.
-- **Centralized Docs**: All specs and architecture documents live under `docs/` (`docs/GLOSSARY.md`, `docs/design/`, `docs/architecture/`).
+- **Project**: SynapseTwin (CISTAC 1.0): cognitive training with Loti (coach), Dolphin (celebrations) and Momo (mood guess); 5 skills (pillars) in the UI.
+- **Frontend Stack**: Vite, React 18, TypeScript, Tailwind CSS with design tokens in `frontend/src/styles/tokens.css` (the classroom board: brand v2).
+- **Centralized Docs**: All specs and architecture documents live under `docs/` (index: `docs/README.md`; vocabulary: `docs/GLOSSARY.md`; decisions: `docs/adr/`). Never link with `file:///`; `tests/test_docs_links.py` fails on it.
 - **Verification Suite**: Run `cd frontend && npm run qa:checks` (`lint:tokens`, `lint:copy`, `check:contrast`, `test`, `build`).
 
 ## Backend

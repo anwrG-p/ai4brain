@@ -1,5 +1,7 @@
 # Page 14 Specification: Settings & Accessibility Controls (`/settings`)
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: `/settings` has Theme and Reduce motion. Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 - **Page Name & Route**: Settings & Accessibility Controls (`/settings`)
 - **Primary Users**: Neurodivergent learners, screen reader users, keyboard-only operators, students requiring sensory adjustments, and competition evaluators.
 - **Challenge Goals**:

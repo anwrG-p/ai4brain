@@ -1,5 +1,7 @@
 # Agent Evaluation & Audit Handoff Guide (`docs/ui/AGENT-EVALUATION-HANDOFF.md`)
 
+> **History.** This describes the UI before brand v2 (BRIAN, the Doodle design, 19 pages, 7 dimensions), superseded on 2026-10-31. Current: the [root README](../../README.md), the [glossary](../../docs/GLOSSARY.md) and `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 This guide is designed for any secondary AI agent, external code auditor, or competition evaluator assessing the frontend implementation of **SynapseTwin (CISTAC 1.0 AI4Brain)**.
 
 ---

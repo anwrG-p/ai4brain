@@ -1,5 +1,7 @@
 # 05. Profile Reveal (`/profile-reveal`) · HERO PAGE (+ Mascot Sprint)
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: `/profile-reveal` redirects to **Results** (`/results`). Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 ## Purpose, user moment, rubric criteria
 - **Purpose**: The high-emotion, zero-judgment **"Aha!" moment** immediately after a learner completes their 2-minute Quick Baseline (or after an evaluator clicks **"Inspect Profile Reveal"**). It reveals the learner's initial **Cognitive Brain Twin** with honest $\pm\text{CI}$ bands, their **SAT-JEPA Archetype Discovery Card** (with hysteresis explanation), their **Top 2 Calibrated Strengths** vs **Top 1 Calibration Opportunity** (hatched low-confidence dimension), **Signature Component #8 (`<Mascot />`)**, and their **First Explainable AI Coach Micro-Step** (`<WhyThisPanel />`).
 - **User / Evaluator Moment**: Reached within $\le 3\text{ minutes}$ of opening the app. Turns raw behavioral telemetry into an empowering, non-clinical narrative before transitioning into the full `/dashboard`.

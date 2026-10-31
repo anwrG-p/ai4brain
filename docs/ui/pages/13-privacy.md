@@ -1,5 +1,7 @@
 # Page 13 — Privacy Center & Audit Log (`/privacy`) Specification
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: `/privacy` shows consent, Export my data and Delete my data; no certificates, receipts or hashes. Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 - **Page Name & Route**: Privacy Center & Audit Log (`/privacy`) · Signature #6 `<PrivacyCenter />`
 - **Wave & Priority**: Wave 3 · **Must** (`P1` Safety, Transparency & User Agency · Signature Component #6)
 - **Branch**: `ui/page-13-privacy`

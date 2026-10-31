@@ -1,5 +1,7 @@
 # Page 15 Specification: Methodology, Limits & Ethics (`/methodology`)
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: `/methodology` is **How we calculate this**: 5 closed topics with the real formulas. Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 - **Page Name & Route**: How It Works, Limits & Ethics (`/methodology`)
 - **Primary Users**: Competition judges, research evaluators, neurodiverse learners, educators, and students seeking complete scientific and ethical transparency.
 - **Challenge Goals**:

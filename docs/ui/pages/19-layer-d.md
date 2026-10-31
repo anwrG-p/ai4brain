@@ -1,5 +1,7 @@
 # Page 19 Specification: Layer D Bonus: Voice Coaching & Scenario Projections (`/layer-d`)
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: `/layer-d` redirects to Home; voice coaching was dropped. Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 - **Page Name & Route**: Layer D Bonus: Voice Coaching & Scenario Projections (`/layer-d`)
 - **Primary Users**: Competition evaluators, students seeking conversational auditory tutoring, and proactive learners wanting counterfactual "what-if" scenario forecasting.
 - **Challenge Goals**:

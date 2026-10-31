@@ -1,5 +1,7 @@
 # Page 16 — Demo & Judge Mode (`/judge-mode`) Specification
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: evaluator tools render only with `?judge=1`. Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 - **Page Name & Route**: Demo & Judge Mode (`/judge-mode`) · Signature #7 `<JudgeModeDock />`
 - **Wave & Priority**: Wave 3 · **Must** (`P1` Evaluator Defense & Rubric-to-UI Proof Suite · Signature Component #7)
 - **Branch**: `ui/page-16-judge-mode`

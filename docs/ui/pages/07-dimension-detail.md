@@ -1,5 +1,7 @@
 # Page 07 — Dimension Detail (`/dimensions/:dimId`) Specification
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: `/dimensions/*` redirects to **You**; skills replace dimensions. Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 - **Page Name & Route**: Dimension Detail (`/dimensions/:dimId`, defaulting to `/dimensions/working-memory` or any active `DimensionRegistry` ID)
 - **Wave & Priority**: Wave 2 · **Must** (`P1` Deep-Dive & Scientific Transparency Proof)
 - **Branch**: `ui/page-07-dimension-detail`

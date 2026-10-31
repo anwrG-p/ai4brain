@@ -1,5 +1,7 @@
 # UI & UX Architecture Decisions (`DECISIONS.md`)
 
+> **History.** Entries are kept as written. Later decisions supersede earlier ones: DEC-010 (Calm & Clean) replaced the Doodle direction, and brand v2 (Loti, the classroom board, 5 skills; DEC-011) replaced both. Current: the [glossary](../../docs/GLOSSARY.md) and `docs/design/BRAND-V2.md`.
+
 Every non-trivial frontend, UX, design-system, and contract decision is recorded here in chronological order.
 
 ---

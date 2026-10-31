@@ -1,5 +1,7 @@
 # 04. Task Runner (`/task/:dimId`) · HERO PAGE
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: `/task/:dimId` runs one exercise in `ExerciseFrame` (instruction, fixation, trials, end card). Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 ## Purpose, user moment, rubric criteria
 - **Purpose**: The **Layer A Interactive Psychometric Task Runner** where learners complete 90–120 second adaptive micro-blocks (or untimed Evaluator Sandbox previews) across any configured cognitive dimension (`3 | 6 | 7 | 8 | 10`), capturing high-precision client-side behavioral telemetry (`response_time_ms`, `error_flag`, `error_burst`, `hesitation_jitter`, `keystroke_latency_ms`) and streaming it to `POST /v1/telemetry/event` with **zero biometric collection**.
 - **User / Evaluator Moment**: Reached when clicking **"▶ Start #1 Priority Block"** or **"Launch Task →"** on `/assessment` or `/dashboard`. Must feel crisp, tactile, and 100% distraction-free during active timed trials while giving evaluators an interactive **8-Schema Switcher (`n_back`, `stroop`, `ufov`, `mst`, `matrix`, `relational`, `tower`, `mental_rotation`)**, **1-Click Simulate Tab-Blur Auto-Pause**, and **Live `TelemetryEvent` JSON Stream Inspector**.

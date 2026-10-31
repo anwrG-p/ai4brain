@@ -1,5 +1,7 @@
 # Page 17 Specification: System States & Error Boundaries (`/system/*`)
 
+> **Superseded (history).** This spec describes the page before brand v2. Now: `/offline`, `/system-error` and `*`: Loti, one line, one way home. Current route map: `docs/design/BRAND-V2.md`. Kept as a record; not maintained.
+
 - **Page Name & Route**: System States & Error Boundaries (`/system`, `/system/404`, `/system/offline`, `/system/error`, and catch-all `*`)
 - **Primary Users**: Competition Judges, Technical Evaluators, Students, and Knowledge Workers encountering runtime faults or connectivity losses.
 - **Challenge Goals**:
