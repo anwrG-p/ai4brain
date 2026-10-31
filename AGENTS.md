@@ -23,3 +23,10 @@ Single-context repo layout with canonical consumer vocabulary in `docs/GLOSSARY.
 - **Centralized Docs**: All specs and architecture documents live under `docs/` (`docs/GLOSSARY.md`, `docs/design/`, `docs/architecture/`).
 - **Verification Suite**: Run `cd frontend && npm run qa:checks` (`lint:tokens`, `lint:copy`, `check:contrast`, `test`, `build`).
 
+## Backend
+
+- **One API server**: `backend/app` (FastAPI). Run from the repo root: `uvicorn app.main:app --app-dir backend --reload` (port 8000; the Vite dev server proxies `/v1` to it). On Windows, `scripts/run_dev.ps1` starts it and the frontend.
+- **One router per module**: `backend/app/main.py` mounts `app/api/routes/v1_telemetry.py`, `v1_privacy.py`, `v1_auth.py`, `dynamic_cache/api.py`, `ai_coach/api.py` and `brain_twin_jepa/api.py`. New routes go in the module, never in `main.py`.
+- **Tests**: `pip install -r requirements.txt`, then `pytest -q` from the repo root runs every Python suite, `backend/tests` included.
+- **Config**: `CORS_ALLOW_ORIGINS` (comma-separated, default `http://localhost:5173`), `TELEMETRY_DIR` (default `data/raw/telemetry`). See `backend/.env.example`.
+- **Payloads**: user-facing responses carry dimension ids, never brain-region names (spec U5: we don't measure your brain). The agent engine's internal state nodes stay internal.

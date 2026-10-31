@@ -10,7 +10,7 @@ This document mirrors `frontend/src/contracts/` and bridges our UI with the 5-me
 
 | Endpoint | Owner | Status in Repo | Payload / Contract Summary |
 | :--- | :--- | :--- | :--- |
-| `POST /v1/telemetry/event` | Member 1 (`assessment_engine/api/routes/telemetry.py`) | **Implemented & Tested** | Accepts single `TelemetryEvent` or `Batch` ($\le 100$). Validates `user_id`, `session_id`, `task_id`, `trial_index`, `dimension`, `score_norm` ($0..1$), `response_time_ms`, `error_flag`, `error_burst`, `hesitation_jitter`, `keystroke_latency_ms`, `trial_meta`, `voice_opt_in`, `voice_latency_ms`, `vocal_pace_hz`, `client_ts`. Returns `202 {"accepted": n}`. |
+| `POST /v1/telemetry/event` | Member 1 (`backend/app/api/routes/v1_telemetry.py`) | **Implemented & Tested** | Accepts single `TelemetryEvent` or `Batch` ($\le 100$). Validates `user_id`, `session_id`, `task_id`, `trial_index`, `dimension`, `score_norm` ($0..1$), `response_time_ms`, `error_flag`, `error_burst`, `hesitation_jitter`, `keystroke_latency_ms`, `trial_meta`, `voice_opt_in`, `voice_latency_ms`, `vocal_pace_hz`, `client_ts`. Returns `202 {"accepted": n}`. |
 | `GET /v1/tasks/next` | Member 5 (`dynamic_cache`) | Specified in `README.md` (Mocked in UI) | Returns `TaskPayload`: `{ task_id, dimension, schema_type, params, surface_seed }`. |
 | `GET /v1/dashboard/profile` | Member 3 & 2 (`brain_twin_jepa`, `ai_coach`) | Specified in `README.md` (Mocked in UI) | Returns `{ profile_pct, uncertainty_sigma, collab_score, predictions }` + extended history & archetypes. |
 | `DELETE /v1/user/telemetry` | Member 4 / API (`privacy.py`) | Specified in `README.md` (Mocked in UI) | Purges `data/raw/telemetry/{user_id}.jsonl` and resets profile state. |
@@ -112,7 +112,7 @@ export interface CollaborationScorePayload {
 
 ## 4. Requests to Backend Team (To Raise at Mon 26/10 Sync)
 
-1. **`[REQ-BE-01]` Dimension Enum Alignment (`assessment_engine/api/routes/telemetry.py`)**:
+1. **`[REQ-BE-01]` Dimension Enum Alignment (`backend/app/api/routes/v1_telemetry.py`)**:
    - Confirm whether `Dimension` stays as the 6 snake_case keys (`working_memory`, `pattern_induction`, `executive_function`, `spatial_orientation`, `processing_speed`, `episodic_memory`) or adds a 7th key (e.g., `cognitive_flexibility` / `attentional_control`) to match the 7-dimension list. Our UI supports both via `DimensionRegistry`.
 2. **`[REQ-BE-02]` Explainability Object (`WhyThisTrail`) in Coach & Plan Responses**:
    - Please include `{ observed_data: string[], inference: string, advice_rationale: string, confidence: float, what_would_change: string }` in Member 2's `POST /v1/coach/chat` and plan endpoints so the `<WhyThisPanel />` renders live backend reasoning when `VITE_USE_MOCKS=false`.

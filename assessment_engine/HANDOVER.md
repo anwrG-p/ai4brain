@@ -2,7 +2,7 @@
 
 Member 1 (`assessment_engine/`) delivers tasks to the user and turns every trial into a telemetry event. Read this before you integrate with it. The source of truth for every field, limit and command is [`README.md`](README.md); this file only adds what the code can't tell you.
 
-- Server contract: `assessment_engine/api/routes/telemetry.py` (`TelemetryEvent`, `POST /v1/telemetry/event`)
+- Server contract: `backend/app/api/routes/v1_telemetry.py` (`TelemetryEvent`, `POST /v1/telemetry/event`)
 - Client contract: `frontend/src/features/assessment/telemetry/types.ts` (`TaskPayload`, the `*Params` types)
 - Mock tasks you can copy: `frontend/src/features/assessment/tasks/fixtures.json` (one per `schema_type`)
 - The exercises run inside the team UI (`frontend/`). `assessment_engine/client/` is a frozen reference; see "The UI" below.
@@ -69,10 +69,10 @@ Find your section and skip the rest.
 
 ## Member 4 (Dashboard & Privacy)
 
-- **Deleting a user's telemetry** (`DELETE /v1/user/telemetry`) = delete `{TELEMETRY_DIR}/{user_id}.jsonl`. Use the resolver `telemetry_dir()` in `routes/telemetry.py`, so your route and ingestion agree on the location. On the server, nothing else stores telemetry.
+- **Deleting a user's telemetry** (`DELETE /v1/user/telemetry`) = delete `{TELEMETRY_DIR}/{user_id}.jsonl`. Use the resolver `telemetry_dir()` in `backend/app/api/routes/v1_telemetry.py`, so your route and ingestion agree on the location. On the server, nothing else stores telemetry.
 - **The UI's purge is local only.** The Privacy page calls `tracker.clear()`, which drops the events still waiting on this device (memory and `localStorage`). It does not call your route yet; wire it in when the route exists.
 - **The 30-day retention job** works on the same files. Each line has a `received_at` UTC timestamp.
-- **Shared FastAPI app:** `assessment_engine/api/main.py` currently mounts only the telemetry router. It also adds a custom 422 handler that leaves the rejected `input` out of the response, so NaN values don't turn into 500 errors. Agree with Member 1 who owns the app before adding `privacy.py`. Keep that handler.
+- **Shared FastAPI app:** `backend/app/main.py` is the one API server (BE-00). It mounts one router per module; privacy routes go in `backend/app/api/routes/v1_privacy.py`. It also adds a custom 422 handler that leaves the rejected `input` out of the response, so NaN values don't turn into 500 errors. Keep that handler.
 - **Voice consent:** the UI ships without voice (D1), so there is no consent to manage there. The opt-in toggle exists only in the frozen `client/`. If voice comes back, your governance UI should own its consent; tell Member 1.
 - **Radar axes:** there are 6 dimensions; see Member 3's section.
 

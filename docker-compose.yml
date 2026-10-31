@@ -1,0 +1,15 @@
+# The API server alone. The frontend runs with `cd frontend && npm run dev` (Vite proxies /v1 to :8000).
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: synapsetwin_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS:-http://localhost:5173}
+    volumes:
+      # Telemetry JSONL lands in the same gitignored folder as a local run.
+      - ./data/raw/telemetry:/data/telemetry

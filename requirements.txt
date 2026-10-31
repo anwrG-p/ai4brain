@@ -1,5 +1,5 @@
 # The whole Python workspace in one install: pip install -r requirements.txt
--r assessment_engine/api/requirements.txt
+-r backend/requirements.txt
 -r ai_coach/requirements.txt
 -r brain_twin_jepa/requirements.txt
 -r clustering_engine/requirements.txt

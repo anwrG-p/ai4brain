@@ -97,7 +97,7 @@
 ---
 
 ## Data contract (types) and the mock fixtures used
-- **`TelemetryEventPayload`** matching `assessment_engine/api/routes/telemetry.py`:
+- **`TelemetryEventPayload`** matching `backend/app/api/routes/v1_telemetry.py`:
   - `user_id`, `session_id`, `task_id`, `trial_index`, `dimension`, `score_norm`, `response_time_ms`, `error_flag`, `error_burst`, `hesitation_jitter`, `keystroke_latency_ms`, `trial_meta`, `voice_opt_in: false`, `client_ts`.
 
 ---

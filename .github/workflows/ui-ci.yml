@@ -54,7 +54,7 @@ jobs:
         run: npx playwright test
 
   python:
-    name: Python Tests (API, coach, module packages, root scripts)
+    name: Python Tests (backend API server, coach, module packages, root scripts)
     runs-on: ubuntu-latest
 
     steps:
@@ -76,5 +76,5 @@ jobs:
       - name: Install the Python Workspace
         run: pip install -r requirements.txt
 
-      - name: Pytest (root pytest.ini collects every suite)
+      - name: Pytest (root pytest.ini collects every suite, backend/tests included)
         run: python -m pytest -q

@@ -7,7 +7,9 @@ from typing import Annotated, Literal
 from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
-Id = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
+# The anonymous device id (R13) and the session id. user_id is also a file name: no dots or slashes.
+ID_PATTERN = r"^[A-Za-z0-9_-]{1,64}$"
+Id = Annotated[str, StringConstraints(pattern=ID_PATTERN)]
 MetaKey = Annotated[str, StringConstraints(pattern=r"^[a-z0-9_]{1,32}$")]
 MetaValue = Annotated[str, StringConstraints(max_length=64)] | int | float | bool
 
@@ -53,10 +55,11 @@ class TelemetryEvent(BaseModel):
 
 Batch = Annotated[list[TelemetryEvent], Field(max_length=100)]
 
+# Mounted by app/main.py. The frontend tracker (frontend/src/features/assessment/telemetry) posts here.
 router = APIRouter()
 
-# routes/ -> api/ -> assessment_engine/ -> repo root, whose data/raw/* is gitignored.
-REPO_ROOT = Path(__file__).resolve().parents[3]
+# routes/ -> api/ -> app/ -> backend/ -> repo root, whose data/raw/* is gitignored.
+REPO_ROOT = Path(__file__).resolve().parents[4]
 
 
 def telemetry_dir() -> Path:

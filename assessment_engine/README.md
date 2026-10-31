@@ -10,7 +10,7 @@ code lives in **`frontend/src/features/assessment/`**, a folder Member 1 owns in
 `client/` is a **frozen reference** (see [`client/README.md`](client/README.md)).
 
 ```
-api/                                  FastAPI app: POST /v1/telemetry/event -> JSONL sink   (routes/telemetry.py is the source of truth)
+backend/app/api/routes/v1_telemetry.py   POST /v1/telemetry/event -> JSONL sink, in the one API server (repo root; source of truth)
 frontend/src/features/assessment/     maintained: 8 task screens, tracker, staircase / QUEST+, task source, ExerciseHost   (repo root)
 client/                               frozen reference: the original standalone app, including the voice opt-in
 ```
@@ -21,15 +21,14 @@ frozen `client/`.
 
 ## Run
 
-API (Python 3.13):
+API (Python 3.13). The ingest lives in the one API server, `backend/app` (BE-00). From the repo root:
 
 ```bash
-cd assessment_engine/api
-python -m venv .venv && .venv/Scripts/pip install -r ../../requirements.txt   # whole Python workspace; .venv/bin/pip on macOS/Linux
-.venv/Scripts/python -m uvicorn main:app --port 8000
+python -m venv .venv && .venv/Scripts/pip install -r requirements.txt   # whole Python workspace; .venv/bin/pip on macOS/Linux
+.venv/Scripts/python -m uvicorn app.main:app --app-dir backend --port 8000
 ```
 
-`main.py` mounts one router per module (`routes/telemetry.py`, `routes/privacy.py`, `routes/auth.py`,
+`backend/app/main.py` mounts one router per module (`app/api/routes/v1_telemetry.py`, `v1_privacy.py`, `v1_auth.py`,
 `dynamic_cache/api.py`, `ai_coach/api.py`, `brain_twin_jepa/api.py`). New routes go in the module's router, not in `main.py`.
 
 Events go to the repo-root `data/raw/telemetry/` (gitignored), whatever the working directory.
@@ -56,8 +55,8 @@ PowerShell: `$env:VITE_USE_MOCKS='false'; npm run dev` and `$env:TELEMETRY_DIR='
 Tests and checks:
 
 ```bash
-cd assessment_engine/api && .venv/Scripts/python -m pytest   # API suite
-assessment_engine/api/.venv/Scripts/python -m pytest        # from the repo root: every Python suite (root pytest.ini)
+.venv/Scripts/python -m pytest -q backend/tests   # API suite, from the repo root
+.venv/Scripts/python -m pytest -q                 # from the repo root: every Python suite (root pytest.ini)
 cd frontend && npm run qa:checks    # lint:tokens, lint:copy, check:contrast, vitest, build
 cd frontend && npm run qa:e2e       # Playwright; its config uses the Chrome channel, so Chrome must be installed
 ```

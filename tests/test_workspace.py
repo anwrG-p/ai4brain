@@ -18,7 +18,7 @@ def test_package_importable(package):
 def test_root_requirements_include_every_package():
     lines = (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
     included = {line.split(None, 1)[1] for line in lines if line.startswith("-r ")}
-    expected = {"assessment_engine/api/requirements.txt"} | {
+    expected = {"backend/requirements.txt"} | {
         f"{p}/requirements.txt" for p in PACKAGES
     }
     assert included == expected
@@ -29,5 +29,12 @@ def test_root_pytest_collects_every_suite():
     ini = configparser.ConfigParser()
     ini.read(ROOT / "pytest.ini", encoding="utf-8")
     testpaths = ini["pytest"]["testpaths"].split()
-    assert {"tests", "assessment_engine/api/tests"} <= set(testpaths)
+    assert {"tests", "backend/tests"} <= set(testpaths)
     assert all(f"{p}/tests" in testpaths for p in PACKAGES)
+
+
+def test_one_api_server():
+    # BE-00: backend/app is the only FastAPI app; assessment_engine/api is folded into it.
+    assert (ROOT / "backend" / "app" / "main.py").is_file()
+    assert not (ROOT / "assessment_engine" / "api" / "main.py").exists()
+    assert not (ROOT / "dashboard_ui").exists()
