@@ -1,5 +1,8 @@
 import json
 import os
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Literal
@@ -7,7 +10,9 @@ from typing import Annotated, Literal
 from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
-Id = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
+# Also the anonymous device id in the privacy routes; it is a file name, so no dots or slashes.
+ID_PATTERN = r"^[A-Za-z0-9_-]{1,64}$"
+Id = Annotated[str, StringConstraints(pattern=ID_PATTERN)]
 MetaKey = Annotated[str, StringConstraints(pattern=r"^[a-z0-9_]{1,32}$")]
 MetaValue = Annotated[str, StringConstraints(max_length=64)] | int | float | bool
 
@@ -64,18 +69,52 @@ def telemetry_dir() -> Path:
     return Path(env) if env else REPO_ROOT / "data" / "raw" / "telemetry"
 
 
+@contextmanager
+def telemetry_lock(directory: Path) -> Iterator[None]:
+    """Exclusive lock over every file in `directory`, across threads and processes.
+
+    Ingest, delete, export and the retention job all hold it, so a rewrite never drops an append.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    with open(directory / ".lock", "a+b") as f:
+        if os.name == "nt":
+            import msvcrt
+
+            f.seek(0)
+            while True:
+                try:
+                    msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+                    break
+                except OSError:
+                    time.sleep(0.01)
+            try:
+                yield
+            finally:
+                f.seek(0)
+                msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(f, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(f, fcntl.LOCK_UN)
+
+
 @router.post("/v1/telemetry/event", status_code=202)
-async def ingest(body: TelemetryEvent | Batch) -> dict[str, int]:
+def ingest(body: TelemetryEvent | Batch) -> dict[str, int]:
+    # Sync handler, so it runs in the threadpool: waiting on the lock never stalls the event loop.
     events = body if isinstance(body, list) else [body]
     out_dir = telemetry_dir()
-    out_dir.mkdir(parents=True, exist_ok=True)
     received_at = datetime.now(timezone.utc).isoformat()
-    # ponytail: sync appends inside an async handler are serialized on the event loop, so lines
-    # never interleave within one uvicorn worker; Redis Streams if multiple workers.
-    for e in events:
-        line = json.dumps(
-            {**e.model_dump(mode="json"), "received_at": received_at}, allow_nan=False
-        )
-        with open(out_dir / f"{e.user_id}.jsonl", "a", encoding="utf-8") as f:
-            f.write(line + "\n")
+    rows = [
+        json.dumps({**e.model_dump(mode="json"), "received_at": received_at}, allow_nan=False)
+        for e in events
+    ]
+    # ponytail: one lock for the whole directory; per-user locks only if ingest ever contends.
+    with telemetry_lock(out_dir):
+        for e, row in zip(events, rows):
+            with open(out_dir / f"{e.user_id}.jsonl", "a", encoding="utf-8") as f:
+                f.write(row + "\n")
     return {"accepted": len(events)}
