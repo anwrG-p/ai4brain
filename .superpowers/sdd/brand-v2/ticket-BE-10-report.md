@@ -225,6 +225,7 @@ Not applicable: BE-10 adds no routes (BE-11 does).
    - Map errors and statuses:
      - `not_enough_data` → pass through
      - missing checkpoint (`FileNotFoundError`) → 501
+     - checkpoint saved before `bc6a929`: `BrainTwin.load` raises `ValueError("checkpoint predates the calibrated-triangle format; ...")` → 501. Catch it around `load`, separately from the `forecast` call, whose `ValueError` (bad h) is a 422.
      - h outside 1..6 (`ValueError`) → 422
      - `calibrated: false` → show no range claim
    - The Docker image needs a trained checkpoint, either trained at deploy (about 15 s training + data) or mounted.

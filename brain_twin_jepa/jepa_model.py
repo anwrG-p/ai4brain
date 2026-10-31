@@ -343,6 +343,10 @@ class BrainTwin:
         ckpt = torch.load(path, map_location="cpu", weights_only=True)
         model = SATJEPA(**ckpt["config"])
         model.load_state_dict(ckpt["state_dict"])
+        if "n_max_by_h" not in ckpt["calibration"]:
+            # Saved before the calibrated range became a triangle: its range is unknown, and guessing
+            # it would claim coverage nobody measured. BE-11 answers 501.
+            raise ValueError("checkpoint predates the calibrated-triangle format; retrain with python -m brain_twin_jepa.train")
         return cls(model, Calibration(**ckpt["calibration"]), ckpt.get("meta"))
 
 

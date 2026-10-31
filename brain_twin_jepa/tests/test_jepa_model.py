@@ -214,3 +214,14 @@ def test_checkpoint_round_trip(tmp_path):
     loaded = BrainTwin.load(t.save(tmp_path / "ckpt" / "twin.pt"))
     assert loaded.forecast(history(5), 3) == t.forecast(history(5), 3)
     assert loaded.meta == t.meta and loaded.calibration == t.calibration
+
+
+def test_checkpoint_from_before_the_triangle_format_is_refused(tmp_path):
+    """A pre-bc6a929 checkpoint stored one n_max for every h; its triangle is unknown, so it is not
+    guessed: load raises a clear ValueError (BE-11 answers 501)."""
+    t = twin()
+    old = {k: v for k, v in vars(t.calibration).items() if k != "n_max_by_h"} | {"n_max": 13}
+    path = tmp_path / "old.pt"
+    torch.save({"config": t.model.config, "state_dict": t.model.state_dict(), "calibration": old, "meta": {}}, path)
+    with pytest.raises(ValueError, match="checkpoint predates the calibrated-triangle format; retrain with python -m brain_twin_jepa.train"):
+        BrainTwin.load(path)
