@@ -4,6 +4,8 @@ import { AppShell } from './components/layout/AppShell'
 import { ErrorBoundary } from './components/layout/ErrorBoundary'
 
 const WelcomePage = React.lazy(() => import('./pages/WelcomePage'))
+const BaselinePage = React.lazy(() => import('./pages/BaselinePage'))
+const ResultsPage = React.lazy(() => import('./pages/ResultsPage'))
 const OnboardingPage = React.lazy(() => import('./pages/OnboardingPage'))
 const AssessmentHubPage = React.lazy(() => import('./pages/AssessmentHubPage'))
 const TaskRunnerPage = React.lazy(() => import('./pages/TaskRunnerPage'))
@@ -51,6 +53,8 @@ export function App() {
           <Suspense fallback={<RouteLoadingSkeleton />}>
             <Routes>
               <Route path="/" element={<WelcomePage />} />
+              <Route path="/baseline" element={<BaselinePage />} />
+              <Route path="/results" element={<ResultsPage />} />
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/login" element={<Navigate to="/auth" replace />} />
               <Route path="/sign-in" element={<Navigate to="/auth" replace />} />

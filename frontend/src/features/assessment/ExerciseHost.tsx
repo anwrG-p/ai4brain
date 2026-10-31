@@ -13,6 +13,10 @@ type ExerciseHostProps = {
   // The block is over and its end card shows: from here a pause must not discard it.
   onBlockEnd?: () => void
   onError: (msg: string) => void
+  // Reshapes the fetched task before it runs (the baseline's ?fast=1 test hook).
+  prepare?: (task: TaskPayload) => TaskPayload
+  // The task that runs, with its final task_id: a page collects its own events by it.
+  onTask?: (taskId: string) => void
 }
 
 // One session per page load: every task played until a reload shares it.
@@ -24,12 +28,12 @@ let fetchCount = 0
 
 // Fetches one task, records it with its own TrialRecorder and renders the matching exercise inside
 // the jsPsych-style ExerciseFrame (instruction, fixation, progress dots, end card).
-export function ExerciseHost({ schemaType, attempt, onDone, onBlockEnd, onError }: ExerciseHostProps) {
+export function ExerciseHost({ schemaType, attempt, onDone, onBlockEnd, onError, prepare, onTask }: ExerciseHostProps) {
   const [run, setRun] = useState<{ task: TaskPayload; recorder: TrialRecorder } | null>(null)
   // The exercises restart their trial loop when onDone changes, so they get a stable callback.
-  const cb = useRef({ onDone, onBlockEnd, onError })
+  const cb = useRef({ onDone, onBlockEnd, onError, prepare, onTask })
   useLayoutEffect(() => {
-    cb.current = { onDone, onBlockEnd, onError }
+    cb.current = { onDone, onBlockEnd, onError, prepare, onTask }
   })
   const done = useCallback(() => cb.current.onDone(), [])
   const blockEnd = useCallback(() => cb.current.onBlockEnd?.(), [])
@@ -45,9 +49,10 @@ export function ExerciseHost({ schemaType, attempt, onDone, onBlockEnd, onError 
         // Mock fixtures reuse one task_id per schema; a session token plus the page-load fetch
         // counter keeps task_id and item_id unique per run, across remounts and reloads (R3).
         // Fits the 48-char limit.
-        const task = usingMocks()
+        const unique = usingMocks()
           ? { ...fetched, task_id: `${fetched.task_id}.${getSessionId().slice(0, 8)}.${fetchNo}` }
           : fetched
+        const task = cb.current.prepare?.(unique) ?? unique
         const recorder = new TrialRecorder({
           user_id: userId,
           session_id: getSessionId(),
@@ -55,6 +60,7 @@ export function ExerciseHost({ schemaType, attempt, onDone, onBlockEnd, onError 
           dimension: task.dimension, // R1: the payload's dimension, never the UI registry's
           voice_opt_in: false, // D1: no voice
         })
+        cb.current.onTask?.(task.task_id)
         setRun({ task, recorder })
       },
       (err: unknown) => {

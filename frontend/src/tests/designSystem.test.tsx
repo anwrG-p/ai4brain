@@ -40,34 +40,16 @@ describe('Wave 1 & Wave 2 Pages & Design System Unit Suite', () => {
     expect(getDimensionsByPreset('10')).toHaveLength(10)
   })
 
-  it('renders Page 01 Welcome (/) and supports starting baseline assessment and viewing how it works', async () => {
+  it('renders Page 01 Welcome (/): Loti greets, Start goes to the baseline', async () => {
     window.history.pushState({}, '', '/')
     render(<App />)
 
-    const heading = await screen.findByRole(
-      'heading',
-      {
-        name: /Let's map how your mind works/i,
-      },
-      { timeout: 5000 },
-    )
+    const heading = await screen.findByRole('heading', { level: 1, name: "Hi, I'm Loti." }, { timeout: 5000 })
     expect(heading).toBeInTheDocument()
 
-    const startBtn = screen.getByRole('button', {
-      name: /Start my 2-minute baseline/i,
-    })
-    expect(startBtn).toBeInTheDocument()
-    expect(screen.getByText(/How SynapseTwin Works/i)).toBeInTheDocument()
-    expect(screen.getByText(/2-Minute Micro-Games/i)).toBeInTheDocument()
-    expect(screen.getByText(/Your Living Brain Twin/i)).toBeInTheDocument()
-    expect(screen.getByText(/Zero-Guilt Growth/i)).toBeInTheDocument()
-
+    const startBtn = screen.getByRole('button', { name: 'Start' })
     fireEvent.click(startBtn)
-    expect(
-      await screen.findByRole('heading', {
-        name: /Configure your cognitive twin on your own terms/i,
-      }),
-    ).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your first check-in' })).toBeInTheDocument()
   })
 
   it('renders Page 02 Onboarding (/onboarding) and supports 3-step wizard, granular consent toggles, and Judge Fast-Track', async () => {
@@ -899,7 +881,7 @@ describe('Wave 1 & Wave 2 Pages & Design System Unit Suite', () => {
     expect(screen.getByRole('cell', { name: /Working Memory/i })).toBeInTheDocument()
   })
 
-  it('displays accurate team sprint progress labels across routes (Nearly Done, In Progress, Pending)', async () => {
+  it('displays accurate team sprint progress labels across routes (Nearly Done, In Progress, Pending; none in the new-user flow)', async () => {
     // 1. Auth routes -> Nearly Done
     window.history.pushState({}, '', '/auth')
     const { unmount: unmountAuth } = render(<App />)
@@ -907,11 +889,11 @@ describe('Wave 1 & Wave 2 Pages & Design System Unit Suite', () => {
     expect(authBadge).toHaveTextContent(/Nearly Done/i)
     unmountAuth()
 
-    // 2. Welcome route (/) -> In Progress
+    // 2. Welcome route (/): the new-user flow shows no badge (ticket 07)
     window.history.pushState({}, '', '/')
     const { unmount: unmountWelcome } = render(<App />)
-    const welcomeBadge = await screen.findByTestId('page-progress-badge')
-    expect(welcomeBadge).toHaveTextContent(/In Progress/i)
+    await screen.findByRole('heading', { level: 1, name: "Hi, I'm Loti." })
+    expect(screen.queryByTestId('page-progress-badge')).toBeNull()
     unmountWelcome()
 
     // 3. Dashboard route (/dashboard) -> In Progress

@@ -125,3 +125,17 @@ test('real mode keeps the generator task_id and reports a failed fetch through o
   render(host(1, onError))
   await waitFor(() => expect(onError).toHaveBeenCalledWith('GET /v1/tasks/next failed: HTTP 503'))
 })
+
+test('prepare reshapes the fetched task, and onTask hears the task that runs (its final task_id)', async () => {
+  const onTask = vi.fn()
+  const prepare = (t: TaskPayload): TaskPayload => {
+    const p = t.params as { trials: unknown[] }
+    return { ...t, params: { ...p, trials: p.trials.slice(0, 1) } }
+  }
+  render(<ExerciseHost schemaType="stroop" attempt={0} onDone={vi.fn()} onError={vi.fn()} prepare={prepare} onTask={onTask} />)
+  await begin('Color Clash')
+  expect(screen.getByRole('progressbar', { name: 'Progress' })).toHaveAttribute('aria-valuemax', '1')
+  answer()
+  expect(onTask).toHaveBeenCalledTimes(1)
+  expect(onTask.mock.calls[0]![0]).toBe(pushed[0]!.task_id)
+})

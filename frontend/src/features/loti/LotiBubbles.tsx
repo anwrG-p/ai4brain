@@ -1,6 +1,6 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { MessageCircle } from 'lucide-react'
-import { Loti } from '../../components/features/characters'
+import { Loti, type CharacterSize, type LotiPose } from '../../components/features/characters'
 import { Button } from '../../components/ui/Button'
 import { scriptedBrain } from './scriptedBrain'
 import { useLotiActions } from './useLotiActions'
@@ -132,5 +132,23 @@ export function LotiBubbles({ context, brain = scriptedBrain, onAction, classNam
         </div>
       </div>
     </section>
+  )
+}
+
+export interface LotiSaysProps {
+  children: ReactNode
+  pose?: LotiPose
+  size?: CharacterSize
+  className?: string
+}
+
+/** One static line from Loti: the character above a bubble, no chips and no controls. For screens
+    whose only action is the page's own button (Welcome, the login sheet). */
+export function LotiSays({ children, pose = 'idle', size = 'sm', className = '' }: LotiSaysProps) {
+  return (
+    <div className={`flex flex-col items-center gap-3 text-center ${className}`}>
+      <Loti pose={pose} size={size} />
+      <div className="tactile-card max-w-md px-5 py-4">{children}</div>
+    </div>
   )
 }

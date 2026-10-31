@@ -29,7 +29,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const searchParams = new URLSearchParams(location.search)
   const isBaselineMode = searchParams.get('mode') === 'baseline'
+  // The new-user flow (ticket 07): Welcome and Results keep only the logo and the theme toggle;
+  // the baseline runs distraction-free like a task.
+  const isFlowRoute = location.pathname === '/' || location.pathname === '/results'
+  const inNewUserFlow = isFlowRoute || location.pathname === '/baseline'
   const isTaskRoute =
+    location.pathname === '/baseline' ||
     location.pathname.startsWith('/task') ||
     location.pathname.startsWith('/practice') ||
     isBaselineMode
@@ -90,7 +95,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const showOfflineBanner = queueStatus.consent !== 'denied' && (simulateOffline || isRealOffline)
 
   return (
-    <div className={`min-h-screen flex flex-col bg-canvas text-ink ${location.pathname === '/' ? 'pb-0' : 'pb-16 lg:pb-0'}`}>
+    <div className={`min-h-screen flex flex-col bg-canvas text-ink ${isFlowRoute ? 'pb-0' : 'pb-16 lg:pb-0'}`}>
       {/* Skip link for keyboard users (Tab stop 1) */}
       <a
         href="#main-content"
@@ -176,18 +181,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               />
             </Link>
 
-            {/* 5 Primary Consumer Destinations Navbar (lg and up; below that the bottom tabs) or Skip intro on Welcome first run */}
-            {location.pathname === '/' ? (
-              <div className="flex-1 flex justify-end items-center">
-                <Link
-                  to="/dashboard"
-                  className="focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-md border border-border-strong px-3.5 text-sm font-semibold text-ink no-underline hover:bg-surface-raised transition-colors"
-                >
-                  <span>Skip intro</span>
-                  <span aria-hidden="true">→</span>
-                </Link>
-              </div>
-            ) : (
+            {/* 5 Primary Consumer Destinations Navbar (lg and up; below that the bottom tabs); none in the flow */}
+            {isFlowRoute ? null : (
               <nav aria-label="Primary product navigation" className="hidden lg:flex items-center gap-1">
                 {consumerNavItems.map((item) => {
                   const isActive =
@@ -214,11 +209,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             )}
 
             {/* EMILY Emotion Atmosphere & Micro-Interaction Rhythm */}
-            <EmilyMoodPill />
+            {!isFlowRoute && <EmilyMoodPill />}
 
             {/* Utility Controls */}
             <div className="flex items-center gap-1">
-              {!isAuthRoute && (
+              {!isAuthRoute && !isFlowRoute && (
                 <Link
                   to="/auth"
                   title={isAuthenticated ? `Signed in as ${userProfile?.preferredName || 'Explorer'}` : 'Sign In to Your Sanctuary'}
@@ -241,23 +236,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {theme === 'light' ? <Moon size={18} aria-hidden="true" /> : <Sun size={18} aria-hidden="true" />}
               </button>
 
-              <Link
-                to="/privacy"
-                title="Privacy Center & Non-Biometric Lock"
-                aria-label="Privacy Center"
-                className={`${UTILITY_CONTROL} no-underline max-sm:hidden`}
-              >
-                <ShieldCheck size={18} aria-hidden="true" />
-              </Link>
+              {!isFlowRoute && (
+                <>
+                  <Link
+                    to="/privacy"
+                    title="Privacy Center & Non-Biometric Lock"
+                    aria-label="Privacy Center"
+                    className={`${UTILITY_CONTROL} no-underline max-sm:hidden`}
+                  >
+                    <ShieldCheck size={18} aria-hidden="true" />
+                  </Link>
 
-              <Link
-                to="/settings"
-                title="Settings & Accessibility Controls"
-                aria-label="Settings"
-                className={`${UTILITY_CONTROL} no-underline max-sm:hidden`}
-              >
-                <Settings size={18} aria-hidden="true" />
-              </Link>
+                  <Link
+                    to="/settings"
+                    title="Settings & Accessibility Controls"
+                    aria-label="Settings"
+                    className={`${UTILITY_CONTROL} no-underline max-sm:hidden`}
+                  >
+                    <Settings size={18} aria-hidden="true" />
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </header>
@@ -272,28 +271,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             : 'max-w-6xl py-8'
         }`}
       >
-        {/* Team Sprint Progress Badge - small and muted, in the top-right padding area */}
-        <aside
-          aria-label="Sprint progress status"
-          className="absolute top-2 right-4 sm:right-6 lg:right-8 z-30 pointer-events-none"
-        >
-          <Badge
-            tone="neutral"
-            data-testid="page-progress-badge"
-            title={`Sprint Progress: ${pageProgress}`}
-            aria-label={`Page progress: ${pageProgress}`}
-            className="select-none pointer-events-auto font-medium"
+        {/* Team Sprint Progress Badge - small and muted, in the top-right padding area; not in the new-user flow */}
+        {!inNewUserFlow && (
+          <aside
+            aria-label="Sprint progress status"
+            className="absolute top-2 right-4 sm:right-6 lg:right-8 z-30 pointer-events-none"
           >
-            <span className="hidden sm:inline">Progress: </span>
-            {pageProgress}
-          </Badge>
-        </aside>
+            <Badge
+              tone="neutral"
+              data-testid="page-progress-badge"
+              title={`Sprint Progress: ${pageProgress}`}
+              aria-label={`Page progress: ${pageProgress}`}
+              className="select-none pointer-events-auto font-medium"
+            >
+              <span className="hidden sm:inline">Progress: </span>
+              {pageProgress}
+            </Badge>
+          </aside>
+        )}
 
         {children}
       </main>
 
       {/* Product Footer: one muted non-clinical line plus the evaluator controls */}
-      {!isTaskRoute && (
+      {!isTaskRoute && !isFlowRoute && (
         <footer
           role="contentinfo"
           className="border-t border-border bg-surface px-4 py-4 text-xs text-ink-muted"
@@ -306,7 +307,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Mobile Bottom Tab Bar: Lucide icons with labels */}
-      {location.pathname !== '/' && !isTaskRoute && !isAuthRoute && (
+      {!isFlowRoute && !isTaskRoute && !isAuthRoute && (
         <nav
           aria-label="Mobile bottom navigation"
           className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t border-border flex items-center justify-around px-2"
