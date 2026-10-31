@@ -7,7 +7,7 @@
    Do not add --shadow-* tokens to @theme: it would revive the dead shadow-doodle* utilities.
    No purple, no gradients, no backdrop blur (anti-slop rules 1, 2, 9; tokens.test.ts checks them). */
 @theme {
-  --color-canvas: #F3F9FD;
+  --color-canvas: #FFF5EE;
   --color-surface: #FFFFFF;
   --color-surface-raised: #E8F3FB;
   --color-ink: #0F2233;
@@ -60,7 +60,7 @@
      use --color-accent-strong. --color-reward is the coral milestone fill.
      Never put coral text on a brand-subtle chip: accent-strong on brand-subtle is 4.42:1 (light).
      Never use brand-vivid or the coral fill as text (tokens.test.ts scans src for it). */
-  --color-canvas: #F3F9FD;
+  --color-canvas: #FFF5EE;
   --color-surface: #FFFFFF;
   --color-surface-raised: #E8F3FB;
   --color-ink: #0F2233;
@@ -223,7 +223,7 @@
 
 [data-theme="dark"] {
   /* Brand v2 semantic colour roles (dark) */
-  --color-canvas: #0B1622;
+  --color-canvas: #131B2E;
   --color-surface: #122130;
   --color-surface-raised: #1A2D40;
   --color-ink: #F2F8FC;
@@ -437,6 +437,10 @@ html[data-theme="dark"][data-emotion="fatigued"] {
   html,
   body {
     background-color: var(--color-canvas);
+    /* The first design's sketchbook dot grid (user, 2026-10-31: "make it like the first one").
+       Static, so it never moves behind a stimulus. */
+    background-image: radial-gradient(color-mix(in srgb, var(--color-ink) 9%, transparent) 0.8px, transparent 0.8px);
+    background-size: 24px 24px;
     color: var(--color-ink);
     font-family: var(--font-sans);
     font-size: var(--text-base);
@@ -1066,4 +1070,9 @@ html[data-theme="dark"][data-emotion="fatigued"] {
 }
 [data-reduced-motion="true"] .anim-press:active:not(:disabled) {
   transform: none !important;
+}
+
+/* Dark: the first design's warm dots on navy. */
+[data-theme="dark"] body {
+  background-image: radial-gradient(color-mix(in srgb, var(--color-accent) 12%, transparent) 0.8px, transparent 0.8px);
 }

@@ -21,7 +21,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-ink',
     fgHex: '#0F2233',
     bgName: '--color-canvas',
-    bgHex: '#F3F9FD',
+    bgHex: '#FFF5EE',
     minRequired: 4.5,
   },
   {
@@ -51,7 +51,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-ink-muted',
     fgHex: '#46617A',
     bgName: '--color-canvas',
-    bgHex: '#F3F9FD',
+    bgHex: '#FFF5EE',
     minRequired: 4.5,
   },
   {
@@ -101,7 +101,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-brand',
     fgHex: '#1E6FA8',
     bgName: '--color-canvas',
-    bgHex: '#F3F9FD',
+    bgHex: '#FFF5EE',
     minRequired: 4.5,
   },
   {
@@ -171,7 +171,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-accent-strong',
     fgHex: '#B94A2F',
     bgName: '--color-canvas',
-    bgHex: '#F3F9FD',
+    bgHex: '#FFF5EE',
     minRequired: 4.5,
   },
   {
@@ -271,7 +271,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-border-strong',
     fgHex: '#5E7C96',
     bgName: '--color-canvas',
-    bgHex: '#F3F9FD',
+    bgHex: '#FFF5EE',
     minRequired: 3.0,
   },
   {
@@ -351,7 +351,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-brand',
     fgHex: '#1E6FA8',
     bgName: '--color-canvas',
-    bgHex: '#F3F9FD',
+    bgHex: '#FFF5EE',
     minRequired: 3.0,
   },
   {
@@ -401,7 +401,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-ink',
     fgHex: '#F2F8FC',
     bgName: '--color-canvas',
-    bgHex: '#0B1622',
+    bgHex: '#131B2E',
     minRequired: 4.5,
   },
   {
@@ -431,7 +431,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-ink-muted',
     fgHex: '#A9C1D6',
     bgName: '--color-canvas',
-    bgHex: '#0B1622',
+    bgHex: '#131B2E',
     minRequired: 4.5,
   },
   {
@@ -481,7 +481,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-brand',
     fgHex: '#7CC4F2',
     bgName: '--color-canvas',
-    bgHex: '#0B1622',
+    bgHex: '#131B2E',
     minRequired: 4.5,
   },
   {
@@ -551,7 +551,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-accent-strong',
     fgHex: '#FF9F86',
     bgName: '--color-canvas',
-    bgHex: '#0B1622',
+    bgHex: '#131B2E',
     minRequired: 4.5,
   },
   {
@@ -651,7 +651,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-border-strong',
     fgHex: '#8FB0CC',
     bgName: '--color-canvas',
-    bgHex: '#0B1622',
+    bgHex: '#131B2E',
     minRequired: 3.0,
   },
   {
@@ -731,7 +731,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-brand',
     fgHex: '#7CC4F2',
     bgName: '--color-canvas',
-    bgHex: '#0B1622',
+    bgHex: '#131B2E',
     minRequired: 3.0,
   },
   {

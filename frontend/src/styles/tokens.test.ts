@@ -59,9 +59,9 @@ describe('tokens.css palette', () => {
   )
 
   it('ships the brand v2 sky canvas, surface and ink', () => {
-    expect(light.get('--color-canvas')).toBe('#F3F9FD')
+    expect(light.get('--color-canvas')).toBe('#FFF5EE')
     expect(light.get('--color-ink')).toBe('#0F2233')
-    expect(dark.get('--color-canvas')).toBe('#0B1622')
+    expect(dark.get('--color-canvas')).toBe('#131B2E')
     expect(dark.get('--color-surface')).toBe('#122130')
     expect(light.get('--color-accent')).toBe('#F2876B')
   })
@@ -121,10 +121,12 @@ describe('tokens.css palette', () => {
 
 describe('tokens.css shape and elevation', () => {
   // Anti-slop rules 1, 2 and 9: gradients only inside the clay token, never backdrop blur.
-  it('has no gradient outside the clay token and no backdrop-filter', () => {
+  // The one exception is the body's sketchbook dot grid (a dot pattern, not a colour wash).
+  const DOT_GRID = /background-image: radial-gradient\(color-mix\(.*\) 0\.8px, transparent 0\.8px\);/
+  it('has no gradient outside the clay token and the dot grid, and no backdrop-filter', () => {
     const offending = tokensCss
       .split('\n')
-      .filter((line) => /(linear|radial)-gradient/.test(line) && !/^\s*--clay[a-z-]*:/.test(line))
+      .filter((line) => /(linear|radial)-gradient/.test(line) && !/^\s*--clay[a-z-]*:/.test(line) && !DOT_GRID.test(line))
     expect(offending).toEqual([])
     expect(tokensCss).not.toMatch(/backdrop-filter/)
   })
