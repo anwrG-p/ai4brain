@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '../state/useAppStore'
 import { App } from '../App'
@@ -28,12 +28,21 @@ describe('Welcome (/): Loti, one button, one link', () => {
     expect(within(main).getByText('Want to see how your mind works today? It takes about 5 minutes.')).toBeInTheDocument()
   })
 
+  const controlsIn = (main: HTMLElement) => Array.from(main.querySelectorAll('a, button'))
+
   it('has exactly one primary button, Start, and one other control', async () => {
+    vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client.apps.googleusercontent.com')
     const main = await renderWelcome()
-    const controls = Array.from(main.querySelectorAll('a, button'))
+    const controls = controlsIn(main)
     const primary = controls.filter((el) => /(^|\s)bg-brand(\s|$)/.test(el.className))
     expect(primary.map((el) => el.textContent?.trim())).toEqual(['Start'])
     expect(controls.map((el) => el.textContent?.trim())).toEqual(['Start', 'I already have an account'])
+  })
+
+  it('without a Google client id there is no sign-in, so Start is the only control (rule 14)', async () => {
+    vi.stubEnv('VITE_GOOGLE_CLIENT_ID', '')
+    const main = await renderWelcome()
+    expect(controlsIn(main).map((el) => el.textContent?.trim())).toEqual(['Start'])
   })
 
   it('keeps the visible copy to 40 words or fewer', async () => {
@@ -57,32 +66,25 @@ describe('Welcome (/): Loti, one button, one link', () => {
   it('Start goes to the baseline', async () => {
     await renderWelcome()
     fireEvent.click(screen.getByRole('button', { name: 'Start' }))
-    expect(await screen.findByText('1 of 5', { exact: false })).toBeInTheDocument()
+    expect(await screen.findByText('1 of 6', { exact: false })).toBeInTheDocument()
     expect(window.location.pathname).toBe('/baseline')
     await screen.findByRole('heading', { name: 'Logic Web' }) // the first exercise has loaded
   })
 
-  it('"I already have an account" opens the login sheet: guest only, no Google without a client id', async () => {
-    vi.stubEnv('VITE_GOOGLE_CLIENT_ID', '')
+  it('"I already have an account" opens the login sheet: Google or guest, no consent step; Escape closes it', async () => {
+    vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client.apps.googleusercontent.com')
     await renderWelcome()
     const link = screen.getByRole('button', { name: 'I already have an account' })
     link.focus() // fireEvent.click does not move focus
     fireEvent.click(link)
     const sheet = screen.getByRole('dialog')
     expect(sheet).toHaveFocus()
+    expect(screen.getByTestId('google-signin')).toBeInTheDocument()
     expect(within(sheet).getByRole('button', { name: 'Continue as guest' })).toBeInTheDocument()
-    expect(screen.queryByTestId('google-signin')).toBeNull()
     expect(within(sheet).queryByText(/Save your answers/)).toBeNull() // no consent step from here
     fireEvent.keyDown(sheet, { key: 'Escape' })
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.getByRole('button', { name: 'I already have an account' })).toHaveFocus()
-  })
-
-  it('shows the Google sign-in box when VITE_GOOGLE_CLIENT_ID is set', async () => {
-    vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client.apps.googleusercontent.com')
-    await renderWelcome()
-    fireEvent.click(screen.getByRole('button', { name: 'I already have an account' }))
-    expect(screen.getByTestId('google-signin')).toBeInTheDocument()
   })
 
   // Motion pass (ticket 07b, spec R8).
@@ -96,13 +98,20 @@ describe('Welcome (/): Loti, one button, one link', () => {
     expect(within(main).getByRole('img', { name: /Loti/ }).closest('.anim-rise')).not.toBeNull()
   })
 
+  it("Loti breathes on an HTML wrapper (a compositor transform), not inside the SVG", async () => {
+    const main = await renderWelcome()
+    const loti = within(main).getByRole('img', { name: /Loti/ })
+    expect(loti.closest('.anim-breathe')?.tagName).toBe('DIV')
+  })
+
   it('Start: Loti turns happy, the page leaves, then the baseline opens', async () => {
     const main = await renderWelcome()
     fireEvent.click(screen.getByRole('button', { name: 'Start' }))
     expect(within(main).getByRole('img', { name: 'Loti is happy' })).toBeInTheDocument()
-    expect(main.querySelector('.anim-page-exit')).not.toBeNull()
+    expect(main.querySelector('[inert]')).not.toBeNull() // no key or click lands while it leaves
+    await waitFor(() => expect(main.querySelector('.anim-page-exit')).not.toBeNull())
     expect(window.location.pathname).toBe('/') // the exit plays first (300 ms at most)
-    expect(await screen.findByText('1 of 5', { exact: false })).toBeInTheDocument()
+    expect(await screen.findByText('1 of 6', { exact: false })).toBeInTheDocument()
     expect(window.location.pathname).toBe('/baseline')
     await screen.findByRole('heading', { name: 'Logic Web' }) // the first exercise has loaded
   })

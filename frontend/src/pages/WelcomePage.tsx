@@ -1,20 +1,33 @@
 import { Fragment, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Loti, type LotiPose } from '../components/features/characters'
+import type { LotiPose } from '../components/features/characters'
 import { useCharacterMotion } from '../components/features/characters/shared'
 import { Button } from '../components/ui/Button'
+import { googleClientId } from '../features/flow/GoogleSignIn'
 import { LoginSheet } from '../features/flow/LoginSheet'
+import { LotiSays } from '../features/loti/LotiBubbles'
 
-// Motion timeline (tokens.css, "Motion pass"): Loti rises (400 ms) and waves 3 times from 300 ms,
+// Motion timeline (tokens.css, "Motion pass"): Loti rises (400 ms) and waves 3 times once landed,
 // then settles; the bubble follows and its words reveal; Start fades up at 900 ms.
 const SETTLE_MS = 2400
 // On Start the page leaves in 80 ms + 220 ms (anim-page-exit), then the baseline opens.
 const EXIT_MS = 300
 
-/* Welcome: Loti says hello, one button starts the baseline, one quiet link opens the login sheet.
-   Nothing else (Landing page doc: "VERY SIMPLE UI early on"; anti-slop rules 13 and 14).
-   Motion (spec R8, "Loti welcomes you into the app"): an entrance, a breathing idle, eyes that follow
-   a mouse, a cheer on Start. With reduced motion every piece is off and Start goes at once. */
+// The baseline's code (a lazy route chunk; the same module App loads). Fetched early, and awaited
+// before the exit plays, so the page never fades out onto a blank screen while it downloads. One
+// request at a time; a failed one is forgotten so Start can try again.
+let baseline: Promise<unknown> | null = null
+const loadBaseline = () =>
+  (baseline ??= import('./BaselinePage').catch((e: unknown) => {
+    baseline = null
+    throw e
+  }))
+
+/* Welcome: Loti says hello, one button starts the baseline, and, only with Google sign-in set up,
+   one quiet link opens the login sheet. Nothing else (Landing page doc: "VERY SIMPLE UI early on";
+   anti-slop rules 13 and 14). Motion (spec R8, "Loti welcomes you into the app"): an entrance, a
+   breathing idle, eyes that follow a mouse, a cheer on Start. With reduced motion every piece is
+   off and Start goes at once. Once Start is pressed the page is inert: no second key or click. */
 export default function WelcomePage() {
   const navigate = useNavigate()
   const { search } = useLocation()
@@ -22,10 +35,21 @@ export default function WelcomePage() {
   const motion = useCharacterMotion()
   const [pose, setPose] = useState<LotiPose>('wave')
   const [leaving, setLeaving] = useState(false)
+  const [exiting, setExiting] = useState(false)
+  const root = useRef<HTMLDivElement>(null)
+  const live = useRef(true)
   const [lotiRef, look] = useLookAt(motion && !leaving)
   const a = (cls: string) => (motion ? cls : '')
   // The query string rides along, so the e2e hook ?fast=1 reaches /baseline.
   const go = () => navigate({ pathname: '/baseline', search })
+
+  useEffect(() => {
+    live.current = true
+    void loadBaseline().catch(() => {}) // a failure surfaces on Start, where it is retried
+    return () => {
+      live.current = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!motion) return
@@ -33,45 +57,64 @@ export default function WelcomePage() {
     return () => window.clearTimeout(t)
   }, [motion])
 
+  // React 18 has no `inert` prop: set the attribute directly.
   useEffect(() => {
-    if (!leaving) return
+    root.current?.toggleAttribute('inert', leaving)
+  }, [leaving])
+
+  useEffect(() => {
+    if (!exiting) return
     const t = window.setTimeout(() => navigate({ pathname: '/baseline', search }), EXIT_MS)
     return () => window.clearTimeout(t)
-  }, [leaving, navigate, search])
+  }, [exiting, navigate, search])
 
   const start = () => {
     if (leaving) return
+    setLeaving(true)
+    // Reduced motion: no exit to wait for; the router keeps this page up until the baseline renders.
     if (!motion) return go()
     setPose('happy')
-    setLeaving(true)
+    loadBaseline().then(
+      () => live.current && setExiting(true),
+      () => live.current && go(), // the route shows its own error
+    )
   }
 
   return (
-    <div className={`mx-auto flex max-w-xl flex-col items-center gap-8 pt-6 pb-12 text-center sm:pt-12 ${leaving ? 'anim-page-exit' : ''}`}>
-      <div className="flex flex-col items-center gap-3">
-        <div ref={lotiRef} className={a('anim-rise')}>
-          <Loti pose={pose} size="lg" alive={motion} look={look} />
-        </div>
-        <div className={`tactile-card max-w-md px-5 py-4 ${a('anim-bubble')}`}>
-          <h1 className="font-display text-2xl font-bold text-ink">
-            <Reveal text="Hi, I'm Loti." from={0} motion={motion} />
-          </h1>
-          <p className="mt-1 text-lg text-ink">
-            <Reveal text="Want to see how your mind works today? It takes about 5 minutes." from={3} motion={motion} />
-          </p>
-        </div>
-      </div>
+    <div
+      ref={root}
+      className={`mx-auto flex max-w-xl flex-col items-center gap-8 pt-6 pb-12 text-center sm:pt-12 ${exiting ? 'anim-page-exit' : ''}`}
+    >
+      <LotiSays
+        pose={pose}
+        size="lg"
+        alive={motion}
+        look={look}
+        lotiRef={lotiRef}
+        lotiClassName={a('anim-rise')}
+        bubbleClassName={a('anim-bubble')}
+      >
+        <h1 className="font-display text-2xl font-bold text-ink">
+          <Reveal text="Hi, I'm Loti." from={0} motion={motion} />
+        </h1>
+        <p className="mt-1 text-lg text-ink">
+          <Reveal text="Want to see how your mind works today? It takes about 5 minutes." from={3} motion={motion} />
+        </p>
+      </LotiSays>
       <div className={`flex flex-col items-center gap-2 ${a('anim-cta')}`}>
         <Button size="lg" className={`min-w-40 ${a('anim-press')}`} onClick={start}>
           Start
         </Button>
-        <button
-          type="button"
-          onClick={() => setSignIn(true)}
-          className="focus-ring inline-flex min-h-11 cursor-pointer items-center rounded-sm text-sm font-medium text-brand underline underline-offset-4"
-        >
-          I already have an account
-        </button>
+        {/* Without Google sign-in there is nothing to sign in with (rule 14: fewer controls). */}
+        {googleClientId() !== null && (
+          <button
+            type="button"
+            onClick={() => setSignIn(true)}
+            className="focus-ring inline-flex min-h-11 cursor-pointer items-center rounded-sm text-sm font-medium text-brand underline underline-offset-4"
+          >
+            I already have an account
+          </button>
+        )}
       </div>
       {signIn && <LoginSheet askConsent={false} onClose={() => setSignIn(false)} onFinish={() => navigate('/dashboard')} />}
     </div>

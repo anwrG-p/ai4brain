@@ -12,11 +12,16 @@ import { taskScores } from '../features/insights/taskScores'
 
 const TOTAL = BASELINE_SCHEMAS.length
 
-/* The baseline: the five exercises in a row, each in its own ExerciseFrame (instruction, fixation,
+/** What the baseline hands to /results (router state): how many exercises were finished. */
+export type BaselineResult = { finished: number; total: number }
+
+/* The baseline: the six exercises in a row, each in its own ExerciseFrame (instruction, fixation,
    trials, end card). Continue on an end card goes straight to the next exercise. Telemetry stays
    held on the device (consent is asked on /results). The page collects the events of its own tasks
    and, after the last one, saves the session's scores (R5) and moves on to /results.
-   Exit leaves at any time; a hidden tab or Escape pauses and the exercise starts over (R3). */
+   Exit leaves at any time. A hidden tab or Escape pauses a running block, and the exercise starts
+   over (R3): the paused attempt's events are dropped from the scores. Before the trials start
+   (instruction, fixation) and on the end card there is nothing to discard, so neither pauses. */
 export default function BaselinePage() {
   const navigate = useNavigate()
   const { search } = useLocation()
@@ -25,9 +30,11 @@ export default function BaselinePage() {
   const [step, setStep] = useState(0)
   const [attempt, setAttempt] = useState(0)
   const [paused, setPaused] = useState(false)
-  const blockEnded = useRef(false)
+  const root = useRef<HTMLDivElement>(null)
+  const current = useRef<string | null>(null)
   const taskIds = useRef(new Set<string>())
   const events = useRef<TelemetryEvent[]>([])
+  const finished = useRef(0)
 
   useEffect(
     () =>
@@ -39,25 +46,35 @@ export default function BaselinePage() {
 
   const onTask = useCallback((id: string) => {
     taskIds.current.add(id)
-    blockEnded.current = false
-  }, [])
-  const onBlockEnd = useCallback(() => {
-    blockEnded.current = true
+    current.current = id
   }, [])
 
-  // A skipped exercise (it could not be shown) moves on like a finished one.
-  const next = useCallback(() => {
-    if (step + 1 < TOTAL) {
-      setStep(step + 1)
-      return
-    }
-    addSession({ id: newId(), at: new Date().toISOString(), inputs: taskScores(events.current) })
-    navigate('/results', { replace: true })
-  }, [step, addSession, navigate])
+  const next = useCallback(
+    (done: boolean) => {
+      if (done) finished.current += 1
+      if (step + 1 < TOTAL) {
+        setStep(step + 1)
+        return
+      }
+      addSession({ id: newId(), at: new Date().toISOString(), inputs: taskScores(events.current) })
+      const state: BaselineResult = { finished: finished.current, total: TOTAL }
+      navigate('/results', { replace: true, state })
+    },
+    [step, addSession, navigate],
+  )
+  const onDone = useCallback(() => next(true), [next])
+  const onError = useCallback(() => next(false), [next]) // could not be shown: skipped, not counted
 
-  // A running block is discarded on pause; one already on its end card just waits there.
+  // Only a block whose trials are running pauses: ExerciseFrame puts the motion lock
+  // ([data-timed-trial]) on the exercise for exactly that time.
   const pause = useCallback(() => {
-    if (!blockEnded.current) setPaused(true)
+    if (!root.current?.querySelector('[data-timed-trial="true"]')) return
+    const id = current.current
+    if (id) {
+      taskIds.current.delete(id)
+      events.current = events.current.filter((e) => e.task_id !== id)
+    }
+    setPaused(true)
   }, [])
   useEffect(() => {
     if (paused) return
@@ -77,7 +94,7 @@ export default function BaselinePage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 pt-2">
+    <div ref={root} className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 pt-2">
       <h1 className="sr-only">Your first check-in</h1>
       <div className="flex items-center justify-between gap-3">
         <Link
@@ -105,16 +122,15 @@ export default function BaselinePage() {
           attempt={attempt}
           prepare={fast ? fastTask : undefined}
           onTask={onTask}
-          onBlockEnd={onBlockEnd}
-          onDone={next}
-          onError={next}
+          onDone={onDone}
+          onError={onError}
         />
       )}
     </div>
   )
 }
 
-// "1 of 5" with a thin bar of five segments; the next one fills from the left as an exercise ends
+// "1 of 6" with a thin bar of six segments; the next one fills from the left as an exercise ends
 // (a transform transition, off under reduced motion). The text is what screen readers hear.
 function StepIndicator({ step }: { step: number }) {
   return (

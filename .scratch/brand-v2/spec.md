@@ -121,7 +121,7 @@ The skill's "App Store landing" pattern (ratings, stars, device mockups) is also
 
 **UX** (skill `ux` domain):
 - Every flow has Skip and Back. No forced, unskippable tours.
-- Continuous animation is for loading only. Characters are **still when idle** (R8 allows a nearly imperceptible breathing and blink) and animate on events: greeting, a celebration, a mood change.
+- Continuous animation is for loading only, with one exception: the short looping demo on an exercise's instruction screen (R8), which stops once Begin is pressed. Characters are **still when idle** (R8 allows a nearly imperceptible breathing and blink) and animate on events: greeting, a celebration, a mood change.
 - Use ease-out on enter and ease-in on exit, never linear. Respect reduced motion.
 
 **Typography.** Quicksand (headings) with Inter (body and UI), per the brand doc. The skill's alternative was Nunito + DM Sans; the brand doc wins. Quicksand is a rounded display face, so use it only for headings of 20 px and up. All small UI text is Inter.
@@ -129,7 +129,7 @@ The skill's "App Store landing" pattern (ratings, stars, device mockups) is also
 ## Anti-slop rules (binding; every review checks these)
 
 1. **No gradient buttons, gradient text, or purple/violet anything.** Use solid sky or coral fills.
-2. **No decorative background blobs, floating orbs, particles, or drifting shapes.** No glassmorphism or `backdrop-blur` cards. Blur is allowed **only** for the results blur, because it carries meaning.
+2. **No decorative background blobs, floating orbs, particles, or drifting shapes.** One exception: the one-shot sparkle burst on an exercise's end card (R8), which plays once as a celebration and then is gone. No glassmorphism or `backdrop-blur` cards. Blur is allowed **only** for the results blur, because it carries meaning.
 3. **No fake social proof:** no ratings, stars, testimonials, user counts, "trusted by", or fake stats.
 4. **No hype copy.** Banned: "unlock", "supercharge", "revolutionize", "AI-powered", "magic", "seamless", "next-level", "elevate", "empower", ✨. Write plain, specific copy in Loti's voice, at most about 12 words per line of UI text.
 5. **No icon-in-a-circle feature-card grids** (the 3-column "icon + title + 2 lines" cliché). Explain with characters, real UI or a single sentence.

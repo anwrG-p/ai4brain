@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react'
 import { MessageCircle } from 'lucide-react'
 import { Loti, type CharacterSize, type LotiPose } from '../../components/features/characters'
 import { Button } from '../../components/ui/Button'
@@ -140,15 +140,37 @@ export interface LotiSaysProps {
   pose?: LotiPose
   size?: CharacterSize
   className?: string
+  /** Passthroughs for a page's own entrance motion (Welcome): on Loti's wrapper and on the bubble. */
+  lotiClassName?: string
+  bubbleClassName?: string
+  /** Measures Loti's wrapper (Welcome's eyes that follow the mouse). */
+  lotiRef?: Ref<HTMLDivElement>
+  /** Loti's idle (spec R8): the breath on an HTML wrapper (tokens.css .anim-breathe) and the blink. */
+  alive?: boolean
+  look?: [number, number]
 }
 
-/** One static line from Loti: the character above a bubble, no chips and no controls. For screens
-    whose only action is the page's own button (Welcome, the login sheet). */
-export function LotiSays({ children, pose = 'idle', size = 'sm', className = '' }: LotiSaysProps) {
+/** One static line from Loti: the character above a bubble, no chips and no controls. For a screen
+    whose only action is the page's own button (Welcome). */
+export function LotiSays({
+  children,
+  pose = 'idle',
+  size = 'sm',
+  className = '',
+  lotiClassName,
+  bubbleClassName = '',
+  lotiRef,
+  alive = false,
+  look,
+}: LotiSaysProps) {
   return (
     <div className={`flex flex-col items-center gap-3 text-center ${className}`}>
-      <Loti pose={pose} size={size} />
-      <div className="tactile-card max-w-md px-5 py-4">{children}</div>
+      <div ref={lotiRef} className={lotiClassName}>
+        <div className={alive ? 'anim-breathe' : undefined}>
+          <Loti pose={pose} size={size} alive={alive} look={look} />
+        </div>
+      </div>
+      <div className={`tactile-card max-w-md px-5 py-4 ${bubbleClassName}`}>{children}</div>
     </div>
   )
 }

@@ -2,14 +2,17 @@ import { test, expect, type Page, type TestInfo } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import path from 'node:path'
 
-/* The new-user flow (ticket 07): Welcome → the five-exercise baseline → Results (blur, Dolphin,
-   login sheet, consent, un-blur).
+/* The new-user flow (ticket 07): Welcome → the six-exercise baseline → Results (blur, Dolphin,
+   consent, un-blur). This build has no VITE_GOOGLE_CLIENT_ID, so "See my results" opens straight on
+   the consent choice (no sign-in step).
 
-   Test hook: `?fast=1` (mock tasks only; see src/features/flow/baseline.ts) shortens each exercise:
-   fewer trials and short time limits. The exercises still run for real and record real events.
-   Logic Web, Memory Gauntlet and Strategic Blueprint finish on their own once started (Tower needs
-   its move prediction first); Perceptual Radar and Precision Archive wait for answers, which this
-   spec gives with the keyboard. Welcome passes its query string on to /baseline.
+   Test hook: `?fast=1` (see src/features/flow/baseline.ts) shortens each exercise: fewer trials and
+   short time limits. It needs mock tasks and a test build: playwright.config.ts builds with
+   VITE_E2E=1 into dist/e2e; a normal build ignores the query. The exercises still run for real and
+   record real events. Logic Web, Memory Gauntlet, Strategic Blueprint and Color Clash finish on
+   their own once started (Tower needs its move prediction first); Perceptual Radar and Precision
+   Archive wait for answers, which this spec gives with the keyboard. Welcome passes its query
+   string on to /baseline.
 
    Screenshots go to $FLOW_SHOT_DIR when set, else to the test's output folder. */
 
@@ -53,7 +56,7 @@ async function recordPosts(page: Page) {
 }
 
 async function begin(page: Page, step: number, name: string) {
-  await expect(page.getByText(`${step} of 5`)).toBeVisible()
+  await expect(page.getByText(`${step} of 6`)).toBeVisible()
   await expect(page.getByRole('heading', { name })).toBeVisible()
   await page.getByRole('button', { name: 'Begin' }).click()
 }
@@ -66,8 +69,10 @@ async function runBaseline(page: Page, info: TestInfo, theme: string) {
 
   await expect(page.getByRole('heading', { name: 'Logic Web' })).toBeVisible()
   await shot(page, info, `07-baseline-instruction-${theme}`)
-  await noAxeViolations(page, `baseline instruction (${theme})`)
+  await checkViewports(page, `baseline instruction (${theme})`, info, `07-baseline-instruction-${theme}`)
   await begin(page, 1, 'Logic Web')
+  await expect(page.getByRole('button', { name: 'Continue' })).toBeVisible({ timeout: 30_000 })
+  await checkViewports(page, `baseline end card (${theme})`, info, `07-baseline-end-${theme}`)
   await finish(page)
 
   await begin(page, 2, 'Memory Gauntlet')
@@ -79,13 +84,16 @@ async function runBaseline(page: Page, info: TestInfo, theme: string) {
   await tower.getByRole('button', { name: 'Start' }).click()
   await finish(page)
 
-  await begin(page, 4, 'Perceptual Radar')
+  await begin(page, 4, 'Color Clash')
+  await finish(page)
+
+  await begin(page, 5, 'Perceptual Radar')
   await expect(page.getByRole('group', { name: 'Your answer' })).toBeVisible({ timeout: 10_000 })
   await page.keyboard.press('a')
   await page.keyboard.press('1')
   await finish(page)
 
-  await begin(page, 5, 'Precision Archive')
+  await begin(page, 6, 'Precision Archive')
   const cont = page.getByRole('button', { name: 'Continue' })
   for (let k = 0; k < 60 && !(await cont.isVisible()); k++) {
     await page.keyboard.press('1')
@@ -98,15 +106,12 @@ async function runBaseline(page: Page, info: TestInfo, theme: string) {
 async function openConsent(page: Page, info: TestInfo, theme: string) {
   await page.getByRole('button', { name: 'See my results' }).click()
   const sheet = page.getByRole('dialog')
-  await expect(sheet.getByRole('button', { name: 'Continue as guest' })).toBeVisible()
-  // R4: no client id in this build, so no Google button at all.
+  // R4 and rule 14: no client id in this build, so no sign-in step and nothing Google-shaped.
+  await expect(sheet.getByRole('heading', { name: 'Save your answers?' })).toBeFocused()
+  await expect(sheet.getByRole('button', { name: 'Continue as guest' })).toHaveCount(0)
   await expect(page.getByTestId('google-signin')).toHaveCount(0)
-  await shot(page, info, `07-results-login-${theme}`)
-  await checkViewports(page, `login sheet (${theme})`, info, `07-results-login-${theme}`)
-  await sheet.getByRole('button', { name: 'Continue as guest' }).click()
-  await expect(sheet.getByRole('heading', { name: 'Save your answers?' })).toBeVisible()
   await shot(page, info, `07-results-consent-${theme}`)
-  await checkViewports(page, `consent (${theme})`)
+  await checkViewports(page, `consent (${theme})`, info, `07-results-consent-${theme}`)
   return sheet
 }
 
@@ -114,7 +119,7 @@ async function expectBlurredResults(page: Page, info: TestInfo, theme: string) {
   await expect(page.getByRole('heading', { level: 1, name: 'Your results are ready' })).toBeVisible()
   await expect(page.locator('figure[data-blurred="true"]')).toBeVisible()
   await expect(page.getByRole('img', { name: /Dolphin/ })).toBeVisible()
-  await expect(page.getByText('Good job! You finished all five.')).toBeVisible()
+  await expect(page.getByText('Good job! You finished all six.')).toBeVisible()
   await shot(page, info, `07-results-blurred-${theme}`)
   await checkViewports(page, `results blurred (${theme})`, info, `07-results-blurred-${theme}`)
 }

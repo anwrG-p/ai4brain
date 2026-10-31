@@ -241,8 +241,8 @@ test('an unknown exercise skips the frame and runs as before', () => {
   expect(screen.queryByRole('button', { name: 'Begin' })).toBeNull()
 })
 
-// Motion pass (ticket 07b, spec R8): motion lives on the instruction, fixation and end screens,
-// never on the stimulus. The motion lock ([data-timed-trial]) wraps the exercise only.
+// Motion pass (ticket 07b, spec R8): motion lives on the instruction and end screens, never on the
+// fixation (R9) or the stimulus. The motion lock ([data-timed-trial]) wraps the exercise only.
 test.each(Object.keys(EXERCISE_NAME))('%s: the instruction screen has a small animated demo, hidden from screen readers', (schema) => {
   const { container } = setup(schema as SchemaType)
   const demo = container.querySelector(`[data-demo="${schema}"]`)
@@ -269,7 +269,8 @@ test('the motion lock wraps the exercise only: not the instruction, the dots or 
   expect(locked()).toBeNull()
   expect(container.firstElementChild).toHaveClass('anim-slide-in') // a new exercise slides in from the right
   space()
-  expect(screen.getByRole('img', { name: 'Look at the cross' })).toHaveClass('anim-fix-in')
+  // R9: the fixation cross appears at once, at full contrast, for its whole 500 ms (no fade or scale).
+  expect(container.querySelector('[class*="anim-"]')).toBeNull()
   advance(FIXATION_MS)
   expect(locked()).toContainElement(screen.getByRole('region', { name: 'Pattern Puzzle' }))
   expect(locked()).not.toContainElement(screen.getByRole('progressbar', { name: 'Progress' }))

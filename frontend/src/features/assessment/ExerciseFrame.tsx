@@ -248,9 +248,10 @@ export function ExerciseFrame({ task, onDone, onBlockEnd, children }: Props) {
     case 'intro':
       return <Instructions schema={task.schema_type} intro={intro} onBegin={begin} />
     case 'fixation':
+      // R9: the cross appears at once, at full contrast for all of its 500 ms (jsPsych convention).
       return (
         <div className="flex min-h-64 items-center justify-center">
-          <span role="img" aria-label="Look at the cross" className="anim-fix-in select-none text-5xl font-bold text-ink">
+          <span role="img" aria-label="Look at the cross" className="select-none text-5xl font-bold text-ink">
             +
           </span>
         </div>

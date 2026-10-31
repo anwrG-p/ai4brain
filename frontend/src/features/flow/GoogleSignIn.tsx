@@ -33,11 +33,14 @@ function loadGis(): Promise<Gis> {
     const s = document.createElement('script')
     s.src = GIS_SRC
     s.async = true
-    s.onload = () => (window.google ? resolve(window.google) : reject(new Error('Google sign-in did not load')))
-    s.onerror = () => {
-      gis = null // let a later sheet try again
+    // Any failure is forgotten, so a later sheet tries again with a fresh script.
+    const fail = () => {
+      gis = null
+      s.remove()
       reject(new Error('Google sign-in did not load'))
     }
+    s.onload = () => (window.google?.accounts ? resolve(window.google) : fail())
+    s.onerror = fail
     document.head.appendChild(s)
   })
   return gis

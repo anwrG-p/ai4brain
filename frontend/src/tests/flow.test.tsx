@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../App'
 import { getUserId } from '../features/assessment/tasks/taskSource'
@@ -17,18 +17,46 @@ const META: Partial<Record<SchemaType, TelemetryEvent['trial_meta']>> = {
   mst: { kind: 'lure', response: 'similar' },
 }
 
+// The stub opens on its "instruction" (Begin); Begin starts its "trials" under the motion lock
+// ([data-timed-trial], as the real frame does) and records one event. `stub` steers a test's run.
+const stub = { failing: null as SchemaType | null, wrongOnFirstAttempt: false, tasks: [] as string[] }
+
 vi.mock('../features/assessment/ExerciseHost', () => ({
-  ExerciseHost: ({ schemaType, onTask, onDone }: { schemaType: SchemaType; onTask?: (id: string) => void; onDone: () => void }) => {
+  ExerciseHost: ({
+    schemaType,
+    attempt,
+    onTask,
+    onDone,
+    onError,
+  }: {
+    schemaType: SchemaType
+    attempt: number
+    onTask?: (id: string) => void
+    onDone: () => void
+    onError: (msg: string) => void
+  }) => {
+    const [running, setRunning] = useState(false)
+    const id = `stub-${schemaType}-${attempt}`
     useEffect(() => {
-      const id = `stub-${schemaType}`
+      if (stub.failing === schemaType) return onError('This exercise could not be shown.')
+      stub.tasks.push(id)
       onTask?.(id)
+    }, [])
+    const begin = () => {
+      setRunning(true)
       const r = new TrialRecorder({ user_id: getUserId(), session_id: 's', task_id: id, dimension: 'pattern_induction', voice_opt_in: false })
       r.start(0)
-      tracker.push(r.finish({ correct: true, meta: META[schemaType] }))
-    }, [])
-    return (
-      <button type="button" onClick={onDone}>
-        Finish {schemaType}
+      tracker.push(r.finish({ correct: !(stub.wrongOnFirstAttempt && attempt === 0), meta: META[schemaType] }))
+    }
+    return running ? (
+      <div data-timed-trial="true">
+        <button type="button" onClick={onDone}>
+          Finish {schemaType}
+        </button>
+      </div>
+    ) : (
+      <button type="button" onClick={begin}>
+        Begin {schemaType}
       </button>
     )
   },
@@ -41,6 +69,7 @@ beforeEach(() => {
   useSessionStore.getState().clearSessions()
   tracker.resetConsent()
   tracker.clear()
+  Object.assign(stub, { failing: null, wrongOnFirstAttempt: false, tasks: [] })
   fetchFn = vi.fn(async (_url: string, init?: RequestInit) => {
     const n = (JSON.parse(String(init?.body)) as unknown[]).length
     return new Response(JSON.stringify({ accepted: n }), { status: 200 })
@@ -61,74 +90,120 @@ const go = (path: string) => {
   render(<App />)
 }
 
-async function runBaseline() {
-  go('/baseline')
-  for (const [k, s] of (['relational', 'n_back', 'tower', 'ufov', 'mst'] as const).entries()) {
-    expect(await screen.findByText(`${k + 1} of 5`, { exact: false })).toBeInTheDocument()
+const ALL: readonly SchemaType[] = ['relational', 'n_back', 'tower', 'stroop', 'ufov', 'mst']
+
+async function playThrough(schemas: readonly SchemaType[] = ALL) {
+  for (const s of schemas) {
+    expect(await screen.findByText(`${ALL.indexOf(s) + 1} of 6`, { exact: false })).toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: `Begin ${s}` }))
     fireEvent.click(await screen.findByRole('button', { name: `Finish ${s}` }))
   }
   await screen.findByRole('heading', { level: 1, name: 'Your results are ready' })
 }
 
+async function runBaseline(schemas: readonly SchemaType[] = ALL) {
+  go('/baseline')
+  await playThrough(schemas)
+}
+
 const radar = () => document.querySelector('figure[data-blurred]')!
 
 describe('/baseline', () => {
-  it('runs the five exercises in order, saves the session and goes to /results without sending anything', async () => {
+  it('runs the six exercises in order, saves the session and goes to /results without sending anything', async () => {
     await runBaseline()
     expect(window.location.pathname).toBe('/results')
     const sessions = useSessionStore.getState().sessions
     expect(sessions).toHaveLength(1)
     // Only this page's events are scored: the relational stub event (hops 2) gives FluidMatrices.
     expect(sessions[0]!.inputs.FluidMatrices).toMatchObject({ score: 100 })
-    expect(tracker.getStatus()).toMatchObject({ consent: 'pending', queuedCount: 5 })
+    expect(tracker.getStatus()).toMatchObject({ consent: 'pending', queuedCount: 6 })
     expect(fetchFn).not.toHaveBeenCalled()
   })
 
   it('has Exit and the step indicator, and nothing from the app shell', async () => {
     go('/baseline')
-    expect(await screen.findByText('1 of 5', { exact: false })).toBeInTheDocument()
+    expect(await screen.findByText('1 of 6', { exact: false })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Exit' })).toHaveAttribute('href', '/')
     expect(screen.queryByRole('banner')).toBeNull()
     expect(screen.queryByRole('contentinfo')).toBeNull()
   })
 
-  it('a hidden tab pauses; Resume starts the exercise again', async () => {
-    go('/baseline')
-    await screen.findByRole('button', { name: 'Finish relational' })
+  const hideTab = () => {
     const hidden = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
     act(() => void document.dispatchEvent(new Event('visibilitychange')))
     hidden.mockRestore()
+  }
+
+  it('a hidden tab pauses a running exercise; Resume starts it again', async () => {
+    go('/baseline')
+    fireEvent.click(await screen.findByRole('button', { name: 'Begin relational' }))
+    hideTab()
     expect(screen.getByRole('heading', { name: 'Paused' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Finish relational' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Resume' }))
-    expect(await screen.findByRole('button', { name: 'Finish relational' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Begin relational' })).toBeInTheDocument()
+  })
+
+  it('Escape or a hidden tab on an instruction screen does nothing: no pause, no new task', async () => {
+    go('/baseline')
+    await screen.findByRole('button', { name: 'Begin relational' })
+    fireEvent.keyDown(window, { key: 'Escape' })
+    hideTab()
+    expect(screen.queryByRole('heading', { name: 'Paused' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Begin relational' })).toBeInTheDocument()
+    expect(stub.tasks).toEqual(['stub-relational-0'])
+    // Once the trials run, Escape pauses.
+    fireEvent.click(screen.getByRole('button', { name: 'Begin relational' }))
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getByRole('heading', { name: 'Paused' })).toBeInTheDocument()
+  })
+
+  it('a paused attempt is dropped: its events are not scored', async () => {
+    stub.wrongOnFirstAttempt = true // attempt 0 answers wrong, the restart answers right
+    go('/baseline')
+    fireEvent.click(await screen.findByRole('button', { name: 'Begin relational' }))
+    fireEvent.keyDown(window, { key: 'Escape' })
+    fireEvent.click(screen.getByRole('button', { name: 'Resume' }))
+    await playThrough()
+    expect(useSessionStore.getState().sessions[0]!.inputs.FluidMatrices).toMatchObject({ score: 100 })
+  })
+
+  it('an exercise that cannot be shown is skipped, and Results counts only the finished ones', async () => {
+    stub.failing = 'tower'
+    await runBaseline(['relational', 'n_back', 'stroop', 'ufov', 'mst'])
+    expect(screen.getByText('Good job! You finished 5 of 6.')).toBeInTheDocument()
+    expect(screen.queryByText(/all six/)).toBeNull()
   })
 })
 
 describe('/results', () => {
-  it('starts blurred, with the Dolphin and no Google button when no client id is set', async () => {
+  it('starts blurred, with the Dolphin; without a Google client id the sheet opens on the consent choice', async () => {
     vi.stubEnv('VITE_GOOGLE_CLIENT_ID', '')
     await runBaseline()
     expect(radar()).toHaveAttribute('data-blurred', 'true')
     expect(screen.queryByRole('table')).toBeNull() // the blurred scores are not read out either
     expect(screen.getByRole('img', { name: /Dolphin/ })).toBeInTheDocument()
-    expect(screen.getByText('Good job! You finished all five.')).toBeInTheDocument()
+    expect(screen.getByText('Good job! You finished all six.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'See my results' }))
-    expect(within(screen.getByRole('dialog')).getByRole('button', { name: 'Continue as guest' })).toBeInTheDocument()
+    const sheet = screen.getByRole('dialog', { name: 'Save your answers?' })
+    expect(within(sheet).getByRole('heading', { name: 'Save your answers?' })).toHaveFocus()
+    // No sign-in step: there is nothing to sign in with (rule 14).
+    expect(within(sheet).queryByRole('button', { name: 'Continue as guest' })).toBeNull()
     expect(screen.queryByTestId('google-signin')).toBeNull()
   })
 
-  it('shows the Google sign-in box when VITE_GOOGLE_CLIENT_ID is set', async () => {
+  it('with VITE_GOOGLE_CLIENT_ID set, the sheet offers Google or guest first, then the consent choice', async () => {
     vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client.apps.googleusercontent.com')
     await runBaseline()
     fireEvent.click(screen.getByRole('button', { name: 'See my results' }))
     expect(screen.getByTestId('google-signin')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Continue as guest' }))
+    expect(screen.getByRole('heading', { name: 'Save your answers?' })).toHaveFocus()
   })
 
   it('"Save my answers" sends the held events with this device\'s user_id and un-blurs the radar', async () => {
     await runBaseline()
     fireEvent.click(screen.getByRole('button', { name: 'See my results' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Continue as guest' }))
     expect(screen.getByRole('heading', { name: 'Save your answers?' })).toHaveFocus()
     expect(screen.getByText('We record answer timing and accuracy only. No camera, no microphone.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'How we handle your data' })).toHaveAttribute('href', '/privacy')
@@ -139,7 +214,7 @@ describe('/results', () => {
     expect(url).toBe('/v1/telemetry/event')
     expect(init.method).toBe('POST')
     const sent = JSON.parse(String(init.body)) as TelemetryEvent[]
-    expect(sent).toHaveLength(5)
+    expect(sent).toHaveLength(6)
     expect(new Set(sent.map((e) => e.user_id))).toEqual(new Set([getUserId()]))
     expect(tracker.getStatus()).toMatchObject({ consent: 'granted', queuedCount: 0 })
 
@@ -156,7 +231,6 @@ describe('/results', () => {
   it('"Keep them on this device only" sends nothing, clears the buffer, and still shows the results', async () => {
     await runBaseline()
     fireEvent.click(screen.getByRole('button', { name: 'See my results' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Continue as guest' }))
     await act(async () => void fireEvent.click(screen.getByRole('button', { name: 'Keep them on this device only' })))
     expect(tracker.getStatus()).toMatchObject({ consent: 'denied', queuedCount: 0 })
     expect(fetchFn).not.toHaveBeenCalled()
