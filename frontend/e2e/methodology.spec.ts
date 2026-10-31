@@ -1,131 +1,100 @@
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-const SCREENSHOT_DIR = path.resolve(__dirname, '../../docs/ui/screenshots')
+// SHOTS_DIR lets a local run write its screenshots elsewhere.
+const SCREENSHOT_DIR = process.env.SHOTS_DIR ?? path.resolve(process.cwd(), '../docs/ui/screenshots')
 
-test.describe('Page 15: Methodology, Limits & Ethics (/methodology) Visual QA & A11y', () => {
-  test('passes axe-core accessibility, 375/768/1440px responsive layout, pipeline stepper, bias simulator, and copy guardrail', async ({
-    page,
-  }) => {
-    // 1. Desktop 1440px Light (Playful Lab) Baseline
+const TOPICS = [
+  'The 5 pillars and their exercises',
+  'How a pillar score is built',
+  'Brain areas',
+  'Your progress curve',
+  'Real improvement',
+]
+
+const VIEWPORTS = [
+  { width: 1440, height: 900 },
+  { width: 768, height: 1024 },
+  { width: 375, height: 812 },
+]
+
+/** Words in <main> whose text is on screen in the first viewport. */
+async function wordsAboveFold(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const main = document.querySelector('main')
+    if (!main) return Infinity
+    const walker = document.createTreeWalker(main, NodeFilter.SHOW_TEXT)
+    let count = 0
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      // A closed <details> keeps its body laid out under content-visibility: hidden.
+      if (!node.parentElement?.checkVisibility({ visibilityProperty: true, opacityProperty: true })) continue
+      const range = document.createRange()
+      range.selectNodeContents(node)
+      const r = range.getBoundingClientRect()
+      if (r.width === 0 || r.height === 0 || r.top >= window.innerHeight || r.bottom <= 0) continue
+      count += (node.textContent ?? '').split(/\s+/).filter(Boolean).length
+    }
+    return count
+  })
+}
+
+async function setAll(page: Page, open: boolean) {
+  for (const name of TOPICS) {
+    const details = page.locator('main details').filter({ has: page.getByRole('heading', { level: 2, name }) })
+    if ((await details.evaluate((d) => (d as HTMLDetailsElement).open)) !== open) {
+      await details.locator('summary').click()
+    }
+  }
+}
+
+async function checkViewports(page: Page, theme: 'light' | 'dark', state: 'closed' | 'open') {
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize(vp)
+    await expect(page.getByRole('heading', { level: 1, name: 'How we calculate this' })).toBeVisible()
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)
+    expect(overflow, `horizontal overflow at ${vp.width}px (${theme}, ${state})`).toBe(false)
+    const axe = await new AxeBuilder({ page }).analyze()
+    expect(axe.violations, `axe at ${vp.width}px (${theme}, ${state})`).toEqual([])
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, `15-methodology-${theme}-${state}-${vp.width}.png`),
+      fullPage: true,
+    })
+  }
+}
+
+test.describe('How we calculate this (/methodology)', () => {
+  test.use({ reducedMotion: 'reduce' })
+
+  test('plain intro, five closed topics, at most 60 words above the fold at 1440x900', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/methodology', { waitUntil: 'networkidle' })
+    await expect(page.getByRole('heading', { level: 1, name: 'How we calculate this' })).toBeVisible()
+    await expect(page.getByText('Real improvement means a change bigger than normal day-to-day noise.')).toBeVisible()
+    const details = page.locator('main details')
+    await expect(details).toHaveCount(TOPICS.length)
+    for (let i = 0; i < TOPICS.length; i++) {
+      await expect(details.nth(i).getByRole('heading', { level: 2 })).toHaveText(TOPICS[i]!)
+      expect(await details.nth(i).evaluate((d) => (d as HTMLDetailsElement).open)).toBe(false)
+    }
+    await expect(page.getByRole('table', { name: 'Weights per pillar' })).toBeHidden()
+    const words = await wordsAboveFold(page)
+    expect(words).toBeGreaterThan(30) // the counter sees the heading, intro and topic titles
+    expect(words).toBeLessThanOrEqual(60)
+  })
 
-    await expect(
-      page.getByRole('heading', {
-        name: /Methodology, Limits & Ethical Charter/i,
-        level: 1,
-      }),
-    ).toBeVisible()
+  test('axe light and dark at 375/768/1440, topics closed and open; no overflow', async ({ page }) => {
+    await page.goto('/methodology', { waitUntil: 'networkidle' })
+    await checkViewports(page, 'light', 'closed')
+    await setAll(page, true)
+    await expect(page.getByRole('table', { name: 'Weights per pillar' })).toBeVisible()
+    await checkViewports(page, 'light', 'open')
 
-    // Verify 4 pipeline stages exist
-    await expect(page.getByRole('tab', { name: /Active Probe Stimuli/i })).toBeVisible()
-    await expect(page.getByRole('tab', { name: /Weighted Staircase IRT/i })).toBeVisible()
-    await expect(page.getByRole('tab', { name: /Bayesian Twin Updating/i })).toBeVisible()
-    await expect(page.getByRole('tab', { name: /SAT-JEPA Plan Generation/i })).toBeVisible()
-
-    // Verify zero horizontal overflow at 1440px
-    const overflow1440 = await page.evaluate(() => {
-      return (
-        document.documentElement.scrollWidth >
-        document.documentElement.clientWidth
-      )
-    })
-    expect(overflow1440).toBe(false)
-
-    // Run axe-core on 1440px Light
-    const axeLight = await new AxeBuilder({ page }).analyze()
-    expect(axeLight.violations).toEqual([])
-
-    await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, '15-methodology-desktop-overview.png'),
-      fullPage: true,
-    })
-
-    // 2. Interactive Pipeline Stepper: Click Stage 3 (Bayesian Twin Updating)
-    const stage3Tab = page.getByRole('tab', { name: /Bayesian Twin Updating/i })
-    await stage3Tab.click()
-
-    await expect(
-      page.getByRole('heading', { name: /Stage 3: Bayesian Twin Updating/i }),
-    ).toBeVisible()
-
-    await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, '15-methodology-pipeline-step.png'),
-      fullPage: true,
-    })
-
-    // 3. Interactive Bias & Confidence Simulator
-    const slumpRadio = page.getByRole('radio', { name: /Afternoon Slump/i })
-    await slumpRadio.click()
-    await expect(slumpRadio).toHaveAttribute('aria-checked', 'true')
-
-    await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, '15-methodology-bias-simulator.png'),
-      fullPage: true,
-    })
-
-    // 4. Live Copy Guardrail Sandbox: Click Clinical Test
-    const clinicalTestBtn = page.getByRole('button', { name: /Clinical Test/i })
-    await clinicalTestBtn.click()
-
-    await expect(page.getByText(/Violation\(s\) Flagged/i)).toBeVisible()
-
-    await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, '15-methodology-guardrail-sandbox.png'),
-      fullPage: true,
-    })
-
-    // 5. Night Lab Dark Mode Switch
-    const themeBtn = page.getByRole('button', { name: /Dark \(Night Lab\)/i }).first()
-    await themeBtn.click()
-
+    await setAll(page, false)
+    await page.getByRole('button', { name: /Dark \(Night Lab\)/i }).first().click()
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-
-    // Run axe-core in Dark Mode
-    const axeDark = await new AxeBuilder({ page }).analyze()
-    expect(axeDark.violations).toEqual([])
-
-    await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, '15-methodology-night-lab.png'),
-      fullPage: true,
-    })
-
-    // Switch back to light
-    const lightBtn = page.getByRole('button', { name: /Light \(Playful Lab\)/i }).first()
-    await lightBtn.click()
-
-    // 6. Tablet 768px Viewport
-    await page.setViewportSize({ width: 768, height: 1024 })
-    await page.waitForTimeout(300)
-
-    const overflow768 = await page.evaluate(() => {
-      return (
-        document.documentElement.scrollWidth >
-        document.documentElement.clientWidth
-      )
-    })
-    expect(overflow768).toBe(false)
-
-    // 7. Mobile 375px Viewport
-    await page.setViewportSize({ width: 375, height: 812 })
-    await page.waitForTimeout(300)
-
-    const overflow375 = await page.evaluate(() => {
-      return (
-        document.documentElement.scrollWidth >
-        document.documentElement.clientWidth
-      )
-    })
-    expect(overflow375).toBe(false)
-
-    await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, '15-methodology-mobile.png'),
-      fullPage: true,
-    })
+    await checkViewports(page, 'dark', 'closed')
+    await setAll(page, true)
+    await checkViewports(page, 'dark', 'open')
   })
 })

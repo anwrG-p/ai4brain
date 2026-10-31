@@ -783,54 +783,6 @@ describe('Wave 1 & Wave 2 Pages & Design System Unit Suite', () => {
     expect(screen.getByText(/All settings and accessibility preferences restored to factory defaults/i)).toBeInTheDocument()
   })
 
-  it('renders Page 15 Methodology (/methodology) with 4-stage pipeline, formula disclosure, bias simulator, and copy guardrail', async () => {
-    window.history.pushState({}, '', '/methodology')
-    render(<App />)
-
-    const heading = await screen.findByRole(
-      'heading',
-      {
-        name: /Methodology, Limits & Ethical Charter/i,
-      },
-      { timeout: 5000 },
-    )
-    expect(heading).toBeInTheDocument()
-
-    // 1. Verify 4 pipeline stages
-    expect(screen.getByRole('tab', { name: /Active Probe Stimuli/i })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /Weighted Staircase IRT/i })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /Bayesian Twin Updating/i })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /SAT-JEPA Plan Generation/i })).toBeInTheDocument()
-
-    // 2. Click Stage 3: Bayesian Twin Updating
-    const stage3Tab = screen.getByRole('tab', { name: /Bayesian Twin Updating/i })
-    fireEvent.click(stage3Tab)
-    expect(stage3Tab).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByText(/Stage 3: Bayesian Twin Updating/i)).toBeInTheDocument()
-
-    // 3. Verify Mathematical Model headings
-    expect(screen.getByText(/1. Conjugate Gaussian Trait Estimation/i)).toBeInTheDocument()
-    expect(screen.getByText(/2. Archetype Classification Hysteresis/i)).toBeInTheDocument()
-    expect(screen.getByText(/3. SAT-JEPA Latent Vector Differential/i)).toBeInTheDocument()
-
-    // 4. Test Interactive Bias Simulator
-    const slumpRadio = screen.getByRole('radio', { name: /Afternoon Slump/i })
-    fireEvent.click(slumpRadio)
-    expect(slumpRadio).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByText(/Computed Posterior Credible Band:/i)).toBeInTheDocument()
-
-    // 5. Test Live Copy Guardrail Sandbox
-    const clinicalTestBtn = screen.getByRole('button', { name: /Clinical Test/i })
-    fireEvent.click(clinicalTestBtn)
-    expect(screen.getByText(/Violation\(s\) Flagged/i)).toBeInTheDocument()
-
-    // 6. Verify Measurement Biases Reference Table
-    const tableRegion = screen.getByRole('region', { name: /Measurement Biases Matrix/i })
-    expect(tableRegion).toHaveAttribute('tabIndex', '0')
-    expect(screen.getByRole('cell', { name: /Hardware Latency & Bluetooth Jitter/i })).toBeInTheDocument()
-    expect(screen.getByText(/Circadian Rhythm Alertness Dip/i)).toBeInTheDocument()
-  })
-
   it('renders Page 19 Layer D (/layer-d) with multimodal voice studio, what-if scenario simulator, and fatigue risk gauge', async () => {
     window.history.pushState({}, '', '/layer-d')
     render(<App />)
