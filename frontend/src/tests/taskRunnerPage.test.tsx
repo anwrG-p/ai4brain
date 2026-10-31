@@ -5,6 +5,7 @@ import { tracker } from '../features/assessment/telemetry/tracker'
 import type { TelemetryEvent } from '../features/assessment/telemetry/types'
 import TaskRunnerPage from '../pages/TaskRunnerPage'
 import { useAppStore } from '../state/useAppStore'
+import { begin } from './exerciseFrame'
 
 // Same flags as App.tsx, so the router prints no v7 warnings.
 const future = { v7_startTransition: true, v7_relativeSplatPath: true }
@@ -63,39 +64,39 @@ afterEach(() => {
 describe('TaskRunnerPage mounts the real exercises', () => {
   it('pressing "1" while N-back runs triggers no page answer handler; Escape still pauses (R4, R3)', async () => {
     renderAt('/task/working_memory')
-    await screen.findByRole('region', { name: 'Memory Sharpness' })
+    await begin('Memory Gauntlet')
 
     fireEvent.keyDown(window, { key: '1' })
     fireEvent.click(screen.getByRole('button', { name: /View Telemetry as Table/i }))
     expect(dataRows()).toHaveLength(0) // no fabricated event, no seeded row
-    expect(screen.getByRole('region', { name: 'Memory Sharpness' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Memory Gauntlet' })).toBeInTheDocument()
 
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(screen.getByRole('heading', { name: /Trial Auto-Paused — Focus Left Window/i })).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Memory Sharpness' })).toBeNull() // unmounted
+    expect(screen.queryByRole('region', { name: 'Memory Gauntlet' })).toBeNull() // unmounted
 
     fireEvent.click(screen.getByRole('button', { name: /Resume/i }))
-    expect(await screen.findByRole('region', { name: 'Memory Sharpness' })).toBeInTheDocument()
+    expect(await begin('Memory Gauntlet')).toBeInTheDocument()
   })
 
   it('?schema= picks the exercise of the current dimension; evaluator buttons switch it (R2)', async () => {
     renderAt('/task/visuospatial_planning_gf?schema=tower')
-    expect(await screen.findByRole('region', { name: 'Tower puzzle' })).toBeInTheDocument()
+    expect(await begin('Strategic Blueprint')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Exercise: relational' }))
-    expect(await screen.findByRole('region', { name: 'Word relations' })).toBeInTheDocument()
+    expect(await begin('Logic Web')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Exercise: mental_rotation' })).toBeInTheDocument()
   })
 
   it('a ?schema= outside the dimension falls back to its first schema type', async () => {
     renderAt('/task/visuospatial_planning_gf?schema=ufov')
-    expect(await screen.findByRole('region', { name: 'Pattern puzzle' })).toBeInTheDocument()
+    expect(await begin('Pattern Puzzle')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Exercise: ufov' })).toBeNull()
   })
 
   it('the table and the summary show real tracker events and status, never a fixed "202 Accepted" (R5)', async () => {
     renderAt('/task/episodic_pattern_separation')
-    await screen.findByRole('region', { name: 'Shape memory' })
+    await begin('Precision Archive')
     act(() => {
       tracker.push(event())
       tracker.push(event({ trial_index: 1, score_norm: 0, error_flag: true, response_time_ms: 660 }))
@@ -118,7 +119,7 @@ describe('TaskRunnerPage mounts the real exercises', () => {
 
   it('counts and averages every event of the block, though the table keeps only the latest 50', async () => {
     renderAt('/task/episodic_pattern_separation')
-    await screen.findByRole('region', { name: 'Shape memory' })
+    await begin('Precision Archive')
     act(() => {
       // 50 correct at 600 ms, then 1 error at 2100 ms: mean RT 32100/51 = 629, accuracy 50/51 = 98%.
       for (let i = 0; i < 50; i++) tracker.push(event({ trial_index: i, response_time_ms: 600 }))
@@ -142,7 +143,7 @@ describe('TaskRunnerPage mounts the real exercises', () => {
       consent: 'granted',
     })
     renderAt('/task/episodic_pattern_separation')
-    await screen.findByRole('region', { name: 'Shape memory' })
+    await begin('Precision Archive')
     fireEvent.click(screen.getByRole('button', { name: /Fast-Forward to Summary/i }))
     expect(screen.getByText(/^Telemetry: 0 recorded · queue empty · 4 dropped$/)).toBeInTheDocument()
     expect(screen.queryByText(/rejected/i)).toBeNull()
@@ -162,7 +163,7 @@ describe('TaskRunnerPage mounts the real exercises', () => {
         </Routes>
       </MemoryRouter>,
     )
-    await screen.findByRole('region', { name: 'Shape memory' })
+    await begin('Precision Archive')
     act(() => {
       tracker.push(event())
       tracker.push(event({ trial_index: 1 }))
@@ -171,7 +172,7 @@ describe('TaskRunnerPage mounts the real exercises', () => {
     expect(screen.getByText(/Accuracy 100% · 640 ms/)).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'browser back' }))
-    expect(await screen.findByRole('region', { name: 'Memory Sharpness' })).toBeInTheDocument()
+    expect(await begin('Memory Gauntlet')).toBeInTheDocument()
     expect(screen.getByText('Recorded: 0')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Fast-Forward to Summary/i }))
     expect(screen.getByText('No answers recorded')).toBeInTheDocument()
@@ -179,7 +180,7 @@ describe('TaskRunnerPage mounts the real exercises', () => {
 
   it('the completed drawer has no card chrome around the WhyThisPanel card', async () => {
     renderAt('/task/episodic_pattern_separation')
-    await screen.findByRole('region', { name: 'Shape memory' })
+    await begin('Precision Archive')
     fireEvent.click(screen.getByRole('button', { name: /Fast-Forward to Summary/i }))
     const drawer = screen.getByText('Show details').closest('details')!
     const panel = drawer.querySelector('.editorial-card, .tactile-card, .hero-card')

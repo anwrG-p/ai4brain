@@ -6,6 +6,7 @@ import { pressProps, useTimedTrials } from '../telemetry/useTimedTrials'
 import type { MstParams, Poly } from '../telemetry/types'
 import { PolyView } from './svg'
 import type { TaskProps } from './TaskRunner'
+import { EXERCISE_NAME } from '../exercises'
 
 type Response = 'old' | 'similar' | 'new'
 const EXPECTED = { old: 'old', lure: 'similar', new: 'new' } as const
@@ -118,7 +119,7 @@ export function Mst({ params, recorder, onDone }: TaskProps<MstParams>) {
   const [testing, setTesting] = useState(false)
   const startTest = useCallback(() => setTesting(true), [])
   return (
-    <section aria-label="Shape memory" className="flex flex-col items-center gap-4">
+    <section aria-label={EXERCISE_NAME.mst} className="flex flex-col items-center gap-4">
       {testing ? (
         <Test test={params.test} recorder={recorder} onDone={onDone} />
       ) : (

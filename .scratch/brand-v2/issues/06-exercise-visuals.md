@@ -51,3 +51,22 @@ Add an `ExerciseFrame` wrapper in `features/assessment/`. Every exercise renders
 ## Done when
 
 `qa:checks` is green, and the commit has no AI attribution.
+
+## Comments
+
+**2026-10-31 — Implemented (implementer, ticket 06).**
+
+- `ExerciseFrame` (`features/assessment/ExerciseFrame.tsx`) wraps every exercise inside `ExerciseHost`: instruction (name, one line, `<kbd>` keycaps, one Begin; Space/Enter start it unless a focused control owns the key) → 500 ms "+" fixation (UFOV skips it) → trials with progress dots → end card ("Nice work", Loti `sm`, Continue). The exercise mounts only when the trials start, so no `recorder.start` and no event happen on the instruction or fixation screens. Exercise timing and telemetry code is untouched.
+- Progress dots count finished trials from `tracker.onEvent` for the task's own `task_id` (distinct `trial_index`, so N-back's two events per trial count once). The frame never touches the recorder.
+- Consumer names live in `features/assessment/exercises.ts` (`EXERCISE_NAME`) and are also each exercise's region label.
+
+### Stroop red: its own token pair
+
+`--color-danger` (`#A83A4E` / `#F28B9E`) is a crimson-rose; dark reads pink (CIELAB hue 9.9°). Stroop "red" now uses `--color-stroop-red`, a true red (hue 28–29°). It is a stimulus colour, not mood, so the Anti-Red rule does not apply.
+
+| Theme | Hex | On surface | On raised | ΔE00 vs coral fill | ΔE00 vs accent-strong / danger |
+|---|---|---|---|---|---|
+| light | `#C8102E` | 5.88 | 5.22 | 25.7 (`#F2876B`) | 10.2 (`#B94A2F`) / 10.3 (`#A83A4E`) |
+| dark | `#FF5C5C` | 5.39 | 4.65 | 14.7 (`#FF9F86`) | — / 14.3 (`#F28B9E`) |
+
+Tower disc slot 1 keeps `--color-danger` (its id label tells discs apart). Progress dot (brand fill on canvas): 5.08 light, 9.58 dark. New frame text uses ink / ink-muted on canvas and ink on surface keycaps (pairs already audited). No other exercise token changed.

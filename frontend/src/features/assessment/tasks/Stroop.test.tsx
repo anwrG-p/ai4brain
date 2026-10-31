@@ -213,6 +213,8 @@ const HEX_OR_FN = /#[0-9a-fA-F]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\s*\(/
 
 test('the ink palette holds theme tokens only, no raw colour values', () => {
   expect(Object.keys(INK).sort()).toEqual(['blue', 'green', 'red', 'yellow'])
+  // Red has its own pure-red pair: --color-danger reads rose in dark (brand v2 ticket 06).
+  expect(INK.red).toBe('var(--color-stroop-red)')
   for (const v of Object.values(INK)) {
     expect(v).toMatch(/^var\(--[a-z0-9-]+\)$/)
     expect(v).not.toMatch(HEX_OR_FN)

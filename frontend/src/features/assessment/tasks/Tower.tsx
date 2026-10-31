@@ -5,6 +5,7 @@ import { tracker } from '../telemetry/tracker'
 import { useInputCapture } from '../telemetry/useInputCapture'
 import type { TowerParams } from '../telemetry/types'
 import type { TaskProps } from './TaskRunner'
+import { EXERCISE_NAME } from '../exercises'
 
 const same = (a: string[][], b: string[][]) => JSON.stringify(a) === JSON.stringify(b)
 
@@ -167,7 +168,7 @@ export function Tower({ params, recorder, onDone }: TaskProps<TowerParams>) {
 
   const locked = predicted === null
   return (
-    <section aria-label="Tower puzzle" className="flex flex-col items-center gap-4">
+    <section aria-label={EXERCISE_NAME.tower} className="flex flex-col items-center gap-4">
       <p className="text-ink">Rearrange the discs to match the goal. Move the top disc of one peg onto another peg; each peg holds a limited number of discs.</p>
       <form noValidate onSubmit={submit} className="flex flex-wrap items-center justify-center gap-3">
         <label className="flex flex-wrap items-center gap-2 text-ink">

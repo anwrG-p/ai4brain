@@ -6,6 +6,7 @@ import { useInputCapture } from '../telemetry/useInputCapture'
 import { pressProps } from '../telemetry/useTimedTrials'
 import type { NBackParams, TelemetryEvent } from '../telemetry/types'
 import type { TaskProps } from './TaskRunner'
+import { EXERCISE_NAME } from '../exercises'
 
 type Stream = NBackParams['streams'][number]
 type Rule = NBackParams['trials'][number]['rule']
@@ -126,7 +127,7 @@ export function NBack({ params, recorder, onDone }: TaskProps<NBackParams>) {
   if (!t) return null // no trials: the effect has already called onDone
   const showStim = stimOff !== i && !paused && i < trials.length
   return (
-    <section aria-label="Memory Sharpness" className="flex flex-col items-center gap-4">
+    <section aria-label={EXERCISE_NAME.n_back} className="flex flex-col items-center gap-4">
       {t.trial_type === 'switch' && !paused && i < trials.length && (
         <p role="status" className="font-bold text-ink">
           New rule: {hint(t.rule, params.n)}

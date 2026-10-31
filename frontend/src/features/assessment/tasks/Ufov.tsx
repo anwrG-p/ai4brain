@@ -8,6 +8,7 @@ import { pressProps } from '../telemetry/useTimedTrials'
 import type { TrialMeta, UfovParams } from '../telemetry/types'
 import { defaultRaf, framesFor, measureFrameMs, type Raf } from './frames'
 import type { TaskProps } from './TaskRunner'
+import { EXERCISE_NAME } from '../exercises'
 
 const FIXATION_MS = 500
 const SIZE = 360
@@ -255,7 +256,7 @@ export function Ufov({ params, recorder, onDone, raf = defaultRaf }: TaskProps<U
 
   const mid = PAD / 2
   return (
-    <section aria-label="Quick look" className="flex flex-col items-center gap-4">
+    <section aria-label={EXERCISE_NAME.ufov} className="flex flex-col items-center gap-4">
       <p className="text-ink">Look at the cross. A letter and shapes flash briefly. Then pick the letter in the middle (A or B) and the direction of the round shape (1–8).</p>
       <Card className="flex w-full justify-center">
         {/* Scales down on narrow screens; the drawing buffer stays SIZE × SIZE. */}

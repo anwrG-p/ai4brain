@@ -4,12 +4,14 @@ import { Card } from '../../../components/ui/Card'
 import { pressProps, useTimedTrials } from '../telemetry/useTimedTrials'
 import type { StroopParams } from '../telemetry/types'
 import type { TaskProps } from './TaskRunner'
+import { EXERCISE_NAME } from '../exercises'
 
 // Payload ink names → theme tokens that reach >= 4.5:1 text contrast on --color-surface in light
-// and dark (ratios in ticket 05's Comments). Not --color-success (3.30:1 light) or --dim-5
-// (4.29:1 light). ponytail: only the names the fixtures use; anything else paints in ink.
+// and dark (ratios in brand-v2 tickets 01 and 06). Red is its own pure red: --color-danger reads
+// rose in dark. Not --dim-5 (4.29:1 light).
+// ponytail: only the names the fixtures use; anything else paints in ink.
 export const INK: Record<string, string> = {
-  red: 'var(--color-danger)',
+  red: 'var(--color-stroop-red)',
   green: 'var(--dim-3)',
   blue: 'var(--dim-1)',
   yellow: 'var(--dim-7)',
@@ -42,7 +44,7 @@ export function Stroop({ params, recorder, onDone }: TaskProps<StroopParams>) {
 
   if (!t) return null
   return (
-    <section aria-label="Color naming" className="flex flex-col items-center gap-4">
+    <section aria-label={EXERCISE_NAME.stroop} className="flex flex-col items-center gap-4">
       <p className="text-ink">Pick the color of the ink, not the word.</p>
       <Card className="flex w-full items-center justify-center" style={{ minHeight: 160 }}>
         {!paused && (

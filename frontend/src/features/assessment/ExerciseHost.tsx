@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { ExerciseFrame } from './ExerciseFrame'
 import { SkipOnError } from './SkipOnError'
 import { TaskRunner } from './tasks/TaskRunner'
 import { fetchNextTask, getUserId, newId, usingMocks } from './tasks/taskSource'
@@ -19,7 +20,8 @@ const getSessionId = () => (sessionId ??= newId())
 // remounts (exit and come back, Back/Forward), so it cannot make mock task ids unique.
 let fetchCount = 0
 
-// Fetches one task, records it with its own TrialRecorder and renders the matching exercise.
+// Fetches one task, records it with its own TrialRecorder and renders the matching exercise inside
+// the jsPsych-style ExerciseFrame (instruction, fixation, progress dots, end card).
 export function ExerciseHost({ schemaType, attempt, onDone, onError }: ExerciseHostProps) {
   const [run, setRun] = useState<{ task: TaskPayload; recorder: TrialRecorder } | null>(null)
   // The exercises restart their trial loop when onDone changes, so they get a stable callback.
@@ -67,7 +69,9 @@ export function ExerciseHost({ schemaType, attempt, onDone, onError }: ExerciseH
     <div data-timed-trial="true" className="w-full min-w-0">
       {run ? (
         <SkipOnError key={run.task.task_id} taskId={run.task.task_id} onSkip={skip}>
-          <TaskRunner task={run.task} recorder={run.recorder} onDone={done} />
+          <ExerciseFrame task={run.task} onDone={done}>
+            {(end) => <TaskRunner task={run.task} recorder={run.recorder} onDone={end} />}
+          </ExerciseFrame>
         </SkipOnError>
       ) : (
         <p role="status" className="text-center text-sm text-ink-muted">

@@ -36,14 +36,14 @@ test('unmounting before the skip fires never calls onDone', () => {
 
 // Every schema renders its exercise (a labelled region); unknown ones fall back to the skip (above).
 const PORTED: Record<string, string> = {
-  n_back: 'Memory Sharpness',
-  stroop: 'Color naming',
-  matrix: 'Pattern puzzle',
-  mental_rotation: 'Shape turning',
-  relational: 'Word relations',
-  tower: 'Tower puzzle',
-  ufov: 'Quick look',
-  mst: 'Shape memory',
+  n_back: 'Memory Gauntlet',
+  stroop: 'Color Clash',
+  matrix: 'Pattern Puzzle',
+  mental_rotation: 'Shape Turn',
+  relational: 'Logic Web',
+  tower: 'Strategic Blueprint',
+  ufov: 'Perceptual Radar',
+  mst: 'Precision Archive',
 }
 
 test('the fixture schemas and the ported components are the same set', () => {

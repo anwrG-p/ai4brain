@@ -107,6 +107,10 @@
   --dim-8: #80552A;
   --dim-9: #0F766E;
   --dim-10: #831843;
+  /* Stroop "red" ink: a pure red, not --color-danger (crimson-rose) and clearly apart from coral
+     (CIEDE2000 25.7 vs the coral fill, 10.2 vs accent-strong). 5.88:1 on surface. Anti-Red is
+     about mood colour, not this stimulus. */
+  --color-stroop-red: #C8102E;
 
   /* Uncertainty Tokens: a 15% band in the sky hue */
   --uncertainty-band-fill: rgba(43, 143, 214, 0.15);
@@ -258,6 +262,8 @@
   --dim-8: #E0B48A;
   --dim-9: #34D399;
   --dim-10: #F472B6;
+  /* Stroop red (dark): 5.39:1 on surface; dark danger #F28B9E reads rose. */
+  --color-stroop-red: #FF5C5C;
 
   --uncertainty-band-fill: rgba(124, 196, 242, 0.15);
   --uncertainty-low-stroke: #A9C1D6;

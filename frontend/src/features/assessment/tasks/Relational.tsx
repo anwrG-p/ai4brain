@@ -5,6 +5,7 @@ import { WeightedStaircase } from '../adaptive/staircase'
 import { pressProps, useTimedTrials } from '../telemetry/useTimedTrials'
 import type { RelationalParams, Statement } from '../telemetry/types'
 import type { TaskProps } from './TaskRunner'
+import { EXERCISE_NAME } from '../exercises'
 
 type Trial = RelationalParams['levels'][number][number]
 
@@ -75,7 +76,7 @@ export function Relational({ params, recorder, onDone }: TaskProps<RelationalPar
   if (!t) return null
   // An inverted trial is flagged in words; the warning border only repeats it (not colour alone).
   return (
-    <section aria-label="Word relations" className="flex flex-col items-center gap-4">
+    <section aria-label={EXERCISE_NAME.relational} className="flex flex-col items-center gap-4">
       <p className="text-ink">Read the statements, then answer: is the question true or false?</p>
       <Card
         className={`flex w-full flex-col gap-2 text-lg text-ink ${!paused && t.inverted ? 'border-warning' : ''}`}

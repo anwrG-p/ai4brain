@@ -24,6 +24,16 @@ test.describe('Page 04: Task Runner (/task/:dimId) Hero Visual QA & A11y', () =>
       }),
     ).toBeVisible()
 
+    // Instruction screen (jsPsych-style): consumer name, keycaps, one Begin.
+    await expect(page.getByRole('heading', { name: 'Precision Archive' })).toBeVisible()
+    const a11yIntro = await new AxeBuilder({ page }).analyze()
+    expect(a11yIntro.violations).toEqual([])
+
+    // Begin → 500 ms fixation → the trial area with its progress dots.
+    await page.getByRole('button', { name: 'Begin' }).click()
+    await expect(page.getByRole('region', { name: 'Precision Archive' })).toBeVisible()
+    await expect(page.getByRole('progressbar', { name: 'Progress' })).toBeVisible()
+
     const a11yRunning = await new AxeBuilder({ page }).analyze()
     expect(a11yRunning.violations).toEqual([])
 
@@ -70,6 +80,12 @@ test.describe('Page 04: Task Runner (/task/:dimId) Hero Visual QA & A11y', () =>
 
     const a11yDark = await new AxeBuilder({ page }).analyze()
     expect(a11yDark.violations).toEqual([])
+
+    // Dark trial area: the Stroop word in its ink (stroop-red is its own token pair).
+    await page.getByRole('button', { name: 'Begin' }).click()
+    await expect(page.getByRole('region', { name: 'Color Clash' })).toBeVisible()
+    const a11yDarkTrial = await new AxeBuilder({ page }).analyze()
+    expect(a11yDarkTrial.violations).toEqual([])
 
     await page.screenshot({
       path: path.join(SCREENSHOT_DIR, '04-task-runner-dark-1440.png'),
