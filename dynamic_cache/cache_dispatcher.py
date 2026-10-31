@@ -3,8 +3,8 @@
 - Pools: per (archetype, schema_type, theta level), in memory, holding pre-built payloads already
   serialised to JSON. A pop that leaves a pool half empty queues a refill in a worker process, so
   the BE-03 generators (sync, CPU-bound) never run on the event loop, rarely on a request, and
-  never hold the GIL against request threads.
-  An empty pool falls back to building one task inline, in the request's worker thread.
+  never hold the GIL against request threads. An empty pool builds one task inline, in the
+  request's worker thread. The worker exits with its parent, even on a hard kill.
 - Archetype: until clustering (BE-09/BE-11) assigns one, every user is NEUTRAL.
 - No repeats: a per-user TimedBloom (bloom.py) of served task ids; nothing seen in the last 14 days
   is served again.
@@ -16,13 +16,15 @@
   The client must therefore send a new seq (or session_id) for every run, and reuse one only to
   re-ask for the same run (StrictMode's double effect).
 - Difficulty: a per-user, per-schema staircase. It starts at the parameter projector's theta from
-  the user's pillar scores (START_THETA when there are none), and each new task moves it by the
-  85% rule over the user's recent accuracy on that schema, read from telemetry. It only moves when
-  new trials of that schema arrived since the last move, so tasks fetched and never played do not
-  push it around.
+  the user's pillar scores (START_THETA when there are none). It steps by the 85% rule only once
+  MIN_TRIALS trials of the schema arrived since its last step, and only on those trials: each
+  trial is counted once, so a single-trial task (matrix, tower) cannot wind it up by re-reading
+  the same window after every task, and tasks fetched but never played do not move it.
 - Registry: the Bloom slices, session answers and staircases are one JSON file per user under
-  data/processed/task_registry/, written behind the request by a background thread. forget() and
-  export() back the privacy delete and export.
+  data/processed/task_registry/, written behind the request by a background thread. The file is
+  the source of truth: memory keeps at most MAX_USERS users and evicts clean, idle ones first.
+  A registry idle for RETENTION_DAYS is dropped (in memory on next use, on disk by purge_idle,
+  which the retention CLI runs). forget() and export() back the privacy delete and export.
 
 Thread safety: a per-user lock serialises one user's calls (so a double GET in the same session
 cannot hand out two tasks); one dispatcher lock guards the pools and the user table.
@@ -33,19 +35,21 @@ from __future__ import annotations
 import json
 import logging
 import multiprocessing
+import multiprocessing.connection
 import os
 import random
 import re
 import threading
 import time
 from collections import OrderedDict, deque
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from concurrent.futures import Future, ProcessPoolExecutor, ThreadPoolExecutor
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, NamedTuple
 
-from .bloom import TTL_DAYS, DAY_S, TimedBloom
+from .bloom import DAY_S, TTL_DAYS, TimedBloom
 from .generators import DIMENSION_OF, SCHEMA_TYPES, generate
 from .parameter_projector import BOUNDS, START_THETA, clamp, project
 
@@ -57,17 +61,20 @@ NEUTRAL = "neutral"
 ARCHETYPE_OPTIONS: dict[str, dict[str, dict[str, Any]]] = {NEUTRAL: {"stroop": {"inks": "classic"}}}
 
 LEVEL_STEP = 0.1  # pools are keyed by theta snapped to this grid
-POOL_SIZE = 16  # payloads kept per pool: a burst of ~8 calls per pool between refills stays warm
+POOL_SIZE = 16  # payloads kept per pool
 SESSIONS_KEPT = 64  # idempotency answers kept per user (and none older than the TTL)
 REPLAY_CACHE = 256  # serialised payloads kept for session replays
 FRESH_TRIES = 8  # inline builds tried when every pooled task was already seen
+MAX_USERS = 5000  # user registries kept in memory; the files hold the rest
+RETENTION_DAYS = 30  # a registry idle this long is dropped (the telemetry retention period)
 
 # The 85% rule (backend/app/tools/exercise_generator.py) works on an IRT difficulty b in [-2.5, 2.5];
 # theta in [0, 1] maps onto it linearly. (A) step 1.0: at 95% accuracy theta rises by 0.04, at 70%
-# it falls by 0.06; Hamza's default 0.25 moves theta by at most 0.015 per task.
+# it falls by 0.06; Hamza's default 0.25 moves theta by at most 0.015 per step.
 RULE_STEP = 1.0
-MIN_TRIALS = 10  # fewer recent trials of a schema than this: no accuracy, no step
-ACCURACY_WINDOW = 60  # the most recent trials of the schema that count
+MIN_TRIALS = 10  # new trials of a schema needed before the staircase steps
+ACCURACY_WINDOW = 60  # at most this many of the newest new trials count in one step
+KEEP_TRIALS = 500  # trials per schema kept from the telemetry tail
 TELEMETRY_TAIL_BYTES = 1 << 20  # only the end of a user's JSONL is read
 
 KEY_RE = re.compile(r"^[a-z0-9_-]{1,64}$")  # telemetry_store.user_key() output
@@ -91,10 +98,9 @@ class Served(NamedTuple):
     replay: bool
 
 
-class Accuracy(NamedTuple):
-    accuracy: float
-    trials: int
-    marker: str  # identifies the newest trial counted
+class Trial(NamedTuple):
+    correct: bool
+    marker: str  # "{received_at}|{session_id}|{task_id}|{trial_index}": unique per counted trial
 
 
 def theta_level(schema_type: str, theta: float) -> float:
@@ -122,6 +128,9 @@ def rule_step(rule: Callable[..., float], theta: float, accuracy: float) -> floa
     return (b + 2.5) / 5.0
 
 
+# --- building payloads (also in the worker process) -------------------------------------------------
+
+
 def build_entry(archetype: str, schema_type: str, level: float, seed: int) -> Entry:
     """One payload, built and serialised. Module level, so the worker process can run it."""
     options = ARCHETYPE_OPTIONS.get(archetype, ARCHETYPE_OPTIONS[NEUTRAL]).get(schema_type, {})
@@ -132,17 +141,37 @@ def build_entry(archetype: str, schema_type: str, level: float, seed: int) -> En
     return Entry(payload["task_id"], body, seed)
 
 
-def _worker_pool() -> ProcessPoolExecutor:
-    # spawn everywhere: fork from a threaded server (uvicorn's pool) can deadlock the child, and
-    # Python 3.12+ warns about it on Linux.
-    return ProcessPoolExecutor(max_workers=1, mp_context=multiprocessing.get_context("spawn"))
-
-
 def build_entries(archetype: str, schema_type: str, level: float, seeds: list[int]) -> list[Entry]:
     return [build_entry(archetype, schema_type, level, seed) for seed in seeds]
 
 
-# --- telemetry: recent accuracy per schema --------------------------------------------------------
+def worker_pid() -> int:
+    return os.getpid()
+
+
+def _exit_with_parent() -> None:
+    """Worker initializer: a daemon thread ends the worker as soon as its parent is gone, so a
+    hard-killed server (no shutdown hook) leaves no orphan process behind."""
+    parent = multiprocessing.parent_process()
+    if parent is None:
+        return
+
+    def watch() -> None:
+        multiprocessing.connection.wait([parent.sentinel])
+        os._exit(0)
+
+    threading.Thread(target=watch, name="exit-with-parent", daemon=True).start()
+
+
+def worker_pool() -> ProcessPoolExecutor:
+    # spawn everywhere: fork from a threaded server (uvicorn's pool) can deadlock the child, and
+    # Python 3.12+ warns about it on Linux.
+    return ProcessPoolExecutor(
+        max_workers=1, mp_context=multiprocessing.get_context("spawn"), initializer=_exit_with_parent
+    )
+
+
+# --- telemetry: trials per schema ---------------------------------------------------------------------
 
 
 def schema_of(task_id: str) -> str | None:
@@ -151,14 +180,14 @@ def schema_of(task_id: str) -> str | None:
     return head if head in DIMENSION_OF else None
 
 
-def accuracy_by_schema(lines: list[str]) -> dict[str, Accuracy]:
-    """Recent accuracy (1 - error rate) per schema from JSONL lines, oldest line first.
+def trials_by_schema(lines: list[str]) -> dict[str, list[Trial]]:
+    """Each schema's trials from JSONL lines, oldest first, the last KEEP_TRIALS of each.
 
     Duplicates (a batch resent after a timeout) count once: the key is the trial's item id and
     stream when it has one (as BE-07 dedupes), else (session, task, trial_index).
     """
     seen: set[tuple] = set()
-    trials: dict[str, list[tuple[bool, str]]] = {}
+    out: dict[str, list[Trial]] = {}
     for line in lines:
         try:
             e = json.loads(line)
@@ -177,30 +206,38 @@ def accuracy_by_schema(lines: list[str]) -> dict[str, Accuracy]:
             continue
         seen.add(key)
         marker = f"{e.get('received_at', '')}|{e['session_id']}|{e['task_id']}|{e['trial_index']}"
-        trials.setdefault(schema, []).append((e["error_flag"], marker))
-    out = {}
-    for schema, rows in trials.items():
-        recent = rows[-ACCURACY_WINDOW:]
-        if len(recent) >= MIN_TRIALS:
-            correct = sum(1 for err, _ in recent if not err)
-            out[schema] = Accuracy(correct / len(recent), len(recent), recent[-1][1])
-    return out
+        out.setdefault(schema, []).append(Trial(not e["error_flag"], marker))
+    return {s: rows[-KEEP_TRIALS:] for s, rows in out.items()}
 
 
-class TelemetryAccuracy:
-    """Reads the tail of `{dir}/{key}.jsonl`; cached until the file's size or mtime changes."""
+def trials_since(trials: Sequence[Trial], marker: str | None) -> list[Trial]:
+    """The trials after the one `marker` names. If that trial left the window (retention, the
+    tail limit), the trials received after its received_at."""
+    if marker is None:
+        return list(trials)
+    for i in range(len(trials) - 1, -1, -1):
+        if trials[i].marker == marker:
+            return list(trials[i + 1 :])
+    received = marker.split("|", 1)[0]
+    return [t for t in trials if t.marker.split("|", 1)[0] > received]
 
-    def __init__(self, directory: Callable[[], Path]) -> None:
+
+class TelemetryTrials:
+    """Reads the tail of `{dir}/{key}.jsonl`; cached until the file's size or mtime changes.
+    The cache keeps at most MAX_USERS users."""
+
+    def __init__(self, directory: Callable[[], Path], max_users: int = MAX_USERS) -> None:
         self.directory = directory
-        self._cache: dict[str, tuple[tuple[int, int], dict[str, Accuracy]]] = {}
+        self.max_users = max_users
+        self._cache: OrderedDict[str, tuple[tuple[int, int], dict[str, list[Trial]]]] = OrderedDict()
         self._lock = threading.Lock()
 
-    def __call__(self, key: str, schema_type: str) -> Accuracy | None:
+    def __call__(self, key: str, schema_type: str) -> list[Trial]:
         path = self.directory() / f"{key}.jsonl"
         try:
             st = path.stat()
         except OSError:
-            return None
+            return []
         stamp = (st.st_size, st.st_mtime_ns)
         with self._lock:
             hit = self._cache.get(key)
@@ -210,14 +247,17 @@ class TelemetryAccuracy:
                     f.seek(max(0, st.st_size - TELEMETRY_TAIL_BYTES))
                     raw = f.read(TELEMETRY_TAIL_BYTES)
             except OSError:
-                return None
+                return []
             lines = raw.decode("utf-8", errors="replace").splitlines()
             if st.st_size > TELEMETRY_TAIL_BYTES:
                 lines = lines[1:]  # the first line was cut by the seek
-            hit = (stamp, accuracy_by_schema(lines))
-            with self._lock:
-                self._cache[key] = hit
-        return hit[1].get(schema_type)
+            hit = (stamp, trials_by_schema(lines))
+        with self._lock:
+            self._cache[key] = hit
+            self._cache.move_to_end(key)
+            while len(self._cache) > self.max_users:
+                self._cache.popitem(last=False)
+        return hit[1].get(schema_type, [])
 
     def forget(self, key: str) -> None:
         with self._lock:
@@ -230,17 +270,23 @@ class TelemetryAccuracy:
 @dataclass
 class UserState:
     seen: TimedBloom = field(default_factory=TimedBloom)
-    # idempotency key -> {"schema", "theta", "seed", "task_id", "at"}: enough to rebuild the payload
+    # idempotency key -> {"schema", "theta", "seed", "archetype", "task_id", "at"}: enough to rebuild
     sessions: dict[str, dict] = field(default_factory=dict)
-    # schema -> {"theta": staircase value, "marker": newest trial already stepped on, "served_at"}
+    # schema -> {"theta": staircase value, "marker": last trial stepped on, "served_at"}
     schemas: dict[str, dict] = field(default_factory=dict)
+    last: float = 0.0  # last time a task was served
 
     def to_json(self) -> dict:
-        return {"v": 1, "seen": self.seen.to_json(), "sessions": self.sessions, "schemas": self.schemas}
+        return {"v": 1, "seen": self.seen.to_json(), "sessions": self.sessions, "schemas": self.schemas, "last": self.last}
 
     @classmethod
     def from_json(cls, doc: Mapping) -> "UserState":
-        return cls(TimedBloom.from_json(doc.get("seen")), dict(doc.get("sessions") or {}), dict(doc.get("schemas") or {}))
+        return cls(
+            TimedBloom.from_json(doc.get("seen")),
+            dict(doc.get("sessions") or {}),
+            dict(doc.get("schemas") or {}),
+            float(doc.get("last") or 0.0),
+        )
 
     def prune(self, now: float) -> None:
         self.seen.expire(now)
@@ -255,46 +301,74 @@ def default_registry_dir() -> Path:
     return Path(env) if env else Path(__file__).resolve().parents[1] / "data" / "processed" / "task_registry"
 
 
+def purge_idle(directory: Path, days: int = RETENTION_DAYS, now: float | None = None) -> int:
+    """Delete the registry files nobody touched for `days` (the file is rewritten on every change,
+    so its mtime is the user's last activity). Returns how many were removed."""
+    cutoff = (time.time() if now is None else now) - days * DAY_S
+    removed = 0
+    if not directory.is_dir():
+        return 0
+    for path in directory.iterdir():
+        if not (path.name.endswith(".json") or path.name.endswith(".json.tmp")) or not path.is_file():
+            continue
+        try:
+            if path.stat().st_mtime < cutoff:
+                path.unlink()
+                removed += path.name.endswith(".json")
+        except FileNotFoundError:
+            pass  # deleted meanwhile (privacy delete, a live write's replace)
+    return removed
+
+
 class Dispatcher:
     def __init__(
         self,
         *,
         registry_dir: Callable[[], Path] = default_registry_dir,
-        accuracy: Callable[[str, str], Accuracy | None] = lambda key, schema: None,
+        trials: Callable[[str, str], Sequence[Trial]] = lambda key, schema: [],
         pillars: Callable[[str], Mapping[str, float | None] | None] = lambda key: None,
         archetype: Callable[[str], str] = lambda key: NEUTRAL,
         difficulty_rule: Callable[..., float] | None = None,
         clock: Callable[[], float] = time.time,
         seed_source: Callable[[], int] = lambda: random.SystemRandom().randrange(2**32),
         pool_size: int = POOL_SIZE,
+        max_users: int = MAX_USERS,
         background: bool = True,
     ) -> None:
         self.registry_dir = registry_dir
-        self.accuracy = accuracy
+        self.trials = trials
         self.pillars = pillars
         self.archetype = archetype
         self.difficulty_rule = difficulty_rule
         self.clock = clock
         self.seed_source = seed_source
         self.pool_size = pool_size
+        self.max_users = max_users
 
-        # Pools, the user table, user locks, the dirty set. Re-entrant: a refill future that is
-        # already done runs its callback (which takes the lock) inside _queue_refill.
+        # Pools, the user table, pins, the dirty set. Re-entrant: a refill future that is already
+        # done runs its callback (which takes the lock) in the submitting thread.
         self._lock = threading.RLock()
         self._io_lock = threading.Lock()  # registry files
         self._pools: dict[tuple[str, str, float], deque[Entry]] = {}
         self._refilling: set[tuple[str, str, float]] = set()
-        self._users: dict[str, UserState] = {}
-        self._user_locks: dict[str, threading.Lock] = {}
-        self._dirty: set[str] = set()
+        self._users: OrderedDict[str, UserState] = OrderedDict()  # least recently used first
+        self._user_locks: dict[str, threading.Lock] = {}  # only for users with a call in flight
+        self._pins: dict[str, int] = {}  # calls in flight per user
+        self._dirty: dict[str, int] = {}  # user -> generation not yet written
         self._flush_queued = False
+        self._closed = False
         self._replays: OrderedDict[str, bytes] = OrderedDict()
         # Refills run in a worker process: building is CPU-bound Python, and in a thread it would
         # hold the GIL against the request threads (measured: 20-40 ms requests under uvicorn).
-        self._workers = _worker_pool() if background else None
+        self._workers = worker_pool() if background else None
         self._writer = ThreadPoolExecutor(max_workers=1, thread_name_prefix="task-registry") if background else None
 
     # --- building payloads -----------------------------------------------------------------------
+
+    def start(self) -> None:
+        """Spawn the worker process now (server startup), so no request pays for it."""
+        if self._workers is not None:
+            self._workers.submit(worker_pid).result()
 
     def _fill(self, pool_key: tuple[str, str, float]) -> None:
         """Top the pool up in the caller's thread (warm-up)."""
@@ -307,18 +381,28 @@ class Dispatcher:
             with self._lock:
                 self._pools[pool_key].append(entry)
 
-    def _queue_refill(self, pool_key: tuple[str, str, float]) -> None:
-        """Called with self._lock held: below half full, top the pool up in the worker process."""
+    def _refill_job(self, pool_key: tuple[str, str, float]) -> tuple | None:
+        """Called with self._lock held: the refill to submit (after releasing it) when the pool is
+        half empty and none is in flight."""
         have = len(self._pools.get(pool_key, ()))
-        if self._workers is None or pool_key in self._refilling or have * 2 > self.pool_size:
+        if self._workers is None or self._closed or pool_key in self._refilling or have * 2 > self.pool_size:
+            return None
+        self._refilling.add(pool_key)
+        return pool_key, [self.seed_source() for _ in range(self.pool_size - have)]
+
+    def _submit(self, job: tuple | None) -> None:
+        """Outside self._lock: the first submit spawns the worker process, which takes a while."""
+        if job is None:
             return
-        seeds = [self.seed_source() for _ in range(self.pool_size - have)]
+        pool_key, seeds = job
         try:
             future = self._workers.submit(build_entries, *pool_key, seeds)
-        except RuntimeError:  # BrokenProcessPool (the worker died) or shut down: start a new one
-            self._workers = _worker_pool()
+        except RuntimeError:  # BrokenProcessPool (the worker died) or shut down
+            with self._lock:
+                self._refilling.discard(pool_key)
+                if not self._closed:
+                    self._workers = worker_pool()  # the next refill uses a new worker
             return
-        self._refilling.add(pool_key)
         future.add_done_callback(lambda f: self._refilled(pool_key, f))
 
     def _refilled(self, pool_key: tuple[str, str, float], future: Future) -> None:
@@ -347,48 +431,93 @@ class Dispatcher:
 
     # --- user state ------------------------------------------------------------------------------
 
-    def _path(self, key: str) -> Path:
+    def _path(self, key: str, directory: Path | None = None) -> Path:
         if not KEY_RE.fullmatch(key):
             raise ValueError("user key must be telemetry_store.user_key() output")
-        return self.registry_dir() / f"{key}.json"
+        return (directory or self.registry_dir()) / f"{key}.json"
 
-    def _user_lock(self, key: str) -> threading.Lock:
+    @contextmanager
+    def _held(self, key: str) -> Iterator[None]:
+        """The user's lock, pinned so eviction leaves the user alone while a call is in flight."""
         with self._lock:
-            return self._user_locks.setdefault(key, threading.Lock())
+            self._pins[key] = self._pins.get(key, 0) + 1
+            lock = self._user_locks.setdefault(key, threading.Lock())
+        try:
+            with lock:
+                yield
+        finally:
+            with self._lock:
+                self._pins[key] -= 1
+                if not self._pins[key]:
+                    del self._pins[key]
+                    del self._user_locks[key]
 
-    def _state(self, key: str) -> UserState:
-        """Called with the user's lock held."""
+    def _evict(self) -> None:
+        """Called with self._lock held: drop least recently used users over max_users. Only clean
+        (written) users with no call in flight go; the file still holds them."""
+        excess = len(self._users) - self.max_users
+        if excess <= 0:
+            return
+        for key in list(self._users):
+            if excess <= 0:
+                break
+            if key in self._dirty or key in self._pins:
+                continue
+            del self._users[key]
+            excess -= 1
+
+    def _read(self, path: Path) -> UserState | None:
+        # No _io_lock: the caller holds the user, which already serialises it with forget(), and a
+        # user is only read when not in memory, which a user still being written always is (it
+        # stays dirty, so unevictable, until its write lands). Waiting for the writer thread here
+        # put its disk time (antivirus scans of the new file included) on the request path.
+        try:
+            return UserState.from_json(json.loads(path.read_text(encoding="utf-8")))
+        except FileNotFoundError:
+            return None
+        except (ValueError, TypeError, AttributeError):
+            return UserState()  # an unreadable registry only forgets what was served
+
+    def _state(self, key: str, now: float) -> UserState:
+        """Called with the user held."""
         with self._lock:
             st = self._users.get(key)
-        if st is not None:
-            return st
-        path = self._path(key)
-        st = UserState()
-        with self._io_lock:
-            if path.is_file():
-                try:
-                    st = UserState.from_json(json.loads(path.read_text(encoding="utf-8")))
-                except (ValueError, TypeError, AttributeError):
-                    st = UserState()  # an unreadable registry only forgets what was served
+            if st is not None:
+                self._users.move_to_end(key)
+        if st is None:
+            st = self._read(self._path(key)) or UserState()
+        if st.last and now - st.last > RETENTION_DAYS * DAY_S:
+            st = UserState()  # idle past retention: start afresh (the next write replaces the file)
         with self._lock:
-            return self._users.setdefault(key, st)
+            self._users[key] = st
+            self._users.move_to_end(key)
+            self._evict()
+            return st
 
     def _mark_dirty(self, key: str) -> None:
         with self._lock:
-            self._dirty.add(key)
-            if self._writer is None or self._flush_queued:
+            self._dirty[key] = self._dirty.get(key, 0) + 1  # a new generation to write
+            if self._writer is None or self._flush_queued or self._closed:
                 return
             self._flush_queued = True
         self._writer.submit(self.flush)
 
     def flush(self) -> int:
-        """Write every changed user's registry file. Returns how many were written."""
+        """Write every changed user's registry file. Returns how many were written.
+
+        A user stays dirty (so never evicted) until the generation written is its latest: a write
+        that fails, or a change made while it ran, keeps it for the next flush."""
         with self._lock:
             self._flush_queued = False
-            todo = [(k, self._users[k], json.dumps(self._users[k].to_json())) for k in self._dirty if k in self._users]
-            self._dirty.clear()
+            for k in [k for k in self._dirty if k not in self._users]:
+                del self._dirty[k]  # nothing in memory to write
+            todo = [
+                (k, gen, self._users[k], json.dumps(self._users[k].to_json()))
+                for k, gen in self._dirty.items()
+                if k in self._users
+            ]
         written = 0
-        for key, st, text in todo:
+        for key, gen, st, text in todo:
             path = self._path(key)
             with self._io_lock:
                 with self._lock:
@@ -402,25 +531,38 @@ class Dispatcher:
                 except OSError as e:
                     # Memory still holds the state, so serving goes on; the next change retries.
                     # Loud, because a registry that never lands forgets the seen filter on restart.
-                    log.warning("task registry write failed for one user: %s", e)
-                    with self._lock:
-                        self._dirty.add(key)
+                    log.warning("task registry write failed for one user (%s)", type(e).__name__)
                     continue
+                with self._lock:
+                    if self._dirty.get(key) == gen:
+                        del self._dirty[key]
                 written += 1
+        with self._lock:
+            self._evict()  # users that were only kept because they were dirty
         return written
 
-    def forget(self, key: str) -> int:
-        """Drop the user's registry from memory and disk (privacy delete). Returns files removed."""
-        path = self._path(key)
-        with self._user_lock(key):
+    def forget(self, key: str, directory: Path | None = None) -> int:
+        """Drop the user's registry (privacy delete). Returns files removed.
+
+        With `directory`, only that directory's file is touched (a tool or test working on its own
+        copy); without, memory and the dispatcher's own registry.
+        """
+        path = self._path(key, directory)
+        if directory is not None:
+            try:
+                path.unlink()
+                return 1
+            except FileNotFoundError:
+                return 0
+        with self._held(key):
             with self._lock:
                 st = self._users.pop(key, None)
-                self._dirty.discard(key)
+                self._dirty.pop(key, None)
                 if st is not None:
                     for rec in st.sessions.values():
                         self._replays.pop(rec["task_id"], None)
-            if isinstance(self.accuracy, TelemetryAccuracy):
-                self.accuracy.forget(key)
+            if isinstance(self.trials, TelemetryTrials):
+                self.trials.forget(key)
             with self._io_lock:
                 path.with_suffix(".json.tmp").unlink(missing_ok=True)  # a write cut short
                 try:
@@ -429,33 +571,41 @@ class Dispatcher:
                     return 0
         return 1
 
-    def export(self, key: str) -> dict | None:
-        """The user's registry as stored, or None when nothing is kept for them."""
-        with self._user_lock(key):
-            with self._lock:
-                st = self._users.get(key)
-            if st is not None:
-                return st.to_json()
-            path = self._path(key)
-            with self._io_lock:
-                try:
-                    return json.loads(path.read_text(encoding="utf-8"))
-                except FileNotFoundError:
-                    return None
+    def export(self, key: str, directory: Path | None = None) -> dict | None:
+        """The user's registry as stored, or None when nothing is kept for them. A file that is not
+        valid JSON is exported as its raw text, so the rest of the export still goes out."""
+        path = self._path(key, directory)
+        if directory is None:
+            with self._held(key):
+                with self._lock:
+                    st = self._users.get(key)
+                if st is not None:
+                    return st.to_json()
+        with self._io_lock:
+            try:
+                text = path.read_text(encoding="utf-8", errors="replace")
+            except FileNotFoundError:
+                return None
+        try:
+            return json.loads(text)
+        except ValueError:
+            return {"unreadable": text}
 
     # --- difficulty --------------------------------------------------------------------------------
 
     def _theta(self, key: str, st: UserState, schema_type: str) -> tuple[float, str | None]:
-        """The staircase's next theta for this schema, and the trial marker it stepped on."""
+        """The staircase's next theta for this schema, and the last trial it has stepped on."""
         rec = st.schemas.get(schema_type)
         if rec is not None:
             theta, marker = rec["theta"], rec.get("marker")
         else:
             projected = project(self.pillars(key), schema_type)
             theta, marker = (START_THETA[schema_type] if projected is None else projected), None
-        acc = self.accuracy(key, schema_type)
-        if acc is not None and acc.trials >= MIN_TRIALS and acc.marker != marker and self.difficulty_rule:
-            theta, marker = rule_step(self.difficulty_rule, theta, acc.accuracy), acc.marker
+        new = trials_since(self.trials(key, schema_type), marker)
+        if self.difficulty_rule and len(new) >= MIN_TRIALS:
+            window = new[-ACCURACY_WINDOW:]
+            accuracy = sum(t.correct for t in window) / len(window)
+            theta, marker = rule_step(self.difficulty_rule, theta, accuracy), new[-1].marker
         return clamp(schema_type, theta), marker
 
     # --- serving ---------------------------------------------------------------------------------
@@ -496,9 +646,10 @@ class Dispatcher:
         candidates = schemas_for(schema_type, dimension)
         if not candidates:
             raise ValueError("schema_type and dimension match no schema")
-        with self._user_lock(key):
-            st = self._state(key)
+        self._path(key)  # checks the key before anything is kept for it
+        with self._held(key):
             now = self.clock()
+            st = self._state(key, now)
             ikey = f"{session_id}|{seq}|{schema_type or ''}|{dimension or ''}" if session_id else None
             if ikey and ikey in st.sessions:
                 rec = st.sessions[ikey]
@@ -525,7 +676,8 @@ class Dispatcher:
                         entry = e
                         break
                 pool.extendleft(reversed(skipped))
-                self._queue_refill(pool_key)
+                job = self._refill_job(pool_key)
+            self._submit(job)
             tries = 0
             while entry is None:
                 if tries == FRESH_TRIES:
@@ -537,6 +689,7 @@ class Dispatcher:
 
             st.seen.add(entry.task_id, now)
             st.schemas[chosen] = {"theta": theta, "marker": marker, "served_at": now}
+            st.last = now
             if ikey:
                 st.sessions[ikey] = {
                     "schema": chosen,
@@ -552,8 +705,10 @@ class Dispatcher:
             return Served(entry.body, entry.task_id, chosen, level, False)
 
     def close(self) -> None:
-        """Stop the background threads and write what is pending."""
+        """Stop the worker process and the writer, and write what is pending. Idempotent."""
+        with self._lock:
+            self._closed = True
         for ex in (self._workers, self._writer):
             if ex is not None:
-                ex.shutdown(wait=True)
+                ex.shutdown(wait=True, cancel_futures=True)
         self.flush()

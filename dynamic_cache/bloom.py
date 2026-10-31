@@ -7,8 +7,18 @@ older than the TTL plus one day, so a served task is blocked for at least TTL_DA
 day more (the slice's day boundary), never less.
 
 A false positive only makes the dispatcher skip a fresh task and take the next one; it never lets a
-repeat through. With SLICE_BITS = 4096 and HASHES = 7, a day with 100 tasks gives a false-positive
-rate near 1e-4 (the textbook (1 - e^(-kn/m))^k).
+repeat through. One slice holding n items answers a fresh probe 'seen' with probability
+(1 - e^(-kn/m))^k, k = HASHES = 7, m = SLICE_BITS = 4096; a lookup asks up to 15 slices:
+
+  | tasks per day | one slice | 15 such days |
+  |---------------|-----------|--------------|
+  | 8 (a session) | 9e-14     | 1e-12        |
+  | 100           | 2.4e-6    | 3.5e-5       |
+  | 400 (the API's daily cap per id) | 7.3e-3 | 0.10 |
+  | 2880 (no cap, 120/hour all day)  | 0.95   | 1.0  |
+
+So the per-id rate limit in api.py (120/hour, 400/day) is what keeps a leaked id from saturating
+its filter; at the cap a fresh task is still found within the pool and FRESH_TRIES builds.
 """
 
 from __future__ import annotations

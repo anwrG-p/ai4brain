@@ -7,6 +7,7 @@ from app.privacy.telemetry_store import (
     ID_PATTERN,
     ExportTooLarge,
     LockTimeout,
+    StoreUnavailable,
     delete_user,
     export_user,
 )
@@ -19,8 +20,8 @@ router = APIRouter()
 UserId = Annotated[str, Query(pattern=ID_PATTERN)]
 
 
-def busy() -> HTTPException:
-    return HTTPException(status_code=503, detail="telemetry store busy", headers={"Retry-After": "1"})
+def busy(detail: str = "telemetry store busy") -> HTTPException:
+    return HTTPException(status_code=503, detail=detail, headers={"Retry-After": "1"})
 
 
 @router.delete("/v1/user/telemetry", responses={503: {}})
@@ -30,6 +31,9 @@ def delete_telemetry(user_id: UserId) -> dict[str, int]:
         return delete_user(user_id)
     except LockTimeout:
         raise busy()
+    except StoreUnavailable:
+        # Some data may already be gone; repeating the delete finishes the job.
+        raise busy("a user data store is unavailable; retry the delete")
 
 
 @router.get(
@@ -43,6 +47,8 @@ def export_telemetry(user_id: UserId) -> Response:
         data = export_user(user_id)
     except LockTimeout:
         raise busy()
+    except StoreUnavailable:
+        raise busy("a user data store is unavailable; retry the export")
     except ExportTooLarge as e:
         raise HTTPException(status_code=413, detail=str(e))
     if data is None:

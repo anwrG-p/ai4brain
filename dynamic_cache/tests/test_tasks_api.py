@@ -141,7 +141,7 @@ def test_export_includes_the_registry(client):
     assert r.status_code == 200
     rows = [json.loads(line) for line in r.text.splitlines()]
     assert len(rows) == 1 and rows[0]["store"] == "task_registry" and rows[0]["user_id"] == "u1"
-    assert set(rows[0]["data"]) == {"v", "seen", "sessions", "schemas"}
+    assert set(rows[0]["data"]) == {"v", "seen", "sessions", "schemas", "last"}
 
 
 def test_export_puts_the_registry_after_the_events(client):
@@ -169,3 +169,128 @@ def test_openapi_documents_the_payload(client):
     assert "TaskPayload" in json.dumps(op["responses"]["200"])
     assert {p["name"] for p in op["parameters"]} == {"user_id", "schema_type", "dimension", "session_id", "seq"}
     assert [p["name"] for p in op["parameters"] if p["required"]] == ["user_id"]
+
+
+# --- privacy: scoped hooks, the real registry, failures -------------------------------------------
+
+
+def test_a_pre_existing_registry_file_outside_tmp_is_never_touched(client):
+    """The production registry (data/processed/task_registry) is out of every test's reach."""
+    from app.privacy.telemetry_store import delete_user, export_user
+    from dynamic_cache import cache_dispatcher
+
+    real = Path(cache_dispatcher.__file__).resolve().parents[1] / "data" / "processed" / "task_registry"
+    created = [p for p in (real.parent, real) if not p.exists()]  # removed again, innermost first
+    probe = real / "never-touch-probe.json"
+    real.mkdir(parents=True, exist_ok=True)
+    probe.write_text('{"v": 1, "probe": true}')
+    stamp = probe.stat().st_mtime_ns
+    try:
+        q = {"user_id": "never-touch-probe"}
+        assert client.get(URL, params=q).status_code == 200
+        client.get("/v1/user/export", params=q)
+        client.delete("/v1/user/telemetry", params=q)
+        delete_user("never-touch-probe")
+        export_user("never-touch-probe")
+        api.get_dispatcher().flush()
+        assert probe.read_text() == '{"v": 1, "probe": true}' and probe.stat().st_mtime_ns == stamp
+    finally:
+        probe.unlink()
+        for p in reversed(created):
+            p.rmdir()
+
+
+def test_store_hooks_keep_to_an_explicit_directory(client, tmp_path):
+    from app.privacy.telemetry_store import delete_user, export_user
+
+    client.get(URL, params={"user_id": "u1", "session_id": "s1"})
+    api.get_dispatcher().flush()
+    served = tmp_path / "registry" / "u1.json"
+    before = served.read_bytes()
+    tool_dir = tmp_path / "tool"
+    (tool_dir / "task_registry").mkdir(parents=True)
+    (tool_dir / "task_registry" / "u1.json").write_text('{"v": 1}')
+    rows = export_user("u1", tool_dir).decode().splitlines()
+    assert [json.loads(r)["data"] for r in rows] == [{"v": 1}]
+    assert delete_user("u1", tool_dir) == {"deleted_events": 0, "deleted_files": 1}
+    assert not (tool_dir / "task_registry" / "u1.json").exists()
+    assert served.read_bytes() == before  # the served registry is untouched
+
+
+def test_a_failing_store_makes_delete_503_and_still_runs_the_others(client, tmp_path, caplog):
+    from app.privacy import telemetry_store
+
+    ran = []
+    telemetry_store.register_user_store("broken", lambda key, d: 1 / 0, lambda key, d: None)
+    telemetry_store.register_user_store("after", lambda key, d: ran.append(key) or 0, lambda key, d: None)
+    try:
+        client.get(URL, params={"user_id": "u1", "session_id": "s1"})
+        api.get_dispatcher().flush()
+        r = client.delete("/v1/user/telemetry", params={"user_id": "u1"})
+        assert r.status_code == 503 and r.headers["retry-after"] == "1"
+        assert ran == ["u1"]  # the other stores still ran
+        assert not (tmp_path / "registry" / "u1.json").exists()  # and so did the registry's
+        assert "broken" in caplog.text and "ZeroDivisionError" in caplog.text and "u1" not in caplog.text
+    finally:
+        del telemetry_store._USER_STORES["broken"], telemetry_store._USER_STORES["after"]
+    assert client.delete("/v1/user/telemetry", params={"user_id": "u1"}).status_code == 200  # the retry
+
+
+def test_a_failing_store_makes_export_503(client):
+    from app.privacy import telemetry_store
+
+    telemetry_store.register_user_store("broken", lambda key, d: 0, lambda key, d: 1 / 0)
+    try:
+        assert client.get("/v1/user/export", params={"user_id": "u1"}).status_code == 503
+    finally:
+        del telemetry_store._USER_STORES["broken"]
+
+
+def test_a_corrupt_registry_does_not_block_the_telemetry_export(client, tmp_path):
+    (tmp_path / "registry").mkdir(exist_ok=True)
+    (tmp_path / "registry" / "u1.json").write_text("{oops")
+    r = client.get("/v1/user/export", params={"user_id": "u1"})
+    assert r.status_code == 200
+    assert json.loads(r.text)["data"] == {"unreadable": "{oops"}
+
+
+# --- rate limit ---------------------------------------------------------------------------------------
+
+
+def test_too_many_calls_for_one_id_are_429(client, monkeypatch):
+    now = [1_790_000_000.0]
+    monkeypatch.setattr(api, "limiter", api.RateLimiter(limits=((3600, 3),), clock=lambda: now[0]))
+    for _ in range(3):
+        assert client.get(URL, params={"user_id": "u1"}).status_code == 200
+    r = client.get(URL, params={"user_id": "U1"})  # the same id in another case
+    assert r.status_code == 429 and 0 < int(r.headers["retry-after"]) <= 3600
+    assert client.get(URL, params={"user_id": "u2"}).status_code == 200  # per id
+    now[0] += 3600
+    assert client.get(URL, params={"user_id": "u1"}).status_code == 200  # next window
+
+
+def test_rate_limiter_windows_and_bound():
+    now = [0.0]
+    rl = api.RateLimiter(limits=((10, 2), (100, 3)), clock=lambda: now[0], max_keys=2)
+    assert rl.hit("a") is None and rl.hit("a") is None
+    assert rl.hit("a") == 10  # the short window is full: retry when it ends
+    now[0] = 10.0
+    assert rl.hit("a") is None  # a new short window; the long one now holds 3
+    now[0] = 20.0
+    assert rl.hit("a") == 80  # the long window is full until t = 100
+    rl.hit("b"), rl.hit("c")
+    assert list(rl._hits) == ["b", "c"]  # at most max_keys ids tracked
+
+
+def test_default_limits():
+    assert api.RATE_LIMITS == ((3600, 120), (86_400, 400))
+
+
+# --- lifespan -----------------------------------------------------------------------------------------
+
+
+def test_lifespan_starts_and_stops_the_dispatcher(client):
+    d = api.get_dispatcher()
+    with TestClient(app) as c:
+        assert c.get(URL, params={"user_id": "u1"}).status_code == 200
+    assert d._closed and api._dispatcher is None

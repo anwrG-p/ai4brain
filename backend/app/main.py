@@ -21,6 +21,7 @@ if REPO_ROOT not in sys.path:
 
 from ai_coach.api import router as coach_module_router  # noqa: E402
 from app.api.routes.v1_auth import router as auth_router  # noqa: E402
+from app.lifecycle import lifespan  # noqa: E402
 from app.api.routes.v1_interop import router as v1_router  # noqa: E402
 from app.api.routes.v1_privacy import router as privacy_router  # noqa: E402
 from app.api.routes.v1_telemetry import router as v1_telemetry_router  # noqa: E402
@@ -40,6 +41,8 @@ app = FastAPI(
     title="SynapseTwin API",
     description="Telemetry ingest and privacy; task, coach and profile routes land with their modules.",
     version="1.4.0",
+    # Modules register startup/shutdown hooks in app/lifecycle.py (the task worker process).
+    lifespan=lifespan,
 )
 
 # Users are anonymous (R13): no cookies or auth headers, so no credentials. That also keeps a

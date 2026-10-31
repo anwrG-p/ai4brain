@@ -5,20 +5,27 @@ from __future__ import annotations
 import itertools
 import json
 import math
+import os
+import random
+import statistics
+import subprocess
+import sys
 import threading
 import time
+from pathlib import Path
 
 import pytest
 
 from app.tools.exercise_generator import ExerciseGenerator
 from dynamic_cache import cache_dispatcher as cd
 from dynamic_cache.bloom import DAY_S
-from dynamic_cache.cache_dispatcher import Dispatcher, NoFreshTask, TelemetryAccuracy, accuracy_by_schema
+from dynamic_cache.cache_dispatcher import Dispatcher, NoFreshTask, TelemetryTrials
 from dynamic_cache.generators import DIMENSION_OF, SCHEMA_TYPES
 from dynamic_cache.generators.stroop import INK_PRESETS
 from dynamic_cache.parameter_projector import START_THETA
 
 T0 = 1_790_000_000.0
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class Clock:
@@ -234,15 +241,21 @@ def test_projector_seeds_the_staircase(make):
     assert d.next_task("weak", schema_type="n_back").theta == 0.0
 
 
+def telemetry(tmp_path, *batches):
+    tdir = tmp_path / "telemetry"
+    tdir.mkdir(exist_ok=True)
+    with open(tdir / "u1.jsonl", "a", encoding="utf-8") as f:
+        for batch in batches:
+            f.write("\n".join(batch) + "\n")
+    return TelemetryTrials(lambda: tdir)
+
+
 @pytest.mark.parametrize(
     "errors,direction",
     [([False] * 20, +1), ([False, True] * 10, -1), ([False] * 17 + [True] * 3, 0)],
 )
 def test_85_percent_rule_moves_theta_from_recent_accuracy(make, tmp_path, errors, direction):
-    tdir = tmp_path / "telemetry"
-    tdir.mkdir()
-    (tdir / "u1.jsonl").write_text("\n".join(events("n_back", errors)) + "\n", encoding="utf-8")
-    d = make(accuracy=TelemetryAccuracy(lambda: tdir))
+    d = make(trials=telemetry(tmp_path, events("n_back", errors)))
     d.next_task("u1", schema_type="n_back")
     theta = d._users["u1"].schemas["n_back"]["theta"]
     acc = 1 - sum(errors) / len(errors)
@@ -251,48 +264,77 @@ def test_85_percent_rule_moves_theta_from_recent_accuracy(make, tmp_path, errors
     assert (theta > START_THETA["n_back"]) - (theta < START_THETA["n_back"]) == direction
 
 
-def test_the_rule_steps_once_per_batch_of_new_trials(make, tmp_path):
-    tdir = tmp_path / "telemetry"
-    tdir.mkdir()
-    log = tdir / "u1.jsonl"
-    log.write_text("\n".join(events("stroop", [False] * 20)) + "\n", encoding="utf-8")
-    d = make(accuracy=TelemetryAccuracy(lambda: tdir))
+def test_the_rule_steps_only_on_trials_it_has_not_counted(make, tmp_path):
+    later = "2026-10-31T11:00:00+00:00"
+    source = telemetry(tmp_path, events("stroop", [False] * 20))
+    d = make(trials=source)
     d.next_task("u1", schema_type="stroop")
     once = d._users["u1"].schemas["stroop"]["theta"]
-    d.next_task("u1", schema_type="stroop")  # fetched, never played: no new trials
+    d.next_task("u1", schema_type="stroop")  # fetched, never played: no new trials, no step
     assert d._users["u1"].schemas["stroop"]["theta"] == once
-    with open(log, "a", encoding="utf-8") as f:
-        f.write("\n".join(events("stroop", [False] * 20, session="s2", received_at="2026-10-31T11:00:00+00:00")) + "\n")
-    d.next_task("u1", schema_type="stroop")
-    assert d._users["u1"].schemas["stroop"]["theta"] > once
+    telemetry(tmp_path, events("stroop", [True] * 9, session="s2", received_at=later))
+    d.next_task("u1", schema_type="stroop")  # 9 new trials: fewer than MIN_TRIALS, no step
+    assert d._users["u1"].schemas["stroop"]["theta"] == once
+    telemetry(tmp_path, events("stroop", [True], session="s3", received_at=later))
+    d.next_task("u1", schema_type="stroop")  # the 10th: one step on those 10 (all wrong) only
+    b = ExerciseGenerator.apply_85_percent_rule(0.0, 5 * once - 2.5, step_size=cd.RULE_STEP)
+    assert d._users["u1"].schemas["stroop"]["theta"] == pytest.approx((b + 2.5) / 5)
 
 
 def test_perfect_play_walks_up_to_harder_levels_and_stays_bounded(make, tmp_path):
-    tdir = tmp_path / "telemetry"
-    tdir.mkdir()
-    log = tdir / "u1.jsonl"
-    d = make(accuracy=TelemetryAccuracy(lambda: tdir))
+    d = make(trials=telemetry(tmp_path))
     levels = []
     for k in range(30):
-        with open(log, "a", encoding="utf-8") as f:
-            f.write("\n".join(events("ufov", [False] * 12, session=f"s{k}")) + "\n")
+        telemetry(tmp_path, events("ufov", [False] * 12, session=f"s{k}"))
         levels.append(d.next_task("u1", schema_type="ufov").theta)
     assert levels == sorted(levels) and levels[-1] == 1.0
 
 
-def test_accuracy_needs_enough_trials_and_ignores_duplicates_and_fixtures():
-    lines = events("mst", [False] * 5)
-    assert accuracy_by_schema(lines * 4) == {}  # 5 distinct trials, resent 4 times
+@pytest.mark.parametrize("ability", [0.7, 1.0])
+def test_single_trial_tasks_do_not_wind_the_staircase_up(make, ability):
+    """matrix and tower: one trial per task. Re-reading a 60-trial window after every task made
+    theta swing 0..1 (SD ~0.37 in review; ~0.05 now); stepping once per 10 new trials keeps it near the 85%
+    point. Simulated learner: P(correct) = logistic(8 * (ability - served level))."""
+    rng = random.Random(1)
+    log: list[cd.Trial] = []
+    d = make(trials=lambda key, schema: log)
+    thetas = []
+    for k in range(600):
+        served = d.next_task("u1", schema_type="matrix")
+        p = 1 / (1 + math.exp(-8 * (ability - served.theta)))
+        log.append(cd.Trial(rng.random() < p, f"2026-10-31T00:00:00+00:00|s|{served.task_id}|{k}"))
+        thetas.append(d._users["u1"].schemas["matrix"]["theta"])
+    late = thetas[300:]
+    target = ability - math.log(0.85 / 0.15) / 8  # where P(correct) = 0.85
+    assert statistics.pstdev(late) < 0.1, statistics.pstdev(late)  # ~0.05 over 10 learners
+    assert abs(statistics.mean(late) - target) < 0.1
+    assert all(0.0 <= t <= 1.0 for t in thetas)
+
+
+def test_trials_since_a_marker():
+    trials = [cd.Trial(True, f"2026-10-3{d}T00:00:00+00:00|s|t|{d}") for d in range(5)]
+    assert cd.trials_since(trials, None) == trials
+    assert cd.trials_since(trials, trials[2].marker) == trials[3:]
+    assert cd.trials_since(trials, trials[4].marker) == []
+    # The marked trial left the window (retention): only trials received after it count.
+    gone = "2026-10-31T12:00:00+00:00|s|t|1"
+    assert cd.trials_since(trials, gone) == trials[2:]
+
+
+def test_trials_dedupe_and_skip_fixtures_and_torn_lines():
+    lines = events("mst", [False] * 5) * 4  # 5 distinct trials, resent 4 times
     lines += [json.dumps({"session_id": "s", "task_id": "mock-mst-1", "trial_index": i, "error_flag": True}) for i in range(50)]
     lines += ["{torn"]
-    assert accuracy_by_schema(lines) == {}
-    acc = accuracy_by_schema(events("mst", [False] * 9 + [True]))["mst"]
-    assert acc.accuracy == 0.9 and acc.trials == 10
+    got = cd.trials_by_schema(lines)
+    assert list(got) == ["mst"] and len(got["mst"]) == 5 and all(t.correct for t in got["mst"])
 
 
-def test_accuracy_window_is_the_most_recent_trials():
-    acc = accuracy_by_schema(events("tower", [True] * 100 + [False] * cd.ACCURACY_WINDOW))["tower"]
-    assert acc.accuracy == 1.0 and acc.trials == cd.ACCURACY_WINDOW
+def test_one_step_counts_at_most_the_newest_window(make):
+    log = [cd.Trial(False, f"m|s|t|{k}") for k in range(100)] + [cd.Trial(True, f"m|s|t|{100 + k}") for k in range(cd.ACCURACY_WINDOW)]
+    d = make(trials=lambda key, schema: log)
+    d.next_task("u1", schema_type="tower")
+    b = ExerciseGenerator.apply_85_percent_rule(1.0, 5 * START_THETA["tower"] - 2.5, step_size=cd.RULE_STEP)
+    assert d._users["u1"].schemas["tower"]["theta"] == pytest.approx((b + 2.5) / 5)
 
 
 # --- what is served --------------------------------------------------------------------------------
@@ -333,7 +375,7 @@ def test_registry_is_written_behind_and_holds_no_task_list(make, tmp_path):
     d.next_task("u1", session_id="s1")
     d.close()
     doc = json.loads((tmp_path / "registry" / "u1.json").read_text())
-    assert set(doc) == {"v", "seen", "sessions", "schemas"}
+    assert set(doc) == {"v", "seen", "sessions", "schemas", "last"}
     assert all(len(v) < 1000 for v in doc["seen"].values())  # base64 bits, not ids
 
 
@@ -348,6 +390,29 @@ def test_forget_drops_memory_and_file(make, tmp_path):
     assert d.export("u1") is None
     assert d.forget("u1") == 0
     d.next_task("u1", schema_type="matrix")  # a fresh user: the seen filter is gone too
+
+
+def test_forget_and_export_with_a_directory_touch_only_that_directory(make, tmp_path):
+    d = make()
+    d.next_task("u1", session_id="s1")
+    d.flush()
+    own = tmp_path / "registry" / "u1.json"
+    before = own.read_bytes()
+    other = tmp_path / "elsewhere"
+    other.mkdir()
+    assert d.export("u1", other) is None and d.forget("u1", other) == 0
+    (other / "u1.json").write_text('{"v": 1}')
+    assert d.export("u1", other) == {"v": 1}
+    assert d.forget("u1", other) == 1 and not (other / "u1.json").exists()
+    assert own.read_bytes() == before and "u1" in d._users
+
+
+def test_a_corrupt_registry_is_exported_raw(make, tmp_path):
+    d = make()
+    (tmp_path / "registry").mkdir()
+    (tmp_path / "registry" / "u1.json").write_text("{not json")
+    assert d.export("u1") == {"unreadable": "{not json"}
+    d.next_task("u1")  # serving treats it as empty
 
 
 def test_a_pending_write_cannot_undo_a_delete(make, tmp_path):
@@ -370,28 +435,7 @@ def test_session_answers_expire_with_the_ttl(make):
 def test_registry_rejects_keys_that_are_not_user_keys(make):
     with pytest.raises(ValueError):
         make().next_task("../U1")
-
-
-# --- latency -----------------------------------------------------------------------------------------
-
-
-def test_p99_under_10_ms_with_warm_pools(make):
-    """AC: p99 < 10 ms. Warm pools at the level new users start on; background refills stay on."""
-    d = make(background=True, pool_size=48)
-    for s in SCHEMA_TYPES:
-        d.warm(schema_types=(s,), at=START_THETA[s])
-    d.next_task("warmup")  # first-call imports and allocations
-    timings = []
-    for k in range(320):  # 40 users x 8 schemas, some calls replaying a session
-        user = f"bench{k % 40}"
-        session = "s1" if k % 5 == 0 else None
-        t = time.perf_counter()
-        d.next_task(user, session_id=session, seq=k // 40)
-        timings.append(time.perf_counter() - t)
-    timings.sort()
-    p99 = timings[math.ceil(0.99 * len(timings)) - 1]  # nearest rank
-    print(f"\nnext_task p50 {timings[len(timings) // 2] * 1e3:.3f} ms, p99 {p99 * 1e3:.3f} ms")
-    assert p99 < 0.010
+    assert make()._users == {}
 
 
 def test_a_failed_registry_write_is_logged_and_retried(make, tmp_path, caplog):
@@ -403,4 +447,222 @@ def test_a_failed_registry_write_is_logged_and_retried(make, tmp_path, caplog):
     assert "task registry write failed" in caplog.text
     assert "u1" not in caplog.text  # no user id in the logs
     assert d.next_task("u1", session_id="s1").replay  # serving goes on from memory
-    assert d._dirty == {"u1"}
+    assert set(d._dirty) == {"u1"}
+
+
+# --- memory bounds and retention ---------------------------------------------------------------------
+
+
+def test_memory_keeps_at_most_max_users_evicting_clean_ones(make, tmp_path):
+    d = make(max_users=3, seed_source=lambda: 7)
+    for k in range(5):
+        d.next_task(f"u{k}", schema_type="matrix")
+    # Unwritten users are never evicted: the file would not have them yet.
+    assert len(d._users) == 5
+    d.flush()
+    assert list(d._users) == ["u2", "u3", "u4"]  # least recently used went first
+    assert d._user_locks == {} and d._pins == {}  # nothing in flight, nothing kept
+    # u0 comes back from its file, seen filter included: seed 7's task stays refused.
+    with pytest.raises(NoFreshTask):
+        d.next_task("u0", schema_type="matrix")
+    assert "u0" in d._users and len(d._users) == 3
+
+
+def test_a_change_made_during_a_write_keeps_the_user_dirty(make, monkeypatch):
+    """Eviction skips dirty users, so a user is never dropped (and re-read) mid-write."""
+    d = make(max_users=1)
+    d.next_task("u1")
+    real = os.replace
+
+    def replace_while_u1_changes(src, dst):
+        d._mark_dirty("u1")  # a serve landing while the file is written
+        real(src, dst)
+
+    monkeypatch.setattr(cd.os, "replace", replace_while_u1_changes)
+    assert d.flush() == 1
+    assert "u1" in d._dirty  # the newer generation still has to be written
+    monkeypatch.setattr(cd.os, "replace", real)
+    assert d.flush() == 1 and d._dirty == {}
+
+
+def test_a_user_with_a_call_in_flight_is_not_evicted(make):
+    d = make(max_users=1)
+    d.next_task("u0")
+    d.flush()
+    d._pins["u0"] = 1  # as if u0's call were running
+    d.next_task("u1")
+    d.flush()
+    assert "u0" in d._users
+    d._pins.clear()
+    d.next_task("u2")
+    d.flush()
+    assert list(d._users) == ["u2"]
+
+
+def test_telemetry_trials_cache_is_bounded(tmp_path):
+    for k in range(5):
+        (tmp_path / f"u{k}.jsonl").write_text("\n".join(events("mst", [False] * 3)) + "\n")
+    source = TelemetryTrials(lambda: tmp_path, max_users=2)
+    for k in range(5):
+        assert len(source(f"u{k}", "mst")) == 3
+    assert list(source._cache) == ["u3", "u4"]
+
+
+def test_a_registry_idle_past_retention_starts_afresh(make):
+    clock = Clock()
+    d = make(clock=clock, seed_source=lambda: 7)
+    d.next_task("u1", schema_type="matrix", session_id="s1")
+    clock.t = T0 + (cd.RETENTION_DAYS + 1) * DAY_S
+    st = d._state("u1", clock.t)
+    assert st.sessions == {} and st.schemas == {} and st.seen.slices == {}
+
+
+def test_purge_idle_removes_registry_files_untouched_for_30_days(tmp_path):
+    now = time.time()
+    old, fresh, other = tmp_path / "old.json", tmp_path / "fresh.json", tmp_path / "notes.txt"
+    for p in (old, fresh, other):
+        p.write_text("{}")
+    os.utime(old, (now - 31 * DAY_S, now - 31 * DAY_S))
+    os.utime(other, (now - 90 * DAY_S, now - 90 * DAY_S))
+    assert cd.purge_idle(tmp_path, 30, now) == 1
+    assert not old.exists() and fresh.exists() and other.exists()
+    assert cd.purge_idle(tmp_path / "missing", 30, now) == 0
+
+
+def test_the_retention_cli_purges_idle_registries(tmp_path, monkeypatch, capsys):
+    from app.privacy import retention
+
+    registry = Path(os.environ["TASK_REGISTRY_DIR"])  # the autouse fixture's temporary registry
+    stale = registry / "u1.json"
+    stale.write_text("{}")
+    os.utime(stale, (time.time() - 40 * DAY_S,) * 2)
+    (registry / "u2.json").write_text("{}")
+    monkeypatch.setenv("TELEMETRY_DIR", str(tmp_path / "telemetry"))
+    assert retention.main([]) == 0
+    assert json.loads(capsys.readouterr().out)["registries_removed"] == 1
+    assert not stale.exists() and (registry / "u2.json").exists()
+
+
+# --- worker process -----------------------------------------------------------------------------------
+
+
+def test_the_first_submit_runs_outside_the_dispatcher_lock(make):
+    d = make(background=True, pool_size=2)
+    held = []
+
+    class Probe:
+        def submit(self, *args):
+            # Another thread can take the lock only if this one does not hold it.
+            t = threading.Thread(target=lambda: held.append(d._lock.acquire(timeout=1) and d._lock.release() is None))
+            t.start()
+            t.join()
+            raise RuntimeError("probe")
+
+    real = d._workers
+    d._workers = Probe()
+    d.next_task("u1", schema_type="tower")
+    assert held == [True]
+    real.shutdown()
+
+
+def pid_alive(pid: int) -> bool:
+    if os.name == "nt":
+        import ctypes
+
+        k32 = ctypes.windll.kernel32
+        handle = k32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        code = ctypes.c_ulong()
+        k32.GetExitCodeProcess(handle, ctypes.byref(code))
+        k32.CloseHandle(handle)
+        return code.value == 259  # STILL_ACTIVE
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+PARENT = """
+import sys, time
+from dynamic_cache.cache_dispatcher import worker_pid, worker_pool
+if __name__ == "__main__":
+    pool = worker_pool()
+    print(pool.submit(worker_pid).result(), flush=True)
+    time.sleep(120)
+"""
+
+
+def test_the_worker_exits_when_its_parent_is_killed(tmp_path):
+    script = tmp_path / "parent.py"
+    script.write_text(PARENT)
+    env = {**os.environ, "PYTHONPATH": str(REPO_ROOT)}
+    parent = subprocess.Popen([sys.executable, str(script)], stdout=subprocess.PIPE, text=True, env=env, cwd=REPO_ROOT)
+    try:
+        worker = int(parent.stdout.readline())
+        assert pid_alive(worker)
+    finally:
+        parent.kill()  # a hard kill: no shutdown hook runs
+        parent.wait(timeout=30)
+        parent.stdout.close()
+    deadline = time.monotonic() + 20
+    while pid_alive(worker) and time.monotonic() < deadline:
+        time.sleep(0.1)
+    assert not pid_alive(worker)
+
+
+def test_close_stops_the_worker_and_is_idempotent(make):
+    d = make(background=True)
+    d.start()
+    d.close()
+    d.close()
+    d.next_task("u1")  # still serves inline after close, without starting a new worker
+    assert d._refilling == set()
+
+
+# --- latency -----------------------------------------------------------------------------------------
+
+
+def percentile(timings: list[float], q: float) -> float:
+    timings = sorted(timings)
+    return timings[math.ceil(q * len(timings)) - 1]  # nearest rank
+
+
+def test_p99_under_10_ms_with_warm_pools(make):
+    """AC: p99 < 10 ms. Warm deep pools at the level new users start on; refills stay on."""
+    d = make(background=True, pool_size=48)
+    for s in SCHEMA_TYPES:
+        d.warm(schema_types=(s,), at=START_THETA[s])
+    d.start()
+    d.next_task("warmup")  # first-call imports and allocations
+    timings = []
+    for k in range(320):  # 40 users x 8 schemas, some calls replaying a session
+        t = time.perf_counter()
+        d.next_task(f"bench{k % 40}", session_id="s1" if k % 5 == 0 else None, seq=k // 40)
+        timings.append(time.perf_counter() - t)
+    p99 = percentile(timings, 0.99)
+    print(f"\nwarm 48-deep pools: next_task p50 {percentile(timings, 0.5) * 1e3:.3f} ms, p99 {p99 * 1e3:.3f} ms")
+    assert p99 < 0.010
+
+
+def test_p99_under_10_ms_at_production_pool_size_paced(make):
+    """The production POOL_SIZE (16), paced at 100 calls/s, which a single worker refills in time.
+    An unpaced burst is not covered: back-to-back calls drain a 16-deep pool faster than the one
+    worker refills it, and the empty pool builds inline (up to ~7 ms for MST, ~6 ms for mental
+    rotation); measured over HTTP, p99 10-15 ms for 200 back-to-back calls."""
+    d = make(background=True)
+    assert d.pool_size == cd.POOL_SIZE == 16
+    for s in SCHEMA_TYPES:
+        d.warm(schema_types=(s,), at=START_THETA[s])
+    d.start()
+    d.next_task("warmup")
+    timings = []
+    for k in range(320):
+        t = time.perf_counter()
+        d.next_task(f"paced{k % 40}")
+        timings.append(time.perf_counter() - t)
+        time.sleep(0.01)
+    p99 = percentile(timings, 0.99)
+    print(f"\n16-deep pools, 100 calls/s: next_task p50 {percentile(timings, 0.5) * 1e3:.3f} ms, p99 {p99 * 1e3:.3f} ms")
+    assert p99 < 0.010

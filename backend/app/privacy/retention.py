@@ -1,9 +1,10 @@
-"""Telemetry retention: drop events received more than N days ago.
+"""Telemetry retention: drop events received more than N days ago, and task registries
+(GET /v1/tasks/next's per-user files) nobody touched for N days.
 
 Run from the repo root (e.g. daily from cron):  python -m backend.app.privacy.retention --days 30
 In the container (WORKDIR /srv is the repo root there too):
     docker compose exec backend python -m backend.app.privacy.retention --days 30
-Prints one JSON line: {"files", "kept", "dropped", "undated", "removed_files"}.
+Prints one JSON line: {"files", "kept", "dropped", "undated", "removed_files", "registries_removed"}.
 "dropped" counts expired lines; "undated" counts lines with no readable received_at,
 which are also removed. No FastAPI here: another server can import purge_expired as is.
 """
@@ -104,6 +105,11 @@ def main(argv: list[str] | None = None) -> int:
     except LockTimeout as e:
         print(f"retention: {e}; run again later", file=sys.stderr)
         return 1
+    # The task registry (BE-04) under the same period: files idle longer than --days go.
+    # Imported here so the store and this module still load without the task package.
+    from dynamic_cache.cache_dispatcher import default_registry_dir, purge_idle
+
+    report["registries_removed"] = purge_idle(default_registry_dir(), args.days)
     print(json.dumps(report))
     return 0
 

@@ -8,6 +8,7 @@ through it, so u1 and U1 share `u1.jsonl` on every filesystem.
 """
 
 import json
+import logging
 import os
 import re
 import time
@@ -26,21 +27,35 @@ EXPORT_MAX_BYTES = 50 * 1024 * 1024
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
+log = logging.getLogger(__name__)
+
 # Per-user data kept outside the telemetry directory (BE-04's task registry, ...). Each store
 # registers here once, so the privacy delete and export cover it:
-#   delete(key) -> how many files it removed;  export(key) -> its record for the user, or None.
-# key is user_key() output. Registering a name again replaces the earlier hooks.
-_USER_STORES: dict[str, tuple[Callable[[str], int], Callable[[str], dict | None]]] = {}
+#   delete(key, directory) -> how many files it removed
+#   export(key, directory) -> its record for the user, or None
+# key is user_key() output. directory is None for the server's own locations; when a caller
+# passes an explicit telemetry directory (a tool, a test), the store keeps to `directory/<name>/`
+# and touches nothing elsewhere. Registering a name again replaces the earlier hooks.
+StoreDelete = Callable[[str, "Path | None"], int]
+StoreExport = Callable[[str, "Path | None"], "dict | None"]
+_USER_STORES: dict[str, tuple[StoreDelete, StoreExport]] = {}
 
 
-def register_user_store(
-    name: str, delete: Callable[[str], int], export: Callable[[str], dict | None]
-) -> None:
+def register_user_store(name: str, delete: StoreDelete, export: StoreExport) -> None:
     _USER_STORES[name] = (delete, export)
+
+
+def _store_dir(directory: Path | None, name: str) -> Path | None:
+    return None if directory is None else directory / name
 
 
 class LockTimeout(TimeoutError):
     """The telemetry lock stayed busy past the timeout. HTTP callers answer 503."""
+
+
+class StoreUnavailable(Exception):
+    """A registered per-user store failed. Every other store was still tried; the operation is
+    safe to repeat. HTTP callers answer 503."""
 
 
 class ExportTooLarge(Exception):
@@ -146,12 +161,14 @@ def append_events(
 
 def delete_user(user_id: str, directory: Path | None = None) -> dict[str, int]:
     """Remove `{user_key}.jsonl`, every `{user_key}.*` state file and the user's records in every
-    registered store. Counts only what was removed.
+    registered store. Counts only what was removed. Raises StoreUnavailable if a store failed
+    (after trying all of them), LockTimeout if the telemetry lock stays busy.
 
     Matches file names case-insensitively, so a file written under another case before ids
     were lowercased (possible on Linux) is still found and counted.
     """
     key = user_key(user_id)
+    explicit = directory
     directory = directory or telemetry_dir()
     events = files = 0
     if directory.is_dir():
@@ -166,8 +183,15 @@ def delete_user(user_id: str, directory: Path | None = None) -> dict[str, int]:
                     events += sum(1 for line in text.splitlines() if line.strip())
                 path.unlink()
                 files += 1
-    for delete, _ in list(_USER_STORES.values()):
-        files += delete(key)
+    failed = []
+    for name, (delete, _) in list(_USER_STORES.items()):
+        try:
+            files += delete(key, _store_dir(explicit, name))
+        except Exception as e:  # best effort: the other stores still go; no id in the log
+            log.warning("user store %s: delete failed (%s)", name, type(e).__name__)
+            failed.append(name)
+    if failed:
+        raise StoreUnavailable(f"could not delete from {', '.join(failed)}; retry")
     return {"deleted_events": events, "deleted_files": files}
 
 
@@ -178,7 +202,8 @@ def export_user(
     something for them (`{"store": name, "user_id": key, "data": ...}`); None if nothing is stored.
 
     Read whole under the lock, so the caller can send it without holding the lock.
-    Raises ExportTooLarge above `max_bytes` (default EXPORT_MAX_BYTES), LockTimeout if busy.
+    Raises ExportTooLarge above `max_bytes` (default EXPORT_MAX_BYTES), LockTimeout if busy,
+    StoreUnavailable if a registered store fails.
     """
     key = user_key(user_id)
     limit = EXPORT_MAX_BYTES if max_bytes is None else max_bytes
@@ -193,12 +218,19 @@ def export_user(
                 data = path.read_bytes()
             except FileNotFoundError:
                 pass
-    records = []
+    records, failed = [], []
     for name, (_, export) in list(_USER_STORES.items()):
-        record = export(key)
+        try:
+            record = export(key, _store_dir(directory, name))
+        except Exception as e:  # an export missing a store would look complete: fail instead
+            log.warning("user store %s: export failed (%s)", name, type(e).__name__)
+            failed.append(name)
+            continue
         if record is not None:
             line = json.dumps({"store": name, "user_id": key, "data": record}, allow_nan=False)
             records.append(line.encode("utf-8") + b"\n")
+    if failed:
+        raise StoreUnavailable(f"could not export from {', '.join(failed)}; retry")
     if data is None and not records:
         return None
     return (data or b"") + b"".join(records)
