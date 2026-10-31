@@ -157,8 +157,24 @@ class TestXAIExplainer:
     def test_positive_working_memory_delta(self):
         delta = {"working_memory": 0.20}
         rationale = self.explainer.generate_adaptation_rationale(delta, active_cluster_id=2)
-        assert "working memory stability improved by 20%" in rationale
+        # Exercise-level wording (controller ruling on the BE-05 review): no improvement claim.
+        assert rationale == (
+            "We adjusted the working memory pacing and added an item to remember. Your last few rounds were steady."
+        )
         assert "pacing" in rationale
+
+    @pytest.mark.parametrize("dim", [d.value for d in CognitiveDimension] + ["unknown_skill"])
+    @pytest.mark.parametrize("delta", [0.3, 0.06, -0.06, -0.3])
+    @pytest.mark.parametrize("uncertainty", [0.0, 0.9])
+    def test_no_rationale_claims_improvement_or_quotes_a_percentage(self, dim, delta, uncertainty):
+        texts = [
+            self.explainer.generate_adaptation_rationale({dim: delta}, active_cluster_id=4, uncertainty=uncertainty),
+            self.explainer.generate_adaptation_rationale({}, active_cluster_id=4),
+            self.explainer.generate_adaptation_rationale({dim: 0.01}, active_cluster_id=4),
+        ]
+        for text in texts:
+            assert "improv" not in text.lower(), text
+            assert "%" not in text, text
 
     def test_negative_pattern_induction_delta(self):
         delta = {"pattern_induction": -0.15}

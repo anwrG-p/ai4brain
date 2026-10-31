@@ -6,7 +6,10 @@ growth-mindset justifications for task adaptations.
 
 Reference:
 - README: 'Implement Explainability Injection: ingest the differential vector Δc from Member 3
-  to justify recommendations (e.g., "We adjusted task pacing because your working memory stability improved by 20%").'
+  to justify recommendations (e.g., "We adjusted the working memory pacing and added an item to
+  remember. Your last few rounds were steady.").'
+- Wording rule: exercise-level only. No "improved", no percentages, until a calibrated
+  reliable-change gate exists (docs/research/2026-10-31-improvement-opportunities.md, area 3).
 """
 
 from __future__ import annotations
@@ -53,33 +56,34 @@ class XAIExplainer:
             )
 
         top_dim, top_delta = significant_shifts[0]
-        pct_change = abs(round(top_delta * 100))
 
+        # Exercise-level wording only. There is no calibrated reliable-change gate yet, so a reason
+        # never claims the person improved and never quotes a percentage (research area 3).
+        steady = "Your last few rounds were steady."
         dimension_explanations = {
             CognitiveDimension.WORKING_MEMORY.value: {
-                "positive": f"We adjusted task pacing and increased item spans because your working memory stability improved by {pct_change}%.",
-                "negative": f"We added intermediate recall checkpoints to support working memory consolidation as challenge depth increases.",
+                "positive": f"We adjusted the working memory pacing and added an item to remember. {steady}",
+                "negative": "We added intermediate recall checkpoints to support working memory consolidation as challenge depth increases.",
             },
             CognitiveDimension.PATTERN_INDUCTION.value: {
-                "positive": f"We advanced rule complexity because your matrix pattern induction agility showed a +{pct_change}% acceleration.",
-                "negative": f"We scaffolded visual contrast cues to assist in deconstructing intricate matrix transformations.",
+                "positive": f"We added a little more challenge to the matrix pattern rules. {steady}",
+                "negative": "We scaffolded visual contrast cues to assist in deconstructing intricate matrix transformations.",
             },
             CognitiveDimension.EXECUTIVE_FUNCTION.value: {
-                "positive": f"We reduced inter-stimulus intervals to challenge your executive task-switching speed (+{pct_change}% fluidity).",
-                "negative": f"We tuned distractor ratios to create optimal focus conditions for task-switching flow.",
+                "positive": f"We shortened the gap between task switches a little. {steady}",
+                "negative": "We tuned distractor ratios to create optimal focus conditions for task-switching flow.",
             },
             CognitiveDimension.SPATIAL_ORIENTATION.value: {
-                "positive": f"We expanded rotational angles in spatial tasks to match your +{pct_change}% spatial orientation progression.",
-                "negative": f"We provided directional reference markers to anchor mental rotation pathways.",
+                "positive": f"We added wider rotation angles to the spatial rounds. {steady}",
+                "negative": "We provided directional reference markers to anchor mental rotation pathways.",
             },
             CognitiveDimension.PROCESSING_SPEED.value: {
-                "positive": f"We tightened response windows to match your faster, jitter-free cognitive throughput (+{pct_change}%).",
-                "negative": f"We extended pacing windows to encourage deliberate, high-accuracy problem analysis.",
+                "positive": f"We tightened the response window a little. {steady}",
+                "negative": "We extended pacing windows to encourage deliberate, high-accuracy problem analysis.",
             },
             CognitiveDimension.EPISODIC_MEMORY.value: {
-                # Exercise-level wording: no improvement claim without a calibrated RCI gate.
-                "positive": "We added closer look-alikes. Your last few rounds were steady.",
-                "negative": f"We spaced out the look-alikes so each picture is easier to tell apart.",
+                "positive": f"We added closer look-alikes. {steady}",
+                "negative": "We spaced out the look-alikes so each picture is easier to tell apart.",
             },
         }
 
@@ -88,9 +92,10 @@ class XAIExplainer:
 
         if dim_key in dimension_explanations:
             rationale = dimension_explanations[dim_key][direction]
+        elif top_delta >= 0:
+            rationale = f"We added a little more challenge to the {top_dim.replace('_', ' ')} rounds."
         else:
-            trend = "strengthened" if top_delta >= 0 else "is actively calibrating"
-            rationale = f"We fine-tuned difficulty parameters because your {top_dim.replace('_', ' ')} {trend} by {pct_change}%."
+            rationale = f"We eased the {top_dim.replace('_', ' ')} rounds a little."
 
         # If uncertainty is notable, acknowledge adaptive calibration
         if uncertainty > 0.4:
