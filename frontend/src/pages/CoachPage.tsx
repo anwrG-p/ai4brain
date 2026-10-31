@@ -6,7 +6,7 @@ import { Button } from '../components/ui/Button'
 import { TALK_MS } from '../features/loti/LotiBubbles'
 import { coachBrain, type CoachBrain } from '../features/loti/coachAdapter'
 import { useLotiContext } from '../features/loti/lotiContext'
-import { useLotiSession } from '../features/loti/lotiSession'
+import { nextTurnId, useLotiSession } from '../features/loti/lotiSession'
 import { useLotiActions } from '../features/loti/useLotiActions'
 import type { LotiChoice } from '../features/loti/types'
 
@@ -26,7 +26,8 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
   const chipsRef = useRef<HTMLDivElement>(null)
   const logRef = useRef<HTMLDivElement>(null)
   const questionId = useId()
-  const beat = turns.length
+  // The id the next turn gets: it only grows, so it marks each new bubble even once the history is trimmed.
+  const beat = nextTurnId(turns)
 
   // No open question (first visit, or the last talk ended): Loti opens a new one below the history.
   useEffect(() => {
@@ -83,14 +84,14 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
         tabIndex={-1}
         className="focus-ring flex flex-col gap-3 rounded-md"
       >
-        {/* One keyed list: the open bubble has the key and markup it keeps once answered (turns[beat]),
+        {/* One keyed list: the open bubble has the key and markup it keeps once answered (the next turn id),
             so React keeps the node and the log does not announce the question again. */}
         {[
-          ...turns.map((turn, i) =>
+          ...turns.map((turn) =>
             turn.from === 'loti' ? (
-              <LotiLine key={i} text={turn.text} />
+              <LotiLine key={turn.n} text={turn.text} />
             ) : (
-              <div key={i} data-from="you" className="flex justify-end">
+              <div key={turn.n} data-from="you" className="flex justify-end">
                 <p className="max-w-md rounded-xl rounded-tr-sm bg-brand-subtle px-4 py-2 text-base text-ink">
                   <span className="sr-only">You: </span>
                   <span>{turn.text}</span>

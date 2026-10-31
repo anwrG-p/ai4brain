@@ -6,7 +6,7 @@ import CoachPage from '../pages/CoachPage'
 import { useGoalsStore } from '../features/insights/goals'
 import { useSessionStore } from '../features/insights/sessionStore'
 import { LotiBubbles } from '../features/loti/LotiBubbles'
-import { LOTI_SESSION_KEY, loadLotiSession, useLotiSession } from '../features/loti/lotiSession'
+import { LOTI_SESSION_KEY, MAX_TURNS, loadLotiSession, useLotiSession } from '../features/loti/lotiSession'
 import { createCoachBrain, keywordCrisisGate } from '../features/loti/coachAdapter'
 
 const future = { v7_startTransition: true, v7_relativeSplatPath: true }
@@ -138,7 +138,7 @@ describe('CoachPage (/coach)', () => {
     await user.click(screen.getByRole('button', { name: 'Great' }))
     await user.click(screen.getByRole('button', { name: /yes, let's train/i }))
     expect(screen.getByTestId('where').textContent).not.toBe('/coach')
-    expect(useLotiSession.getState().turns.at(-1)).toEqual({ from: 'you', text: "Yes, let's train" })
+    expect(useLotiSession.getState().turns.at(-1)).toMatchObject({ from: 'you', text: "Yes, let's train" })
   })
 
   it('"Start over" is hidden on a fresh talk, then clears the history and asks again', async () => {
@@ -228,5 +228,19 @@ describe('CoachPage (/coach)', () => {
     const { container } = renderAt('/coach', <CoachPage brain={createCoachBrain({ enabled: true, crisisGate: keywordCrisisGate })} />)
     expect(screen.getByText('Loti is an AI guide, not a doctor.')).toBeInTheDocument()
     expect(visibleWords(container)).toBeLessThanOrEqual(60)
+  })
+
+  it('keys history by turn id, so trimming at the cap keeps every node and its text', async () => {
+    const user = userEvent.setup()
+    const day = { id: 'day', text: 'How was your day?', choices: [{ id: 'great', label: 'Great', action: { kind: 'reply' as const, nodeId: 'day-great' } }] }
+    const turns = Array.from({ length: MAX_TURNS }, (_, n) => ({ n, from: n % 2 ? ('you' as const) : ('loti' as const), text: `turn ${n}` }))
+    useLotiSession.setState({ turns, current: day })
+    renderAt()
+    const last = within(log()).getByText(`turn ${MAX_TURNS - 1}`).closest('[data-from]')!
+    await user.click(screen.getByRole('button', { name: 'Great' }))
+    expect(useLotiSession.getState().turns).toHaveLength(MAX_TURNS)
+    expect(within(log()).queryByText('turn 0')).toBeNull()
+    expect(last.isConnected).toBe(true)
+    expect(last.textContent).toBe(`You: turn ${MAX_TURNS - 1}`)
   })
 })
