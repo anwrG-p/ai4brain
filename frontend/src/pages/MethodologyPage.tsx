@@ -1,721 +1,335 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Badge } from '../components/ui/Badge'
-import { Button } from '../components/ui/Button'
-import { Card } from '../components/ui/Card'
-import { DoodleSquiggle } from '../components/ui/DoodleDecorations'
-import { Mascot } from '../components/features/brand/Mascot'
-import { WhyThisPanel } from '../components/features/coach/WhyThisPanel'
-import { lintCopyText, SAMPLE_CLINICAL_DEMO_INPUT, SAMPLE_GUILT_DEMO_INPUT } from '../utils/copyLinter'
-import type { WhyThisTrail } from '../types'
+import { ChevronDown } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { EXERCISE_NAME } from '../features/assessment/names'
+import type { SchemaType } from '../features/assessment/telemetry/types'
+import {
+  MIN_COVERAGE,
+  PILLAR_IDS,
+  PILLAR_LABELS,
+  PILLAR_WEIGHTS,
+  UNSOURCED_INPUTS,
+  type InputId,
+  type PillarId,
+} from '../features/insights/pillars'
+import {
+  DEFAULT_LAMBDA,
+  DEFAULT_TMAX,
+  FALLBACK_ALPHA,
+  GRACE_DAYS,
+  RCI_THRESHOLD,
+  SESSIONS_PER_WEEK,
+  fitAlpha,
+  rci,
+} from '../features/insights/projection'
 
-const METHODOLOGY_WHY_TRAIL: WhyThisTrail = {
-  id: 'trail-methodology-epistemics',
-  confidence: 0.99,
-  observedData: [
-    'Psychometric Item Response Theory requires explicit standard error reporting on all latent ability scores.',
-    'Hardware latency variance across consumer devices spans 16 ms (144Hz wired) to 210 ms (Bluetooth mobile).',
-    'The non-clinical copy guardrail engine actively monitors 14 diagnostic and punitive guilt patterns.',
-  ],
-  inference:
-    'SynapseTwin maintains scientific credibility by disclosing measurement limits and modeling uncertainty explicitly.',
-  recommendation:
-    'Evaluate cognitive growth using 30-day Bayesian moving intervals rather than single-trial snapshots.',
-  counterfactual:
-    'Without explicit uncertainty modeling, a 120 ms Bluetooth keyboard lag would be misclassified as cognitive decline.',
-  sourceModule: 'deterministic_fallback',
+/* "How we calculate this": the one page that holds the formulas, the brain-area links, the projection
+   model and RCI (spec U5, ticket 09). A plain intro, then one closed disclosure per topic (rule 13).
+   Weights, coverage, projection defaults and the RCI threshold are read from features/insights, so
+   the page cannot drift from the code. The scale ends quoted in the text are pinned by
+   src/tests/methodologyPage.test.tsx against taskScores(). */
+
+// What each of the doc's inputs measures, in plain words, and which exercise feeds it. This MIRRORS
+// features/insights/taskScores.ts by hand (it exports no input -> exercise map): change both together.
+// methodologyPage.test.tsx checks the pillar lists against taskScores(). 'any' = every exercise;
+// null = no exercise records it yet. `note` flags a doc measure we only approximate.
+type Measure = { name: string; from: readonly SchemaType[] | 'any' | null; how: ReactNode; note?: string }
+const MEASURES: Record<InputId, Measure> = {
+  OSPAN: {
+    name: 'Working memory',
+    from: ['n_back'],
+    note: 'from Memory Gauntlet',
+    how: (
+      <>
+        d′ = z(H) − z(FA), with H = (hits + 0.5) ÷ (targets + 1) and FA = (false alarms + 0.5) ÷
+        (non-targets + 1). 0 when hits don’t beat false alarms. Scale: d′ 0 → 0, 4 → 100.
+      </>
+    ),
+  },
+  OTS_Planning: {
+    name: 'Planning ahead',
+    from: ['tower'],
+    how: <>0.8 × share solved in the fewest moves + 0.2 × planning speed on those (0 s → 1, 30 s → 0).</>,
+  },
+  FluidMatrices: {
+    name: 'Reasoning',
+    from: ['relational', 'matrix'],
+    how: <>Mean of Pattern Puzzle accuracy and Logic Web accuracy, weighted by the number of steps.</>,
+  },
+  ANT_Conflict: {
+    name: 'Handling conflict',
+    from: ['stroop'],
+    how: (
+      <>
+        Time cost = mean time on mismatched colours − mean time on matching ones, correct answers only.
+        Scale: 0 ms → 100, 300 ms → 0. Multiplied by (accuracy − ¼) ÷ ¾, so guessing scores 0.
+      </>
+    ),
+  },
+  DCCS_SwitchCost: {
+    name: 'Switching rules',
+    from: ['n_back'],
+    note: 'from Memory Gauntlet',
+    how: (
+      <>
+        Accuracy on steady trials − accuracy on switch trials. Scale: 0 → 100, 0.5 → 0. Multiplied by
+        min(1, d′), so not answering scores 0.
+      </>
+    ),
+  },
+  ErrorRecovery: {
+    name: 'Bouncing back after a mistake',
+    from: 'any',
+    how: <>Accuracy on the trial right after a mistake. Exercises played at chance are left out.</>,
+  },
+  SST_SSRT: {
+    name: 'Stopping a habit',
+    from: ['stroop'],
+    note: 'estimated',
+    how: <>A stand-in for now: accuracy on mismatched Color Clash trials. There is no stop-signal exercise yet.</>,
+  },
+  OTS_Execution: {
+    name: 'Moving with care',
+    from: ['tower'],
+    how: <>Mean of (fewest possible moves ÷ your moves); an unsolved puzzle counts as 0.</>,
+  },
+  DDM_Caution: { name: 'Caution', from: null, how: null },
+  MST_LDI: {
+    name: 'Telling similar things apart',
+    from: ['mst'],
+    how: <>LDI = P(“similar” | lure) − P(“similar” | new), kept between 0 and 1.</>,
+  },
+  PAL_FirstTrialMemory: { name: 'Remembering pairs', from: null, how: null },
+  UFOV_SOA: {
+    name: 'Seeing speed',
+    from: ['ufov'],
+    how: <>The shortest display time you still read correctly. Scale: 17 ms → 100, 500 ms → 0.</>,
+  },
+  ANT_Orienting: {
+    name: 'Side vision',
+    from: ['ufov'],
+    how: <>Accuracy on the target at the side of the screen.</>,
+  },
 }
 
-interface PipelineStage {
-  id: number
-  title: string
-  subtitle: string
-  icon: string
-  description: string
-  formula: string
-  telemetrySignature: string
-  safetyCheck: string
+// The doc's brain-area links ("Rou7 zebda", RADAR SCORES). Research links only: nothing here is measured.
+const AREAS: Record<PillarId, { area: string; role: string }> = {
+  focus: { area: 'the dorsolateral prefrontal cortex (dlPFC)', role: 'working memory and planning' },
+  agility: { area: 'the anterior cingulate cortex (ACC)', role: 'noticing conflict and switching flexibly' },
+  impulse: { area: 'the ventrolateral prefrontal cortex (vlPFC) and the striatum', role: 'holding back a response' },
+  memory: { area: 'the hippocampus (dentate gyrus)', role: 'telling apart memories that look alike' },
+  visual: { area: 'the parietal and occipital areas (dorsal stream)', role: 'where things are and how fast you see them' },
 }
 
-const PIPELINE_STAGES: readonly PipelineStage[] = [
-  {
-    id: 1,
-    title: 'Active Probe Stimuli',
-    subtitle: 'Millisecond-Accurate Telemetry',
-    icon: '⚡',
-    description:
-      'Stimulus presentation is locked to the browser animation frame (requestAnimationFrame). Every trial captures timestamped touch/key events, incongruent lure response deltas, and precision jitter.',
-    formula: 'RT_i = t_{response} - t_{stimulus} - \\delta_{input\\_offset}',
-    telemetrySignature: '{ trialIndex: 14, probeType: "n_back_spatial", latencyMs: 342, isLure: true }',
-    safetyCheck: 'Non-Biometric Guarantee: Zero webcam, eye-tracking, or mic streaming during probes.',
-  },
-  {
-    id: 2,
-    title: 'Weighted Staircase IRT',
-    subtitle: 'Dynamic Difficulty Targeting 85% Accuracy',
-    icon: '📈',
-    description:
-      'Rather than fixed-difficulty testing, difficulty adjusts dynamically following a modified 1-up/2-down staircase protocol to pinpoint the boundary of cognitive effort while minimizing frustration.',
-    formula: 'd\' = Z(Hit\\ Rate) - Z(False\\ Alarm\\ Rate)',
-    telemetrySignature: '{ staircaseLevel: 3, stepSize: 0.25, reversalCount: 4, dPrime: 2.18 }',
-    safetyCheck: 'Anti-Frustration Clamp: Staircase caps at 3 consecutive errors to protect learner motivation.',
-  },
-  {
-    id: 3,
-    title: 'Bayesian Twin Updating',
-    subtitle: 'Latent Trait Distribution (μ ± σ)',
-    icon: '🧠',
-    description:
-      'Raw trial scores are mapped to latent cognitive dimensions via conjugate Gaussian Bayesian belief updating. Variance decreases as observations accumulate, producing an honest credible interval.',
-    formula: '\\hat{\\theta}_i = \\frac{\\tau_0 \\mu_0 + \\tau_s \\bar{x}}{\\tau_0 + \\tau_s}, \\quad \\sigma_{\\theta} = \\frac{1}{\\sqrt{\\tau_0 + \\tau_s}}',
-    telemetrySignature: '{ dimension: "working_memory", mean: 0.78, variance: 0.0016, confidence: 0.88 }',
-    safetyCheck: 'Uncertainty Floor: Early baseline sessions display wide confidence bands (±15%) to avoid overconfident claims.',
-  },
-  {
-    id: 4,
-    title: 'SAT-JEPA Plan Generation',
-    subtitle: 'Vector Difference (Δc) Dispatch',
-    icon: '🎯',
-    description:
-      'Adaptive exercise generation compares current multidimensional latent state against user-selected targets to produce the differential vector Δc, selecting drills with maximal recovery payoff.',
-    formula: '\\Delta c = c_{target} - c_{current} = [ \\Delta \\theta_{WM}, \\Delta \\theta_{IC}, \\Delta \\theta_{CF}, \\dots ]',
-    telemetrySignature: '{ targetDelta: { WM: +0.08, IC: +0.03 }, prioritizedDrill: "Dual N-Back Level 3" }',
-    safetyCheck: 'Zero-Guilt Protection: Rest days and missed sessions never penalize trajectory slope or streak contracts.',
-  },
-]
+const weightsOf = (p: PillarId) => Object.entries(PILLAR_WEIGHTS[p]) as [InputId, number][]
 
-const BIASES_TABLE_DATA = [
-  {
-    name: 'Hardware Latency & Bluetooth Jitter',
-    impact: '+40 ms to +180 ms latency overhead',
-    detection: 'Frame-delta timestamps & standard deviation spikes',
-    mitigation: 'Input latency calibration baseline (138 ms) and outlier clustering.',
-  },
-  {
-    name: 'Circadian Rhythm Alertness Dip',
-    impact: '8% to 14% drop in speed & working memory',
-    detection: 'Session timestamp vs preferred peak focus window',
-    mitigation: 'Multi-session moving window averaging across morning and afternoon.',
-  },
-  {
-    name: 'Motor Tremor & Coordination Noise',
-    impact: 'Elevated reaction times and accidental double-taps',
-    detection: 'Inter-tap interval variance distribution < 60 ms',
-    mitigation: 'Generous tap targets (≥ 44 px), keyboard mapping (1/2), and debounce filter.',
-  },
-  {
-    name: 'Practice & Familiarity Drift',
-    impact: 'Artificial score drift after 6+ identical runs',
-    detection: 'Trial sequence index counter (n > 10)',
-    mitigation: 'Algorithmic stimulus seed rotation and randomized lure position generation.',
-  },
-  {
-    name: 'Sensory Crowding & Fatigue',
-    impact: 'Elevated error bursts after 8+ minutes of sustained focus',
-    detection: 'Trial duration timer & reaction-time slope degradation',
-    mitigation: 'Mandatory session timeboxing (< 5 min) and 1-click Calm Sensory Mode.',
-  },
-]
-
-export function MethodologyPage() {
-  const [activeStage, setActiveStage] = useState<number>(1)
-  const [jitterMs, setJitterMs] = useState<number>(45)
-  const [circadianWindow, setCircadianWindow] = useState<'morning' | 'slump' | 'night'>('morning')
-  const [sessionCount, setSessionCount] = useState<number>(8)
-
-  // Copy Linter Sandbox State
-  const [sandboxText, setSandboxText] = useState<string>(
-    'Learner demonstrated steady improvement in working memory with 78% accuracy.',
-  )
-
-  const lintResult = lintCopyText(sandboxText)
-
-  // Calculate simulated confidence interval width based on input parameters
-  const calculateSimulatedUncertainty = () => {
-    // Baseline uncertainty from session count (more sessions = narrower interval)
-    const baseVariance = Math.max(0.03, 0.16 / Math.sqrt(sessionCount))
-
-    // Jitter penalty (higher latency jitter = wider interval)
-    const jitterPenalty = (jitterMs / 250) * 0.05
-
-    // Circadian penalty (testing during slump/night increases noise)
-    const circadianPenalty =
-      circadianWindow === 'morning' ? 0.0 : circadianWindow === 'slump' ? 0.025 : 0.04
-
-    const totalInterval = (baseVariance + jitterPenalty + circadianPenalty) * 100
-    return totalInterval.toFixed(1)
+function exercisesFor(p: PillarId): string {
+  const names = new Set<string>()
+  let any = false
+  for (const [id] of weightsOf(p)) {
+    const from = MEASURES[id].from
+    if (from === 'any') any = true
+    else for (const s of from ?? []) names.add(EXERCISE_NAME[s])
   }
+  const list = [...names].join(', ')
+  return any ? `${list}, and how you bounce back after a mistake in any exercise` : list
+}
 
-  const simulatedWidth = calculateSimulatedUncertainty()
-  const currentStage = PIPELINE_STAGES.find((s) => s.id === activeStage) ?? PIPELINE_STAGES[0]!
+// The clamp on α, read from fitAlpha itself (the bounds are not exported): a flat history gives the
+// floor, an instant jump to the ceiling gives the top.
+const ALPHA_RANGE = [fitAlpha([0, 0, 0], 1), fitAlpha([0, 1, 1], 1)] as const
+// rci() defaults: SD 10, r 0.8. 1 / rci(1, 0) is the standard error of a difference, in points.
+const RCI_POINTS = Math.round(RCI_THRESHOLD / rci(1, 0))
 
+function Topic({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="space-y-8 animate-fadeIn">
-      {/* Header section */}
-      <section className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge tone="brand" glyph="🔬">
-              Science &amp; Ethics
-            </Badge>
-            <Badge tone="success" glyph="✓">
-              Non-Clinical Certified
-            </Badge>
-            <Badge tone="reward" glyph="●">
-              Bayesian Rigor
-            </Badge>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link
-              to="/privacy"
-              className="tactile-btn bg-surface text-ink px-3.5 py-1.5 text-xs font-semibold inline-flex items-center no-underline border border-border"
-            >
-              Privacy &amp; Non-Biometric Lock →
-            </Link>
-          </div>
-        </div>
+    <details className="group border-b border-border">
+      <summary className="focus-ring flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 rounded-md py-3 [&::-webkit-details-marker]:hidden">
+        <h2 className="text-lg font-semibold text-ink">{title}</h2>
+        <ChevronDown aria-hidden="true" size={20} strokeWidth={1.75} className="shrink-0 text-ink-muted group-open:rotate-180" />
+      </summary>
+      <div className="flex flex-col gap-4 pb-6 text-ink">{children}</div>
+    </details>
+  )
+}
 
-        <div>
-          <h1 className="font-display text-3xl md:text-4xl font-black tracking-tight text-ink">
-            Methodology, Limits &amp; Ethical Charter
-          </h1>
-          <DoodleSquiggle className="max-w-xs mt-1" />
-          <p className="text-ink-muted text-base max-w-3xl mt-1">
-            Complete scientific disclosure of Bayesian cognitive modeling, measurement limits,
-            known environmental confounders, and non-clinical ethical guardrails.
-          </p>
-        </div>
-      </section>
+function Formula({ children }: { children: ReactNode }) {
+  return <p className="font-mono-tabular rounded-md bg-surface-raised px-3 py-2 break-words text-ink">{children}</p>
+}
 
-      {/* Section 1: The 4-Stage Cognitive Computation Pipeline */}
-      <Card className="p-6 space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
-          <div>
-            <h2 className="font-display font-bold text-xl text-ink flex items-center gap-2">
-              <span aria-hidden="true">🔄</span> The 4-Stage Cognitive Computation Pipeline
-            </h2>
-            <p className="text-xs text-ink-muted mt-0.5">
-              How SynapseTwin converts raw millisecond probe inputs into explainable, non-clinical twin models.
-            </p>
-          </div>
-          <Badge tone="neutral" glyph="◈">
-            Deterministic Pipeline
-          </Badge>
-        </div>
-
-        {/* Stage Stepper Tabs */}
-        <div
-          role="tablist"
-          aria-label="Cognitive pipeline stages"
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"
-        >
-          {PIPELINE_STAGES.map((stg) => {
-            const isActive = activeStage === stg.id
-            return (
-              <button
-                key={stg.id}
-                role="tab"
-                id={`stage-tab-${stg.id}`}
-                aria-selected={isActive}
-                aria-controls={`stage-panel-${stg.id}`}
-                onClick={() => setActiveStage(stg.id)}
-                className={`p-4 rounded-xl border-2 text-left transition-all cursor-pointer focus-ring flex flex-col justify-between ${
-                  isActive
-                    ? 'border-brand bg-brand/10 shadow-sm'
-                    : 'border-border bg-surface hover:bg-surface-raised'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-lg" aria-hidden="true">
-                      {stg.icon}
-                    </span>
-                    <span
-                      className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${
-                        isActive
-                          ? 'bg-brand text-brand-ink'
-                          : 'bg-surface-raised text-ink-muted'
-                      }`}
-                    >
-                      Step 0{stg.id}
-                    </span>
-                  </div>
-                  <h3 className="font-display font-bold text-sm text-ink">{stg.title}</h3>
-                  <p className="text-xs text-ink-muted mt-1">{stg.subtitle}</p>
-                </div>
-                {isActive && (
-                  <span className="text-brand font-bold text-xs mt-3 block">
-                    ● Active View
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Active Stage Detail Panel */}
-        <div
-          role="tabpanel"
-          id={`stage-panel-${currentStage.id}`}
-          aria-labelledby={`stage-tab-${currentStage.id}`}
-          className="p-5 rounded-xl border border-border bg-canvas/60 space-y-4 animate-fadeIn"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-display font-bold text-base text-ink flex items-center gap-2">
-              <span>{currentStage.icon}</span> Stage {currentStage.id}: {currentStage.title}
-            </h3>
-            <Badge tone="brand">Verified Psychometric Stage</Badge>
-          </div>
-
-          <p className="text-sm text-ink leading-relaxed">{currentStage.description}</p>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-            <div className="space-y-1">
-              <span className="text-xs font-bold text-ink uppercase tracking-wider block">
-                Mathematical Model:
-              </span>
-              <div className="p-3 rounded-lg border border-border bg-surface font-mono text-xs text-ink overflow-x-auto">
-                <code>{currentStage.formula}</code>
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <span className="text-xs font-bold text-ink uppercase tracking-wider block">
-                Telemetry Payload Signature:
-              </span>
-              <div className="p-3 rounded-lg border border-border bg-surface font-mono text-xs text-ink-muted overflow-x-auto">
-                <code>{currentStage.telemetrySignature}</code>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-3 rounded-lg border border-border bg-surface flex items-center gap-2 text-xs">
-            <span className="text-brand font-bold">🛡 Safety Check:</span>
-            <span className="text-ink">{currentStage.safetyCheck}</span>
-          </div>
-        </div>
-      </Card>
-
-      {/* Main Grid: Left 7 cols (Math & Simulator) + Right 5 cols (Ethical Charter & Guardrail) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column (7 cols) */}
-        <div className="lg:col-span-7 space-y-6">
-          {/* Card: Mathematical & Psychometric Formulations */}
-          <Card className="p-6 space-y-6">
-            <div className="border-b border-border pb-3">
-              <h2 className="font-display font-bold text-lg text-ink flex items-center gap-2">
-                <span aria-hidden="true">📐</span> Mathematical &amp; Algorithmic Foundations
-              </h2>
-              <p className="text-xs text-ink-muted mt-0.5">
-                Exact equations governing trait estimation, state hysteresis, and adaptive trajectory dispatch.
-              </p>
-            </div>
-
-            {/* Formula 1: Conjugate Bayesian Updating */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-ink">
-                  1. Conjugate Gaussian Trait Estimation
-                </h3>
-                <Badge tone="neutral">Bayesian IRT</Badge>
-              </div>
-              <p className="text-xs text-ink-muted">
-                Each cognitive dimension is maintained as a normal distribution parameterized by prior mean
-                <code className="font-mono text-ink mx-1">μ_0</code>, prior precision
-                <code className="font-mono text-ink mx-1">τ_0</code>, and sample precision
-                <code className="font-mono text-ink mx-1">τ_s</code>.
-              </p>
-              <div className="p-4 rounded-xl border border-border bg-canvas font-mono text-xs text-ink leading-relaxed overflow-x-auto">
-                <p className="font-bold">θ_hat_i = (τ_0 * μ_0 + τ_s * x_bar) / (τ_0 + τ_s)</p>
-                <p className="text-ink-muted mt-1">σ_θ = 1 / sqrt(τ_0 + τ_s)</p>
-              </div>
-            </div>
-
-            {/* Formula 2: Archetype Hysteresis */}
-            <div className="space-y-2 pt-3 border-t border-border">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-ink">
-                  2. Archetype Classification Hysteresis (3/3 Rule)
-                </h3>
-                <Badge tone="neutral">Anti-Oscillation</Badge>
-              </div>
-              <p className="text-xs text-ink-muted">
-                To prevent rapid, jarring label flips due to daily alertness fluctuations, an archetype reassignment
-                requires 3 consecutive sessions in the new cluster candidate before updating the profile state.
-              </p>
-              <div className="p-4 rounded-xl border border-border bg-canvas font-mono text-xs text-ink leading-relaxed overflow-x-auto">
-                <p className="font-bold">State(t) = A_new  if Candidate(t) == Candidate(t-1) == Candidate(t-2) == A_new</p>
-                <p className="text-ink-muted mt-1">State(t) = State(t-1) otherwise</p>
-              </div>
-            </div>
-
-            {/* Formula 3: Vector Differential Δc */}
-            <div className="space-y-2 pt-3 border-t border-border">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-ink">
-                  3. SAT-JEPA Latent Vector Differential
-                </h3>
-                <Badge tone="neutral">Exercise Dispatch</Badge>
-              </div>
-              <p className="text-xs text-ink-muted">
-                Weekly plans and AI Coach recommendations compare the current estimated state vector against
-                the user’s balance goals, dispatching drills that optimize total cognitive symmetry.
-              </p>
-              <div className="p-4 rounded-xl border border-border bg-canvas font-mono text-xs text-ink leading-relaxed overflow-x-auto">
-                <p className="font-bold">Δc = c_target - c_current = [ Δθ_WM, Δθ_IC, Δθ_CF, Δθ_AT, ... ]</p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Card: Interactive Bias & Confidence Simulator */}
-          <Card className="p-6 space-y-6">
-            <div className="border-b border-border pb-3">
-              <h2 className="font-display font-bold text-lg text-ink flex items-center gap-2">
-                <span aria-hidden="true">🎛</span> Interactive Bias &amp; Confidence Simulator
-              </h2>
-              <p className="text-xs text-ink-muted mt-0.5">
-                Simulate environmental noise to observe how SynapseTwin honestly widens its epistemic credible interval.
-              </p>
-            </div>
-
-            {/* Input Jitter Slider */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <label htmlFor="jitter-slider" className="font-bold text-ink">
-                  Hardware Latency &amp; Bluetooth Jitter:
-                </label>
-                <span className="font-mono font-bold text-ink">{jitterMs} ms</span>
-              </div>
-              <input
-                id="jitter-slider"
-                type="range"
-                min="20"
-                max="240"
-                step="5"
-                value={jitterMs}
-                onChange={(e) => setJitterMs(Number(e.target.value))}
-                className="w-full accent-brand cursor-pointer"
-              />
-              <div className="flex justify-between text-xs text-ink-muted">
-                <span>20 ms (Wired 144Hz)</span>
-                <span>120 ms (Standard Web)</span>
-                <span>240 ms (High Bluetooth Lag)</span>
-              </div>
-            </div>
-
-            {/* Session Count Slider */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <label htmlFor="session-slider" className="font-bold text-ink">
-                  Accumulated Assessment Sessions:
-                </label>
-                <span className="font-mono font-bold text-ink">{sessionCount} sessions</span>
-              </div>
-              <input
-                id="session-slider"
-                type="range"
-                min="1"
-                max="20"
-                step="1"
-                value={sessionCount}
-                onChange={(e) => setSessionCount(Number(e.target.value))}
-                className="w-full accent-brand cursor-pointer"
-              />
-              <div className="flex justify-between text-xs text-ink-muted">
-                <span>1 session (Cold Start)</span>
-                <span>8 sessions (Stabilizing)</span>
-                <span>20 sessions (High Precision)</span>
-              </div>
-            </div>
-
-            {/* Circadian Window Radio Group */}
-            <div className="space-y-2">
-              <span id="circadian-label" className="text-xs font-bold text-ink block">
-                Circadian Alertness Timing:
-              </span>
-              <div
-                role="radiogroup"
-                aria-labelledby="circadian-label"
-                className="grid grid-cols-3 gap-2"
-              >
-                {[
-                  { id: 'morning', label: 'Morning Peak', desc: 'Alert' },
-                  { id: 'slump', label: 'Afternoon Slump', desc: 'Fatigued' },
-                  { id: 'night', label: 'Late Night', desc: 'High Noise' },
-                ].map((item) => {
-                  const active = circadianWindow === item.id
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={active}
-                      onClick={() => setCircadianWindow(item.id as typeof circadianWindow)}
-                      className={`p-2.5 rounded-lg border-2 text-center transition-all cursor-pointer focus-ring ${
-                        active
-                          ? 'border-brand bg-brand/10 font-bold'
-                          : 'border-border bg-surface hover:bg-surface-raised'
-                      }`}
-                    >
-                      <span className="text-xs block text-ink">{item.label}</span>
-                      <span className="text-xs text-ink-muted block mt-0.5">{item.desc}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Dynamic Uncertainty Band Result */}
-            <div className="p-4 rounded-xl border-2 border-border-strong bg-canvas space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-ink uppercase tracking-wider">
-                  Computed Posterior Credible Band:
-                </span>
-                <Badge tone={Number(simulatedWidth) > 8 ? 'warning' : 'success'}>
-                  ± {simulatedWidth}%
-                </Badge>
-              </div>
-
-              {/* Progress bar visualizer */}
-              <div className="w-full h-3 rounded-full bg-surface-raised overflow-hidden border border-border">
-                <div
-                  className={`h-full transition-all duration-300 ${
-                    Number(simulatedWidth) > 10
-                      ? 'bg-warning'
-                      : Number(simulatedWidth) > 6
-                      ? 'bg-brand'
-                      : 'bg-success'
-                  }`}
-                  style={{ width: `${Math.min(100, Number(simulatedWidth) * 5)}%` }}
-                />
-              </div>
-
-              <p className="text-xs text-ink-muted leading-relaxed">
-                {Number(simulatedWidth) > 8
-                  ? '⚠ Epistemic Guardrail: Broad confidence interval detected. Archetype updating is intentionally dampened to prevent false claims.'
-                  : '✓ High precision: Sufficient session history and minimal hardware jitter allow confident trait tracking.'}
-              </p>
-            </div>
-          </Card>
-        </div>
-
-        {/* Right Column (5 cols): Ethical Charter & Guardrail Sandbox */}
-        <div className="lg:col-span-5 space-y-6">
-          {/* Card: The 4-Pillar Ethical Charter */}
-          <Card className="p-6 space-y-4">
-            <div className="border-b border-border pb-3">
-              <h2 className="font-display font-bold text-lg text-ink flex items-center gap-2">
-                <span aria-hidden="true">📜</span> The 4-Pillar Ethical Charter
-              </h2>
-              <p className="text-xs text-ink-muted mt-0.5">
-                Constitutional guardrails baked directly into the codebase.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <div className="p-3 rounded-xl border border-border bg-surface space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-ink">1. Non-Clinical Boundary</span>
-                  <Badge tone="success">Strict</Badge>
-                </div>
-                <p className="text-xs text-ink-muted">
-                  Never provides clinical, medical, or psychiatric diagnostic labels. SynapseTwin is an educational cognitive twin, not a medical device.
-                </p>
-              </div>
-
-              <div className="p-3 rounded-xl border border-border bg-surface space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-ink">2. Non-Biometric Hardware Lock</span>
-                  <Badge tone="brand">Hardware</Badge>
-                </div>
-                <p className="text-xs text-ink-muted">
-                  Zero access to webcams, audio recordings, or biometric eye-tracking. Only timestamped probe interactions are recorded.
-                </p>
-              </div>
-
-              <div className="p-3 rounded-xl border border-border bg-surface space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-ink">3. Zero-Guilt Philosophy</span>
-                  <Badge tone="reward">Empathy</Badge>
-                </div>
-                <p className="text-xs text-ink-muted">
-                  Planned rest days preserve streak contracts. Prohibits shame-based notifications, punitive streak resets, and dark patterns.
-                </p>
-              </div>
-
-              <div className="p-3 rounded-xl border border-border bg-surface space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-ink">4. Data Sovereignty &amp; Recourse</span>
-                  <Badge tone="info">GDPR</Badge>
-                </div>
-                <p className="text-xs text-ink-muted">
-                  Complete client-side persistence, single-click Article 20 JSON archive export, and cryptographic Article 17 deletion certificates.
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Card: Live Non-Clinical Copy Guardrail Sandbox */}
-          <Card className="p-6 space-y-4">
-            <div className="border-b border-border pb-3">
-              <h2 className="font-display font-bold text-base text-ink flex items-center gap-2">
-                <span aria-hidden="true">🛡</span> Live Non-Clinical Copy Guardrail Sandbox
-              </h2>
-              <p className="text-xs text-ink-muted mt-0.5">
-                Test the actual regex guardrail engine (<code className="font-mono">lintCopyText</code>) enforcing non-clinical vocabulary in real time.
-              </p>
-            </div>
-
-            {/* Quick Test Presets */}
-            <div className="flex flex-wrap gap-1.5">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() =>
-                  setSandboxText(SAMPLE_CLINICAL_DEMO_INPUT)
-                }
-              >
-                Clinical Test
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() =>
-                  setSandboxText(SAMPLE_GUILT_DEMO_INPUT)
-                }
-              >
-                Guilt Test
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() =>
-                  setSandboxText(
-                    'Working memory shows steady adaptation with 78% accuracy across lure trials.',
-                  )
-                }
-              >
-                Valid Test
-              </Button>
-            </div>
-
-            {/* Textarea */}
-            <div className="space-y-1">
-              <label htmlFor="guardrail-input" className="text-xs font-bold text-ink block">
-                Enter Text to Inspect:
-              </label>
-              <textarea
-                id="guardrail-input"
-                rows={3}
-                value={sandboxText}
-                onChange={(e) => setSandboxText(e.target.value)}
-                className="w-full p-3 rounded-lg border-2 border-border bg-surface text-ink text-xs focus-ring"
-                placeholder="Type or paste sample UI copy to check against the safety dictionary..."
-              />
-            </div>
-
-            {/* Real-time Lint Result */}
-            <div
-              className={`p-3 rounded-xl border-2 space-y-2 ${
-                lintResult.isClean
-                  ? 'border-success/60 bg-success/10'
-                  : 'border-danger/60 bg-danger/10'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-ink flex items-center gap-1.5">
-                  <span>{lintResult.isClean ? '✓' : '⚠'}</span>
-                  {lintResult.isClean
-                    ? '100% Compliant Non-Clinical Copy'
-                    : `${lintResult.violations.length} Violation(s) Flagged`}
-                </span>
-                <Badge tone={lintResult.isClean ? 'success' : 'danger'}>
-                  {lintResult.isClean ? 'Safe' : 'Blocked'}
-                </Badge>
-              </div>
-
-              {!lintResult.isClean && (
-                <div className="space-y-1.5 pt-1">
-                  {lintResult.violations.map((v, i) => (
-                    <div
-                      key={i}
-                      className="p-2 rounded bg-surface border border-danger/40 text-xs space-y-0.5"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-danger">"{v.term}"</span>
-                        <span className="text-xs uppercase font-bold text-ink-muted">
-                          {v.category}
-                        </span>
-                      </div>
-                      <p className="text-xs text-ink-muted">
-                        Suggested replacement: <strong className="text-ink">{v.replacementSuggestion}</strong>
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Mascot Companion */}
-            <div className="pt-2 flex items-center gap-3 bg-surface-raised p-3 rounded-xl border border-border">
-              <Mascot state="thinking" size="sm" />
-              <p className="text-xs text-ink leading-tight">
-                <strong>Empathetic epistemics.</strong> Words shape self-perception. Our copy linter prevents pathologizing normal human variance!
-              </p>
-            </div>
-          </Card>
-        </div>
-      </div>
-
-      {/* Full-width Section: Measurement Biases & Mitigations Reference Table */}
-      <Card className="p-6 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
-          <div>
-            <h2 className="font-display font-bold text-lg text-ink flex items-center gap-2">
-              <span aria-hidden="true">📊</span> Known Measurement Biases &amp; Mitigations Reference Matrix
-            </h2>
-            <p className="text-xs text-ink-muted mt-0.5">
-              Transparent disclosure of hardware, physiological, and environmental confounders and their architectural mitigations.
-            </p>
-          </div>
-          <Badge tone="neutral" glyph="◈">
-            5 Documented Confounders
-          </Badge>
-        </div>
-
-        <div
-          role="region"
-          aria-label="Measurement Biases Matrix"
-          tabIndex={0}
-          className="focus-ring overflow-x-auto rounded-xl border border-border"
-        >
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-canvas/80 text-ink-muted uppercase tracking-wider font-semibold border-b border-border">
-              <tr>
-                <th scope="col" className="p-3">Confounder Name</th>
-                <th scope="col" className="p-3">Observed Impact on Signal</th>
-                <th scope="col" className="p-3">Detection Mechanism</th>
-                <th scope="col" className="p-3">Architectural Mitigation</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {BIASES_TABLE_DATA.map((row) => (
-                <tr key={row.name} className="hover:bg-surface-raised transition-colors">
-                  <td className="p-3 font-semibold text-ink">{row.name}</td>
-                  <td className="p-3 text-warning font-mono">{row.impact}</td>
-                  <td className="p-3 text-ink-muted">{row.detection}</td>
-                  <td className="p-3 font-medium text-ink">{row.mitigation}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {/* WhyThisPanel Epistemic Trail */}
-      <WhyThisPanel trail={METHODOLOGY_WHY_TRAIL} />
+function Sources({ children }: { children: ReactNode }) {
+  return (
+    <div className="text-sm text-ink-muted">
+      <p className="font-semibold">Sources</p>
+      <ul className="flex flex-col gap-1">{children}</ul>
     </div>
   )
 }
 
-export default MethodologyPage
+function Swatch({ dash, className }: { dash?: string; className: string }) {
+  return (
+    <svg aria-hidden="true" width="28" height="8" className="mr-2 inline-block shrink-0 align-middle">
+      <line x1={2} x2={26} y1={4} y2={4} strokeWidth={2.5} strokeLinecap="round" strokeDasharray={dash} className={className} />
+    </svg>
+  )
+}
+
+export default function MethodologyPage() {
+  return (
+    <div className="mx-auto flex max-w-2xl flex-col gap-8 pt-4 pb-16">
+      <header className="flex flex-col gap-3">
+        <h1 className="font-display text-3xl font-bold text-ink">How we calculate this</h1>
+        <div className="flex flex-col gap-1 text-lg text-ink">
+          <p data-testid="methodology-intro-line">Your scores cover {PILLAR_IDS.length} pillars of thinking.</p>
+          <p data-testid="methodology-intro-line">We compare them with your own past results, never with other people.</p>
+          <p data-testid="methodology-intro-line">Real improvement means a change bigger than normal day-to-day noise.</p>
+        </div>
+      </header>
+
+      <div className="border-t border-border">
+        <Topic title="The 5 pillars and their exercises">
+          <dl className="flex flex-col gap-3">
+            {PILLAR_IDS.map((p) => (
+              <div key={p}>
+                <dt className="font-semibold">{PILLAR_LABELS[p]}</dt>
+                <dd className="text-ink-muted">{exercisesFor(p)}</dd>
+              </div>
+            ))}
+          </dl>
+        </Topic>
+
+        <Topic title="How a pillar score is built">
+          <Formula>
+            pillar score = (w<sub>1</sub>·x<sub>1</sub> + w<sub>2</sub>·x<sub>2</sub> + …) ÷ (w<sub>1</sub> + w<sub>2</sub> + …)
+          </Formula>
+          <ul className="flex list-disc flex-col gap-1 pl-5">
+            <li>Each x is one measure on a 0–100 scale; w is its weight.</li>
+            <li>Only the measures you have count, so their weights are rescaled to add up to 1.</li>
+            <li>No score shows until {Math.round(MIN_COVERAGE * 100)}% of a pillar’s weight is measured.</li>
+            <li>Each score has a ~95% range: 1.96 × the weighted error (50 ÷ √trials per measure), wider when measures are missing.</li>
+          </ul>
+          <div className="w-full">
+            <table className="w-full text-left text-sm">
+              <caption className="sr-only">Weights per pillar</caption>
+              <thead>
+                <tr className="border-b border-border-strong text-ink-muted">
+                  <th scope="col" className="py-2 pr-4 font-semibold">Measure</th>
+                  <th scope="col" className="py-2 text-right font-semibold">Weight</th>
+                </tr>
+              </thead>
+              {PILLAR_IDS.map((p) => (
+                <tbody key={p}>
+                  <tr>
+                    <th scope="rowgroup" colSpan={2} className="pt-4 pb-1 text-base font-semibold">
+                      {PILLAR_LABELS[p]}
+                    </th>
+                  </tr>
+                  {weightsOf(p).map(([id, w]) => (
+                    <tr key={id} data-pillar={p} data-input={id} className="border-b border-border">
+                      <td className="py-2 pr-4">
+                        {MEASURES[id].name}
+                        {MEASURES[id].from === null && <span className="text-ink-muted"> (not measured yet)</span>}
+                        {MEASURES[id].note && <span className="text-ink-muted"> ({MEASURES[id].note})</span>}
+                        <code className="block break-all text-xs text-ink-muted">{id}</code>
+                      </td>
+                      <td className="font-mono-tabular py-2 text-right align-top">{w.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              ))}
+            </table>
+          </div>
+          <h3 className="pt-2 font-semibold">How each measure is scored</h3>
+          <dl className="flex flex-col gap-3 text-sm">
+            {(Object.keys(MEASURES) as InputId[])
+              .filter((id) => MEASURES[id].how)
+              .map((id) => (
+                <div key={id}>
+                  <dt className="font-semibold">{MEASURES[id].name}</dt>
+                  <dd className="text-ink-muted">{MEASURES[id].how}</dd>
+                </div>
+              ))}
+          </dl>
+          <p className="text-sm">
+            {UNSOURCED_INPUTS.map((id) => MEASURES[id].name).join(' and ')} have no exercise yet. The scale
+            ends are working values we will tune as data comes in.
+          </p>
+          <Sources>
+            <li>d′ correction: Hautus 1995, Behavior Research Methods, Instruments, &amp; Computers.</li>
+            <li>LDI: Stark et al. 2023, Frontiers in Behavioral Neuroscience.</li>
+            <li>
+              Time-cost scores are unreliable from one test to the next: Hedge, Powell &amp; Sumner 2018, Behavior
+              Research Methods.
+            </li>
+          </Sources>
+        </Topic>
+
+        <Topic title="Brain areas">
+          <p>We don’t measure your brain. We only see how you play the exercises, and this is not a medical test.</p>
+          <ul className="flex flex-col gap-3">
+            {PILLAR_IDS.map((p) => (
+              <li key={p}>
+                <span className="font-semibold">{PILLAR_LABELS[p]}</span>
+                <span className="text-ink-muted">
+                  {' '}
+                  is linked in research to {AREAS[p].area}, for {AREAS[p].role}.
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Topic>
+
+        <Topic title="Your progress curve">
+          <Formula>
+            T = T<sub>max</sub> − (T<sub>max</sub> − T<sub>0</sub>) · e<sup>−α·N</sup> − λ · idle days
+          </Formula>
+          <ul className="flex list-disc flex-col gap-1 pl-5">
+            <li>T<sub>0</sub> is your latest score and N the number of sessions from now.</li>
+            <li>
+              T<sub>max</sub> = {DEFAULT_TMAX}: a ceiling, so the curve levels off instead of rising in a straight line. It
+              moves up to your best score if you pass it.
+            </li>
+            <li>
+              α is how fast you have been improving, fitted to your sessions. With fewer than 3 sessions, α ={' '}
+              {FALLBACK_ALPHA}. It stays between {ALPHA_RANGE[0]} and {ALPHA_RANGE[1]}.
+            </li>
+            <li>
+              λ = {DEFAULT_LAMBDA} points per idle day, counted after {GRACE_DAYS} days off.
+            </li>
+          </ul>
+          <ul className="flex flex-col gap-2">
+            <li className="flex items-center">
+              <Swatch className="stroke-brand" />
+              Solid: your sessions so far.
+            </li>
+            <li className="flex items-center">
+              <Swatch dash="8 6" className="stroke-brand-vivid" />
+              Dashed: If you keep training ({SESSIONS_PER_WEEK} sessions a week, no idle days).
+            </li>
+            <li className="flex items-center">
+              <Swatch dash="0.1 7" className="stroke-ink-muted" />
+              Dotted: If you pause (no new sessions; the idle cost grows each day).
+            </li>
+          </ul>
+          <p className="text-sm text-ink-muted">Both lines start at your latest score and look 30 or 90 days ahead.</p>
+          <p className="text-sm text-ink-muted">These are working values we will tune as data comes in.</p>
+        </Topic>
+
+        <Topic title="Real improvement">
+          <Formula>
+            RCI = (now − baseline) ÷ (√2 · SD · √(1 − r))
+          </Formula>
+          <ul className="flex list-disc flex-col gap-1 pl-5">
+            <li>For now SD = 10 points and r = 0.8 (how stable a score is from one test to the next).</li>
+            <li>
+              A change counts as real when RCI ≥ {RCI_THRESHOLD} (p &lt; .05): about {RCI_POINTS} points.
+            </li>
+            <li>Smaller changes are treated as normal day-to-day noise.</li>
+          </ul>
+          <Sources>
+            <li>Jacobson &amp; Truax 1991, the Reliable Change Index.</li>
+          </Sources>
+        </Topic>
+      </div>
+    </div>
+  )
+}
