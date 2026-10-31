@@ -18,6 +18,11 @@ COPY clustering_engine/ clustering_engine/
 COPY dynamic_cache/ dynamic_cache/
 COPY backend/app/ backend/app/
 
+# Run as an unprivileged user; it owns only the telemetry folder.
+RUN useradd --system --no-create-home --uid 10001 app \
+    && mkdir -p /data/telemetry && chown app /data/telemetry
+USER app
+
 ENV TELEMETRY_DIR=/data/telemetry
 EXPOSE 8000
 

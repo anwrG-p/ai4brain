@@ -1,45 +1,6 @@
-"""Test suite for procedural exercise generation, non-duplication, and 85% rule."""
+"""The 85% rule (the procedural generators moved to dynamic_cache, BE-03)."""
 
-import pytest
 from app.tools.exercise_generator import ExerciseGenerator
-from app.models.task_schema import TaskType
-
-
-def test_no_duplicate_stimuli_in_relational_responding():
-    """Verifies that all procedurally generated RFT trials possess unique stimulus IDs."""
-    task = ExerciseGenerator.generate_relational_responding_task(num_trials=40, difficulty_b=0.5, seed=123)
-    stimulus_ids = [t.stimulus_id for t in task.trials]
-
-    # Zero duplicate stimulus IDs
-    assert len(stimulus_ids) == len(set(stimulus_ids))
-    assert len(task.trials) == 40
-    assert task.task_type == TaskType.RELATIONAL_RESPONDING_RFT
-
-
-def test_no_duplicate_stimuli_in_interference_n_back():
-    """Verifies that all procedurally generated N-Back trials possess unique stimulus IDs."""
-    task = ExerciseGenerator.generate_interference_n_back_task(num_trials=50, difficulty_b=1.2, seed=456)
-    stimulus_ids = [t.stimulus_id for t in task.trials]
-
-    # Zero duplicate stimulus IDs
-    assert len(stimulus_ids) == len(set(stimulus_ids))
-    assert len(task.trials) == 50
-    assert task.task_type == TaskType.INTERFERENCE_N_BACK
-
-
-def test_proactive_lures_distribution_in_n_back():
-    """Verifies that interference N-Back includes proactive lures (N-1 or N+1)."""
-    task = ExerciseGenerator.generate_interference_n_back_task(num_trials=40, difficulty_b=1.0, seed=789)
-    lure_trials = [t for t in task.trials if t.is_lure]
-
-    # Must contain lures
-    assert len(lure_trials) > 0
-    # Must specify lure type
-    for lt in lure_trials:
-        assert lt.lure_type in ["N-1", "N+1", "conflict"]
-        # In a lure trial, target_present must be False (distractor familiarity)
-        assert lt.target_present is False
-        assert lt.correct_key == "NO_MATCH"
 
 
 def test_85_percent_rule_difficulty_scaling():

@@ -20,10 +20,6 @@ if REPO_ROOT not in sys.path:
     sys.path.append(REPO_ROOT)
 
 from ai_coach.api import router as coach_module_router  # noqa: E402
-from app.api.routes.brain import router as brain_router  # noqa: E402
-from app.api.routes.coach import router as coach_router  # noqa: E402
-from app.api.routes.session import router as session_router  # noqa: E402
-from app.api.routes.telemetry import router as telemetry_router  # noqa: E402
 from app.api.routes.v1_auth import router as auth_router  # noqa: E402
 from app.api.routes.v1_interop import router as v1_router  # noqa: E402
 from app.api.routes.v1_privacy import router as privacy_router  # noqa: E402
@@ -42,7 +38,7 @@ def cors_origins() -> list[str]:
 
 app = FastAPI(
     title="SynapseTwin API",
-    description="Telemetry ingest, privacy, task delivery, coach and profile routes.",
+    description="Telemetry ingest and privacy; task, coach and profile routes land with their modules.",
     version="1.4.0",
 )
 
@@ -68,11 +64,7 @@ for router in (
     v1_router,
 ):
     app.include_router(router)
-
-# /api: the agent engine's own routes (session, DDM/IRT ingest, Kalman state, reflection).
-# No product screen calls them; they served the dashboard_ui cockpit, which stays out of the product.
-for router in (session_router, telemetry_router, brain_router, coach_router):
-    app.include_router(router, prefix="/api")
+# The agent engine's /api routes were unmounted and deleted in BE-00 (recoverable from 1085ec8).
 
 
 @app.exception_handler(RequestValidationError)
@@ -84,9 +76,5 @@ async def validation_error(request: Request, exc: RequestValidationError) -> JSO
 
 @app.get("/")
 def health_check():
-    """Liveness and the psychometric methods this server implements."""
-    return {
-        "status": "OPERATIONAL",
-        "version": "1.4.0",
-        "psychometrics": ["EZ-Diffusion-DDM", "3PL-IRT-MLE", "SSRT-Integration", "SignalDetection-dPrime", "RCI"],
-    }
+    """Liveness only."""
+    return {"status": "OPERATIONAL", "version": "1.4.0"}

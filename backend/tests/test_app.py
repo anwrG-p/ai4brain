@@ -54,6 +54,33 @@ def test_module_routes_win_over_the_interop_router(module):
         reload_main()
 
 
+# (path, method) -> module of a route that intentionally answers instead of its v1_interop stand-in.
+# BE-04/06/11 add their entry here when their module route lands, then delete the stand-in.
+INTENTIONAL_OVERRIDES: dict[tuple[str, str], str] = {}
+
+
+def flat_routes(routes, prefix=""):
+    """The app's routes in match order. Included routers stay nested in FastAPI >= 0.16x."""
+    for r in routes:
+        nested = getattr(r, "original_router", None)
+        if nested is not None:
+            yield from flat_routes(nested.routes, prefix)
+        elif hasattr(r, "methods"):
+            yield prefix + r.path, r.methods or set(), r.endpoint.__module__
+
+
+def test_no_route_shadows_a_v1_interop_stand_in_by_accident():
+    from app.api.routes import v1_interop
+
+    ordered = list(flat_routes(reload_main().app.routes))
+    stand_ins = [(r.path, m) for r in v1_interop.router.routes for m in r.methods]
+    assert stand_ins
+    for path, method in stand_ins:
+        first = next(mod for p, methods, mod in ordered if p == path and method in methods)
+        expected = INTENTIONAL_OVERRIDES.get((path, method), "app.api.routes.v1_interop")
+        assert first == expected, f"{method} {path} is answered by {first}, not {expected}"
+
+
 def test_custom_422_handler_kept(client):
     r = client.post("/v1/telemetry/event", json={"user_id": "u1"})
     assert r.status_code == 422

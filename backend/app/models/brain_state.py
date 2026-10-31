@@ -1,7 +1,7 @@
 """Pydantic schemas for the Digital Brain state space and evaluation metrics."""
 
 from typing import Dict, Any, List, Tuple, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 
 
@@ -49,7 +49,7 @@ class DigitalBrainEvaluation(BaseModel):
     """Structured payload communicated from Telemetry Engine to Digital Brain Agent and DB."""
     user_id: str = Field(..., description="User unique identifier")
     session_id: str = Field(..., description="Completed assessment session identifier")
-    evaluation_timestamp: datetime = Field(default_factory=datetime.utcnow, description="UTC timestamp of evaluation")
+    evaluation_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="UTC timestamp of evaluation")
     session_metrics: SessionMetrics = Field(..., description="Extracted computational psychometric parameters")
     digital_brain_delta: DigitalBrainDelta = Field(..., description="Updates across the 5 cortical nodes")
     plasticity_bottleneck: str = Field(..., description="Target node exhibiting lowest capacity or highest growth room")

@@ -12,7 +12,7 @@ filtering out momentary fatigue, distractions, and circadian fluctuations.
 """
 
 from typing import Dict, Any, List, Tuple, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import math
 import numpy as np
 
@@ -56,8 +56,10 @@ class KalmanBrainFilter:
         P_pred = self.A @ current_cov @ self.A.T + self.Q
 
         # 2. Measurement Update
-        # Construct observation matrix H based on active_mask
-        H = np.diag(active_mask)
+        # H selects the observed nodes. It used to be diag(active_mask), so a 0.5 weight read the
+        # T-score as half the state and the update overshot (50 -> ~95 T on a 60 reading).
+        # ponytail: a partial weight should inflate R for that node; it is ignored for now.
+        H = np.diag((active_mask > 0).astype(float))
         # Innovation / Measurement residual
         y = measurement - H @ x_pred
 
@@ -85,7 +87,7 @@ class DigitalBrainUpdater:
             "means": {node: 50.0 for node in KalmanBrainFilter.NODES},
             "variances": {node: 16.0 for node in KalmanBrainFilter.NODES},  # Initial SEM ~4.0
             "covariance_matrix": (np.eye(5) * 16.0).tolist(),
-            "updated_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
 
     @classmethod
@@ -124,10 +126,14 @@ class DigitalBrainUpdater:
                 ldi = session_metrics.task_specific.lure_discrimination_index
                 acc_score = float(np.clip(50.0 + ldi * 20.0, 20.0, 80.0))
                 obs[1] = acc_score  # ACC
+                # ponytail: not an estimate. Inhibition is set to the lure score - 1.5; no inhibition
+                # measure exists in this task. Do not show it until a task measures it (BE-11).
                 obs[2] = float(np.clip(acc_score - 1.5, 20.0, 80.0))  # vlPFC_Striatum
                 active_mask[1] = 1.0
                 active_mask[2] = 1.0
             else:
+                # ponytail: not an estimate. Without an LDI, flexibility copies the working-memory
+                # score. Do not show it (BE-11).
                 obs[1] = adj_t_score
                 active_mask[1] = 1.0
 
@@ -143,6 +149,8 @@ class DigitalBrainUpdater:
             obs[0] = adj_t_score  # dlPFC
             active_mask[0] = 1.0
 
+            # ponytail: not an estimate. Episodic memory is set to the reasoning score + 1; nothing
+            # here measures it. Do not show it (BE-11).
             obs[3] = float(np.clip(adj_t_score + 1.0, 20.0, 80.0))  # Hippocampus_DG
             active_mask[3] = 1.0
 
@@ -159,7 +167,7 @@ class DigitalBrainUpdater:
             active_mask[4] = 0.5
 
         else:
-            # Generic mapping across all nodes
+            # ponytail: not an estimate. One score is copied to all five nodes.
             for i in range(5):
                 obs[i] = adj_t_score
                 active_mask[i] = 0.7
@@ -227,7 +235,7 @@ class DigitalBrainUpdater:
         return DigitalBrainEvaluation(
             user_id=user_id,
             session_id=session_id,
-            evaluation_timestamp=datetime.utcnow(),
+            evaluation_timestamp=datetime.now(timezone.utc),
             session_metrics=session_metrics,
             digital_brain_delta=brain_delta,
             plasticity_bottleneck=bottleneck,

@@ -46,6 +46,19 @@ def test_kalman_filter_variance_contraction():
     assert P_upd[0, 0] < P_prior[0, 0]
 
 
+def test_partial_mask_never_overshoots_the_measurement():
+    """A 0.5 mask weight must not scale H: with H = 0.5 the update jumped from 50 to ~95 T."""
+    kf = KalmanBrainFilter()
+    x_prior = np.array([50.0] * 5)
+    z_obs = np.array([50.0, 50.0, 50.0, 50.0, 60.0])
+    active_mask = np.array([0.0, 0.0, 0.0, 0.0, 0.5])
+
+    x_upd, _ = kf.step(x_prior, np.eye(5) * 16.0, z_obs, active_mask)
+
+    assert 50.0 < x_upd[4] <= 60.0
+    assert np.allclose(x_upd[:4], 50.0, atol=0.1)  # only the small coupling from A moves them
+
+
 def test_plasticity_bottleneck_detection():
     """Verifies correct identification of the weakest cognitive node."""
     means = {
