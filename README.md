@@ -134,9 +134,11 @@ The platform uses a closed-loop system divided into **5 decoupled modules**:
 
 * **Deliverable Files:**
 
-  * `clustering_engine/` (Soft GMM, hysteresis gate, explainability decoder, evaluator, and FastAPI router)
+  * `clustering_engine/` (Soft GMM, dynamic user-generated archetypes, hysteresis gate, explainability decoder, evaluator, and FastAPI router)
 
-  * `brain_twin_jepa/clustering_bridge.py` (JEPA encoder to clustering engine bridge)
+  * `brain_twin_jepa/` (SAT-JEPA featurizer, GRU context encoder, EMA target encoder, latent trajectory predictor, and clustering bridge)
+
+  * `brain_twin_jepa/README.md` (Technical documentation for Brain Twin SAT-JEPA)
 
   * `clustering_engine/README.md` (Technical documentation, architecture & quickstart)
 

@@ -226,42 +226,50 @@ result = evaluator.evaluate("usr_02", np.random.randn(64))
 print(result.radar_scores)
 ```
 
-### 4. FastAPI Service with Dynamic Endpoints
+### 4. FastAPI Service with Brain Twin & Clustering Endpoints
 
 ```python
 from fastapi import FastAPI
-from clustering_engine.api_router import router
+from clustering_engine.api_router import brain_twin_router, router
 
 app = FastAPI(title="AI4Brain Cognitive Service")
 app.include_router(router)
+app.include_router(brain_twin_router)
 
 # Available endpoints:
-# POST /v1/clustering/evaluate
-# POST /v1/clustering/reset/{user_id}
-# GET  /v1/clustering/centroids
-# POST /v1/clustering/centroids/spawn
-# POST /v1/clustering/centroids/adapt
-# POST /v1/clustering/centroids/discover
+# --- Brain Twin (SAT-JEPA) ---
+# POST /v1/brain-twin/step           (ingest Member 1 telemetry trial)
+# GET  /v1/brain-twin/forecast/{id}  (predict growth trajectory ribbons)
+# POST /v1/brain-twin/reset/{id}     (clear user session memory)
+#
+# --- Clustering Engine ---
+# POST /v1/clustering/evaluate       (direct latent vector evaluation)
+# POST /v1/clustering/reset/{id}     (reset clustering state)
+# GET  /v1/clustering/centroids      (retrieve active centroid coordinates)
+# POST /v1/clustering/centroids/spawn (dynamically register new archetype)
+# POST /v1/clustering/centroids/adapt (configure online adaptation params)
+# POST /v1/clustering/centroids/discover (fit optimal K via BIC on user data)
 ```
 
 ---
 
 ## 🧪 Testing & Verification
 
-Run the full test suite across both `clustering_engine` and `brain_twin_jepa`:
+Run the complete test suite across both `clustering_engine` and `brain_twin_jepa`:
 
 ```powershell
-C:\Users\User\miniconda3\envs\ai4brain-clustering\python.exe -m pytest clustering_engine/tests brain_twin_jepa/tests -v
+pytest clustering_engine/tests brain_twin_jepa/tests
 ```
 
-All 67 unit and integration tests verify:
+All 112 unit and integration tests pass:
 - Soft responsibilities sum to $1.0 \pm 10^{-5}$ across diverse inputs.
 - Finite number validation rejects `NaN` and `Inf` inputs, preserving clean session memory.
 - LRU cache evicts inactive sessions when `max_sessions` is reached.
 - Schmitt-trigger hysteresis gate prevents chattering and requires 3 sustained frames.
 - Dynamic centroids update online via soft EM, adapting to continuous user trajectories.
+- Dynamic user archetype generation operates cleanly from zero default archetypes ($k=0$).
 - Runtime centroid spawning expands $K$ and registers new archetypes cleanly.
 - BIC discovery accurately detects optimal $K$ from empirical cluster data.
 - Extensible dimensions (4, 5, 6, custom) and arbitrary cluster counts ($K \ge 1$) execute deterministically.
 - Non-clinical safety guardrails strictly reject pathological terminology.
-- `BrainTwinClusteringBridge` correctly processes vectors and handles user resets.
+- SAT-JEPA featurizer, context encoder, target encoder, and latent predictor execute with sub-millisecond latency.

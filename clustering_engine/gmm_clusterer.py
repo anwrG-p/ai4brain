@@ -24,8 +24,10 @@ def _create_dynamic_centroids(k: int = 9, dim: int = 64, seed: int = 42) -> np.n
 
     Uses QR decomposition to guarantee orthogonality, then scales and normalizes.
     """
-    if k <= 0:
-        raise ValueError(f"k must be >= 1, got {k}")
+    if k < 0:
+        raise ValueError(f"k must be >= 0, got {k}")
+    if k == 0:
+        return np.empty((0, dim), dtype=np.float64)
     if dim <= 0:
         raise ValueError(f"dim must be >= 1, got {dim}")
 
@@ -84,6 +86,13 @@ class SoftGMMClusterer:
         self.dim: int = dim
         self.k: int = k
         self.seed: Optional[int] = seed
+
+        if self.k == 0:
+            self.cluster_codes: List[str] = []
+            self.centroids = np.empty((0, self.dim), dtype=np.float64)
+            self.variances = np.empty((0, self.dim), dtype=np.float64)
+            self.priors = np.empty((0,), dtype=np.float64)
+            return
 
         if cluster_codes is not None:
             if len(cluster_codes) != self.k:
@@ -148,6 +157,9 @@ class SoftGMMClusterer:
         Returns:
             Dictionary mapping cluster codes to probabilities summing to 1.0 +/- 1e-5.
         """
+        if self.k == 0:
+            return {}
+
         x = np.asarray(s_bar, dtype=np.float64).flatten()
         if x.shape[0] != self.dim:
             raise ValueError(
@@ -177,6 +189,8 @@ class SoftGMMClusterer:
         s_bar: Union[np.ndarray, Sequence[float]],
     ) -> np.ndarray:
         """Compute soft posterior probabilities as a 1D numpy array."""
+        if self.k == 0:
+            return np.empty((0,), dtype=np.float64)
         resps = self.compute_responsibilities(s_bar)
         return np.array([resps[code] for code in self.cluster_codes], dtype=np.float64)
 
@@ -189,6 +203,8 @@ class SoftGMMClusterer:
         Returns:
             Affinity score where 1.0 indicates exact centroid match and ~0.0 indicates an outlier.
         """
+        if self.k == 0:
+            return 0.0
         x = np.asarray(s_bar, dtype=np.float64).flatten()
         if x.shape[0] != self.dim:
             raise ValueError(f"Dimension mismatch: expected {self.dim}, got {x.shape[0]}")
@@ -294,30 +310,42 @@ class SoftGMMClusterer:
             if norm > 1e-12:
                 c = c / norm
 
-        new_centroids = np.vstack([self.centroids, c[None, :]])
-        new_code = code if code is not None else f"C{self.k + 1}"
-        new_codes = list(self.cluster_codes) + [new_code]
-
-        if variance is not None:
-            v = np.asarray(variance, dtype=np.float64).flatten()
-            if v.shape[0] == 1:
-                new_var_row = np.full((1, self.dim), fill_value=v[0])
-            elif v.shape[0] == self.dim:
-                new_var_row = v[None, :]
+        if self.k == 0:
+            new_centroids = c[None, :]
+            new_code = code if code is not None else "C1"
+            new_codes = [new_code]
+            if variance is not None:
+                v = np.asarray(variance, dtype=np.float64).flatten()
+                new_var_row = np.full((1, self.dim), fill_value=v[0]) if v.shape[0] == 1 else v[None, :]
             else:
-                raise ValueError(f"Variance shape mismatch: expected 1 or {self.dim}, got {v.shape[0]}")
+                new_var_row = np.full((1, self.dim), fill_value=0.30)
+            new_variances = new_var_row
+            new_priors = np.array([1.0], dtype=np.float64)
         else:
-            avg_var = float(np.mean(self.variances))
-            new_var_row = np.full((1, self.dim), fill_value=avg_var)
-        new_variances = np.vstack([self.variances, new_var_row])
+            new_centroids = np.vstack([self.centroids, c[None, :]])
+            new_code = code if code is not None else f"C{self.k + 1}"
+            new_codes = list(self.cluster_codes) + [new_code]
 
-        if prior is not None:
-            new_p = float(np.clip(prior, 1e-4, 0.5))
-            scaled_priors = self.priors * (1.0 - new_p)
-            new_priors = np.append(scaled_priors, new_p)
-        else:
-            new_priors = np.append(self.priors, 1.0 / (self.k + 1))
-            new_priors = new_priors / np.sum(new_priors)
+            if variance is not None:
+                v = np.asarray(variance, dtype=np.float64).flatten()
+                if v.shape[0] == 1:
+                    new_var_row = np.full((1, self.dim), fill_value=v[0])
+                elif v.shape[0] == self.dim:
+                    new_var_row = v[None, :]
+                else:
+                    raise ValueError(f"Variance shape mismatch: expected 1 or {self.dim}, got {v.shape[0]}")
+            else:
+                avg_var = float(np.mean(self.variances))
+                new_var_row = np.full((1, self.dim), fill_value=avg_var)
+            new_variances = np.vstack([self.variances, new_var_row])
+
+            if prior is not None:
+                new_p = float(np.clip(prior, 1e-4, 0.5))
+                scaled_priors = self.priors * (1.0 - new_p)
+                new_priors = np.append(scaled_priors, new_p)
+            else:
+                new_priors = np.append(self.priors, 1.0 / (self.k + 1))
+                new_priors = new_priors / np.sum(new_priors)
 
         self.k += 1
         self.centroids = new_centroids

@@ -121,7 +121,7 @@ class CognitiveEvaluator:
             resolved_k = k
         elif clusterer is not None:
             resolved_k = clusterer.k
-        elif archetype_registry is not None and len(archetype_registry) > 0:
+        elif archetype_registry is not None:
             resolved_k = len(archetype_registry)
         else:
             resolved_k = 9
@@ -131,6 +131,8 @@ class CognitiveEvaluator:
         # Resolve archetype registry
         if archetype_registry is not None:
             self.archetype_registry = archetype_registry
+        elif self.k == 0:
+            self.archetype_registry = ArchetypeRegistry()
         elif self.k == 9 and self.dimensions == DEFAULT_DIMENSIONS:
             self.archetype_registry = ArchetypeRegistry.create_default()
         else:
@@ -234,6 +236,14 @@ class CognitiveEvaluator:
         """
         # Step 1: Temporal State Smoothing (Leaky Integrator)
         s_bar = self.smoother.smooth(user_id=user_id, s_t=latent_vector)
+
+        # Dynamic bootstrapping: if starting from zero archetypes, generate first centroid from user
+        if self.k == 0:
+            self.add_dynamic_centroid(
+                centroid=s_bar,
+                name="User Archetype 1",
+                description="Initial dynamic archetype generated from user telemetry.",
+            )
 
         # Step 2: Soft GMM Clustering (dynamic K archetypes)
         probs_by_code = self.clusterer.compute_responsibilities(s_bar)

@@ -8,21 +8,35 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from clustering_engine.evaluator import CognitiveEvaluator
+from brain_twin_jepa.clustering_bridge import BrainTwinClusteringBridge
 
 router = APIRouter(prefix="/v1/clustering", tags=["clustering"])
+brain_twin_router = APIRouter(prefix="/v1/brain-twin", tags=["brain-twin"])
 
-# Shared singleton evaluator instance
+# Shared singleton evaluator and bridge instances
 _evaluator = CognitiveEvaluator()
+_bridge = BrainTwinClusteringBridge(evaluator=_evaluator)
 
 
 def get_evaluator() -> CognitiveEvaluator:
     return _evaluator
 
 
+def get_bridge() -> BrainTwinClusteringBridge:
+    return _bridge
+
+
 def set_evaluator(evaluator: CognitiveEvaluator) -> None:
     """Override the active evaluator instance (useful for tests or custom K/dimensions)."""
-    global _evaluator
+    global _evaluator, _bridge
     _evaluator = evaluator
+    _bridge = BrainTwinClusteringBridge(evaluator=_evaluator)
+
+
+def set_bridge(bridge: BrainTwinClusteringBridge) -> None:
+    """Override the active bridge instance."""
+    global _bridge
+    _bridge = bridge
 
 
 # ============================================================================
@@ -290,3 +304,106 @@ def discover_optimal_k_endpoint(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Dynamic K discovery failed: {exc}",
         ) from exc
+
+
+# ============================================================================
+# Brain Twin (SAT-JEPA) Schemas & Endpoints
+# ============================================================================
+
+
+class TelemetryStepRequest(BaseModel):
+    user_id: str = Field(..., min_length=1, description="Unique user session identifier")
+    dimension: str = Field(..., description="Cognitive dimension evaluated in this trial")
+    score_norm: float = Field(..., ge=0.0, le=1.0, description="Normalized score in [0, 1]")
+    response_time_ms: float = Field(..., ge=0.0, le=600000.0, description="Response time in milliseconds")
+    error_flag: bool = Field(False, description="True if trial was incorrect")
+    error_burst: int = Field(0, ge=0, description="Consecutive error count")
+    hesitation_jitter: float = Field(0.0, ge=0.0, description="Hesitation jitter in milliseconds")
+    trial_index: int = Field(0, ge=0, description="0-based trial sequence index")
+
+
+class TelemetryStepResponse(BaseModel):
+    user_id: str
+    active_cluster_id: int
+    cluster_name: str
+    cluster_probabilities: Dict[str, float]
+    has_transitioned: bool
+    transition_event: Optional[TransitionEventModel] = None
+    radar_scores: Dict[str, float]
+    uncertainty_band: float
+    latent_state: List[float]
+    input_dimension: Optional[str] = None
+
+
+class TrajectoryStepModel(BaseModel):
+    step_offset: int
+    predicted_cluster_id: int
+    cluster_name: str
+    cluster_probabilities: Dict[str, float]
+    predicted_radar_scores: Dict[str, float]
+    uncertainty_sigma: float
+    latent_vector: List[float]
+
+
+class TrajectoryForecastResponse(BaseModel):
+    user_id: str
+    forecast_horizon: int
+    steps: List[TrajectoryStepModel]
+
+
+@brain_twin_router.post(
+    "/step",
+    response_model=TelemetryStepResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Process a single telemetry trial through SAT-JEPA and cluster evaluator",
+)
+def process_telemetry_step(
+    payload: TelemetryStepRequest,
+    bridge: BrainTwinClusteringBridge = Depends(get_bridge),
+) -> Dict[str, Any]:
+    try:
+        return bridge.process_telemetry(payload.user_id, payload.model_dump())
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Telemetry step failed: {exc}",
+        ) from exc
+
+
+@brain_twin_router.get(
+    "/forecast/{user_id}",
+    response_model=TrajectoryForecastResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Forecast forward trajectory ribbons using SAT-JEPA latent predictor",
+)
+def get_trajectory_forecast(
+    user_id: str,
+    horizon: int = 5,
+    bridge: BrainTwinClusteringBridge = Depends(get_bridge),
+) -> Dict[str, Any]:
+    try:
+        return bridge.predict_trajectory(user_id=user_id, horizon=horizon)
+    except ValueError as val_err:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(val_err),
+        ) from val_err
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Trajectory forecast failed: {exc}",
+        ) from exc
+
+
+@brain_twin_router.post(
+    "/reset/{user_id}",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_200_OK,
+    summary="Reset user session across both SAT-JEPA memory and clustering smoother/gate",
+)
+def reset_brain_twin_user(
+    user_id: str,
+    bridge: BrainTwinClusteringBridge = Depends(get_bridge),
+) -> Dict[str, Any]:
+    bridge.reset_user(user_id)
+    return {"user_id": user_id, "status": "reset_successful"}

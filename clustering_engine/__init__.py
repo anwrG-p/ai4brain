@@ -31,6 +31,7 @@ from clustering_engine.evaluator import (
     EvaluationResult,
     TransitionEvent,
 )
+from clustering_engine.api_router import brain_twin_router, router
 
 __all__ = [
     "ARCHETYPES",
@@ -51,4 +52,6 @@ __all__ = [
     "CognitiveEvaluator",
     "EvaluationResult",
     "TransitionEvent",
+    "router",
+    "brain_twin_router",
 ]
