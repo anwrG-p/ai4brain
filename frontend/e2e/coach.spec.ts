@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import path from 'node:path'
+import { FULL_PAGE_CSS } from './testUtils'
 
 const SCREENSHOT_DIR = process.env.SHOTS_DIR ?? path.resolve(process.cwd(), '../docs/ui/screenshots')
 
@@ -40,7 +41,7 @@ async function checkViewports(page: Page, theme: 'light' | 'dark') {
     expect(axe.violations, `axe at ${vp.width}px (${theme})`).toEqual([])
     await page.screenshot({
       path: path.join(SCREENSHOT_DIR, `coach-${theme === 'dark' ? 'dark-' : ''}${vp.label}.png`),
-      fullPage: true,
+      fullPage: true, style: FULL_PAGE_CSS,
     })
   }
 }

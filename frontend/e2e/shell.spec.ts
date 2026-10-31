@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 import path from 'node:path'
-import { closeJudgeMode, openJudgeMode } from './testUtils'
+import { closeJudgeMode, openJudgeMode, FULL_PAGE_CSS } from './testUtils'
 
 // Screenshots go to SHOTS_DIR when set, else to the test's own output folder (never docs/).
 const shot = (name: string) => path.join(process.env.SHOTS_DIR ?? test.info().outputPath(), name)
@@ -129,7 +129,7 @@ test.describe('App shell (ticket 09a)', () => {
     // Remembered: a plain in-app URL keeps judge mode on.
     await page.goto('/dashboard', { waitUntil: 'networkidle' })
     await expect(page.getByRole('region', { name: 'Judge tools' })).toBeVisible()
-    await page.screenshot({ path: shot('judge-tools-1440.png'), fullPage: true })
+    await page.screenshot({ path: shot('judge-tools-1440.png'), fullPage: true, style: FULL_PAGE_CSS })
 
     await closeJudgeMode(page)
     await expect(page.getByRole('region', { name: 'Judge tools' })).toHaveCount(0)

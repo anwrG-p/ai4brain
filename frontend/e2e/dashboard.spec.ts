@@ -1,6 +1,7 @@
 import { test, expect, type Page, type TestInfo } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import path from 'node:path'
+import { FULL_PAGE_CSS } from './testUtils'
 
 /* Home (/dashboard, ticket 08). The session store is seeded before the app loads (localStorage
    'synapsetwin_sessions_v1', the same shape the baseline writes), with 0, 1, 4 and 6 sessions a
@@ -51,7 +52,7 @@ async function seed(page: Page, n: number) {
 
 async function shot(page: Page, info: TestInfo, name: string) {
   const dir = process.env.DASH_SHOT_DIR
-  await page.screenshot({ path: dir ? path.join(dir, `${name}.png`) : info.outputPath(`${name}.png`), fullPage: true })
+  await page.screenshot({ path: dir ? path.join(dir, `${name}.png`) : info.outputPath(`${name}.png`), fullPage: true, style: FULL_PAGE_CSS })
 }
 
 async function checkViewports(page: Page, where: string, info: TestInfo, name: string) {

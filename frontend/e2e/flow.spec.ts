@@ -1,6 +1,7 @@
 import { test, expect, type Page, type TestInfo } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import path from 'node:path'
+import { FULL_PAGE_CSS } from './testUtils'
 
 /* The new-user flow (ticket 07): Welcome → the six-exercise baseline → Results (blur, Dolphin,
    consent, un-blur). This build has no VITE_GOOGLE_CLIENT_ID, so "See my results" opens straight on
@@ -24,7 +25,7 @@ const VIEWPORTS = [
 
 async function shot(page: Page, info: TestInfo, name: string) {
   const dir = process.env.FLOW_SHOT_DIR
-  await page.screenshot({ path: dir ? path.join(dir, `${name}.png`) : info.outputPath(`${name}.png`), fullPage: true })
+  await page.screenshot({ path: dir ? path.join(dir, `${name}.png`) : info.outputPath(`${name}.png`), fullPage: true, style: FULL_PAGE_CSS })
 }
 
 async function noAxeViolations(page: Page, where: string) {

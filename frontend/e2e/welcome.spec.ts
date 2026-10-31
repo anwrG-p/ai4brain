@@ -1,6 +1,7 @@
 import { test, expect, type Page, type TestInfo } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import path from 'node:path'
+import { FULL_PAGE_CSS } from './testUtils'
 
 /* Welcome (/). Screenshots go to $FLOW_SHOT_DIR when set, else to the test's output folder (never
    into the repo). This build has no VITE_GOOGLE_CLIENT_ID, so there is no sign-in link (rule 14). */
@@ -13,7 +14,7 @@ const VIEWPORTS = [
 
 async function shot(page: Page, info: TestInfo, name: string) {
   const dir = process.env.FLOW_SHOT_DIR
-  await page.screenshot({ path: dir ? path.join(dir, `${name}.png`) : info.outputPath(`${name}.png`), fullPage: true })
+  await page.screenshot({ path: dir ? path.join(dir, `${name}.png`) : info.outputPath(`${name}.png`), fullPage: true, style: FULL_PAGE_CSS })
 }
 
 async function checkViewports(page: Page, info: TestInfo, theme: 'light' | 'dark', motion: string) {

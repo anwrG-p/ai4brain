@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { FULL_PAGE_CSS } from './testUtils'
 
 // SHOTS_DIR sends the screenshots to a scratch folder instead of the docs.
 const SCREENSHOT_DIR = process.env.SHOTS_DIR ?? path.resolve(process.cwd(), '../docs/ui/screenshots')
@@ -28,7 +29,7 @@ async function checkViewports(page: Page, theme: 'light' | 'dark') {
     expect(overflow, `Horizontal overflow at ${vp.width}px (${theme})`).toBe(false)
     const axe = await new AxeBuilder({ page }).analyze()
     expect(axe.violations, `axe at ${vp.width}px (${theme})`).toEqual([])
-    await page.screenshot({ path: path.join(SCREENSHOT_DIR, `13-privacy-${theme}-${vp.width}.png`), fullPage: true })
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, `13-privacy-${theme}-${vp.width}.png`), fullPage: true, style: FULL_PAGE_CSS })
   }
 }
 

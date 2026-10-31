@@ -1,6 +1,7 @@
 import { test, expect, type Page, type TestInfo } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import path from 'node:path'
+import { FULL_PAGE_CSS } from './testUtils'
 
 // Screenshots go to TRAIN_SHOTS_DIR when set, else to this test's own output folder (never docs/).
 const shotPath = (testInfo: TestInfo, name: string) =>
@@ -70,7 +71,7 @@ async function checkViewports(page: Page, theme: 'light' | 'dark', testInfo: Tes
     expect(axe.violations, `axe at ${vp.width}px (${theme})`).toEqual([])
     await page.screenshot({
       path: shotPath(testInfo, `09-train-${theme === 'dark' ? 'dark-' : ''}${vp.label}.png`),
-      fullPage: true,
+      fullPage: true, style: FULL_PAGE_CSS,
     })
   }
 }
