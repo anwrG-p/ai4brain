@@ -24,11 +24,13 @@ noted. Evidence marks follow that doc: H primary/meta-analysis, M single study, 
   cost, a difference score, gets its between-person spread solved from `stroop_cost_reliability`
   so its retest reliability lands near .6 (Hedge et al. 2018, via area 1, H).
 - Low effort: a share `low_effort_rate` of sessions has fast RTs, chance accuracy and timeouts.
-  The default .07 is the share Zorowitz et al. 2023 flagged on chance accuracy alone (H).
+  The default .07 is the share Zorowitz et al. 2023 flagged on chance accuracy alone (H). It is a
+  lower bound: that screen missed careless responders, so the true share is likely higher.
 - Time of day: performance drops by up to `tod_amplitude` SD away from a personal peak hour
   (synchrony effect; Schmidt et al. 2007, Cogn Neuropsychol ⚠; the size is J).
 - Schedule: at most one session a day, about `sessions_per_week` a week, so days get skipped
-  (3/week: Lampit et al. 2014 found more added nothing, H).
+  (3/week: in Lampit et al. 2014, more than 3 sessions a week was not more effective in healthy
+  older adults, H. That finding is about efficacy, not adherence; the schedule just uses it.)
 - Day-to-day state: a session-wide shift of `state_sd` SD (J).
 
 ponytail: one n-back stream, no device or input-kind context, no voice, hours treated as UTC.
@@ -45,6 +47,8 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 
+# The only coupling to the server: its event model. Tests import it from here too, so moving the
+# model (e.g. to backend/app/models/telemetry.py) is a change to this one line.
 from assessment_engine.api.routes.telemetry import TelemetryEvent
 
 PILLARS = ("focus", "agility", "impulse", "memory", "visual")

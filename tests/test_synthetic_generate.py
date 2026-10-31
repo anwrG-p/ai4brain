@@ -9,8 +9,11 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from assessment_engine.api.routes.telemetry import TelemetryEvent
-from data.synthetic.generate import Params, generate, simulate_user
+import dataclasses
+from datetime import date
+
+# The server model, through the generator's single import of it (a move is a one-line change there).
+from data.synthetic.generate import Params, TelemetryEvent, generate, simulate_user
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -118,16 +121,20 @@ def test_cli_writes_the_same_files(tmp_path):
         assert (out / f.name).read_bytes() == f.read_bytes()
 
 
+def session_accuracy(events: list[dict]) -> dict[str, float]:
+    """Emitted accuracy (share of events without error_flag) per session_id, in session order."""
+    by: dict[str, list[float]] = {}
+    for e in events:
+        by.setdefault(e["session_id"], []).append(0.0 if e["error_flag"] else 1.0)
+    return {sid: statistics.fmean(v) for sid, v in by.items()}
+
+
 def accuracy_by_session(users: int, sessions: int, params: Params) -> list[float]:
     acc = [[] for _ in range(sessions)]
     for i in range(users):
-        events, truth = simulate_user(seed=11, index=i, sessions=sessions, params=params)
-        index = {s["session_id"]: k for k, s in enumerate(truth["sessions"])}
-        by = [[] for _ in range(sessions)]
-        for e in events:
-            by[index[e["session_id"]]].append(0.0 if e["error_flag"] else 1.0)
-        for k in range(sessions):
-            acc[k].append(statistics.fmean(by[k]))
+        events, _ = simulate_user(seed=11, index=i, sessions=sessions, params=params)
+        for k, a in enumerate(session_accuracy(events).values()):
+            acc[k].append(a)
     return [statistics.fmean(a) for a in acc]
 
 
@@ -156,6 +163,13 @@ def test_forgetting_defaults_to_zero_and_only_shrinks_the_practice_gain():
     assert [s["day"] for s in keep["sessions"]] == [s["day"] for s in fade["sessions"]]
     later = zip(keep["sessions"][1:], fade["sessions"][1:])
     assert all(f["practice_level"] < k["practice_level"] for k, f in later)
+
+
+def test_forgetting_lowers_emitted_accuracy_after_the_first_sessions():
+    keep = accuracy_by_session(users=60, sessions=8, params=QUIET)
+    fade = accuracy_by_session(users=60, sessions=8, params=dataclasses.replace(QUIET, forgetting_per_day=0.2))
+    assert keep[0] == fade[0]  # no practice yet, so nothing to forget
+    assert statistics.fmean(keep[3:]) - statistics.fmean(fade[3:]) > 0.005, (keep, fade)
 
 
 def test_low_effort_fraction_matches_its_parameter():
@@ -206,21 +220,37 @@ def test_stroop_cost_retest_reliability_is_about_0_6():
     assert 0.48 < r < 0.72, r
 
 
-def test_time_of_day_shifts_performance():
-    _, truth = simulate_user(seed=4, index=0, sessions=10)
-    shifts = [s["tod_shift"] for s in truth["sessions"]]
-    assert all(-Params().tod_amplitude <= x <= 0 for x in shifts)
-    _, flat = simulate_user(seed=4, index=0, sessions=10, params=QUIET)
-    assert all(s["tod_shift"] == 0 for s in flat["sessions"])
+def test_time_of_day_lowers_emitted_accuracy_off_peak():
+    # Same users, seed and trial streams; only the amplitude differs. No state or low-effort noise.
+    flat = Params(low_effort_rate=0.0, state_sd=0.0, tod_amplitude=0.0)
+    swing = dataclasses.replace(flat, tod_amplitude=2.0)
+    off_peak, near_peak = [], []
+    for i in range(100):
+        ev_flat, _ = simulate_user(seed=41, index=i, sessions=4, params=flat)
+        ev_swing, truth = simulate_user(seed=41, index=i, sessions=4, params=swing)
+        a_flat, a_swing = session_accuracy(ev_flat), session_accuracy(ev_swing)
+        for s in truth["sessions"]:
+            drop = a_flat[s["session_id"]] - a_swing[s["session_id"]]
+            if s["tod_shift"] < -1:
+                off_peak.append(drop)
+            elif s["tod_shift"] > -0.2:
+                near_peak.append(drop)
+    assert len(off_peak) > 20 and len(near_peak) > 20
+    assert statistics.fmean(off_peak) > 0.04, statistics.fmean(off_peak)
+    assert statistics.fmean(off_peak) > 3 * abs(statistics.fmean(near_peak))
 
 
 def test_schedule_skips_days_and_trains_at_most_once_a_day():
     gaps = []
     for i in range(50):
-        _, truth = simulate_user(seed=8, index=i, sessions=10)
-        days = [s["day"] for s in truth["sessions"]]
-        assert all(b > a for a, b in zip(days, days[1:]))
-        gaps += [b - a for a, b in zip(days, days[1:])]
-    assert max(gaps) > 1
-    # About 3 sessions a week on average (Lampit 2014: > 3/week added nothing).
+        events, _ = simulate_user(seed=8, index=i, sessions=10)
+        first: dict[str, str] = {}
+        for e in events:  # events are in time order, so this is each session's first client_ts
+            first.setdefault(e["session_id"], e["client_ts"])
+        days = [date.fromisoformat(ts[:10]) for _, ts in sorted(first.items())]
+        assert len(days) == 10
+        gaps += [(b - a).days for a, b in zip(days, days[1:])]
+    assert min(gaps) >= 1  # at most one session a day
+    assert max(gaps) > 1  # days get skipped
+    # About 3 sessions a week (Lampit 2014: more than 3/week was not more effective in healthy older adults).
     assert 1.8 < statistics.fmean(gaps) < 3.2
