@@ -20,7 +20,8 @@ afterEach(() => {
 })
 
 describe('UI telemetry goes through the Tracker', () => {
-  it('the offline banner shows the tracker queue count', () => {
+  // Ticket 09a: one plain line, no counts, no queue words, no sync promise.
+  it('when the tracker is offline the shell says so in one plain line', () => {
     vi.spyOn(tracker, 'getStatus').mockReturnValue({
       isOnline: false,
       queuedCount: 3,
@@ -35,30 +36,7 @@ describe('UI telemetry goes through the Tracker', () => {
         </AppShell>
       </MemoryRouter>,
     )
-    expect(screen.getByText(/Connection dropped/i).closest('[role="status"]')).toHaveTextContent(
-      '3 in buffer',
-    )
-  })
-
-  it('the simulated-offline banner states the tracker capacity', () => {
-    vi.spyOn(tracker, 'getStatus').mockReturnValue({
-      isOnline: true,
-      queuedCount: 0,
-      droppedCount: 0,
-      maxCapacity: 250,
-      consent: 'granted',
-    })
-    useAppStore.getState().setSimulateOffline(true)
-    render(
-      <MemoryRouter future={future} initialEntries={['/dashboard']}>
-        <AppShell>
-          <p>page</p>
-        </AppShell>
-      </MemoryRouter>,
-    )
-    const banner = screen.getByText(/Offline Mode Active/i).closest('[role="status"]')
-    expect(banner).toHaveTextContent('up to 250 events')
-    expect(banner).toHaveTextContent(/sync automatically/i)
+    expect(screen.getByRole('status')).toHaveTextContent("You're offline. Your answers are saved on this device.")
   })
 
   const renderShell = () =>
@@ -80,10 +58,10 @@ describe('UI telemetry goes through the Tracker', () => {
     })
     useAppStore.getState().setSimulateOffline(true)
     renderShell()
-    const banner = screen.getByText(/Offline Mode Active/i).closest('[role="status"]')
+    const banner = screen.getByRole('status')
     expect(banner).not.toHaveTextContent(/sync/i)
     expect(banner).not.toHaveTextContent(/Ready/i) // nothing is ready to go out yet
-    expect(banner).toHaveTextContent('Saved on this device (2)')
+    expect(banner).toHaveTextContent('saved on this device')
   })
 
   it('after a decline there is no offline banner: nothing is kept to send', () => {
@@ -95,7 +73,7 @@ describe('UI telemetry goes through the Tracker', () => {
       consent: 'denied',
     })
     renderShell()
-    expect(screen.queryByText(/Connection dropped|Offline Mode Active/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/offline/i)).not.toBeInTheDocument()
   })
 
   const renderPrivacy = () =>

@@ -4,7 +4,7 @@ import type { CharacterSize } from '../characters/shared'
 
 /* The app-wide companion wrapper. It renders Loti (components/features/characters) and keeps the
    old Mascot / NodiCompanion props API (NodiCompanion is gone), so the pages that use it did not have to change.
-   ponytail: the bubble copy and badges are the pre-brand-v2 ones; tickets 03 and 09 replace them. */
+   A badge shows only when a page passes `badgeLabel`. */
 
 export type MascotState =
   | 'idle'
@@ -51,61 +51,25 @@ const SIZE_TO_LOTI: Record<NonNullable<MascotProps['size']>, CharacterSize> = {
 
 interface StateSpec {
   defaultTitle: string
-  defaultBadge: string
   badgeTone: 'neutral' | 'brand' | 'info' | 'reward' | 'warning'
   badgeGlyph: string
   defaultLine: string
 }
 
+// Loti's default lines (ticket 09a copy trim): plain, short, no numbers or method words, and no
+// promise to sync (consent decides that, R3). No default badge: the old "State: X" chips are gone.
 const STATE_COPY: Record<Exclude<MascotState, 'hidden'>, StateSpec> = {
-  idle: {
-    defaultTitle: 'Loti · Your guide',
-    defaultBadge: 'State: Idle',
-    badgeTone: 'neutral',
-    badgeGlyph: '●',
-    defaultLine: 'Every 2-minute block helps your cognitive twin grow with honest calibration.',
-  },
-  hello: {
-    defaultTitle: 'Loti · Welcome',
-    defaultBadge: 'State: Hello',
-    badgeTone: 'brand',
-    badgeGlyph: '✦',
-    defaultLine: 'Welcome back! Pick up wherever you like—zero streak pressure, just honest insights.',
-  },
-  curious: {
-    defaultTitle: 'Loti · Calibration notice',
-    defaultBadge: 'State: Curious',
-    badgeTone: 'info',
-    badgeGlyph: '◈',
-    defaultLine: 'I need two more mini-blocks to be sure about your recall confidence band.',
-  },
-  thinking: {
-    defaultTitle: 'Loti · Thinking',
-    defaultBadge: 'State: Thinking',
-    badgeTone: 'info',
-    badgeGlyph: '◈',
-    defaultLine: 'Putting your map together... computing ±95% confidence intervals across all dimensions.',
-  },
-  celebrate: {
-    defaultTitle: 'Loti · Block completed',
-    defaultBadge: 'State: Celebrate',
-    badgeTone: 'reward',
-    badgeGlyph: '★',
-    defaultLine: 'Nice work! That trial counted toward narrowing your uncertainty bands.',
-  },
-  rest: {
-    defaultTitle: 'Loti · Rest & recharge',
-    defaultBadge: 'State: Rest',
-    badgeTone: 'warning',
-    badgeGlyph: '◐',
-    defaultLine: 'Rest is an essential part of cognitive training. Take a mindful pause today.',
-  },
+  idle: { defaultTitle: 'Loti', badgeTone: 'neutral', badgeGlyph: '●', defaultLine: 'Short rounds, often, help most.' },
+  hello: { defaultTitle: 'Loti', badgeTone: 'brand', badgeGlyph: '✦', defaultLine: 'Welcome back. Pick up wherever you like.' },
+  curious: { defaultTitle: 'Loti', badgeTone: 'info', badgeGlyph: '◈', defaultLine: "A couple more rounds and I'll know you better." },
+  thinking: { defaultTitle: 'Loti', badgeTone: 'info', badgeGlyph: '◈', defaultLine: 'Putting your results together…' },
+  celebrate: { defaultTitle: 'Loti', badgeTone: 'reward', badgeGlyph: '★', defaultLine: 'Nice work! That round counts.' },
+  rest: { defaultTitle: 'Loti', badgeTone: 'warning', badgeGlyph: '◐', defaultLine: 'Rest is part of training too.' },
   'calm-shrug': {
-    defaultTitle: 'Loti · Saved on this device',
-    defaultBadge: 'State: Offline Buffer',
+    defaultTitle: 'Loti',
     badgeTone: 'warning',
     badgeGlyph: '⚡',
-    defaultLine: 'Connection dropped. Your answers are saved safely on this device and will sync automatically.',
+    defaultLine: "You're offline. Your answers are saved on this device.",
   },
 }
 
@@ -126,7 +90,7 @@ export function Mascot({
   const spec = STATE_COPY[state]
   const resolvedTitle = title ?? spec.defaultTitle
   const resolvedMessage = message ?? spec.defaultLine
-  const resolvedBadge = badgeLabel ?? spec.defaultBadge
+  const resolvedBadge = badgeLabel
   const isHero = size === 'hero'
   const isDocked = size === 'docked'
   const bubble = showSpeechBubble && Boolean(resolvedTitle || resolvedMessage)

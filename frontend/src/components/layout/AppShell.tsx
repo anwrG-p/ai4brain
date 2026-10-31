@@ -1,171 +1,76 @@
-import React, { useState, useEffect } from 'react'
+import React, { useSyncExternalStore } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import {
-  Compass,
-  Target,
-  Bot,
-  TrendingUp,
-  User,
-  ShieldCheck,
-  Settings,
-  Moon,
-  Sun,
-  WifiOff,
-  Cpu,
-} from 'lucide-react'
+import { Dumbbell, House, MessageCircle, Moon, Sun, User, WifiOff, type LucideIcon } from 'lucide-react'
 import { BRAND_CONFIG } from '../../config/brand'
 import { useAppStore } from '../../state/useAppStore'
 import { tracker } from '../../features/assessment/telemetry/tracker'
-import { Badge } from '../ui/Badge'
 import { BrianLogo } from '../features/brand/BrianLogo'
-import { EmilyMoodPill } from '../common/EmilyMoodPill'
 import { HumanReviewGate } from '../dev/HumanReviewGate'
+import { Button } from '../ui/Button'
+import { EmotionListener } from './EmotionListener'
+import { useJudgeMode } from './judgeMode'
 
 // Icon-sized header controls: 44 px targets, colour change only.
 const UTILITY_CONTROL =
   'focus-ring inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-ink-muted hover:text-ink hover:bg-surface-raised transition-colors'
 
+// The 4 destinations (spec IA). Privacy, Settings and "How we calculate this" live under You.
+const NAV: readonly { path: string; label: string; icon: LucideIcon }[] = [
+  { path: '/dashboard', label: 'Home', icon: House },
+  { path: '/train', label: 'Train', icon: Dumbbell },
+  { path: '/coach', label: 'Loti', icon: MessageCircle },
+  { path: '/you', label: 'You', icon: User },
+]
+// Pages reached from You keep You active in the nav.
+const UNDER_YOU = ['/you', '/privacy', '/settings', '/methodology']
+const isActive = (path: string, pathname: string) =>
+  path === '/you' ? UNDER_YOU.some((p) => pathname.startsWith(p)) : pathname.startsWith(path)
+
+const ICON = { strokeWidth: 1.75, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true } as const
+
+const subscribeTracker = (onChange: () => void) => tracker.subscribe(onChange)
+const trackerStatus = () => tracker.getStatus()
+
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const location = useLocation()
-  const searchParams = new URLSearchParams(location.search)
-  const isBaselineMode = searchParams.get('mode') === 'baseline'
+  const { pathname } = useLocation()
+  const judge = useJudgeMode()
   // The new-user flow (ticket 07): Welcome and Results keep only the logo and the theme toggle;
-  // the baseline runs distraction-free like a task.
-  const isFlowRoute = location.pathname === '/' || location.pathname === '/results'
-  const inNewUserFlow = isFlowRoute || location.pathname === '/baseline'
-  const isTaskRoute =
-    location.pathname === '/baseline' ||
-    location.pathname.startsWith('/task') ||
-    location.pathname.startsWith('/practice') ||
-    isBaselineMode
-  const isAuthRoute =
-    location.pathname === '/login' ||
-    location.pathname === '/sign-in' ||
-    location.pathname === '/register' ||
-    location.pathname === '/create-account' ||
-    location.pathname === '/auth'
-  const {
-    theme,
-    toggleTheme,
-    simulateOffline,
-    simulateLlmDown,
-    userProfile,
-    isAuthenticated,
-  } = useAppStore()
+  // the baseline and the exercises run distraction-free, without the header.
+  const isFlowRoute = pathname === '/' || pathname === '/results'
+  const isTaskRoute = pathname === '/baseline' || pathname.startsWith('/task')
+  const withNav = !isFlowRoute && !isTaskRoute
+  const { theme, toggleTheme, simulateOffline, setSimulateOffline } = useAppStore()
+  const status = useSyncExternalStore(subscribeTracker, trackerStatus)
 
-  // Real offline queue status
-  const [queueStatus, setQueueStatus] = useState(() => tracker.getStatus())
-
-  useEffect(() => {
-    return tracker.subscribe(() => {
-      setQueueStatus(tracker.getStatus())
-    })
-  }, [])
-
-  // 5 Primary Consumer Destinations
-  const consumerNavItems = [
-    { path: '/dashboard', label: 'Today', icon: Compass },
-    { path: '/assessment', label: 'Practice', icon: Target },
-    { path: '/coach', label: 'Coach', icon: Bot },
-    { path: '/brain-twin', label: 'Progress', icon: TrendingUp },
-    { path: '/settings', label: 'You', icon: User },
-  ]
-
-  // Team Development Progress Status per page
-  const getPageProgress = (pathname: string) => {
-    if (
-      pathname === '/auth' ||
-      pathname === '/login' ||
-      pathname === '/register' ||
-      pathname === '/sign-in' ||
-      pathname === '/create-account'
-    ) {
-      return 'Nearly Done'
-    }
-    if (pathname === '/' || pathname === '/dashboard') {
-      return 'In Progress'
-    }
-    return 'Pending'
-  }
-
-  const pageProgress = getPageProgress(location.pathname)
-
-  const isRealOffline = !queueStatus.isOnline
   // R3: after a decline nothing is kept to send, so being offline changes nothing for the user.
-  const showOfflineBanner = queueStatus.consent !== 'denied' && (simulateOffline || isRealOffline)
+  const offline = status.consent !== 'denied' && (simulateOffline || !status.isOnline)
+  const themeLabel = theme === 'light' ? 'Switch to Dark (Night Lab)' : 'Switch to Light (Playful Lab)'
 
   return (
-    <div className={`min-h-screen flex flex-col bg-canvas text-ink ${isFlowRoute ? 'pb-0' : 'pb-16 lg:pb-0'}`}>
-      {/* Skip link for keyboard users (Tab stop 1) */}
+    <div className={`min-h-screen flex flex-col bg-canvas text-ink ${withNav ? 'pb-16 lg:pb-0' : ''}`}>
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:start-2 focus:z-50 focus:px-4 focus:py-2 focus:rounded-md focus:bg-brand focus:text-brand-ink focus:font-semibold"
       >
         Skip to main content
       </a>
+      <EmotionListener />
 
-      {/* Global Robustness Banner (Truth in claims: Real queue status) - suppressed during distraction-free calibration */}
-      {!isBaselineMode && showOfflineBanner && (
-        <div
+      {offline && (
+        <p
           role="status"
-          aria-live="polite"
-          className="bg-warning-subtle border-b border-border px-4 py-2 text-xs md:text-sm text-ink flex flex-wrap items-center justify-between gap-2"
+          className="m-0 bg-warning-subtle border-b border-border px-4 py-2 text-sm text-ink flex items-center justify-center gap-2"
         >
-          <span className="flex items-center gap-1.5">
-            <WifiOff size={16} aria-hidden="true" className="text-warning" />
-            {isRealOffline ? (
-              <span>
-                <strong>Connection dropped:</strong> Your answers are saved locally on this device ({queueStatus.queuedCount} in buffer).
-              </span>
-            ) : (
-              <span>
-                <strong>Offline Mode Active:</strong> Trial telemetry is buffered locally (up to {queueStatus.maxCapacity} events){' '}
-                {/* Pending consent: nothing is sent, so no sync is promised. */}
-                {queueStatus.consent === 'granted'
-                  ? 'and will sync automatically when your connection returns'
-                  : 'and stays on this device'}{' '}
-                ({queueStatus.queuedCount} queued).
-              </span>
-            )}
-          </span>
-          {/* Pending: nothing is ready to go out, it is only kept here. */}
-          <Badge tone="warning" glyph="⚡">
-            {queueStatus.consent === 'granted'
-              ? `Queue Ready (${queueStatus.queuedCount} / ${queueStatus.maxCapacity})`
-              : `Saved on this device (${queueStatus.queuedCount})`}
-          </Badge>
-        </div>
+          <WifiOff size={16} {...ICON} className="shrink-0 text-warning" />
+          You're offline. Your answers are saved on this device.
+        </p>
       )}
 
-      {!isBaselineMode && simulateLlmDown && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="bg-info-subtle border-b border-border px-4 py-2 text-xs md:text-sm text-ink flex flex-wrap items-center justify-between gap-2"
-        >
-          <span className="flex items-center gap-1.5">
-            <Cpu size={16} aria-hidden="true" className="text-brand" />
-            <span>
-              <strong>Deterministic Fallback:</strong> Cognitive assessment and coaching operating via verified rule templates.
-            </span>
-          </span>
-          <Badge tone="info" glyph="◈">
-            Deterministic Engine
-          </Badge>
-        </div>
-      )}
-
-      {/* Top Consumer Navigation Header (64 px, DEC-008) */}
       {!isTaskRoute && (
-        <header
-          role="banner"
-          className="sticky top-0 z-50 w-full h-16 bg-surface border-b border-border px-4 flex items-center"
-        >
-          <div className="max-w-6xl w-full mx-auto flex items-center justify-between gap-2 sm:gap-3">
-            {/* Product Brand Mark: fill is currentColor, so it follows --color-ink in both themes */}
+        <header className="sticky top-0 z-50 w-full h-16 bg-surface border-b border-border px-4 flex items-center">
+          <div className="max-w-6xl w-full mx-auto flex items-center justify-between gap-3">
             <Link
-              to="/"
-              title={`${BRAND_CONFIG.productName} Home`}
+              to={isFlowRoute ? '/' : '/dashboard'}
               aria-label={`${BRAND_CONFIG.productName} Home`}
               className="focus-ring rounded-md flex items-center text-ink no-underline shrink-0"
             >
@@ -181,24 +86,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               />
             </Link>
 
-            {/* 5 Primary Consumer Destinations Navbar (lg and up; below that the bottom tabs); none in the flow */}
-            {isFlowRoute ? null : (
-              <nav aria-label="Primary product navigation" className="hidden lg:flex items-center gap-1">
-                {consumerNavItems.map((item) => {
-                  const isActive =
-                    item.path === '/dashboard'
-                      ? location.pathname === '/dashboard'
-                      : location.pathname.startsWith(item.path)
-
+            {withNav && (
+              <nav aria-label="Main" className="hidden lg:flex items-center gap-1">
+                {NAV.map((item) => {
+                  const active = isActive(item.path, pathname)
                   return (
                     <Link
                       key={item.path}
                       to={item.path}
-                      aria-current={isActive ? 'page' : undefined}
+                      aria-current={active ? 'page' : undefined}
                       className={`focus-ring rounded-sm px-3 py-2 border-b-2 text-sm font-medium no-underline transition-colors ${
-                        isActive
-                          ? 'border-brand text-brand'
-                          : 'border-transparent text-ink-muted hover:text-ink'
+                        active ? 'border-brand text-brand' : 'border-transparent text-ink-muted hover:text-ink'
                       }`}
                     >
                       {item.label}
@@ -208,127 +106,71 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </nav>
             )}
 
-            {/* EMILY Emotion Atmosphere & Micro-Interaction Rhythm */}
-            {!isFlowRoute && <EmilyMoodPill />}
-
-            {/* Utility Controls */}
-            <div className="flex items-center gap-1">
-              {!isAuthRoute && !isFlowRoute && (
-                <Link
-                  to="/auth"
-                  title={isAuthenticated ? `Signed in as ${userProfile?.preferredName || 'Explorer'}` : 'Sign In to Your Sanctuary'}
-                  aria-label={isAuthenticated ? `Profile: ${userProfile?.preferredName || 'Explorer'}` : 'Sign In'}
-                  className={`${UTILITY_CONTROL} gap-1.5 px-2.5 text-sm font-medium no-underline`}
-                >
-                  <User size={18} aria-hidden="true" className={isAuthenticated ? 'text-success' : 'text-brand'} />
-                  <span className="hidden sm:inline">
-                    {isAuthenticated ? (userProfile?.preferredName || 'Explorer') : 'Sign In'}
-                  </span>
-                </Link>
-              )}
-              <button
-                type="button"
-                aria-label={theme === 'light' ? 'Switch to Dark (Night Lab)' : 'Switch to Light (Playful Lab)'}
-                title={theme === 'light' ? 'Switch to Dark (Night Lab)' : 'Switch to Light (Playful Lab)'}
-                onClick={toggleTheme}
-                className={`${UTILITY_CONTROL} cursor-pointer`}
-              >
-                {theme === 'light' ? <Moon size={18} aria-hidden="true" /> : <Sun size={18} aria-hidden="true" />}
-              </button>
-
-              {!isFlowRoute && (
-                <>
-                  <Link
-                    to="/privacy"
-                    title="Privacy Center & Non-Biometric Lock"
-                    aria-label="Privacy Center"
-                    className={`${UTILITY_CONTROL} no-underline max-sm:hidden`}
-                  >
-                    <ShieldCheck size={18} aria-hidden="true" />
-                  </Link>
-
-                  <Link
-                    to="/settings"
-                    title="Settings & Accessibility Controls"
-                    aria-label="Settings"
-                    className={`${UTILITY_CONTROL} no-underline max-sm:hidden`}
-                  >
-                    <Settings size={18} aria-hidden="true" />
-                  </Link>
-                </>
-              )}
-            </div>
+            <button
+              type="button"
+              aria-label={themeLabel}
+              title={themeLabel}
+              onClick={toggleTheme}
+              className={`${UTILITY_CONTROL} cursor-pointer`}
+            >
+              {theme === 'light' ? <Moon size={20} {...ICON} /> : <Sun size={20} {...ICON} />}
+            </button>
           </div>
         </header>
       )}
 
-      {/* Main Content Column */}
       <main
         id="main-content"
         className={`relative flex-1 w-full min-w-0 mx-auto px-4 ${
-          isTaskRoute
-            ? 'max-w-4xl py-2 sm:py-4 flex flex-col justify-between'
-            : 'max-w-6xl py-8'
+          isTaskRoute ? 'max-w-4xl py-2 sm:py-4 flex flex-col justify-between' : 'max-w-6xl py-8'
         }`}
       >
-        {/* Team Sprint Progress Badge - small and muted, in the top-right padding area; not in the new-user flow */}
-        {!inNewUserFlow && (
-          <aside
-            aria-label="Sprint progress status"
-            className="absolute top-2 right-4 sm:right-6 lg:right-8 z-30 pointer-events-none"
-          >
-            <Badge
-              tone="neutral"
-              data-testid="page-progress-badge"
-              title={`Sprint Progress: ${pageProgress}`}
-              aria-label={`Page progress: ${pageProgress}`}
-              className="select-none pointer-events-auto font-medium"
-            >
-              <span className="hidden sm:inline">Progress: </span>
-              {pageProgress}
-            </Badge>
-          </aside>
-        )}
-
         {children}
       </main>
 
-      {/* Product Footer: one muted non-clinical line plus the evaluator controls */}
-      {!isTaskRoute && !isFlowRoute && (
-        <footer
-          role="contentinfo"
-          className="border-t border-border bg-surface px-4 py-4 text-xs text-ink-muted"
+      {/* R6: the evaluator tools exist only in judge mode. The task runner carries its own. */}
+      {judge && !isTaskRoute && (
+        <section
+          aria-label="Judge tools"
+          className="border-t border-border bg-surface px-4 py-3 flex flex-wrap items-center justify-center gap-2"
         >
-          <div className="max-w-6xl mx-auto flex flex-col items-center justify-center text-center gap-2">
-            <p className="m-0">{BRAND_CONFIG.nonClinicalNotice}</p>
-            <HumanReviewGate />
-          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            aria-pressed={simulateOffline}
+            onClick={() => setSimulateOffline(!simulateOffline)}
+          >
+            Simulate offline
+          </Button>
+          <HumanReviewGate />
+        </section>
+      )}
+
+      {withNav && (
+        <footer className="border-t border-border bg-surface px-4 py-4 text-xs text-ink-muted">
+          <p className="m-0 max-w-6xl mx-auto text-center">{BRAND_CONFIG.nonClinicalNotice}</p>
         </footer>
       )}
 
-      {/* Mobile Bottom Tab Bar: Lucide icons with labels */}
-      {!isFlowRoute && !isTaskRoute && !isAuthRoute && (
+      {/* Mobile bottom tabs: the same 4 items, Lucide icons with labels */}
+      {withNav && (
         <nav
-          aria-label="Mobile bottom navigation"
+          aria-label="Tabs"
           className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t border-border flex items-center justify-around px-2"
         >
-          {consumerNavItems.map((item) => {
+          {NAV.map((item) => {
             const Icon = item.icon
-            const isActive =
-              item.path === '/dashboard'
-                ? location.pathname === '/dashboard'
-                : location.pathname.startsWith(item.path)
-
+            const active = isActive(item.path, pathname)
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                aria-current={isActive ? 'page' : undefined}
-                className={`focus-ring flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-sm text-xs no-underline transition-colors ${
-                  isActive ? 'text-brand font-semibold' : 'text-ink-muted hover:text-ink'
+                aria-current={active ? 'page' : undefined}
+                className={`focus-ring flex min-h-11 min-w-16 flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-sm text-xs no-underline transition-colors ${
+                  active ? 'text-brand font-semibold' : 'text-ink-muted hover:text-ink'
                 }`}
               >
-                <Icon size={20} aria-hidden="true" />
+                <Icon size={20} {...ICON} />
                 <span>{item.label}</span>
               </Link>
             )
