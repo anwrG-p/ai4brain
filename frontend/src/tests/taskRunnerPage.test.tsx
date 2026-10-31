@@ -135,6 +135,36 @@ describe('TaskRunnerPage mounts the real exercises', () => {
     expect(screen.getByText(/Accuracy 50% · 650 ms\./)).toBeInTheDocument()
   })
 
+  it('N-back: the result line reads the rule-stream events only, one per trial (R16)', async () => {
+    renderAt('/task/working_memory?judge=1')
+    await begin('Memory Gauntlet')
+    const nb = (trial_index: number, stream: string, rule: string, ok: boolean, rt: number) =>
+      event({
+        task_id: 'mock-nback-1.0',
+        dimension: 'working_memory',
+        trial_index,
+        error_flag: !ok,
+        score_norm: ok ? 1 : 0,
+        response_time_ms: rt,
+        trial_meta: { trial_type: 'standard', rule, stream },
+      })
+    act(() => {
+      // Trial 0: right (the off-rule event is right too). Trial 1, parity: L wrong, A right.
+      // Trial 2: the off-rule event is wrong as well as the rule event; it must count once.
+      tracker.push(nb(0, 'position', 'position', true, 400))
+      tracker.push(nb(0, 'symbol', 'position', true, 2000))
+      tracker.push(nb(1, 'position', 'parity', true, 2000))
+      tracker.push(nb(1, 'symbol', 'parity', false, 600))
+      tracker.push(nb(2, 'position', 'symbol', false, 500))
+      tracker.push(nb(2, 'symbol', 'symbol', false, 500))
+    })
+    fireEvent.click(screen.getByRole('button', { name: /View Telemetry as Table/i }))
+    expect(dataRows()).toHaveLength(6) // the judge table still lists every event
+    fireEvent.click(screen.getByRole('button', { name: /Fast-Forward to Summary/i }))
+    // Rule-stream events: 400 ok, 600 wrong, 500 wrong -> 1 / 3 right, mean 500 ms.
+    expect(screen.getByText(/Accuracy 33% · 500 ms\./)).toBeInTheDocument()
+  })
+
   it('counts and averages every event of the block, though the judge table keeps only the latest 50', async () => {
     renderAt('/task/episodic_pattern_separation?judge=1')
     await begin('Precision Archive')

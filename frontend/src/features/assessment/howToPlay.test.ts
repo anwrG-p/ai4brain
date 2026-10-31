@@ -67,10 +67,35 @@ describe('How to play (INT-1 item 13)', () => {
 
   it('N-back with both streams: only the rule shown counts (R16, as the on-screen hint says)', () => {
     expect(howToPlay(task('n_back'))!.steps).toEqual([
-      'Place rule: same place 2 back? Tap [A].',
-      'Symbol rule: same symbol 2 back? Tap [L].',
+      'Place rule: 2 back? Tap or press [A].',
+      'Symbol rule: 2 back? Tap or press [L].',
       'Anything else? Do nothing.',
     ])
+  })
+
+  it('N-back names only the rules its trials use, parity included', () => {
+    const base = task('n_back')
+    const p = base.params as NBackParams
+    const withRules = (rules: NBackParams['trials'][number]['rule'][], streams = p.streams) =>
+      howToPlay({ ...base, params: { ...p, streams, trials: rules.map((rule) => ({ ...p.trials[0]!, rule })) } } as TaskPayload)!.steps
+    // One rule in a two-stream task: the other stream's matches are still lures.
+    expect(withRules(['symbol'])).toEqual(['Symbol matches 2 back? Tap or press [L].', 'Anything else? Do nothing.'])
+    expect(withRules(['position', 'parity'])).toEqual([
+      'Place rule: 2 back? Tap or press [A].',
+      'Parity rule: even number? Tap or press [L].',
+      'Anything else? Do nothing.',
+    ])
+    expect(withRules(['parity'], ['symbol'])).toEqual(['Even number? Tap or press [L].', 'Anything else? Do nothing.'])
+    // A parity rule without the symbol stream has no key to answer with: not named.
+    expect(withRules(['position', 'parity'], ['position'])).toEqual(['Place matches 2 back? Tap or press [A].', 'No match? Do nothing.'])
+    // All three rules: one step points at the hint, so the steps stay at 3.
+    expect(withRules(['position', 'symbol', 'parity'])).toEqual([
+      'Follow the rule above the grid.',
+      'Its match? Tap or press [A] or [L].',
+      'Anything else? Do nothing.',
+    ])
+    for (const rules of [['position', 'parity'], ['position', 'symbol', 'parity'], ['parity']] as const)
+      for (const s of withRules([...rules])) expect(words(s), s).toBeLessThanOrEqual(8)
   })
 
   it('an unknown exercise has none', () => {

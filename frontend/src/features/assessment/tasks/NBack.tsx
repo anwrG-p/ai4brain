@@ -4,6 +4,7 @@ import { Card } from '../../../components/ui/Card'
 import { tracker } from '../telemetry/tracker'
 import { useInputCapture } from '../telemetry/useInputCapture'
 import { pressProps } from '../telemetry/useTimedTrials'
+import { NBACK_RULE_STREAM as RULE_STREAM } from '../telemetry/types'
 import type { NBackEventTrialType, NBackParams, TelemetryEvent } from '../telemetry/types'
 import type { TaskProps } from './TaskRunner'
 import { EXERCISE_NAME } from '../names'
@@ -13,8 +14,6 @@ type Rule = NBackParams['trials'][number]['rule']
 
 export const KEYS: Record<string, Stream> = { a: 'position', l: 'symbol' }
 const LABEL: Record<Stream, string> = { position: 'Position match (A)', symbol: 'Symbol match (L)' }
-// The stream whose key the hint names: the rule's own stream; parity is answered with L (symbol).
-const RULE_STREAM: Record<Rule, Stream> = { position: 'position', symbol: 'symbol', parity: 'symbol' }
 
 const hint = (rule: Rule, n: number) =>
   rule === 'position'
@@ -29,11 +28,12 @@ const LIT = 'var(--dim-1)'
 const UNLIT = 'var(--color-surface-raised)'
 
 // Interference N-back: 3×3 grid position + centre symbol, one event per stream per trial.
-// Scoring follows the hint (R16): only the rule's stream expects a press, when answer[rule stream]
-// is true. The rule-stream event carries the trial's verdict: right when its key was pressed exactly
-// on a match and the off-rule key was not pressed at all. A match on the other stream is a lure
-// (`lure_stream`): its key must be withheld, and a press is wrong on that stream's own event too.
-// `answer` stays per-stream data (the true n-back match on each stream).
+// Scoring follows the hint (R16): only the rule's stream (RULE_STREAM) expects a press, when
+// answer[rule stream] is true. The rule-stream event carries the trial's verdict: right when the rule
+// key's press-or-withhold matches that answer and the off-rule key was not pressed at all (so an
+// off-rule press is a false alarm on a noise trial and a miss on a target trial). A match on the other
+// stream is a lure (`lure_stream`): its key must be withheld, and a press is wrong on that stream's own
+// event too. `answer` stays per-stream data (the true n-back match on each stream).
 export function NBack({ params, recorder, onDone }: TaskProps<NBackParams>) {
   const [i, setI] = useState(0)
   const [stimOff, setStimOff] = useState(-1) // index of the trial whose stimulus has been hidden

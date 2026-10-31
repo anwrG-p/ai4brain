@@ -92,10 +92,10 @@ test.each(Object.keys(EXERCISE_NAME))('%s: a step that ends on a keycap keeps it
   }
 })
 
-test('N-back: the instruction keeps "Tap A." together and shows the task n in the caption', () => {
+test('N-back: the instruction keeps "press A." together and shows the task n in the caption', () => {
   setup('n_back')
   const items = within(screen.getByRole('list', { name: 'How to play' })).getAllByRole('listitem')
-  expect(items[0]!.querySelector('[data-nowrap]')?.textContent).toBe('Tap A.')
+  expect(items[0]!.querySelector('[data-nowrap]')?.textContent).toBe('press A.')
   expect(screen.getByText('Same place and symbol, 2 back')).toBeInTheDocument()
 })
 

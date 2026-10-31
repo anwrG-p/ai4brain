@@ -1,3 +1,4 @@
+import { NBACK_RULE_STREAM } from '../assessment/telemetry/types'
 import type { SchemaType, TelemetryEvent } from '../assessment/telemetry/types'
 import type { InputScore, TaskScores } from './pillars'
 
@@ -155,17 +156,30 @@ export function taskScores(events: readonly TelemetryEvent[]): TaskScores {
   return out
 }
 
-const ruleStream = (nb: TelemetryEvent[]) => nb.filter((e) => e.trial_meta?.stream === e.trial_meta?.rule)
+/** True for the n-back event that carries its trial's verdict: the one on the stream whose key the
+    rule's hint names (NBACK_RULE_STREAM; symbol for parity). An unknown rule falls back to the
+    stream of the same name. */
+export function onRuleStream(e: TelemetryEvent): boolean {
+  const rule = e.trial_meta?.rule
+  const want = typeof rule === 'string' && Object.hasOwn(NBACK_RULE_STREAM, rule) ? NBACK_RULE_STREAM[rule as keyof typeof NBACK_RULE_STREAM] : rule
+  return e.trial_meta?.stream === want
+}
+
+/** The events that count toward a block's accuracy: all of them, except n-back's off-rule events
+    (the rule-stream event already holds the trial's verdict, R16). */
+export const countsToward = (e: TelemetryEvent) => schemaOf(e) !== 'n_back' || onRuleStream(e)
+
+const ruleStream = (nb: TelemetryEvent[]) => nb.filter(onRuleStream)
 const isSwitch = (e: TelemetryEvent) => e.trial_meta?.trial_type === 'switch'
 const isTarget = (e: TelemetryEvent) => e.trial_meta?.trial_type === 'target'
 
-/** d' on the n-back rule stream (only its answer follows trial_type: target <-> respond), switch
-    trials left out. Signal = a rule-stream match (target); noise = every other non-switch trial,
-    other-stream lures included. NBack.tsx marks the rule event wrong on any off-rule press (R16), so
-    a press on an other-stream match is a false alarm here. Floored at 0 when the raw hit rate is
-    not above the raw false-alarm rate (the log-linear correction alone would give a non-responder
-    a small positive d'). Null without both signal and noise trials.
-    ponytail: 'parity' rule events have no stream to score and are skipped. */
+/** d' on the n-back rule stream (only its answer follows trial_type: target <-> respond; under a
+    parity rule a target is an even symbol), switch trials left out. Signal = a rule-stream match
+    (target); noise = every other non-switch trial, other-stream lures included. NBack.tsx marks the
+    rule event wrong on any off-rule press (R16): on a noise trial that is a false alarm, on a target
+    trial a miss (never a hit plus a false alarm). Floored at 0 when the raw hit rate is not above
+    the raw false-alarm rate (the log-linear correction alone would give a non-responder a small
+    positive d'). Null without both signal and noise trials. */
 function nbackDPrime(nb: TelemetryEvent[]): number | null {
   const scored = ruleStream(nb).filter((e) => !isSwitch(e))
   const signal = scored.filter(isTarget)

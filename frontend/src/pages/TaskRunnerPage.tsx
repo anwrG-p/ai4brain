@@ -9,6 +9,7 @@ import { EXERCISE_NAME } from '../features/assessment/names'
 import { tracker } from '../features/assessment/telemetry/tracker'
 import type { TelemetryEvent } from '../features/assessment/telemetry/types'
 import { saveRun } from '../features/insights/sessionStore'
+import { countsToward } from '../features/insights/taskScores'
 import { Loti } from '../components/features/characters'
 import { useJudgeMode } from '../components/layout/judgeMode'
 import { Button } from '../components/ui/Button'
@@ -103,9 +104,10 @@ export default function TaskRunnerPage() {
     setRunEvents([])
   }, [])
 
+  // N-back logs one event per stream; only its rule-stream event (the trial's verdict, R16) counts.
   const totals = useMemo(
     () =>
-      runEvents.reduce(
+      runEvents.filter(countsToward).reduce(
         (t, e) => ({ n: t.n + 1, rtSum: t.rtSum + e.response_time_ms, errors: t.errors + (e.error_flag ? 1 : 0) }),
         { n: 0, rtSum: 0, errors: 0 },
       ),

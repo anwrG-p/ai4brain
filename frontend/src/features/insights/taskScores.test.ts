@@ -124,6 +124,24 @@ describe('taskScores', () => {
     expect(s.DCCS_SwitchCost?.score).toBeCloseTo(100 * (1 - (25 / 30 - 3 / 4) / 0.5), 6)
   })
 
+  it('scores parity-rule trials on the symbol stream (L = even), not on the position stream', () => {
+    const rule = 'parity'
+    const trial = (trial_type: string, ok: boolean, posOk = true) => {
+      const t = seq++
+      return [
+        ev({ trial_type: 'standard', rule, stream: 'position' }, { ok: posOk, trial: t }),
+        ev({ trial_type, rule, stream: 'symbol' }, { ok, trial: t }),
+      ]
+    }
+    const events = [
+      ...repeat(10, (k) => trial('target', k < 8)).flat(),
+      ...repeat(30, (k) => trial('standard', k >= 3, k >= 3)).flat(), // 3 false alarms, each an A press
+    ]
+    const s = taskScores(events)
+    expect(s.OSPAN?.trials).toBe(40)
+    expect(s.OSPAN?.score).toBeCloseTo(25 * dPrime(8, 10, 3, 30), 6)
+  })
+
   it("leaves switch trials out of d'", () => {
     const rule = 'position'
     const base = [
