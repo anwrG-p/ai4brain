@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { ExerciseDemo } from './ExerciseDemo'
 import { EXERCISE_NAME } from './exercises'
 import { ExerciseFrame, FIXATION_MS } from './ExerciseFrame'
 import fixtures from './tasks/fixtures.json'
@@ -73,6 +74,38 @@ test.each(Object.keys(EXERCISE_NAME))('%s: its instruction screen has how-to-pla
   expect(screen.getByText(/^Trains: /)).toBeInTheDocument()
   expect(container.querySelector('[data-demo-caption]')?.textContent).toBeTruthy()
   expect(container.querySelector('details')!.open).toBe(false)
+})
+
+// At 375 px a keycap must not wrap onto its own line: each step's last word, keycap(s) and closing
+// punctuation stay together.
+test.each(Object.keys(EXERCISE_NAME))('%s: a step that ends on a keycap keeps its last words with it', (schema) => {
+  setup(schema as SchemaType)
+  for (const li of within(screen.getByRole('list', { name: 'How to play' })).getAllByRole('listitem')) {
+    const last = [...li.querySelectorAll('kbd')].at(-1)
+    if (!last) continue
+    const tail = li.textContent!.trimEnd().split(/\s+/).at(-1)!
+    if (!tail.includes(last.textContent!)) continue // the step does not end on a keycap
+    const keep = last.closest('[data-nowrap]')
+    expect(keep, li.textContent!).not.toBeNull()
+    expect(keep).toHaveClass('whitespace-nowrap')
+    expect(keep!.textContent).toMatch(new RegExp(`\\S+\\s+${tail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`))
+  }
+})
+
+test('N-back: the instruction keeps "press A." together and shows the task n in the caption', () => {
+  setup('n_back')
+  const items = within(screen.getByRole('list', { name: 'How to play' })).getAllByRole('listitem')
+  expect(items[0]!.querySelector('[data-nowrap]')?.textContent).toBe('press A.')
+  expect(screen.getByText('Same place and symbol, 2 back')).toBeInTheDocument()
+})
+
+test.each([1, 2, 3])('the N-back demo draws a match %i back: n + 1 squares, the last on the first', (n) => {
+  const { container } = render(<ExerciseDemo schema="n_back" n={n} />)
+  const squares = [...container.querySelectorAll('g.anim-demo-seq')]
+  expect(squares).toHaveLength(n + 1)
+  const at = (g: Element) => [g.querySelector('rect')!.getAttribute('x'), g.querySelector('rect')!.getAttribute('y'), g.textContent]
+  expect(at(squares[n]!)).toEqual(at(squares[0]!))
+  for (const g of squares.slice(1, n)) expect(at(g)).not.toEqual(at(squares[0]!))
 })
 
 test('Space starts the exercise after a 500 ms fixation cross', () => {

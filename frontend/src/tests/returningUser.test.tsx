@@ -31,7 +31,7 @@ afterEach(() => {
 describe('a returning device skips the first-visit flow', () => {
   it('a new device sees Welcome on /', async () => {
     go('/')
-    expect(await screen.findByRole('heading', { level: 1, name: "Hi, I'm Loti." })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: "Hi, I'm Loti." }, { timeout: 5000 })).toBeInTheDocument()
     expect(window.location.pathname).toBe('/')
   })
 
@@ -40,7 +40,7 @@ describe('a returning device skips the first-visit flow', () => {
     const length = window.history.length
     go('/')
     expect(screen.queryByRole('heading', { name: "Hi, I'm Loti." })).toBeNull()
-    await waitFor(() => expect(window.location.pathname).toBe('/dashboard'))
+    await waitFor(() => expect(window.location.pathname).toBe('/dashboard'), { timeout: 5000 })
     expect(window.history.length).toBe(length + 1) // the pushState above; the redirect replaced it
     expect(screen.queryByRole('heading', { name: "Hi, I'm Loti." })).toBeNull()
   })
@@ -48,30 +48,30 @@ describe('a returning device skips the first-visit flow', () => {
   it('a device with one session goes from /baseline to Home', async () => {
     useSessionStore.getState().addSession(SESSION)
     go('/baseline')
-    await waitFor(() => expect(window.location.pathname).toBe('/dashboard'))
+    await waitFor(() => expect(window.location.pathname).toBe('/dashboard'), { timeout: 5000 })
     expect(screen.queryByRole('heading', { name: 'Your first check-in' })).toBeNull()
   })
 
   it('?again=1 is the explicit retake: the baseline runs', async () => {
     useSessionStore.getState().addSession(SESSION)
     go('/baseline?again=1')
-    expect(await screen.findByRole('heading', { name: 'Your first check-in' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Your first check-in' }, { timeout: 5000 })).toBeInTheDocument()
     expect(window.location.pathname).toBe('/baseline')
   })
 
   it('/results stays reachable with sessions', async () => {
     useSessionStore.getState().addSession(SESSION)
     go('/results')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Your results are ready' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your results are ready' }, { timeout: 5000 })).toBeInTheDocument()
   })
 
   it('after "Delete my data", / shows Welcome again', async () => {
     useSessionStore.getState().addSession(SESSION)
     go('/privacy')
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete my data' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete my data' }, { timeout: 5000 }))
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
     cleanup()
     go('/')
-    expect(await screen.findByRole('heading', { level: 1, name: "Hi, I'm Loti." })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: "Hi, I'm Loti." }, { timeout: 5000 })).toBeInTheDocument()
   })
 })

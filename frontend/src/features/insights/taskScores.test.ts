@@ -100,6 +100,48 @@ describe('taskScores', () => {
     expect(s?.trials).toBe(34)
   })
 
+  it("counts a press on an other-stream match (a lure for the rule) as a false alarm in d' and the switch cost", () => {
+    // R16, as NBack logs it: rule symbol; on 5 noise trials and 1 switch trial the place matched 2 back and
+    // A was pressed. The rule event carries the false alarm; the position event is the lure itself.
+    const rule = 'symbol'
+    const trial = (trial_type: string, ok: boolean, lure = false) => {
+      const trialIndex = seq++
+      return [
+        ev({ trial_type: lure ? 'lure_stream' : 'standard', rule, stream: 'position' }, { ok: !lure || ok, trial: trialIndex }),
+        ev({ trial_type, rule, stream: rule }, { ok, trial: trialIndex }),
+      ]
+    }
+    const events = [
+      ...repeat(10, (k) => trial('target', k < 9)).flat(),
+      ...repeat(25, () => trial('standard', true)).flat(),
+      ...repeat(5, () => trial('standard', false, true)).flat(), // pressed A on a place match
+      ...repeat(3, () => trial('switch', true, true)).flat(), // withheld on a place match
+      ...trial('switch', false, true), // pressed A on a place match
+    ]
+    const s = taskScores(events)
+    expect(s.OSPAN?.trials).toBe(40)
+    expect(s.OSPAN?.score).toBeCloseTo((100 * dPrime(9, 10, 5, 30)) / 4, 6)
+    expect(s.DCCS_SwitchCost?.score).toBeCloseTo(100 * (1 - (25 / 30 - 3 / 4) / 0.5), 6)
+  })
+
+  it('scores parity-rule trials on the symbol stream (L = even), not on the position stream', () => {
+    const rule = 'parity'
+    const trial = (trial_type: string, ok: boolean, posOk = true) => {
+      const t = seq++
+      return [
+        ev({ trial_type: 'standard', rule, stream: 'position' }, { ok: posOk, trial: t }),
+        ev({ trial_type, rule, stream: 'symbol' }, { ok, trial: t }),
+      ]
+    }
+    const events = [
+      ...repeat(10, (k) => trial('target', k < 8)).flat(),
+      ...repeat(30, (k) => trial('standard', k >= 3, k >= 3)).flat(), // 3 false alarms, each an A press
+    ]
+    const s = taskScores(events)
+    expect(s.OSPAN?.trials).toBe(40)
+    expect(s.OSPAN?.score).toBeCloseTo(25 * dPrime(8, 10, 3, 30), 6)
+  })
+
   it("leaves switch trials out of d'", () => {
     const rule = 'position'
     const base = [
@@ -210,12 +252,16 @@ describe('taskScores', () => {
     const dim = 'executive_function'
     const pattern = [false, true, false, false, true]
     const events = pattern.map((ok, trial) => ev({ congruent: true }, { dim, ok, trial, task: 'r' }))
-    // The n-back trial 1 is wrong on one of its two streams, so trial 2 follows an error.
+    // N-back reads the rule stream only (R16): trial 1 is wrong only off-rule (symbol), so it is not an
+    // error; trial 3 is wrong on the rule stream (position), so trial 4 follows an error.
     const nb = (trial: number, ok: boolean, stream: string) =>
       ev({ trial_type: 'standard', rule: 'position', stream }, { trial, ok, task: 'n' })
-    events.push(nb(1, true, 'position'), nb(1, false, 'symbol'), nb(2, true, 'position'), nb(2, true, 'symbol'))
+    events.push(
+      ...[nb(1, true, 'position'), nb(1, false, 'symbol'), nb(2, true, 'position'), nb(2, true, 'symbol')],
+      ...[nb(3, false, 'position'), nb(3, false, 'symbol'), nb(4, true, 'position'), nb(4, true, 'symbol')],
+    )
     const s = taskScores(events)
-    // After errors: r1 ok, r3 wrong, r4 ok, n2 ok -> 3 / 4
+    // After errors: r1 ok, r3 wrong, r4 ok, n4 ok -> 3 / 4
     expect(s.ErrorRecovery).toEqual({ score: 75, trials: 4 })
   })
 })

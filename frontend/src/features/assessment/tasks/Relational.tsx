@@ -9,6 +9,7 @@ import { EXERCISE_NAME } from '../names'
 
 type Trial = RelationalParams['levels'][number][number]
 
+export const KEYS: Record<string, boolean> = { t: true, f: false }
 const ARROW = { more: '▷', less: '◁' } as const
 const WORDS = { same: 'SAME as', opposite: 'OPPOSITE to', before: 'BEFORE', after: 'AFTER', contains: 'CONTAINS' } as const
 
@@ -66,8 +67,8 @@ export function Relational({ params, recorder, onDone }: TaskProps<RelationalPar
     if (!t) return
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
-      const k = e.key.toLowerCase()
-      if (k === 't' || k === 'f') respond((k === 't') === t.answer)
+      const v = KEYS[e.key.toLowerCase()]
+      if (v !== undefined) respond(v === t.answer)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

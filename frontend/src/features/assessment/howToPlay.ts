@@ -1,4 +1,5 @@
 import type { PillarId } from '../insights/pillars'
+import { NBACK_RULE_STREAM } from './telemetry/types'
 import type { NBackParams, SchemaType, StroopParams, TaskPayload } from './telemetry/types'
 
 /* "How to play" for each exercise's instruction screen (INT-1 item 13; user: "add some explanation to
@@ -22,15 +23,26 @@ export function howToPlay(task: TaskPayload): HowToPlay | null {
   const p = task.params
   switch (task.schema_type as SchemaType) {
     case 'n_back': {
-      // NBack.tsx: one answer per stream; a press is right exactly when that stream matches n back.
-      const { n, streams } = p as NBackParams
+      // NBack.tsx (R16): only the rule shown above the grid counts, on the key its hint names
+      // (NBACK_RULE_STREAM: A = place, L = symbol, L = even for parity). A match on the other stream is
+      // a lure, so any other press is wrong. One step per rule the trials use (if its key is shown);
+      // with all three rules there is no room, so one step points at the hint instead.
+      const { n, streams, trials } = p as NBackParams
+      const RULES = ['position', 'symbol', 'parity'] as const
+      const used = RULES.filter((r) => streams.includes(NBACK_RULE_STREAM[r]) && trials.some((t) => t.rule === r))
+      const rules = used.length ? used : RULES.filter((r) => r !== 'parity' && streams.includes(r))
+      const only = rules.length === 1
+      const step = {
+        position: only ? `Place matches ${n} back? Tap or press [A].` : `Place rule: ${n} back? Tap or press [A].`,
+        symbol: only ? `Symbol matches ${n} back? Tap or press [L].` : `Symbol rule: ${n} back? Tap or press [L].`,
+        parity: only ? 'Even number? Tap or press [L].' : 'Parity rule: even number? Tap or press [L].',
+      }
+      const ruleSteps =
+        rules.length > 2 ? ['Follow the rule above the grid.', 'Its match? Tap or press [A] or [L].'] : rules.map((r) => step[r])
+      const plain = streams.length === 1 && only && rules[0] !== 'parity'
       return {
-        steps: [
-          ...(streams.includes('position') ? [`Place matches ${n} back? Tap or press [A].`] : []),
-          ...(streams.includes('symbol') ? [`Symbol matches ${n} back? Tap or press [L].`] : []),
-          'No match? Do nothing.',
-        ],
-        caption: 'Same place and letter, 2 back',
+        steps: [...ruleSteps, plain ? 'No match? Do nothing.' : 'Anything else? Do nothing.'],
+        caption: `Same place and symbol, ${n} back`, // ExerciseDemo draws a match n back
         pillar: 'agility',
         more: ['It measures how much you hold in mind.', 'Sometimes the rule switches partway through.'],
       }
