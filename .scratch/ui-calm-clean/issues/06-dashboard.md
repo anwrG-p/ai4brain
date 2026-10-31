@@ -1,6 +1,6 @@
 # 06: Dashboard (`/dashboard`)
 
-Status: ready-for-agent
+Status: wontfix
 Blocked by: 02
 Spec: `../spec.md` (Goal, R1, R2, R5)
 
@@ -42,3 +42,7 @@ This page is not copy-lint exempt. "38 ms Jitter" becomes consumer language ("Co
 ## Done when
 
 `qa:checks` is green, the dashboard e2e passes, and the commit has no AI attribution.
+
+## Comments
+
+- 2026-10-31 (TD-03 tracker hygiene): Superseded by `.scratch/brand-v2/` (brand-v2 ticket 08 is the dashboard).

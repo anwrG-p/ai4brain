@@ -1,6 +1,6 @@
 # 07: Flow: Welcome → Baseline → Results (blur, dolphin, login + consent)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 02, 03, 05, 06
 Spec: `../spec.md` (IA flow, R3, R4, U1, all Anti-slop rules — esp. 13 need-to-know only: each Results step shows one message + one action). Source: `docs/Landing page.docx`.
 
@@ -51,3 +51,7 @@ Centred, mobile-first, max-width about 560 px.
 ## Done when
 
 `qa:checks` is green, the flow e2e passes, and the commit has no AI attribution.
+
+## Comments
+
+- 2026-10-31 (TD-03 tracker hygiene): Done in 9bae4b3..d3d51c8, plus the 07b motion pass 30fd78c; reviews clean (brand-v2 ledger). Minor follow-ups: `07c-cleanup.md`.

@@ -1,6 +1,6 @@
 # 07: Verify everything, regenerate screenshots, docs
 
-Status: ready-for-agent
+Status: wontfix
 Blocked by: 03, 04, 05, 06
 Spec: `../spec.md` ("Done when")
 
@@ -27,3 +27,7 @@ The e2e specs write to `docs/ui/screenshots/`. Commit the regenerated images, be
 ## Done when
 
 All of the above pass, and the commits have no AI attribution.
+
+## Comments
+
+- 2026-10-31 (TD-03 tracker hygiene): Superseded by `.scratch/brand-v2/` (brand-v2 ticket 10 verifies and updates docs).

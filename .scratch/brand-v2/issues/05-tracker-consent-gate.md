@@ -1,6 +1,6 @@
 # 05: Tracker consent gate (hold until accept)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: —
 Spec: `../spec.md` (R3, U4)
 
@@ -34,3 +34,7 @@ Spec: `../spec.md` (R3, U4)
 ## Done when
 
 `qa:checks` is green, and the commit has no AI attribution.
+
+## Comments
+
+- 2026-10-31 (TD-03 tracker hygiene): Done in e2f4835..3d2b34b, review clean (brand-v2 ledger).

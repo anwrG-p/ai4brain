@@ -1,6 +1,6 @@
 # 04: Pillar math and local session store (pure, tested)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: —
 Spec: `../spec.md` (R5, U5). Source: `docs/Rou7 zebda cognitive intelligence.docx`.
 
@@ -68,3 +68,7 @@ Document this in the code. Every input is a 0–100 score.
 ## Done when
 
 `qa:checks` is green, and the commit has no AI attribution.
+
+## Comments
+
+- 2026-10-31 (TD-03 tracker hygiene): Done in b1041e5..20c0b47, review clean (brand-v2 ledger).

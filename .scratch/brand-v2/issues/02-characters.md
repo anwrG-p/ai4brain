@@ -1,6 +1,6 @@
 # 02: Characters (Loti, Dolphin, Momo)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 01
 Spec: `../spec.md` (R1, Design intelligence: clay belongs to characters; Anti-slop rules 2, 9, 10)
 
@@ -43,3 +43,7 @@ Each character is a pure SVG React component in the brand doc's soft-clay style:
 - Screenshots of each character (light and dark, md and xl) are saved to the scratchpad and described in the report.
 - The report says how each character avoids looking like a generic AI illustration.
 - Commit with no AI attribution.
+
+## Comments
+
+- 2026-10-31 (TD-03 tracker hygiene): Done in 4cac361..665927b, review clean (brand-v2 ledger).
