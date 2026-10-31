@@ -1,1 +1,3 @@
 # clustering_engine runtime dependencies. The root requirements.txt includes this file.
+# GaussianMixture (clustering_gmm.py); pulls joblib and threadpoolctl. scipy/numpy are pinned in backend.
+scikit-learn==1.9.1
