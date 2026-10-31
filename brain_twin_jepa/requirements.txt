@@ -1,1 +1,6 @@
 # brain_twin_jepa runtime dependencies. The root requirements.txt includes this file.
+# PyTorch from the CPU wheel index: the brain twin trains and runs on CPU, and the CPU wheel is a
+# fraction of the CUDA one. A plain version pin matches the index's 2.14.1+cpu: a local version
+# sorts after the public one, so pip picks it on Linux and Windows (macOS wheels are CPU-only anyway).
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.14.1
