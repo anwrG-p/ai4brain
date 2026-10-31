@@ -139,6 +139,7 @@ describe('TaskRunnerPage mounts the real exercises', () => {
       queuedCount: 0,
       droppedCount: 4,
       maxCapacity: 500,
+      consent: 'granted',
     })
     renderAt('/task/episodic_pattern_separation')
     await screen.findByRole('region', { name: 'Shape memory' })

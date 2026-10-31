@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { Link } from 'react-router-dom'
 import { PrivacyCenter } from '../components/features/privacy/PrivacyCenter'
 import { WhyThisPanel } from '../components/features/coach/WhyThisPanel'
@@ -8,7 +8,7 @@ import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { DoodleSquiggle } from '../components/ui/DoodleDecorations'
 import { useAppStore } from '../state/useAppStore'
-import { tracker } from '../features/assessment/telemetry/tracker'
+import { tracker, type Consent } from '../features/assessment/telemetry/tracker'
 import { forgetUserId } from '../features/assessment/tasks/taskSource'
 import { useGoalsStore } from '../features/insights/goals'
 import { useSessionStore } from '../features/insights/sessionStore'
@@ -167,6 +167,8 @@ export default function PrivacyPage() {
     resetDemoState()
     // Drops pending events on this device; server-side deletion is Member 4's route.
     const recordsPurged = tracker.clear()
+    // Back to not asked: nothing is sent until the user accepts again.
+    tracker.resetConsent()
     forgetUserId()
     // The dashboard's local data: completed sessions and yearly goals.
     useSessionStore.getState().clearSessions()
@@ -241,6 +243,8 @@ export default function PrivacyPage() {
           </div>
         </div>
       </div>
+
+      <ConsentLine />
 
       {/* Download Alert Notification */}
       {downloadSuccessMessage && (
@@ -390,6 +394,51 @@ export default function PrivacyPage() {
               </Button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const CONSENT_LINE: Record<Consent, string> = {
+  pending: 'Your answers stay on this device until you choose.',
+  granted: 'You chose to share your answers with us.',
+  denied: 'You chose not to share. Your answers stay on this device.',
+}
+
+const subscribeTracker = (onChange: () => void) => tracker.subscribe(onChange)
+const currentConsent = () => tracker.getStatus().consent
+
+// R3 consent in one plain line; the two equal choices sit behind one quiet link (rules 13, 14).
+function ConsentLine() {
+  const consent = useSyncExternalStore(subscribeTracker, currentConsent)
+  const [open, setOpen] = useState(false)
+  const choose = (share: boolean) => {
+    if (share) tracker.grantConsent()
+    else tracker.denyConsent()
+    setOpen(false)
+  }
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-ink">
+        {CONSENT_LINE[consent]}{' '}
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+          className="focus-ring rounded-sm font-semibold text-ink-muted underline underline-offset-2 hover:text-ink"
+        >
+          Change my choice
+        </button>
+      </p>
+      {open && (
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" size="sm" onClick={() => choose(true)}>
+            Share my answers
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => choose(false)}>
+            Don't share
+          </Button>
         </div>
       )}
     </div>

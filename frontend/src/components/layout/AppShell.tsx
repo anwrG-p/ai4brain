@@ -86,7 +86,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pageProgress = getPageProgress(location.pathname)
 
   const isRealOffline = !queueStatus.isOnline
-  const showOfflineBanner = simulateOffline || isRealOffline
+  // R3: after a decline nothing is kept to send, so being offline changes nothing for the user.
+  const showOfflineBanner = queueStatus.consent !== 'denied' && (simulateOffline || isRealOffline)
 
   return (
     <div className={`min-h-screen flex flex-col bg-canvas text-ink ${location.pathname === '/' ? 'pb-0' : 'pb-16 lg:pb-0'}`}>
@@ -113,7 +114,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </span>
             ) : (
               <span>
-                <strong>Offline Mode Active:</strong> Trial telemetry is buffered locally (up to {queueStatus.maxCapacity} events) and will sync automatically when your connection returns ({queueStatus.queuedCount} queued).
+                <strong>Offline Mode Active:</strong> Trial telemetry is buffered locally (up to {queueStatus.maxCapacity} events){' '}
+                {/* Pending consent: nothing is sent, so no sync is promised. */}
+                {queueStatus.consent === 'granted'
+                  ? 'and will sync automatically when your connection returns'
+                  : 'and stays on this device'}{' '}
+                ({queueStatus.queuedCount} queued).
               </span>
             )}
           </span>

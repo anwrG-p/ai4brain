@@ -206,10 +206,12 @@ function sent(fetchFn: ReturnType<typeof okFetch>, call = 0): number[] {
 }
 
 const KEY = 'synapsetwin_telemetry_queue_v2'
+const CONSENT_KEY = 'synapsetwin_consent_v1'
 
-// In-memory stand-in for localStorage, so no test touches the real one.
-function memStorage(init: Record<string, string> = {}) {
-  const m = new Map(Object.entries(init))
+// In-memory stand-in for localStorage, so no test touches the real one. It starts as a returning
+// user who already accepted, so the sending tests keep their meaning; pass consent null for a new user.
+function memStorage(init: Record<string, string> = {}, consent: string | null = 'granted') {
+  const m = new Map(Object.entries(consent === null ? init : { [CONSENT_KEY]: consent, ...init }))
   return {
     getItem: (k: string) => m.get(k) ?? null,
     setItem: (k: string, v: string) => void m.set(k, v),
@@ -582,6 +584,8 @@ describe('Tracker', () => {
       const storage = { getItem: boom, setItem: boom, removeItem: boom }
       const fetchFn = okFetch()
       const t = make({ fetchFn, beacon: vi.fn(), storage })
+      expect(t.getStatus().consent).toBe('pending') // unreadable storage: nobody has accepted yet
+      t.grantConsent() // the choice still holds in memory for this page's life
       t.push(full(1))
       await t.flush()
       t.push(full(2))
@@ -684,7 +688,13 @@ describe('Tracker', () => {
       expect(storage.getItem(KEY)).not.toBeNull()
       expect(t.clear()).toBe(2)
       expect(listener).toHaveBeenCalledTimes(3)
-      expect(t.getStatus()).toEqual({ isOnline: true, queuedCount: 0, droppedCount: 0, maxCapacity: 500 })
+      expect(t.getStatus()).toEqual({
+        isOnline: true,
+        queuedCount: 0,
+        droppedCount: 0,
+        maxCapacity: 500,
+        consent: 'granted',
+      })
       expect(storage.getItem(KEY)).toBeNull()
       unsubscribe()
       t.push(full(3))
@@ -783,6 +793,123 @@ describe('Tracker', () => {
       t.destroy()
       window.dispatchEvent(new Event('offline'))
       expect(t.getStatus().isOnline).toBe(true)
+    })
+  })
+
+  describe('consent gate (R3: nothing leaves the device until the user accepts)', () => {
+    // Every send path: batch size, interval, online, pagehide, hidden, and the public flush calls.
+    async function trySendEverything(t: Tracker) {
+      await vi.advanceTimersByTimeAsync(10 * 60_000)
+      window.dispatchEvent(new Event('online'))
+      window.dispatchEvent(new Event('pagehide'))
+      setVisibility('hidden')
+      t.flushBeacon()
+      await t.flush()
+      await vi.advanceTimersByTimeAsync(10 * 60_000)
+    }
+
+    test('a new user starts pending: events are kept and persisted, nothing is sent', async () => {
+      const storage = memStorage({}, null)
+      const fetchFn = okFetch()
+      const beacon = vi.fn((_url: string, _data: Blob) => true)
+      const t = make({ fetchFn, beacon, storage })
+      expect(t.getStatus().consent).toBe('pending')
+      for (let i = 0; i < 25; i++) t.push(full(i)) // past batchSize
+      await trySendEverything(t)
+      expect(fetchFn).not.toHaveBeenCalled()
+      expect(beacon).not.toHaveBeenCalled()
+      expect(t.getStatus().queuedCount).toBe(25)
+      t.destroy()
+      const reloaded = make({ fetchFn, beacon, storage })
+      expect(reloaded.getStatus()).toMatchObject({ consent: 'pending', queuedCount: 25 })
+      await trySendEverything(reloaded)
+      expect(fetchFn).not.toHaveBeenCalled()
+    })
+
+    test('an unknown stored consent value counts as pending', async () => {
+      const fetchFn = okFetch()
+      const t = make({ fetchFn, beacon: vi.fn(), storage: memStorage({}, 'yes') })
+      expect(t.getStatus().consent).toBe('pending')
+      t.push(full(1))
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(fetchFn).not.toHaveBeenCalled()
+    })
+
+    test('grantConsent persists, notifies and sends the held events in batches of at most 100', async () => {
+      const storage = memStorage(stored(Array.from({ length: 250 }, (_, i) => full(i))), null)
+      const fetchFn = okFetch()
+      const t = make({ fetchFn, beacon: vi.fn(), storage })
+      const listener = vi.fn()
+      t.subscribe(listener)
+      t.grantConsent()
+      expect(t.getStatus().consent).toBe('granted')
+      expect(storage.getItem(CONSENT_KEY)).toBe('granted')
+      expect(listener).toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(fetchFn).toHaveBeenCalledTimes(1) // immediately, not on the next tick of the timer
+      await vi.advanceTimersByTimeAsync(10_000)
+      const batches = fetchFn.mock.calls.map((_, i) => sent(fetchFn, i))
+      expect(batches.every((b) => b.length <= 100)).toBe(true)
+      expect(batches.flat()).toEqual(Array.from({ length: 250 }, (_, i) => i))
+      expect(t.getStatus().queuedCount).toBe(0)
+      expect(storage.getItem(KEY)).toBeNull()
+    })
+
+    test('denyConsent clears buffer and storage; later pushes are dropped, counted, and still shown', async () => {
+      const storage = memStorage({}, null)
+      const fetchFn = okFetch()
+      const beacon = vi.fn((_url: string, _data: Blob) => true)
+      const t = make({ fetchFn, beacon, storage })
+      t.push(full(1))
+      t.push(full(2))
+      t.denyConsent()
+      expect(t.getStatus()).toMatchObject({ consent: 'denied', queuedCount: 0, droppedCount: 0 })
+      expect(storage.getItem(KEY)).toBeNull()
+      expect(storage.getItem(CONSENT_KEY)).toBe('denied')
+      const seen = vi.fn() // results stay on the device: on-screen listeners still get the event
+      t.onEvent(seen)
+      t.push(full(3))
+      expect(seen).toHaveBeenCalledOnce()
+      expect(t.getStatus()).toMatchObject({ queuedCount: 0, droppedCount: 1 })
+      expect(storage.getItem(KEY)).toBeNull()
+      await trySendEverything(t)
+      expect(fetchFn).not.toHaveBeenCalled()
+      expect(beacon).not.toHaveBeenCalled()
+      t.destroy()
+      expect(make({ fetchFn, beacon, storage }).getStatus().consent).toBe('denied')
+    })
+
+    test('denied ignores a stale stored queue instead of restoring it', () => {
+      const storage = memStorage(stored([full(1)]), 'denied')
+      const t = make({ fetchFn: okFetch(), beacon: vi.fn(), storage })
+      expect(t.getStatus().queuedCount).toBe(0)
+      expect(storage.getItem(KEY)).toBeNull()
+    })
+
+    test('a returning user who granted sends restored and new events, by fetch and by beacon', async () => {
+      const storage = memStorage(stored([full(1)]))
+      const fetchFn = okFetch()
+      const beacon = vi.fn((_url: string, _data: Blob) => true)
+      const t = make({ fetchFn, beacon, storage })
+      expect(t.getStatus().consent).toBe('granted')
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(sent(fetchFn)).toEqual([1])
+      t.push(full(2))
+      window.dispatchEvent(new Event('pagehide'))
+      expect(beacon).toHaveBeenCalledOnce()
+    })
+
+    test('resetConsent goes back to pending, forgets the stored choice, and holds new events', async () => {
+      const storage = memStorage()
+      const fetchFn = okFetch()
+      const t = make({ fetchFn, beacon: vi.fn(), storage })
+      t.resetConsent()
+      expect(t.getStatus().consent).toBe('pending')
+      expect(storage.getItem(CONSENT_KEY)).toBeNull()
+      t.push(full(1))
+      await trySendEverything(t)
+      expect(fetchFn).not.toHaveBeenCalled()
+      expect(t.getStatus().queuedCount).toBe(1)
     })
   })
 
