@@ -125,11 +125,11 @@ describe('LotiBubbles', () => {
     expect(screen.getByRole('button', { name: /talk to loti/i })).toHaveFocus()
   })
 
-  it('a train choice runs the action and navigates to the exercise', async () => {
+  it('a train choice runs the action and opens Train on that pillar', async () => {
     const user = userEvent.setup()
     renderBubbles({ ...dayCtx, weakestPillar: 'memory' })
     await user.click(screen.getByRole('button', { name: /yes/i }))
-    expect(screen.getByTestId('where')).toHaveTextContent('/task/episodic_pattern_separation?schema=mst')
+    expect(screen.getByTestId('where')).toHaveTextContent('/train?pillar=memory')
   })
 
   it('hands actions to onAction when given', async () => {

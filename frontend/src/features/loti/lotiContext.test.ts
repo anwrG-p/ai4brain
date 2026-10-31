@@ -1,6 +1,18 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import * as dashboard from '../insights/dashboard'
 import { lotiContext } from './lotiContext'
 import type { SessionRecord } from '../insights/sessionStore'
+
+// Spied on, called through: Loti reads the weakest pillar and the week's count as the dashboard does.
+vi.mock('../insights/dashboard', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../insights/dashboard')>()
+  return {
+    ...real,
+    currentPillars: vi.fn(real.currentPillars),
+    weakestPillar: vi.fn(real.weakestPillar),
+    sessionsThisWeek: vi.fn(real.sessionsThisWeek),
+  }
+})
 
 const now = new Date('2026-10-28T15:00:00') // a Wednesday
 
@@ -34,5 +46,14 @@ describe('lotiContext', () => {
     expect(ctx.sessionsThisWeek).toBe(2)
     expect(ctx.hasGoalsThisYear).toBe(true)
     expect(ctx.mood).toBe('frustrated')
+  })
+
+  it('uses the dashboard’s own helpers, so Loti and Home agree on the weakest pillar and the week', () => {
+    const sessions = [session('2026-10-27T10:00:00', { UFOV_SOA: { score: 50, trials: 40 }, ANT_Orienting: { score: 50, trials: 40 } })]
+    const ctx = lotiContext({ sessions, goals: { year: null, goals: {} }, emotion: undefined, now })
+    expect(dashboard.currentPillars).toHaveBeenCalledWith(sessions)
+    expect(dashboard.weakestPillar).toHaveBeenCalled()
+    expect(dashboard.sessionsThisWeek).toHaveBeenCalledWith(sessions, now)
+    expect(ctx.weakestPillar).toBe(dashboard.weakestPillar(dashboard.currentPillars(sessions)))
   })
 })

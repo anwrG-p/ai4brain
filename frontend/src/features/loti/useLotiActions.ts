@@ -4,19 +4,16 @@ import type { DimensionPresetKey } from '../../config/dimensions'
 import { useAppStore } from '../../state/useAppStore'
 import { currentPillars } from '../insights/dashboard'
 import { useGoalsStore } from '../insights/goals'
-import { dimensionFor, pillarTraining } from '../insights/pillars'
+import { dimensionFor } from '../insights/pillars'
 import { useSessionStore } from '../insights/sessionStore'
 import type { LotiAction } from './types'
 
 /** Where a train action goes under the active preset: the exercise for its schema type when the
-    preset has it, else the pillar's exercise, else the assessment hub.
-    Ticket 09 may send these to /train?pillar= once the Train page exists. */
+    preset has it, else the Train page on the action's pillar, else the Train page. */
 export function trainPath(action: Extract<LotiAction, { kind: 'train' }>, preset: DimensionPresetKey = '7'): string {
-  const t =
-    (action.schemaType && dimensionFor(action.schemaType, preset)) ||
-    (action.pillar && pillarTraining(action.pillar, preset)) ||
-    null
-  return t ? `/task/${t.dimId}?schema=${t.schema}` : '/assessment'
+  const t = action.schemaType && dimensionFor(action.schemaType, preset)
+  if (t) return `/task/${t.dimId}?schema=${t.schema}`
+  return action.pillar ? `/train?pillar=${action.pillar}` : '/train'
 }
 
 /** Runs Loti's side effects. Reply actions are the brain's business and do nothing here. */

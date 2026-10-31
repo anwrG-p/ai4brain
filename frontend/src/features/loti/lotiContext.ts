@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { EMOTION_TO_MOOD } from '../../components/features/characters'
 import { useEmilyStore } from '../../state/useEmilyStore'
 import type { EmilyEmotion } from '../../styles/emilyTokens'
+import { currentPillars, sessionsThisWeek, weakestPillar } from '../insights/dashboard'
 import { useGoalsStore, type Goals } from '../insights/goals'
-import { PILLAR_IDS, pillarScores, type PillarId } from '../insights/pillars'
 import { useSessionStore, type SessionRecord } from '../insights/sessionStore'
 import type { LotiContext } from './types'
 
@@ -14,35 +14,14 @@ export interface LotiContextInput {
   now: Date
 }
 
-/** What Loti knows when a talk opens, from what is on this device. Pure.
-    ponytail: the weakest pillar is the lowest one as last measured; the dashboard's helpers can
-    replace this once they land. */
+/** What Loti knows when a talk opens, from what is on this device. Pure. The weakest pillar and the
+    week's count come from the dashboard's helpers, so Loti and Home always agree. */
 export function lotiContext({ sessions, goals, emotion, now }: LotiContextInput): LotiContext {
-  const last: Partial<Record<PillarId, number>> = {}
-  for (const s of [...sessions].sort((a, b) => Date.parse(a.at) - Date.parse(b.at))) {
-    const p = pillarScores(s.inputs)
-    for (const id of PILLAR_IDS) {
-      const score = p[id].score
-      if (score !== null) last[id] = score
-    }
-  }
-  let weakest: PillarId | undefined
-  for (const id of PILLAR_IDS) {
-    const s = last[id]
-    if (s !== undefined && (weakest === undefined || s < last[weakest]!)) weakest = id
-  }
-
-  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
-  const sessionsThisWeek = sessions.filter((s) => {
-    const t = Date.parse(s.at)
-    return t >= monday.getTime() && t <= now.getTime()
-  }).length
-
+  const weakest = weakestPillar(currentPillars(sessions))
   const ctx: LotiContext = {
     now,
     hasGoalsThisYear: goals.year === now.getFullYear() && Object.keys(goals.goals).length > 0,
-    sessionsThisWeek,
+    sessionsThisWeek: sessionsThisWeek(sessions, now),
   }
   if (weakest) ctx.weakestPillar = weakest
   if (emotion) ctx.mood = EMOTION_TO_MOOD[emotion]
