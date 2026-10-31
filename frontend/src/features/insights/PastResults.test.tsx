@@ -44,17 +44,17 @@ describe('PastResults', () => {
     expect(container.innerHTML).not.toMatch(/red|danger/)
   })
 
-  // Review fix: one tab stop for the whole grid (roving tabindex), arrows move between cells.
-  it('is one tab stop: arrow keys, Home and End move a roving tabindex', () => {
+  // Review fix: one tab stop for the whole grid (roving tabindex), arrows move between cells. The
+  // tab stop starts on the latest week, where the weeks open (ticket 10).
+  it('is one tab stop, starting at the latest week: arrow keys, Home and End move a roving tabindex', () => {
     const { container } = render(<PastResults sessions={weeks(4)} />)
     const cells = () => [...container.querySelectorAll<HTMLElement>('[role="gridcell"]')]
-    expect(cells().filter((c) => c.tabIndex === 0)).toHaveLength(1)
-    expect(cells()[0]!.tabIndex).toBe(0)
-    act(() => cells()[0]!.focus())
-    fireEvent.keyDown(document.activeElement!, { key: 'ArrowRight' })
-    expect(document.activeElement).toBe(cells()[1])
+    expect(cells().filter((c) => c.tabIndex === 0)).toEqual([cells()[3]])
+    act(() => cells()[3]!.focus())
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowLeft' })
+    expect(document.activeElement).toBe(cells()[2])
     fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
-    expect(document.activeElement).toBe(cells()[5]) // 4 weeks a row: row 2, week 2
+    expect(document.activeElement).toBe(cells()[6]) // 4 weeks a row: row 2, week 3
     fireEvent.keyDown(document.activeElement!, { key: 'End' })
     expect(document.activeElement).toBe(cells()[7])
     fireEvent.keyDown(document.activeElement!, { key: 'Home' })
@@ -65,15 +65,37 @@ describe('PastResults', () => {
     expect(cells().filter((c) => c.tabIndex === 0)).toEqual([cells()[0]])
   })
 
-  it('announces a cell on focus only; hovering shows its value as a tooltip but announces nothing', () => {
+  it('keeps one tab stop when the data shrinks under it', () => {
+    const { container, rerender } = render(<PastResults sessions={weeks(5)} />)
+    const cells = () => [...container.querySelectorAll<HTMLElement>('[role="gridcell"]')]
+    act(() => cells()[4]!.focus())
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' }) // the last row
+    const fourExercises = weeks(5).map((s) => {
+      const { MST_LDI: _drop, ...rest } = s.inputs as TaskScores
+      return { ...s, inputs: rest }
+    })
+    rerender(<PastResults sessions={fourExercises} />)
+    expect(cells()).toHaveLength(20)
+    expect(cells().filter((c) => c.tabIndex === 0)).toEqual([cells()[19]])
+  })
+
+  // A focused cell is announced once: by its own name. The line under the grid shows it for sighted
+  // keyboard users and is hidden from screen readers (no second, live announcement).
+  it('names each cell for screen readers and echoes the focused one visually; hovering shows a tooltip', () => {
     const { container } = render(<PastResults sessions={weeks(4)} />)
-    const live = container.querySelector('[aria-live="polite"]')!
+    expect(container.querySelector('[aria-live]')).toBeNull()
+    const echo = container.querySelector('[data-focus-echo]')!
+    expect(echo).toHaveAttribute('aria-hidden', 'true')
     const [first, second] = container.querySelectorAll<HTMLElement>('td[data-value]')
+    expect(first).toHaveAccessibleName(expect.stringMatching(/^Logic Web, week of \d+ \w+: 20$/))
     fireEvent.mouseEnter(second!)
-    expect(live.textContent).toBe('')
+    expect(echo.textContent).toBe('')
     expect(second).toHaveAttribute('title', expect.stringMatching(/^Logic Web, week of \d+ \w+: 35$/))
     fireEvent.focus(first!)
-    expect(live.textContent).toMatch(/^Logic Web, week of \d+ \w+: 20$/)
+    expect(echo.textContent).toMatch(/^Logic Web, week of \d+ \w+: 20$/)
   })
 
   it('bins scores into five steps', () => {

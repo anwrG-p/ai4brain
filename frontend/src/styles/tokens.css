@@ -250,18 +250,19 @@
 }
 
 [data-theme="dark"] {
-  /* Brand v2 semantic colour roles (dark) */
+  /* Brand v2 semantic colour roles (dark). Cards are green slate, the hue of the chalkboard
+     (--color-canvas), lifted a step and edged by --color-border: no navy on the board. */
   --color-canvas: #162621;
   --color-wood: #6E3F1F;
-  --color-surface: #122130;
-  --color-surface-raised: #1A2D40;
+  --color-surface: #1A2D28;
+  --color-surface-raised: #1D312B;
   --color-ink: #F2F8FC;
   --color-ink-muted: #A9C1D6;
-  --color-border: #2A4157;
+  --color-border: #2B463F;
   --color-border-strong: #8FB0CC;
   --color-brand: #7CC4F2;
   --color-brand-hover: #A5D6F6;
-  --color-brand-subtle: #15304A;
+  --color-brand-subtle: #183533;
   --color-brand-ink: #0B1622;
   --color-brand-vivid: #7CC4F2;
   --color-secondary: #C5D8E8;
@@ -277,7 +278,7 @@
   --color-danger: #F28B9E;
   --color-danger-subtle: #3A1A24;
   --color-info: #7CC4F2;
-  --color-info-subtle: #15304A;
+  --color-info-subtle: #183533;
 
   --pillar-focus: #8ECDF5;
   --pillar-agility: #2E9E84;
@@ -296,7 +297,7 @@
   --dim-8: #E0B48A;
   --dim-9: #34D399;
   --dim-10: #F472B6;
-  /* Stroop red (dark): 5.39:1 on surface; dark danger #F28B9E reads rose. */
+  /* Stroop red (dark): 4.78:1 on surface, 4.54:1 on raised; dark danger #F28B9E reads rose. */
   --color-stroop-red: #FF5C5C;
 
   --color-canvas-happy: #202622;
@@ -319,7 +320,7 @@
 
   --uncertainty-band-fill: rgba(124, 196, 242, 0.15);
   --uncertainty-low-stroke: #A9C1D6;
-  --uncertainty-low-tint: #1A2D40;
+  --uncertainty-low-tint: #1D312B;
 
   /* Dark theme: a 1 px border only, no shadow */
   --shadow-elevation: none;

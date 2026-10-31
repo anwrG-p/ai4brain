@@ -40,7 +40,7 @@ export default function ResultsPage() {
   const blurred = consent === 'pending'
 
   return (
-    <div className="mx-auto flex max-w-xl flex-col items-center gap-6 pt-4 pb-12 text-center">
+    <div className="mx-auto flex max-w-xl flex-col items-center gap-5 pt-2 pb-6 text-center sm:gap-6 sm:pt-4 sm:pb-12">
       <h1 className="font-display text-3xl font-bold text-ink">{blurred ? 'Your results are ready' : 'Your results'}</h1>
       <PillarRadar scores={scores} blurred={blurred} className="max-w-lg" />
       {blurred ? (

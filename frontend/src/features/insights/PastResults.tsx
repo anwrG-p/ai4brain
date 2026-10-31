@@ -6,9 +6,11 @@ import type { SessionRecord } from './sessionStore'
    detail into the historical test results"). Exercise x week. From 20 filled cells a heatmap in five
    steps from pale sky to deep coral (never red; heat-* in tokens.css), each cell edged in
    border-strong and printing its value in the step's own text colour (>= 4.5:1), with a numeric
-   legend. One tab stop: a grid with a roving tabindex (arrows, Home, End); a live line announces the
-   focused cell; hovering only shows a tooltip. On a narrow screen the weeks scroll, starting at the
-   latest, with a "Scroll for earlier weeks" hint. Fewer cells: a plain list. */
+   legend. One tab stop: a grid with a roving tabindex (arrows, Home, End) that starts on the latest
+   week. Each cell is named for screen readers (announced once, on focus); a line under the grid
+   echoes the focused cell for sighted keyboard users and is hidden from screen readers. Hovering
+   only shows a tooltip. On a narrow screen the weeks scroll, starting at the latest, with a "Scroll
+   for earlier weeks" hint. Fewer cells: a plain list. */
 
 const STEPS = 5
 const TICKS = [0, 20, 40, 60, 80, 100]
@@ -44,7 +46,10 @@ export function PastResults({ sessions }: { sessions: readonly SessionRecord[] }
 }
 
 function Heatmap({ weeks, rows }: { weeks: number[]; rows: ExerciseRow[] }) {
-  const [pos, setPos] = useState<[number, number]>([0, 0])
+  // The tab stop opens where the weeks open: the latest week. Clamped on render, so a smaller
+  // grid (fewer rows or weeks) still has exactly one tab stop.
+  const [pos, setPos] = useState<[number, number]>([0, weeks.length - 1])
+  const at: [number, number] = [Math.min(pos[0], rows.length - 1), Math.min(pos[1], weeks.length - 1)]
   const [said, setSaid] = useState('')
   const [scrolls, setScrolls] = useState(false)
   const scroller = useRef<HTMLDivElement>(null)
@@ -77,7 +82,7 @@ function Heatmap({ weeks, rows }: { weeks: number[]; rows: ExerciseRow[] }) {
     grid.current?.querySelector<HTMLElement>(`[data-cell="${next[0]}-${next[1]}"]`)?.focus()
   }
   const onKeyDown = (e: KeyboardEvent) => {
-    const [r, c] = pos
+    const [r, c] = at
     const to: Record<string, [number, number]> = {
       ArrowRight: [r, c + 1],
       ArrowLeft: [r, c - 1],
@@ -117,10 +122,11 @@ function Heatmap({ weeks, rows }: { weeks: number[]; rows: ExerciseRow[] }) {
                   {row.name}
                 </th>
                 {row.values.map((v, c) => {
-                  const here = pos[0] === r && pos[1] === c
+                  const here = at[0] === r && at[1] === c
                   const common = {
                     role: 'gridcell',
                     'data-cell': `${r}-${c}`,
+                    'aria-label': label(r, c),
                     tabIndex: here ? 0 : -1,
                     onFocus: () => {
                       setPos([r, c])
@@ -129,9 +135,7 @@ function Heatmap({ weeks, rows }: { weeks: number[]; rows: ExerciseRow[] }) {
                   }
                   if (v === null) {
                     return (
-                      <td key={c} {...common} className="focus-ring h-9 min-w-11 rounded-sm border border-border">
-                        <span className="sr-only">no session</span>
-                      </td>
+                      <td key={c} {...common} className="focus-ring h-9 min-w-11 rounded-sm border border-border" />
                     )
                   }
                   return (
@@ -151,7 +155,7 @@ function Heatmap({ weeks, rows }: { weeks: number[]; rows: ExerciseRow[] }) {
           </tbody>
         </table>
       </div>
-      <p aria-live="polite" className="mt-2 min-h-6 text-sm text-ink">
+      <p data-focus-echo aria-hidden="true" className="mt-2 min-h-6 text-sm text-ink">
         {said}
       </p>
       <ul aria-label="Score scale" className="relative m-0 mt-2 flex w-60 list-none p-0 pb-6 text-sm text-ink-muted">

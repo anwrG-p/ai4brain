@@ -431,7 +431,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-ink',
     fgHex: '#F2F8FC',
     bgName: '--color-surface',
-    bgHex: '#122130',
+    bgHex: '#1A2D28',
     minRequired: 4.5,
   },
   {
@@ -441,7 +441,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-ink',
     fgHex: '#F2F8FC',
     bgName: '--color-surface-raised',
-    bgHex: '#1A2D40',
+    bgHex: '#1D312B',
     minRequired: 4.5,
   },
   {
@@ -461,7 +461,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-ink-muted',
     fgHex: '#A9C1D6',
     bgName: '--color-surface',
-    bgHex: '#122130',
+    bgHex: '#1A2D28',
     minRequired: 4.5,
   },
   {
@@ -471,7 +471,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-ink-muted',
     fgHex: '#A9C1D6',
     bgName: '--color-surface-raised',
-    bgHex: '#1A2D40',
+    bgHex: '#1D312B',
     minRequired: 4.5,
   },
   {
@@ -511,7 +511,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-brand',
     fgHex: '#7CC4F2',
     bgName: '--color-surface-raised',
-    bgHex: '#1A2D40',
+    bgHex: '#1D312B',
     minRequired: 4.5,
   },
   {
@@ -521,7 +521,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-brand',
     fgHex: '#7CC4F2',
     bgName: '--color-brand-subtle',
-    bgHex: '#15304A',
+    bgHex: '#183533',
     minRequired: 4.5,
   },
   {
@@ -531,7 +531,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-brand-vivid',
     fgHex: '#7CC4F2',
     bgName: '--color-surface',
-    bgHex: '#122130',
+    bgHex: '#1A2D28',
     minRequired: 3.0,
   },
   {
@@ -541,7 +541,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-info',
     fgHex: '#7CC4F2',
     bgName: '--color-info-subtle',
-    bgHex: '#15304A',
+    bgHex: '#183533',
     minRequired: 4.5,
   },
   {
@@ -561,7 +561,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-accent-strong',
     fgHex: '#FF9F86',
     bgName: '--color-surface',
-    bgHex: '#122130',
+    bgHex: '#1A2D28',
     minRequired: 4.5,
   },
   {
@@ -591,7 +591,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-secondary',
     fgHex: '#C5D8E8',
     bgName: '--color-surface-raised',
-    bgHex: '#1A2D40',
+    bgHex: '#1D312B',
     minRequired: 4.5,
   },
   {
@@ -599,7 +599,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     role: 'Danger button text (--color-surface) on danger fill',
     theme: 'dark',
     fgName: '--color-surface',
-    fgHex: '#122130',
+    fgHex: '#1A2D28',
     bgName: '--color-danger',
     bgHex: '#F28B9E',
     minRequired: 4.5,
@@ -621,7 +621,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-danger',
     fgHex: '#F28B9E',
     bgName: '--color-surface-raised',
-    bgHex: '#1A2D40',
+    bgHex: '#1D312B',
     minRequired: 4.5,
   },
   {
@@ -641,7 +641,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-success',
     fgHex: '#6FCF97',
     bgName: '--color-surface-raised',
-    bgHex: '#1A2D40',
+    bgHex: '#1D312B',
     minRequired: 4.5,
   },
   {
@@ -661,7 +661,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-warning',
     fgHex: '#F2C063',
     bgName: '--color-surface-raised',
-    bgHex: '#1A2D40',
+    bgHex: '#1D312B',
     minRequired: 4.5,
   },
   {
@@ -681,7 +681,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-border-strong',
     fgHex: '#8FB0CC',
     bgName: '--color-surface-raised',
-    bgHex: '#1A2D40',
+    bgHex: '#1D312B',
     minRequired: 3.0,
   },
   {
@@ -691,7 +691,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--pillar-focus',
     fgHex: '#8ECDF5',
     bgName: '--color-surface',
-    bgHex: '#122130',
+    bgHex: '#1A2D28',
     minRequired: 3.0,
   },
   {
@@ -701,7 +701,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--pillar-agility',
     fgHex: '#2E9E84',
     bgName: '--color-surface',
-    bgHex: '#122130',
+    bgHex: '#1A2D28',
     minRequired: 3.0,
   },
   {
@@ -711,7 +711,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--pillar-impulse',
     fgHex: '#D97A2E',
     bgName: '--color-surface',
-    bgHex: '#122130',
+    bgHex: '#1A2D28',
     minRequired: 3.0,
   },
   {
@@ -721,7 +721,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--pillar-memory',
     fgHex: '#5B7BDC',
     bgName: '--color-surface',
-    bgHex: '#122130',
+    bgHex: '#1A2D28',
     minRequired: 3.0,
   },
   {
@@ -731,7 +731,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--pillar-visual',
     fgHex: '#F2E29A',
     bgName: '--color-surface',
-    bgHex: '#122130',
+    bgHex: '#1A2D28',
     minRequired: 3.0,
   },
   {
@@ -741,7 +741,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--dim-1',
     fgHex: '#56B4E9',
     bgName: '--color-surface',
-    bgHex: '#122130',
+    bgHex: '#1A2D28',
     minRequired: 4.5,
   },
   {
@@ -761,7 +761,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-stroop-red',
     fgHex: '#FF5C5C',
     bgName: '--color-surface',
-    bgHex: '#122130',
+    bgHex: '#1A2D28',
     minRequired: 4.5,
   },
   {
@@ -771,7 +771,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--color-stroop-red',
     fgHex: '#FF5C5C',
     bgName: '--color-surface-raised',
-    bgHex: '#1A2D40',
+    bgHex: '#1D312B',
     minRequired: 4.5,
   },
   {
@@ -781,7 +781,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--dim-3',
     fgHex: '#2DD4BF',
     bgName: '--color-surface',
-    bgHex: '#122130',
+    bgHex: '#1A2D28',
     minRequired: 4.5,
   },
   {
@@ -791,7 +791,7 @@ export const DESIGN_SYSTEM_CONTRAST_PAIRS: readonly RawContrastPairSpec[] = [
     fgName: '--dim-7',
     fgHex: '#F0E442',
     bgName: '--color-surface',
-    bgHex: '#122130',
+    bgHex: '#1A2D28',
     minRequired: 4.5,
   },
   // Home (ticket 08): mood-tinted canvases. (Heatmap cells carry a --color-border-strong edge.)

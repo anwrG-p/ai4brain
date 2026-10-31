@@ -52,6 +52,17 @@ test.describe('App shell (ticket 09a)', () => {
         expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(height)
       })
     }
+    // Results needs a saved session (else it goes to /): one, as the baseline writes it.
+    test(`at ${width}px /results (blurred, before the data choice) is no taller than the viewport`, async ({ page }) => {
+      const scores = { OSPAN: 58, OTS_Planning: 52, FluidMatrices: 60, MST_LDI: 40, UFOV_SOA: 64, ANT_Conflict: 44 }
+      const inputs = Object.fromEntries(Object.entries(scores).map(([k, score]) => [k, { score, trials: 40 }]))
+      const value = JSON.stringify({ version: 1, sessions: [{ id: 'one', at: new Date().toISOString(), inputs }] })
+      await page.addInitScript((v) => window.localStorage.setItem('synapsetwin_sessions_v1', v), value)
+      await page.setViewportSize({ width, height })
+      await page.goto('/results', { waitUntil: 'networkidle' })
+      await expect(page.getByRole('heading', { level: 1, name: 'Your results are ready' })).toBeVisible()
+      expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(height)
+    })
   }
 
   test('the phone tabs sit on the board, inside the wood frame; header, footer and tabs are the board', async ({ page }) => {
