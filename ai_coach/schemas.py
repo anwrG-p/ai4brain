@@ -165,7 +165,11 @@ class ReplySource(str, Enum):
     OFFLINE = "offline"                      # no LLM configured
     OFFLINE_AFTER_LLM_ERROR = "offline_after_llm_error"
     OFFLINE_AFTER_LINT = "offline_after_lint"  # LLM reply withheld: it tripped a banned term
-    CRISIS = "crisis"
+    # The backup crisis classifier failed (timeout, error, invalid JSON): fail closed, so the coach
+    # LLM is not called and the scripted offline reply goes out.
+    OFFLINE_AFTER_CLASSIFIER_ERROR = "offline_after_classifier_error"
+    CRISIS = "crisis"                  # keyword gate hit, or the backup classifier said "high"
+    CRISIS_SIGNPOST = "crisis_signpost"  # the backup classifier said "low"
     HEALTH_SIGNPOST = "health_signpost"
 
 

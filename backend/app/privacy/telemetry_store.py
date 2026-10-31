@@ -1,4 +1,8 @@
-"""Telemetry files on disk: where they live, the lock over them, ingest and the privacy operations.
+"""Per-user files on disk: where they live, the lock over them, ingest and the privacy operations.
+
+Two stores, one file per user in each, both covered by delete, export and retention:
+- telemetry: `{TELEMETRY_DIR}/{user_key}.jsonl` (ingest, below);
+- coach chat history: `{COACH_DIR}/{user_key}.jsonl` (written by `ai_coach/chat_store.py`).
 
 No FastAPI or pydantic here, so the retention CLI and other tools import it as is.
 The HTTP routes (`app/api/routes/v1_telemetry.py`, `v1_privacy.py`) are thin wrappers.
@@ -37,6 +41,12 @@ class ExportTooLarge(Exception):
 def telemetry_dir() -> Path:
     env = os.environ.get("TELEMETRY_DIR")
     return Path(env) if env else REPO_ROOT / "data" / "raw" / "telemetry"
+
+
+def coach_dir() -> Path:
+    """The coach chat history (only what the user saw and picked). data/processed/* is gitignored."""
+    env = os.environ.get("COACH_DIR")
+    return Path(env) if env else REPO_ROOT / "data" / "processed" / "coach"
 
 
 def check_user_id(user_id: str) -> None:
@@ -131,17 +141,11 @@ def append_events(
     return len(rows)
 
 
-def delete_user(user_id: str, directory: Path | None = None) -> dict[str, int]:
-    """Remove `{user_key}.jsonl` and every `{user_key}.*` state file. Counts only what was removed.
-
-    Matches file names case-insensitively, so a file written under another case before ids
-    were lowercased (possible on Linux) is still found and counted.
-    """
-    key = user_key(user_id)
-    directory = directory or telemetry_dir()
-    events = files = 0
+def _delete_owned(directory: Path, key: str) -> tuple[int, int]:
+    """(JSONL lines, files) removed for `key` in `directory`, under that directory's lock."""
+    lines = files = 0
     if not directory.is_dir():
-        return {"deleted_events": 0, "deleted_files": 0}
+        return 0, 0
     with telemetry_lock(directory):
         # Ids have no dots, so the part before the first dot is the owner: `u1` never matches
         # `u10.jsonl`, and `.lock` (empty owner) is never anyone's.
@@ -150,30 +154,59 @@ def delete_user(user_id: str, directory: Path | None = None) -> dict[str, int]:
                 continue
             if path.suffix.lower() == ".jsonl":
                 text = path.read_text(encoding="utf-8")
-                events += sum(1 for line in text.splitlines() if line.strip())
+                lines += sum(1 for line in text.splitlines() if line.strip())
             path.unlink()
             files += 1
-    return {"deleted_events": events, "deleted_files": files}
+    return lines, files
 
 
-def export_user(
-    user_id: str, directory: Path | None = None, max_bytes: int | None = None
-) -> bytes | None:
-    """The user's raw events as stored (JSONL), or None if nothing is stored.
+def delete_user(
+    user_id: str, directory: Path | None = None, coach_directory: Path | None = None
+) -> dict[str, int]:
+    """Remove `{user_key}.jsonl` and every `{user_key}.*` state file in both stores.
 
-    Read whole under the lock, so the caller can send it without holding the lock.
-    Raises ExportTooLarge above `max_bytes` (default EXPORT_MAX_BYTES), LockTimeout if busy.
+    Counts only what was removed: telemetry lines as `deleted_events`, chat-history lines as
+    `deleted_chat_turns`, and files from both stores as `deleted_files`. Matches file names
+    case-insensitively, so a file written under another case before ids were lowercased
+    (possible on Linux) is still found and counted.
     """
     key = user_key(user_id)
-    limit = EXPORT_MAX_BYTES if max_bytes is None else max_bytes
-    path = (directory or telemetry_dir()) / f"{key}.jsonl"
+    events, files = _delete_owned(directory or telemetry_dir(), key)
+    turns, chat_files = _delete_owned(coach_directory or coach_dir(), key)
+    return {"deleted_events": events, "deleted_chat_turns": turns, "deleted_files": files + chat_files}
+
+
+def _read_owned(path: Path, room: int, limit: int) -> bytes | None:
+    """The file's bytes, or None. ExportTooLarge if it is over `room`, what is left of `limit`."""
     if not path.is_file():
         return None
     with telemetry_lock(path.parent):
         try:
-            size = path.stat().st_size
-            if size > limit:
-                raise ExportTooLarge(f"{size} bytes is over the {limit}-byte export limit")
+            if path.stat().st_size > room:
+                raise ExportTooLarge(f"the export is over the {limit}-byte limit")
             return path.read_bytes()
         except FileNotFoundError:
             return None
+
+
+def export_user(
+    user_id: str,
+    directory: Path | None = None,
+    max_bytes: int | None = None,
+    coach_directory: Path | None = None,
+) -> bytes | None:
+    """Everything stored for the user as JSONL, or None if nothing is stored.
+
+    The raw telemetry events as stored, then the coach chat history (rows with
+    `"record": "coach_turn"`). Each file is read whole under its lock, so the caller can send
+    the result without holding a lock. Raises ExportTooLarge above `max_bytes` (default
+    EXPORT_MAX_BYTES) for the two together, LockTimeout if busy.
+    """
+    key = user_key(user_id)
+    limit = EXPORT_MAX_BYTES if max_bytes is None else max_bytes
+    telemetry = _read_owned((directory or telemetry_dir()) / f"{key}.jsonl", limit, limit)
+    room = limit - len(telemetry or b"")
+    chat = _read_owned((coach_directory or coach_dir()) / f"{key}.jsonl", room, limit)
+    if telemetry is None and chat is None:
+        return None
+    return (telemetry or b"") + (chat or b"")

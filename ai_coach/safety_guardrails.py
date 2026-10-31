@@ -25,8 +25,10 @@ pattern). Precision has the same limit: with the round-4/5 guards (first-person 
 soft harms, game/session tails) it passes all 54 benign training messages it was tuned on, but 3
 of 20 held-out benign messages still trip it (15%). An LLM-based backup classifier, run on every user
 message alongside this gate, is
-REQUIRED before any LLM path is enabled for users (research area 7, improvement 1). Until then the
-LLM path stays off, as it is by default in the frontend (VITE_LOTI_COACH).
+REQUIRED before any LLM path is enabled for users (research area 7, improvement 1). It is
+`ai_coach/crisis_classifier.py` (BE-06): the agent runs it after this gate misses and before any
+coach LLM call, and fails closed. Without a GEMINI_API_KEY there is no LLM path at all, and the
+frontend keeps it off unless VITE_LOTI_COACH=on.
 """
 
 from __future__ import annotations
@@ -167,6 +169,24 @@ CRISIS_REPLY_EN = (
 CRISIS_REPLY_FR = (
     "Merci de me l'avoir dit. Appelez maintenant le numéro d'urgence local, "
     "ou une ligne de prévention du suicide. Urgences en Europe : 112. France : 3114. États-Unis : 988."
+)
+# The backup classifier's "low" verdict (possible but unclear risk) gets this gentler signpost
+# instead of CRISIS_REPLY_*. It still names the same lines, and the LLM is still never called.
+CRISIS_SIGNPOST_EN = (
+    "That sounds heavy. You don't have to carry it alone."
+    "\n\nIf you might be at risk, call 112, 3114 in France or 988 in the US."
+)
+CRISIS_SIGNPOST_FR = (
+    "Ça a l'air lourd. Vous n'avez pas à porter ça seul."
+    "\n\nSi vous êtes en danger, appelez le 112, le 3114 en France ou le 988 aux États-Unis."
+)
+# What the frontend's own keyword gate shows (CRISIS_MESSAGE in features/loti/coachAdapter.ts).
+FRONTEND_CRISIS_MESSAGE = (
+    "I'm really glad you told me. Please call your local emergency number now, "
+    "or a suicide and crisis line."
+)
+_FIXED_CRISIS_REPLIES = (
+    CRISIS_REPLY_EN, CRISIS_REPLY_FR, CRISIS_SIGNPOST_EN, CRISIS_SIGNPOST_FR, FRONTEND_CRISIS_MESSAGE,
 )
 
 # Phrases on normalised text (see normalise_user_text). Language: "en", "fr" or None (both).
@@ -430,6 +450,24 @@ def crisis_check(user_text: str) -> GateResult:
         return GateResult(hit=False)
     french = "fr" in langs or ("en" not in langs and bool(_FRENCH_HINTS.search(text)))
     return GateResult(hit=True, reply=CRISIS_REPLY_FR if french else CRISIS_REPLY_EN)
+
+
+def reads_french(user_text: str) -> bool:
+    """The same language hint crisis_check uses when no pattern names the language."""
+    return bool(_FRENCH_HINTS.search(normalise_user_text(user_text)))
+
+
+_FIXED_CRISIS_NORMALISED = frozenset(normalise_user_text(t) for t in _FIXED_CRISIS_REPLIES)
+
+
+def is_fixed_crisis_reply(text: str) -> bool:
+    """True for one of Loti's fixed crisis replies or signposts (backend or frontend copy).
+
+    The coach uses it to keep these lines, and the user turn they answered, out of the LLM window:
+    an emergency line with no context would only confuse the LLM, and the turn it answered may be
+    one only the backup classifier caught, which the keyword redaction cannot see.
+    """
+    return normalise_user_text(text) in _FIXED_CRISIS_NORMALISED
 
 
 # The user raises a diagnosis, a condition, a symptom or medication (English, plus French words as

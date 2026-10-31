@@ -1,10 +1,16 @@
 """Loti's conversational runner (Member 2).
 
 Order of a chat turn:
-1. Input gates, on the user's words as written (never rewritten). The crisis reply goes out when the
-   current message hits, or the previous user turn joined with it; the health signpost when the
-   current message raises health. On a hit the LLM is never called. Earlier user turns that trip
-   the crisis check are redacted from the LLM payload, and the chat carries on.
+1. Input gates, on the user's words as written (never rewritten), in this order (R14):
+   a. the keyword crisis gate: the crisis reply goes out when the current message hits, or the
+      previous user turn joined with it;
+   b. the LLM backup crisis classifier, if one is configured (crisis_classifier.py): "high" gets
+      the crisis reply, "low" the gentler crisis signpost. If it fails, the turn fails closed: the
+      coach LLM is not called and the scripted offline reply goes out;
+   c. the health signpost, when the current message raises health.
+   On a hit the LLM is never called. Earlier user turns that trip the crisis check, and fixed
+   crisis replies with the user turn they answered, are redacted from the LLM payload, and the
+   chat carries on.
 2. AI Collaboration Score and the XAI adaptation reason (Member 3's Δc).
 3. Loti's reply: the LLM if one is configured, else the deterministic offline reply. An LLM error
    is logged, counted and answered with the offline reply; nothing fails silently.
@@ -20,7 +26,16 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from ai_coach.collaboration_scorer import CollaborationScorer
-from ai_coach.safety_guardrails import SafetyGuardrailEngine
+from ai_coach.crisis_classifier import ClassifierError, CrisisClassifier, Risk
+from ai_coach.safety_guardrails import (
+    CRISIS_REPLY_EN,
+    CRISIS_REPLY_FR,
+    CRISIS_SIGNPOST_EN,
+    CRISIS_SIGNPOST_FR,
+    SafetyGuardrailEngine,
+    is_fixed_crisis_reply,
+    reads_french,
+)
 from ai_coach.schemas import (
     ArchetypeTier,
     ChatMessage,
@@ -66,11 +81,15 @@ class AICoachAgent:
         explainer: Optional[XAIExplainer] = None,
         guardrail: Optional[SafetyGuardrailEngine] = None,
         llm_callable: Optional[Callable[[List[Dict[str, str]]], str]] = None,
+        crisis_classifier: Optional[CrisisClassifier] = None,
     ):
         self.scorer = scorer or CollaborationScorer()
         self.explainer = explainer or XAIExplainer()
         self.guardrail = guardrail or SafetyGuardrailEngine()
         self.llm_callable = llm_callable
+        # R14: wherever an LLM path is configured, a backup classifier must be too (the API builds
+        # both from one GEMINI_API_KEY). It runs after the keyword gate, before the coach LLM.
+        self.crisis_classifier = crisis_classifier
         # Every non-LLM reply path is counted (research area 7, "Log fallbacks"). Keys: ReplySource values.
         self.reply_source_counts: Counter[str] = Counter()
 
@@ -107,7 +126,7 @@ class AICoachAgent:
         # 1. Input gates on the user's words as written. On a hit nothing reaches the LLM. Older
         #    turns that hit are redacted from the LLM payload instead, so one false hit cannot lock
         #    the coach for the whole window.
-        gated = self._gate_user_text(request.chat_history, request.message)
+        gated, llm_allowed = self._gate_user_text(request.chat_history, request.message)
         if gated is not None:
             return gated
         llm_window = self._redact_crisis_turns(session_history[-HISTORY_WINDOW:])
@@ -133,6 +152,7 @@ class AICoachAgent:
             cluster_id=cluster_id,
             delta_vector=delta_vec,
             collab_result=collab_result,
+            llm_allowed=llm_allowed,
         )
 
         suggested_actions = self._generate_suggested_actions(
@@ -150,15 +170,22 @@ class AICoachAgent:
             reply_source=source,
         )
 
-    def _gate_user_text(self, history: List[ChatMessage], message: str) -> Optional[CoachingResponse]:
-        """Crisis reply when the CURRENT message hits, or the previous user turn joined with it.
+    def _gate_user_text(
+        self, history: List[ChatMessage], message: str
+    ) -> Tuple[Optional[CoachingResponse], bool]:
+        """(fixed reply or None, whether the coach LLM may be called).
 
-        The join catches a phrase split across the last two turns ("I want to" / "end it all").
-        Older turns never trigger the reply; `_redact_crisis_turns` keeps them from the LLM. The
-        health signpost looks at the current message only, so health mentioned earlier does not
-        lock the chat into the doctor reply.
+        Keyword gate: the crisis reply when the CURRENT message hits, or the previous user turn
+        joined with it. The join catches a phrase split across the last two turns ("I want to" /
+        "end it all"). Older turns never trigger the reply; `_redact_crisis_turns` keeps them from
+        the LLM. Then the backup classifier. Then the health signpost, which looks at the current
+        message only, so health mentioned earlier does not lock the chat into the doctor reply.
         """
-        previous = next((m.content for m in reversed(history) if m.role == ChatMessageRole.USER), None)
+        prev_idx = next(
+            (i for i in range(len(history) - 1, -1, -1) if history[i].role == ChatMessageRole.USER),
+            None,
+        )
+        previous = history[prev_idx].content if prev_idx is not None else None
         candidates = [message]
         # The join is for split phrases only. A previous turn that hit on its own already got the
         # crisis reply; joining it again would lock the next, benign message too.
@@ -167,11 +194,43 @@ class AICoachAgent:
         for text in candidates:
             crisis = self.guardrail.crisis_check(text)
             if crisis.hit:
-                return self._fixed_reply(crisis.reply or "", ReplySource.CRISIS)
+                return self._fixed_reply(crisis.reply or "", ReplySource.CRISIS), False
+
+        if self.crisis_classifier is not None:
+            # Context for split phrases, but never a turn that already got a crisis reply (same
+            # reason as the join above), and never a crisis reply itself.
+            answered = prev_idx is not None and any(
+                m.role == ChatMessageRole.ASSISTANT and is_fixed_crisis_reply(m.content)
+                for m in history[prev_idx + 1 : prev_idx + 2]
+            )
+            loti_said = next(
+                (m.content for m in reversed(history) if m.role == ChatMessageRole.ASSISTANT), None
+            )
+            if loti_said is not None and is_fixed_crisis_reply(loti_said):
+                loti_said = None
+            try:
+                verdict = self.crisis_classifier.classify(
+                    message, previous=None if answered else previous, loti_said=loti_said
+                )
+            except ClassifierError as exc:
+                self.reply_source_counts["classifier_error"] += 1
+                # ClassifierError messages are fixed strings or a type name: no user text, and
+                # never the classifier's reason.
+                logger.warning("coach crisis classifier failed (%s); failing closed, LLM not called", exc)
+                return None, False
+            french = reads_french(message)
+            if verdict.risk is Risk.HIGH:
+                self.reply_source_counts["classifier_high"] += 1
+                reply = CRISIS_REPLY_FR if french else CRISIS_REPLY_EN
+                return self._fixed_reply(reply, ReplySource.CRISIS), False
+            if verdict.risk is Risk.LOW:
+                reply = CRISIS_SIGNPOST_FR if french else CRISIS_SIGNPOST_EN
+                return self._fixed_reply(reply, ReplySource.CRISIS_SIGNPOST), False
+
         signpost = self.guardrail.health_signpost(message)
         if signpost.hit:
-            return self._fixed_reply(signpost.reply or "", ReplySource.HEALTH_SIGNPOST)
-        return None
+            return self._fixed_reply(signpost.reply or "", ReplySource.HEALTH_SIGNPOST), False
+        return None, True
 
     def _redact_crisis_turns(self, window: List[ChatMessage]) -> List[ChatMessage]:
         """Drop earlier USER turns that trip the crisis check, alone or joined with the next USER turn.
@@ -179,22 +238,30 @@ class AICoachAgent:
         The LLM never sees crisis text, and the chat goes on normally after a (possibly false) hit.
         Loti's own turns are kept: they are fixed, pre-checked text.
 
-        Known gap (R14): after a redacted crisis turn, Loti's CRISIS_REPLY stays in the LLM window
-        without the user text it answered, so the LLM sees an emergency line with no context. The
-        LLM-based backup classifier must handle this (see the safety_guardrails docstring) before
-        any LLM path is enabled for users.
+        Fixed crisis replies (backend or frontend copy) are dropped too, with the user turn they
+        answered, so the LLM never sees an emergency line without its context (the BE-05 known gap).
         """
         user_idx = [i for i, m in enumerate(window) if m.role == ChatMessageRole.USER]
         alone = {i: self.guardrail.crisis_check(window[i].content).hit for i in user_idx}
         drop = {i for i in user_idx if alone[i]}
+        # A fixed crisis reply, and the user turn it answered: that turn may be one only the backup
+        # classifier caught, which crisis_check above cannot see.
+        for k, m in enumerate(window):
+            if m.role == ChatMessageRole.ASSISTANT and is_fixed_crisis_reply(m.content):
+                drop.add(k)
+                if k > 0 and window[k - 1].role == ChatMessageRole.USER:
+                    drop.add(k - 1)
         # A split phrase: neither turn hits alone, the two together do. Drop both.
         for i, j in zip(user_idx, user_idx[1:]):
             if not alone[i] and not alone[j]:
                 if self.guardrail.crisis_check(f"{window[i].content} {window[j].content}").hit:
                     drop.update((i, j))
-        if drop:
-            self.reply_source_counts["redacted_history_turn"] += len(drop)
-            logger.info("coach redacted %d earlier user turn(s) from the LLM payload", len(drop))
+        users = sum(1 for k in drop if window[k].role == ChatMessageRole.USER)
+        if users:
+            self.reply_source_counts["redacted_history_turn"] += users
+            logger.info("coach redacted %d earlier user turn(s) from the LLM payload", users)
+        if len(drop) > users:
+            self.reply_source_counts["redacted_crisis_reply"] += len(drop) - users
         return [m for k, m in enumerate(window) if k not in drop]
 
     def _fixed_reply(self, text: str, source: ReplySource) -> CoachingResponse:
@@ -216,6 +283,7 @@ class AICoachAgent:
         cluster_id: int,
         delta_vector: Dict[str, float],
         collab_result: CollaborationScoreResult,
+        llm_allowed: bool = True,
     ) -> Tuple[str, SafetyMetadata, ReplySource]:
         """Call the LLM if one is configured. Any failure is logged, counted and answered offline."""
         offline_reply = self._generate_offline_coaching_response(
@@ -224,6 +292,13 @@ class AICoachAgent:
             collab_result=collab_result,
         )
 
+        if not llm_allowed:  # the backup classifier failed: fail closed
+            self.reply_source_counts[ReplySource.OFFLINE_AFTER_CLASSIFIER_ERROR.value] += 1
+            return (
+                offline_reply,
+                self.guardrail.check_safety(offline_reply),
+                ReplySource.OFFLINE_AFTER_CLASSIFIER_ERROR,
+            )
         if self.llm_callable is None:
             return offline_reply, self.guardrail.check_safety(offline_reply), ReplySource.OFFLINE
 
@@ -276,13 +351,16 @@ class AICoachAgent:
         tier = self.scorer.get_tier_for_cluster(cluster_id)
 
         if any(w in lower_msg for w in ["why", "harder", "faster", "change", "adapted", "pacing", "different"]):
-            return "I tuned the pace to fit your recent rounds." + BUBBLE_SEPARATOR + "The reason is just below."
+            # No "see below": the chat route sends no adaptation reason with the reply.
+            return "I tuned the pace to fit your recent rounds." + BUBBLE_SEPARATOR + "Want to try the next one?"
 
         if any(w in lower_msg for w in ["score", "collab", "collaboration", "rating", "progress"]):
+            # No number here (R15): one chat is not enough data. The score has its own route,
+            # which answers not_enough_data until the stored chat history supports one.
             return (
-                f"Your AI teamwork score is {collab_result.composite_score:.0f} out of 100."
+                "Your scores show on Home once there's enough data."
                 + BUBBLE_SEPARATOR
-                + "Want one tip to grow it?"
+                + "Want one tip for your next round?"
             )
 
         tier_guidance = {

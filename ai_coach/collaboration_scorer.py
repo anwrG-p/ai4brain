@@ -231,7 +231,7 @@ class CollaborationScorer:
         self,
         dimension_scores: DimensionScores,
         weights: DimensionWeights,
-        tier: ArchetypeTier
+        tier: Optional[ArchetypeTier]
     ) -> str:
         """Provide a dynamic growth-mindset tip based on the highest-weighted opportunity."""
         s_dict = dimension_scores.to_dict()
@@ -260,9 +260,52 @@ class CollaborationScorer:
         }
 
         tier_prefix = {
+            None: "",  # no archetype known: no tier claim
             ArchetypeTier.EXPLORER: "Foundational Step: ",
             ArchetypeTier.PRACTITIONER: "Skill Expansion: ",
             ArchetypeTier.STRATEGIST: "Mastery Refinement: ",
         }[tier]
 
         return tier_prefix + recommendations.get(priority_dim, "Keep exploring collaborative cognitive workflows!")
+
+    def score_stored_history(
+        self,
+        user_turns: List[str],
+        telemetry_summary: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """The score from the user's stored chat history and real session telemetry (OQ-3, R15).
+
+        `user_turns`: what the user typed or picked, as stored by ai_coach/chat_store.
+        `telemetry_summary`: {"sessions", "avg_response_time_ms", "hesitation_jitter"} from the
+        user's telemetry, or None. Returns {"status": "not_enough_data"} below MIN_USER_TURNS
+        stored turns or MIN_TELEMETRY_SESSIONS sessions: with fewer turns, a single phrase moves a
+        dimension by 8 points or more, so the number would describe one sentence, not a habit.
+
+        No archetype is known yet (clustering lands in BE-09/BE-11), so the weights are equal and
+        no tier is claimed. They switch to the archetype's profile once the server knows it.
+        """
+        sessions = int((telemetry_summary or {}).get("sessions", 0))
+        if len(user_turns) < MIN_USER_TURNS or sessions < MIN_TELEMETRY_SESSIONS:
+            return {"status": "not_enough_data"}
+        history = [ChatMessage(role=ChatMessageRole.USER, content=t) for t in user_turns]
+        scores = self.evaluate_interaction_signals(history, telemetry_summary)
+        s_dict, w_dict = scores.to_dict(), EQUAL_WEIGHTS.to_dict()
+        contributions = {k: round(w_dict[k] * s_dict[k], 2) for k in s_dict}
+        total = round(max(0.0, min(100.0, sum(w_dict[k] * s_dict[k] for k in s_dict))), 2)
+        return {
+            "status": "ok",
+            "composite_score": total,
+            "dimension_scores": {k: round(v, 2) for k, v in s_dict.items()},
+            "dimension_weights": w_dict,
+            "weighted_contributions": contributions,
+            "growth_recommendation": self._generate_growth_recommendation(scores, EQUAL_WEIGHTS, None),
+            "evidence": {"user_turns": len(user_turns), "sessions": sessions},
+        }
+
+
+# Below these, GET /v1/coach/collaboration-score answers not_enough_data (see score_stored_history).
+MIN_USER_TURNS = 10
+MIN_TELEMETRY_SESSIONS = 1
+EQUAL_WEIGHTS = DimensionWeights(
+    clarification=0.2, critical_verification=0.2, iteration=0.2, autonomy=0.2, responsible_use=0.2
+)
