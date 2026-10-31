@@ -10,14 +10,27 @@ import sklearn
 from ai_coach.safety_guardrails import lint_text
 from clustering_engine.clustering_gmm import (
     ARCHETYPE_NAMES,
+    FALLBACK_NAME,
     PILLARS,
     ClusterModel,
-    archetype_name,
+    _archetype_name,
     fit_gmm,
     posteriors,
 )
 from clustering_engine.fit import fit_synthetic, main, synthetic_pillars
 from clustering_engine.pillar_adapter import session_pillars
+
+
+def assert_well_named(m: ClusterModel) -> list[int]:
+    """Named components first, by distinct archetype id; the rest are FALLBACK_NAME. Returns the
+    named ids."""
+    ids = m.archetype_ids
+    assert ids is not None and len(ids) == m.k
+    named = [i for i in ids if i is not None]
+    assert ids[: len(named)] == named == sorted(set(named))
+    assert all(0 <= i < len(ARCHETYPE_NAMES) for i in named)
+    assert [m.name(c) for c in range(m.k)] == [ARCHETYPE_NAMES[i] for i in named] + [FALLBACK_NAME] * (m.k - len(named))
+    return named
 
 
 @pytest.fixture(scope="module")
@@ -53,19 +66,32 @@ def test_k_defaults_to_nine_and_is_selectable(blobs):
     assert fit_gmm(blobs).k == 9
     m3 = fit_gmm(blobs, k=3)
     assert m3.k == 3 and m3.k_requested == 3
+    assert len(assert_well_named(m3)) >= 1  # distinct ids, at least one named
     m12 = fit_gmm(blobs, k=12)
     assert m12.k == 12
-    # At most nine components carry an archetype name; the rest are numbered profiles, last.
-    named = [i for i in m12.archetype_ids if i is not None]
-    assert len(named) <= 9 and len(set(named)) == len(named)
+    # At most nine components carry an archetype name; the rest are mixed profiles, last.
+    assert 1 <= len(assert_well_named(m12)) <= 9
     assert m12.archetype_ids[-3:] == [None, None, None]
-    assert [m12.name(i) for i in range(9, 12)] == ["Profile 10", "Profile 11", "Profile 12"]
+    assert [m12.name(i) for i in range(9, 12)] == [FALLBACK_NAME] * 3
 
 
 def test_features_must_name_every_column(blobs):
     assert fit_gmm(blobs, features=list("abcde")).features == list("abcde")
     with pytest.raises(ValueError):
         fit_gmm(blobs, features=["focus", "agility"])
+
+
+@pytest.mark.parametrize("empty", [None, []])
+def test_no_feature_names_mean_pillars_at_width_five_in_fit_and_load(blobs, empty):
+    m = fit_gmm(blobs, features=empty)
+    assert m.features == list(PILLARS)
+    saved = m.to_dict()
+    saved.pop("model_id")
+    assert ClusterModel.from_dict({**saved, "features": []}).features == list(PILLARS)
+    latent = np.hstack([blobs, blobs[:, :1]])  # d = 6: no default names
+    m6 = fit_gmm(latent, features=empty)
+    assert m6.features == []
+    assert ClusterModel.from_dict(m6.to_dict()).features == []
 
 
 def test_deterministic_given_a_seed(blobs):
@@ -81,7 +107,14 @@ def test_fewer_rows_than_k_degrade_to_one_component_per_row(n):
     gamma = m.posteriors(X)
     assert gamma.shape == (n, n)
     assert np.allclose(gamma.sum(axis=1), 1.0)
-    assert len(m.archetype_ids) == n
+    assert_well_named(m)
+
+
+def test_a_single_row_is_a_balanced_builder():
+    # One row is exactly everyone's mean: a zero profile, the balanced prototype.
+    m = fit_gmm(np.array([[40.0, 55.0, 60.0, 70.0, 35.0]]))
+    assert m.k == 1
+    assert m.name(0) == "Balanced builder"
 
 
 def test_duplicate_rows_count_once():
@@ -89,6 +122,10 @@ def test_duplicate_rows_count_once():
     m = fit_gmm(X, k=9)
     assert m.k == 2
     assert np.allclose(m.posteriors(X).sum(axis=1), 1.0)
+    # Two rows, all-low and all-high: named by shape even with n < K.
+    assert_well_named(m)
+    low = int(np.argmin(m.means[:, 0]))
+    assert (m.name(low), m.name(1 - low)) == ("Fresh starter", "All-rounder")
 
 
 def test_session_pillars_adapter_scores_and_skips_incomplete_sessions():
@@ -104,7 +141,7 @@ def test_session_pillars_adapter_scores_and_skips_incomplete_sessions():
     assert session_pillars([])[1].shape == (0, 5)
 
 
-@pytest.mark.parametrize("bad",[np.zeros((0, 5)), np.zeros(5), np.array([[np.nan] * 5])])
+@pytest.mark.parametrize("bad", [np.zeros((0, 5)), np.zeros(5), np.array([[np.nan] * 5])])
 def test_bad_input_is_rejected(bad):
     with pytest.raises(ValueError):
         fit_gmm(bad)
@@ -115,10 +152,10 @@ def test_any_latent_width_works_unnamed_or_named_by_pillars(blobs):
     latent = blobs @ rng.normal(size=(5, 8))  # [n, 8], e.g. BE-10's latent
     unnamed = fit_gmm(latent)
     assert unnamed.archetype_ids is None
-    assert [unnamed.name(i) for i in range(3)] == ["Profile 1", "Profile 2", "Profile 3"]
+    assert [unnamed.name(i) for i in range(9)] == [FALLBACK_NAME] * 9
     assert np.allclose(unnamed.posteriors(latent).sum(axis=1), 1.0)
     named = fit_gmm(latent, pillars=blobs)
-    assert named.archetype_ids is not None and len(named.archetype_ids) == 9
+    assert len(assert_well_named(named)) >= 1
     assert named.means.shape == (9, 8)
 
 
@@ -162,7 +199,7 @@ def test_a_profile_far_from_every_prototype_stays_unnamed():
     m = fit_gmm(X, k=2)
     odd = int(np.argmax(m.means[:, 0]))
     assert m.archetype_ids[odd] is None
-    assert m.name(odd) == f"Profile {odd + 1}"
+    assert m.name(odd) == FALLBACK_NAME
 
 
 # --- loading validates every field ----------------------------------------------------------------
@@ -177,6 +214,13 @@ def _broken(d, **changes):
     out = {**d, **changes}
     out.pop("model_id")  # so each case fails on its own field, not on the hash
     return out
+
+
+def _set_diag(chol, value):
+    """A copy of full-covariance Cholesky factors with one diagonal entry set to `value`."""
+    out = np.array(chol)
+    out[0, 2, 2] = value
+    return out.tolist()
 
 
 MALFORMED = {
@@ -198,6 +242,8 @@ MALFORMED = {
     "covariances shape": lambda d: _broken(d, covariances=d["covariances"][:-1]),
     "precisions shape": lambda d: _broken(d, precisions_cholesky=[np.diag(np.array(c)).tolist() for c in d["precisions_cholesky"]]),
     "precisions for another type": lambda d: _broken(d, covariance_type="diag"),
+    "precisions diagonal zero": lambda d: _broken(d, precisions_cholesky=_set_diag(d["precisions_cholesky"], 0.0)),
+    "precisions diagonal negative": lambda d: _broken(d, precisions_cholesky=_set_diag(d["precisions_cholesky"], -1.0)),
     "archetype_ids length": lambda d: _broken(d, archetype_ids=d["archetype_ids"][:-1]),
     "archetype_ids duplicate": lambda d: _broken(d, archetype_ids=[0] * 9),
     "archetype_ids out of range": lambda d: _broken(d, archetype_ids=list(range(1, 10))),
@@ -216,9 +262,18 @@ def test_malformed_models_are_rejected(saved, case):
         ClusterModel.from_dict(MALFORMED[case](saved))
 
 
+@pytest.mark.parametrize("covariance_type", ["tied", "diag", "spherical"])
+def test_non_positive_precision_diagonals_are_rejected_for_every_covariance_type(blobs, covariance_type):
+    d = fit_gmm(blobs, covariance_type=covariance_type).to_dict()
+    assert ClusterModel.from_dict(d).k == 9  # the untouched model loads
+    chol = np.array(d["precisions_cholesky"])
+    chol[(1,) * chol.ndim] = 0.0  # a diagonal entry: [1, 1] tied, [1, 1] diag, [1] spherical
+    with pytest.raises(ValueError, match="positive diagonal"):
+        ClusterModel.from_dict(_broken(d, precisions_cholesky=chol.tolist()))
+
+
 def test_well_formed_variants_still_load(saved):
-    assert ClusterModel.from_dict(_broken(saved, archetype_ids=None)).name(0) == "Profile 1"
-    assert ClusterModel.from_dict(_broken(saved, features=[])).features == []
+    assert ClusterModel.from_dict(_broken(saved, archetype_ids=None)).name(0) == FALLBACK_NAME
     assert ClusterModel.from_dict(_broken(saved)).k == 9  # model_id is optional
 
 
@@ -242,20 +297,21 @@ EMOTION_WORDS = re.compile(
 )
 
 
-@pytest.mark.parametrize("name", list(ARCHETYPE_NAMES) + ["Profile 1", "Profile 12"])
+@pytest.mark.parametrize("name", list(ARCHETYPE_NAMES) + [FALLBACK_NAME])
 def test_archetype_names_pass_the_banned_terms_list(name):
     assert lint_text(name) == [], name
     assert not EMOTION_WORDS.search(name), name
-    assert re.fullmatch(r"[A-Z][A-Za-z -]+(?: \d+)?", name), name
+    assert re.fullmatch(r"[A-Z][a-z]+(?:[ -][A-Za-z]+)*", name), name  # words only, no index
 
 
 def test_archetype_names_are_nine_distinct_names():
     assert len(ARCHETYPE_NAMES) == 9 == len(set(ARCHETYPE_NAMES))
-    assert [archetype_name(k) for k in range(9)] == list(ARCHETYPE_NAMES)
-    assert archetype_name(4) == "Quick spotter"
+    assert FALLBACK_NAME not in ARCHETYPE_NAMES
+    assert [_archetype_name(k) for k in range(9)] == list(ARCHETYPE_NAMES)
+    assert _archetype_name(4) == "Quick spotter"
     for bad in (-1, 9):
         with pytest.raises(ValueError):
-            archetype_name(bad)
+            _archetype_name(bad)
 
 
 # --- golden fit on fixed synthetic data -----------------------------------------------------------
@@ -289,7 +345,7 @@ def test_golden_fit_on_fixed_synthetic_data():
     assert m.archetype_ids == GOLDEN_IDS
     assert [m.name(i) for i in range(9)] == [
         "Steady planner", "Keen recaller", "All-rounder", "Fresh starter", "Balanced builder",
-        "Methodical solver", "Profile 7", "Profile 8", "Profile 9",
+        "Methodical solver", FALLBACK_NAME, FALLBACK_NAME, FALLBACK_NAME,
     ]
     assert m.weights == pytest.approx(GOLDEN_WEIGHTS, abs=1e-3)
     assert m.means == pytest.approx(np.array(GOLDEN_MEANS), abs=0.05)

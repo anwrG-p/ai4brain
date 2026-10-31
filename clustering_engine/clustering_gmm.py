@@ -42,8 +42,14 @@ ARCHETYPE_NAMES: tuple[str, ...] = tuple(name for name, _ in _ARCHETYPES)
 _PROTOTYPES = np.array([proto for _, proto in _ARCHETYPES], dtype=float)
 
 
-def archetype_name(k: int) -> str:
-    """The consumer name of archetype id `k` (0..8)."""
+# Shown for a component no prototype fits. Not an index: indices mean nothing to users and
+# change after a refit.
+FALLBACK_NAME = "Mixed profile"
+
+
+def _archetype_name(k: int) -> str:
+    """The consumer name of archetype id `k` (0..8). Callers outside this module use
+    ClusterModel.name(component)."""
     if not 0 <= k < len(ARCHETYPE_NAMES):
         raise ValueError(f"archetype id must be in 0..{len(ARCHETYPE_NAMES) - 1}")
     return ARCHETYPE_NAMES[k]
@@ -86,8 +92,9 @@ class ClusterModel:
         return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 
     def name(self, component: int) -> str:
+        """The consumer name of a component: its archetype's, or FALLBACK_NAME when it has none."""
         aid = None if self.archetype_ids is None else self.archetype_ids[component]
-        return f"Profile {component + 1}" if aid is None else archetype_name(aid)
+        return FALLBACK_NAME if aid is None else _archetype_name(aid)
 
     def posteriors(self, x) -> np.ndarray:
         """gamma_k = P(C_k | x): [k] for one vector, [n, k] for a batch. Each row sums to 1."""
@@ -147,7 +154,7 @@ class ClusterModel:
             k_requested=d["k_requested"],
             seed=d["seed"],
             archetype_ids=None if d["archetype_ids"] is None else list(d["archetype_ids"]),
-            features=list(d["features"]),
+            features=_features(d["features"], a["means"].shape[1]),
         )
         if "model_id" in d and d["model_id"] != model.model_id:
             raise ValueError("model_id does not match the parameters")
@@ -229,7 +236,11 @@ def _validate(d) -> dict:
         raise ValueError("weights must be >= 0 and sum to 1")
     shape = {"full": (k, dim, dim), "tied": (dim, dim), "diag": (k, dim), "spherical": (k,)}[cov_type]
     a["covariances"] = _array(d, "covariances", shape)
-    a["precisions_cholesky"] = _array(d, "precisions_cholesky", shape)
+    a["precisions_cholesky"] = chol = _array(d, "precisions_cholesky", shape)
+    # A Cholesky factor of a precision matrix has a positive diagonal (diag/spherical: every entry).
+    diagonal = {"full": lambda c: np.diagonal(c, axis1=1, axis2=2), "tied": np.diagonal}.get(cov_type, lambda c: c)
+    if (diagonal(chol) <= 0).any():
+        raise ValueError("precisions_cholesky must have a positive diagonal")
     ids = d["archetype_ids"]
     if ids is not None:
         named = [i for i in ids if i is not None] if isinstance(ids, list) else None
@@ -244,6 +255,16 @@ def _validate(d) -> dict:
     if not isinstance(features, list) or not all(isinstance(f, str) for f in features) or len(features) not in (0, dim):
         raise ValueError(f"features must be empty or {dim} names")
     return a
+
+
+def _features(features, d: int) -> list[str]:
+    """Column names, the same rule for fit and load: None or [] means PILLARS when d == 5 and no
+    names otherwise; anything else must name all d columns."""
+    if not features:
+        return list(PILLARS) if d == len(PILLARS) else []
+    if len(features) != d:
+        raise ValueError(f"features has {len(features)} names for {d} columns")
+    return list(features)
 
 
 def _precisions(chol: np.ndarray, covariance_type: str) -> np.ndarray:
@@ -273,10 +294,10 @@ def fit_gmm(
 
     - k defaults to 9; with fewer distinct rows than k it degrades to one component per distinct row.
     - Names: components are matched one-to-one to archetype prototypes on their pillar profile
-      (see _assign_archetypes); one that fits no prototype stays "Profile N". The pillar profile
-      is X itself when d == 5, else `pillars` ([n, 5], e.g. the pillar scores behind a latent),
-      else every component stays unnamed.
-    - `features`, when given, names the d columns.
+      (see _assign_archetypes); one that fits no prototype is a "Mixed profile". The pillar
+      profile is X itself when d == 5, else `pillars` ([n, 5], e.g. the pillar scores behind a
+      latent), else every component is a "Mixed profile".
+    - `features` names the d columns; None or [] means PILLARS when d == 5, else no names.
     """
     X = np.asarray(X, dtype=float)
     if X.ndim != 2 or X.shape[0] == 0 or X.shape[1] == 0:
@@ -286,8 +307,7 @@ def fit_gmm(
     if k < 1:
         raise ValueError("k must be >= 1")
     n, d = X.shape
-    if features is not None and len(features) != d:
-        raise ValueError(f"features has {len(features)} names for {d} columns")
+    features = _features(features, d)
     k_eff = min(k, len(np.unique(X, axis=0)))
 
     center = X.mean(axis=0)
@@ -327,14 +347,14 @@ def fit_gmm(
         k_requested=k,
         seed=seed,
         archetype_ids=ids,
-        features=list(features) if features is not None else (list(PILLARS) if d == len(PILLARS) else []),
+        features=features,
     )
 
 
 # Naming thresholds (judgement, not evidence). A profile is shrunk to at most PROFILE_CAP SDs so
 # a very pronounced cluster is named by its shape (an all-low cluster 3 SDs out is still "Fresh
 # starter"); a component whose capped profile is more than MAX_NAME_COST (squared SDs) from its
-# matched prototype keeps no name and shows as "Profile N".
+# matched prototype keeps no archetype and shows as FALLBACK_NAME.
 PROFILE_CAP = 1.5
 MAX_NAME_COST = 1.0
 
