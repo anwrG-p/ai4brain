@@ -59,6 +59,15 @@ def test_duplicates_are_pointers(pointer, canonical):
 
 
 TEXT_SUFFIXES = {".md", ".html", ".svg", ".txt", ".json", ".py"}
+# file:/// followed by a path (c:/..., /home/..., Users/...); naming the scheme in prose is fine.
+FILE_URL = re.compile(r"file:///+[\w%~.]", re.I)
+
+
+def test_file_url_pattern():
+    assert FILE_URL.search("[x](file:///c:/Users/Smida/Desktop/CISTAC/frontend/)")
+    assert FILE_URL.search("see file:///C:/Users/hamza/backend/app/main.py")
+    assert FILE_URL.search("file:////home/me/notes.md")
+    assert not FILE_URL.search("never link with `file:///`")
 
 
 def test_no_links_to_another_machine():
@@ -68,6 +77,6 @@ def test_no_links_to_another_machine():
         f"{p.relative_to(ROOT).as_posix()}:{n}"
         for p in [ROOT / "README.md", ROOT / "GLOSSARY.md", *docs_text]
         for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1)
-        if "file:///" in line.lower()
+        if FILE_URL.search(line)
     ]
     assert offenders == []
