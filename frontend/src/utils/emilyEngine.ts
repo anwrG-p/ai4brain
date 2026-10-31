@@ -376,14 +376,16 @@ export function startEmilyListener(
     const now = Date.now()
     const x = 'clientX' in e ? e.clientX : 0
     const y = 'clientY' in e ? e.clientY : 0
+    // A window or document target (a key with nothing focused, a synthetic event) has no closest().
+    const target = e.target instanceof Element ? e.target : null
 
     buffer.push({
       type,
       x,
       y,
       timestamp: now,
-      targetTag: (e.target as HTMLElement)?.tagName?.toLowerCase(),
-      isInteractive: (e.target as HTMLElement)?.closest('button, a, input, [role="button"]') !== null,
+      targetTag: target?.tagName.toLowerCase(),
+      isInteractive: target?.closest('button, a, input, [role="button"]') != null,
     })
 
     // Prune events older than rolling buffer
