@@ -3,22 +3,19 @@ import { CONSENT_KEY, QUEUE_KEY, tracker } from '../assessment/telemetry/tracker
 import { forgetUserId, UID_KEY } from '../assessment/tasks/taskSource'
 import { GOALS_KEY, useGoalsStore } from '../insights/goals'
 import { SESSIONS_KEY, useSessionStore } from '../insights/sessionStore'
+import { useLotiSession, type LotiTalk } from '../loti/lotiSession'
 
 /* Everything this device holds about the user, for "Export my data" and "Delete my data":
    sessions, goals, the consent choice ('granted' | 'denied'; absent means not chosen yet), the
    answers waiting to be sent, the anonymous id, and Loti's talk.
    Excluded: the judge tool's sign-offs (cistac_ux_review_signoffs, HumanReviewGate), which hold
    reviewers' notes about the UI, not anything about the user. */
-// ponytail: the Loti talk store (09c) lives on another branch; after the merge use
-// useLotiSession.getState().clear() for delete and its state for export instead of the raw key.
-export const LOTI_KEY = 'synapsetwin_loti_v1' // sessionStorage
-
 export const LOCAL_KEYS = [SESSIONS_KEY, GOALS_KEY, CONSENT_KEY, QUEUE_KEY, UID_KEY] as const
 
 // Storage can be blocked (reading it throws); a value that isn't JSON is kept as its raw string.
-function read(storage: () => Storage, key: string): unknown {
+function read(key: string): unknown {
   try {
-    const raw = storage().getItem(key)
+    const raw = localStorage.getItem(key)
     if (raw === null) return null
     try {
       return JSON.parse(raw)
@@ -46,7 +43,8 @@ export interface MyData {
   exportedAt: string
   consent: string
   localStorage: Record<string, unknown>
-  sessionStorage: Record<string, unknown>
+  /** Loti's talk for this tab, from its store (what is on screen, even if storage is blocked). */
+  lotiTalk: LotiTalk
   /** The profile and the two real settings. */
   app: Pick<AppState, (typeof APP_FIELDS)[number]>
 }
@@ -55,8 +53,8 @@ export function collectMyData(now = new Date()): MyData {
   return {
     exportedAt: now.toISOString(),
     consent: tracker.getStatus().consent,
-    localStorage: Object.fromEntries(LOCAL_KEYS.map((k) => [k, read(() => localStorage, k)])),
-    sessionStorage: { [LOTI_KEY]: read(() => sessionStorage, LOTI_KEY) },
+    localStorage: Object.fromEntries(LOCAL_KEYS.map((k) => [k, read(k)])),
+    lotiTalk: (({ turns, current }) => ({ turns, current }))(useLotiSession.getState()),
     app: pick(useAppStore.getState()),
   }
 }
@@ -89,9 +87,6 @@ export function deleteMyData(): void {
   forgetUserId()
   useSessionStore.getState().clearSessions()
   useGoalsStore.getState().clearGoals()
-  try {
-    sessionStorage.removeItem(LOTI_KEY)
-  } catch {
-    // Storage blocked: nothing stored to clear.
-  }
+  // The store, not just its key: a mounted Loti bubble would otherwise save the old turns back.
+  useLotiSession.getState().clear()
 }

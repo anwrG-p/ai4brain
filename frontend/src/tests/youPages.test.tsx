@@ -7,7 +7,8 @@ import { CONSENT_KEY, QUEUE_KEY, tracker } from '../features/assessment/telemetr
 import { UID_KEY } from '../features/assessment/tasks/taskSource'
 import { GOALS_KEY, useGoalsStore } from '../features/insights/goals'
 import { SESSIONS_KEY, useSessionStore } from '../features/insights/sessionStore'
-import { LOTI_KEY } from '../features/privacy/myData'
+import { LOTI_SESSION_KEY, useLotiSession } from '../features/loti/lotiSession'
+import type { LotiMessage } from '../features/loti/types'
 import YouPage from '../pages/YouPage'
 import PrivacyPage from '../pages/PrivacyPage'
 import SettingsPage from '../pages/SettingsPage'
@@ -25,11 +26,20 @@ const TECHNICAL = /v1\/|QUEST|JSON|SAT-JEPA|contract|receipt|hash|SHA|endpoint|t
 
 const SESSION = { id: 's1', at: '2026-10-31T10:00:00Z', inputs: {} }
 
+const ASK: LotiMessage = { id: 'day', text: 'How was your day?', choices: [{ id: 'great', label: 'Great' }] }
+/** A talk in Loti's store (and so in sessionStorage): Loti asked, the user answered, a question is open. */
+function seedLotiTalk() {
+  act(() => {
+    useLotiSession.getState().record(ASK, ASK.choices[0]!, { id: 'train', text: 'Shall we train?', choices: [{ id: 'yes', label: 'Yes' }] })
+  })
+}
+
 beforeEach(() => {
   localStorage.clear()
   sessionStorage.clear()
   useSessionStore.getState().clearSessions()
   useGoalsStore.getState().clearGoals()
+  useLotiSession.getState().clear()
   useAppStore.getState().resetDemoState()
   tracker.resetConsent()
   tracker.clear()
@@ -150,7 +160,7 @@ describe('Privacy (/privacy)', () => {
       useAppStore.getState().setTheme('dark')
       useAppStore.getState().setReducedMotion(true)
     })
-    sessionStorage.setItem(LOTI_KEY, '{"history":[]}')
+    seedLotiTalk()
     renderPage(<PrivacyPage />)
     fireEvent.click(screen.getByRole('button', { name: 'Delete my data' }))
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
@@ -158,7 +168,11 @@ describe('Privacy (/privacy)', () => {
     expect(useAppStore.getState().reducedMotion).toBe(true)
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
     expect(document.documentElement).toHaveAttribute('data-reduced-motion', 'true')
-    expect(sessionStorage.getItem(LOTI_KEY)).toBeNull()
+    expect(sessionStorage.getItem(LOTI_SESSION_KEY)).toBeNull()
+    // The in-memory talk is gone too: the next bubble does not save the old turns back.
+    act(() => useLotiSession.getState().begin(ASK))
+    expect(useLotiSession.getState().turns).toEqual([])
+    expect(sessionStorage.getItem(LOTI_SESSION_KEY)).not.toMatch(/Shall we train/)
   })
 
   it('no fake certificate, hash or server claim after delete', () => {
@@ -175,7 +189,8 @@ describe('Privacy (/privacy)', () => {
     act(() => tracker.denyConsent()) // the tracker itself writes the consent key
     localStorage.setItem(QUEUE_KEY, '[{"event":"held"}]')
     localStorage.setItem(UID_KEY, 'anon-1')
-    sessionStorage.setItem(LOTI_KEY, '{"history":["hi"]}')
+    seedLotiTalk()
+    sessionStorage.removeItem(LOTI_SESSION_KEY) // the export reads the store, not the raw key
     let blob: Blob | undefined
     // jsdom has no createObjectURL: stub it so it can be spied on; afterEach restores the spies.
     URL.createObjectURL ??= () => ''
@@ -204,7 +219,9 @@ describe('Privacy (/privacy)', () => {
     expect(data.localStorage[CONSENT_KEY]).toBe('denied')
     expect(data.localStorage[QUEUE_KEY]).toEqual([{ event: 'held' }])
     expect(data.localStorage[UID_KEY]).toBe('anon-1')
-    expect(data.sessionStorage[LOTI_KEY]).toEqual({ history: ['hi'] })
+    expect(data.lotiTalk.turns.map((t: { text: string }) => t.text)).toEqual(['How was your day?', 'Great'])
+    expect(data.lotiTalk.current.text).toBe('Shall we train?')
+    expect(data).not.toHaveProperty('sessionStorage')
     expect(data.consent).toBe('denied')
     // Only the user's own fields: no demo/judge state, no legacy consent defaults (fake receipt id).
     expect(data.app).toEqual({
