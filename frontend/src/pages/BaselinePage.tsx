@@ -3,12 +3,10 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { ExerciseHost } from '../features/assessment/ExerciseHost'
-import { newId } from '../features/assessment/tasks/taskSource'
 import { tracker } from '../features/assessment/telemetry/tracker'
 import type { TelemetryEvent } from '../features/assessment/telemetry/types'
 import { BASELINE_SCHEMAS, fastTask, isFastRun } from '../features/flow/baseline'
-import { useSessionStore } from '../features/insights/sessionStore'
-import { taskScores } from '../features/insights/taskScores'
+import { saveRun } from '../features/insights/sessionStore'
 
 const TOTAL = BASELINE_SCHEMAS.length
 
@@ -18,7 +16,8 @@ export type BaselineResult = { finished: number; total: number }
 /* The baseline: the six exercises in a row, each in its own ExerciseFrame (instruction, fixation,
    trials, end card). Continue on an end card goes straight to the next exercise. Telemetry stays
    held on the device (consent is asked on /results). The page collects the events of its own tasks
-   and, after the last one, saves the session's scores (R5) and moves on to /results.
+   and, after the last one, saves the session's scores with the shared saveRun (R5, as the task
+   runner does) and moves on to /results.
    Exit leaves at any time. A hidden tab or Escape pauses a started block (fixation or trials), and
    the exercise starts over (R3): the paused attempt's events are dropped. On the instruction
    screen and the end card there is nothing to discard, so neither pauses. */
@@ -26,7 +25,6 @@ export default function BaselinePage() {
   const navigate = useNavigate()
   const { search } = useLocation()
   const fast = useMemo(() => isFastRun(search), [search])
-  const addSession = useSessionStore((s) => s.addSession)
   const [step, setStep] = useState(0)
   const [attempt, setAttempt] = useState(0)
   const [paused, setPaused] = useState(false)
@@ -56,11 +54,11 @@ export default function BaselinePage() {
         setStep(step + 1)
         return
       }
-      addSession({ id: newId(), at: new Date().toISOString(), inputs: taskScores(events.current) })
+      saveRun(events.current, taskIds.current) // nothing scored (every exercise skipped): no session
       const state: BaselineResult = { finished: finished.current, total: TOTAL }
       navigate('/results', { replace: true, state })
     },
-    [step, addSession, navigate],
+    [step, navigate],
   )
   const onDone = useCallback(() => next(true), [next])
   const onError = useCallback(() => next(false), [next]) // could not be shown: skipped, not counted

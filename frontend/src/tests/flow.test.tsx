@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useEffect, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../App'
@@ -19,7 +19,7 @@ const META: Partial<Record<SchemaType, TelemetryEvent['trial_meta']>> = {
 
 // The stub opens on its "instruction" (Begin); Begin starts its block ([data-block-running], as the
 // real frame marks it) and records one event. `stub` steers a test's run.
-const stub = { failing: null as SchemaType | null, wrongOnFirstAttempt: false, tasks: [] as string[] }
+const stub = { failing: null as SchemaType | 'all' | null, wrongOnFirstAttempt: false, tasks: [] as string[] }
 
 vi.mock('../features/assessment/ExerciseHost', () => ({
   ExerciseHost: ({
@@ -38,7 +38,7 @@ vi.mock('../features/assessment/ExerciseHost', () => ({
     const [running, setRunning] = useState(false)
     const id = `stub-${schemaType}-${attempt}`
     useEffect(() => {
-      if (stub.failing === schemaType) return onError('This exercise could not be shown.')
+      if (stub.failing === schemaType || stub.failing === 'all') return onError('This exercise could not be shown.')
       stub.tasks.push(id)
       onTask?.(id)
     }, [])
@@ -178,6 +178,13 @@ describe('/baseline', () => {
     await runBaseline(['relational', 'n_back', 'stroop', 'ufov', 'mst'])
     expect(screen.getByText('Good job! You finished 5 of 6.')).toBeInTheDocument()
     expect(screen.queryByText(/all six/)).toBeNull()
+  })
+
+  it('saves through the shared saveRun: a baseline with nothing scored adds no empty session', async () => {
+    stub.failing = 'all'
+    go('/baseline')
+    await waitFor(() => expect(window.location.pathname).toBe('/'))
+    expect(useSessionStore.getState().sessions).toHaveLength(0)
   })
 })
 
