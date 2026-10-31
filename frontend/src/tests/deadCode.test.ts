@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { REDIRECTS } from '../App'
 import { useAppStore } from '../state/useAppStore'
 
 /* INT-1: no dead modules. Every source file is reachable from main.tsx through relative imports,
@@ -57,6 +58,23 @@ describe('dead code (INT-1)', () => {
       .map(rel)
       .filter((f) => !isTest(f) && !isAsset(f) && !SCRIPT_ONLY.includes(f))
     expect(dead).toEqual([])
+  })
+
+  it('no app code links to a redirected route; links go to the new routes', () => {
+    // A quote or backtick opens the path. A plain key matches only itself ('/task' redirects, the
+    // real route '/task/:dimId' does not); a key with a :param matches its prefix plus '/'.
+    const esc = (r: string) => r.replace(/[/-]/g, '\\$&')
+    const alts = Object.keys(REDIRECTS).map((r) => (r.includes('/:') ? `${esc(r.replace(/\/:.*$/, ''))}\\/` : `${esc(r)}(?=[?'"\`])`))
+    const pattern = new RegExp(`['"\`](?:${alts.join('|')})`)
+    const hits = files(SRC)
+      .filter((f) => /\.tsx?$/.test(f) && !isTest(rel(f)) && rel(f) !== 'App.tsx')
+      .flatMap((f) =>
+        readFileSync(f, 'utf8')
+          .split('\n')
+          .filter((line) => pattern.test(line) && !/pathname/.test(line)) // a route check, not a link
+          .map((line) => `${rel(f)}: ${line.trim()}`),
+      )
+    expect(hits).toEqual([])
   })
 
   it('the app store holds no unused settings or demo switches', () => {

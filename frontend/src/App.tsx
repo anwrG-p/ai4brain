@@ -18,7 +18,7 @@ const SystemPage = React.lazy(() => import('./pages/SystemPage'))
 
 /* Old routes (pre brand v2) and where they go now (ticket 09a). Their pages are deleted; a link or a
    bookmark lands on the new equivalent instead of a 404. */
-const REDIRECTS: Record<string, string> = {
+export const REDIRECTS: Record<string, string> = {
   '/onboarding': '/',
   '/auth': '/', // sign-in lives in Welcome's and Results' login sheet
   '/login': '/',
