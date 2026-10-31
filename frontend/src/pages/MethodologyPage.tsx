@@ -11,22 +11,33 @@ import {
   type InputId,
   type PillarId,
 } from '../features/insights/pillars'
+import { MAX_HORIZON_DAYS } from '../features/insights/dashboard'
+import { CURVE_STROKE, DASHED, PROJECT_FROM } from '../features/insights/ProgressCurve'
 import {
-  DEFAULT_LAMBDA,
+  ALPHA_MAX,
+  ALPHA_MIN,
   DEFAULT_TMAX,
-  FALLBACK_ALPHA,
-  GRACE_DAYS,
+  RCI_R,
+  RCI_SD,
   RCI_THRESHOLD,
   SESSIONS_PER_WEEK,
-  fitAlpha,
   rci,
 } from '../features/insights/projection'
+import {
+  D_PRIME_MAX,
+  PLAN_SHARE,
+  PLAN_TIME_MAX_MS,
+  STROOP_COST_MAX_MS,
+  SWITCH_COST_MAX,
+  UFOV_MAX_MS,
+  UFOV_MIN_MS,
+} from '../features/insights/taskScores'
 
 /* "How we calculate this": the one page that holds the formulas, the brain-area links, the projection
    model and RCI (spec U5, ticket 09). A plain intro, then one closed disclosure per topic (rule 13).
-   Weights, coverage, projection defaults and the RCI threshold are read from features/insights, so
-   the page cannot drift from the code. The scale ends quoted in the text are pinned by
-   src/tests/methodologyPage.test.tsx against taskScores(). */
+   Weights, coverage, scale ends, projection defaults and the RCI settings are read from
+   features/insights, so the page cannot drift from the code; src/tests/methodologyPage.test.tsx
+   also pins the scale ends against taskScores(). */
 
 // What each of the doc's inputs measures, in plain words, and which exercise feeds it. This MIRRORS
 // features/insights/taskScores.ts by hand (it exports no input -> exercise map): change both together.
@@ -41,14 +52,19 @@ const MEASURES: Record<InputId, Measure> = {
     how: (
       <>
         d′ = z(H) − z(FA), with H = (hits + 0.5) ÷ (targets + 1) and FA = (false alarms + 0.5) ÷
-        (non-targets + 1). 0 when hits don’t beat false alarms. Scale: d′ 0 → 0, 4 → 100.
+        (non-targets + 1). 0 when hits don’t beat false alarms. Scale: d′ 0 → 0, {D_PRIME_MAX} → 100.
       </>
     ),
   },
   OTS_Planning: {
     name: 'Planning ahead',
     from: ['tower'],
-    how: <>0.8 × share solved in the fewest moves + 0.2 × planning speed on those (0 s → 1, 30 s → 0).</>,
+    how: (
+      <>
+        {PLAN_SHARE} × share solved in the fewest moves + {+(1 - PLAN_SHARE).toFixed(2)} × planning speed on those
+        (0 s → 1, {PLAN_TIME_MAX_MS / 1000} s → 0).
+      </>
+    ),
   },
   FluidMatrices: {
     name: 'Reasoning',
@@ -61,7 +77,7 @@ const MEASURES: Record<InputId, Measure> = {
     how: (
       <>
         Time cost = mean time on mismatched colours − mean time on matching ones, correct answers only.
-        Scale: 0 ms → 100, 300 ms → 0. Multiplied by (accuracy − ¼) ÷ ¾, so guessing scores 0.
+        Scale: 0 ms → 100, {STROOP_COST_MAX_MS} ms → 0. Multiplied by (accuracy − ¼) ÷ ¾, so guessing scores 0.
       </>
     ),
   },
@@ -71,7 +87,7 @@ const MEASURES: Record<InputId, Measure> = {
     note: 'from Memory Gauntlet',
     how: (
       <>
-        Accuracy on steady trials − accuracy on switch trials. Scale: 0 → 100, 0.5 → 0. Multiplied by
+        Accuracy on steady trials − accuracy on switch trials. Scale: 0 → 100, {SWITCH_COST_MAX} → 0. Multiplied by
         min(1, d′), so not answering scores 0.
       </>
     ),
@@ -102,7 +118,11 @@ const MEASURES: Record<InputId, Measure> = {
   UFOV_SOA: {
     name: 'Seeing speed',
     from: ['ufov'],
-    how: <>The shortest display time you still read correctly. Scale: 17 ms → 100, 500 ms → 0.</>,
+    how: (
+      <>
+        The shortest display time you still read correctly. Scale: {UFOV_MIN_MS} ms → 100, {UFOV_MAX_MS} ms → 0.
+      </>
+    ),
   },
   ANT_Orienting: {
     name: 'Side vision',
@@ -134,10 +154,7 @@ function exercisesFor(p: PillarId): string {
   return any ? `${list}, and how you bounce back after a mistake in any exercise` : list
 }
 
-// The clamp on α, read from fitAlpha itself (the bounds are not exported): a flat history gives the
-// floor, an instant jump to the ceiling gives the top.
-const ALPHA_RANGE = [fitAlpha([0, 0, 0], 1), fitAlpha([0, 1, 1], 1)] as const
-// rci() defaults: SD 10, r 0.8. 1 / rci(1, 0) is the standard error of a difference, in points.
+// 1 / rci(1, 0) is the standard error of a difference, in points (rci()'s defaults: RCI_SD, RCI_R).
 const RCI_POINTS = Math.round(RCI_THRESHOLD / rci(1, 0))
 
 function Topic({ title, children }: { title: string; children: ReactNode }) {
@@ -165,10 +182,20 @@ function Sources({ children }: { children: ReactNode }) {
   )
 }
 
-function Swatch({ dash, className }: { dash?: string; className: string }) {
+// Drawn like ProgressCurve's own legend: the same stroke class, widths and dash.
+function Swatch({ dash }: { dash?: string }) {
   return (
     <svg aria-hidden="true" width="28" height="8" className="mr-2 inline-block shrink-0 align-middle">
-      <line x1={2} x2={26} y1={4} y2={4} strokeWidth={2.5} strokeLinecap="round" strokeDasharray={dash} className={className} />
+      <line
+        x1={2}
+        x2={26}
+        y1={4}
+        y2={4}
+        strokeWidth={dash ? 2.5 : 3}
+        strokeLinecap={dash ? 'butt' : 'round'}
+        strokeDasharray={dash}
+        className={CURVE_STROKE}
+      />
     </svg>
   )
 }
@@ -280,7 +307,7 @@ export default function MethodologyPage() {
 
         <Topic title="Your progress curve">
           <Formula>
-            T = T<sub>max</sub> − (T<sub>max</sub> − T<sub>0</sub>) · e<sup>−α·N</sup> − λ · idle days
+            T = T<sub>max</sub> − (T<sub>max</sub> − T<sub>0</sub>) · e<sup>−α·N</sup>
           </Formula>
           <ul className="flex list-disc flex-col gap-1 pl-5">
             <li>T<sub>0</sub> is your latest score and N the number of sessions from now.</li>
@@ -289,28 +316,24 @@ export default function MethodologyPage() {
               moves up to your best score if you pass it.
             </li>
             <li>
-              α is how fast you have been improving, fitted to your sessions. With fewer than 3 sessions, α ={' '}
-              {FALLBACK_ALPHA}. It stays between {ALPHA_RANGE[0]} and {ALPHA_RANGE[1]}.
-            </li>
-            <li>
-              λ = {DEFAULT_LAMBDA} points per idle day, counted after {GRACE_DAYS} days off.
+              α is how fast you have been improving, fitted to your sessions. It stays between {ALPHA_MIN} and{' '}
+              {ALPHA_MAX}.
             </li>
           </ul>
           <ul className="flex flex-col gap-2">
             <li className="flex items-center">
-              <Swatch className="stroke-brand" />
+              <Swatch />
               Solid: your sessions so far.
             </li>
             <li className="flex items-center">
-              <Swatch dash="8 6" className="stroke-brand-vivid" />
-              Dashed: If you keep training ({SESSIONS_PER_WEEK} sessions a week, no idle days).
-            </li>
-            <li className="flex items-center">
-              <Swatch dash="0.1 7" className="stroke-ink-muted" />
-              Dotted: If you pause (no new sessions; the idle cost grows each day).
+              <Swatch dash={DASHED} />
+              Dashed: If you keep training ({SESSIONS_PER_WEEK} sessions a week).
             </li>
           </ul>
-          <p className="text-sm text-ink-muted">Both lines start at your latest score and look 30 or 90 days ahead.</p>
+          <p className="text-sm text-ink-muted">
+            The dashed line shows once you have {PROJECT_FROM} sessions. It starts at your latest score and looks up to{' '}
+            {MAX_HORIZON_DAYS} days ahead.
+          </p>
           <p className="text-sm text-ink-muted">These are working values we will tune as data comes in.</p>
         </Topic>
 
@@ -319,7 +342,9 @@ export default function MethodologyPage() {
             RCI = (now − baseline) ÷ (√2 · SD · √(1 − r))
           </Formula>
           <ul className="flex list-disc flex-col gap-1 pl-5">
-            <li>For now SD = 10 points and r = 0.8 (how stable a score is from one test to the next).</li>
+            <li>
+              For now SD = {RCI_SD} points and r = {RCI_R} (how stable a score is from one test to the next).
+            </li>
             <li>
               A change counts as real when RCI ≥ {RCI_THRESHOLD} (p &lt; .05): about {RCI_POINTS} points.
             </li>

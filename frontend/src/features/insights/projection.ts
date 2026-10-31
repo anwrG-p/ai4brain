@@ -16,8 +16,8 @@ const DAY_MS = 86_400_000
 export const DEFAULT_TMAX = 90
 export const SESSIONS_PER_WEEK = 4
 export const FALLBACK_ALPHA = 0.05
-const ALPHA_MIN = 0.01
-const ALPHA_MAX = 0.3
+export const ALPHA_MIN = 0.01
+export const ALPHA_MAX = 0.3
 
 /** alpha by least squares through the origin on ln((Tmax - T_n) / (Tmax - T0)) = -alpha * n, where
     `scores` are in session order and T0 is the first. */
@@ -75,9 +75,13 @@ export function projection(
   return { alpha, tmax, optimal }
 }
 
+/** Default test-retest reliability and SD (points) for the RCI: assumptions until Member 3's data. */
+export const RCI_R = 0.8
+export const RCI_SD = 10
+
 /** Reliable Change Index (Jacobson & Truax 1991): (current - baseline) / SEdiff, with
     SEdiff = sqrt(2) * sd * sqrt(1 - rxx). */
-export function rci(current: number, baseline: number, rxx = 0.8, sd = 10): number {
+export function rci(current: number, baseline: number, rxx = RCI_R, sd = RCI_SD): number {
   return (current - baseline) / (Math.SQRT2 * sd * Math.sqrt(1 - rxx))
 }
 
@@ -85,6 +89,6 @@ export const RCI_THRESHOLD = 1.96
 
 /** A change counts as real only when RCI >= 1.96 (p < .05). The 1e-9 absorbs float rounding at the
     boundary itself. */
-export function isRealImprovement(current: number, baseline: number, rxx = 0.8, sd = 10): boolean {
+export function isRealImprovement(current: number, baseline: number, rxx = RCI_R, sd = RCI_SD): boolean {
   return rci(current, baseline, rxx, sd) >= RCI_THRESHOLD - 1e-9
 }

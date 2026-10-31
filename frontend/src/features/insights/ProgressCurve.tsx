@@ -18,6 +18,8 @@ export const CURVE_EMPTY = 'Finish one session to see your curve.'
 /** The projection appears from this many sessions. */
 export const PROJECT_FROM = 3
 export const DASHED = '8 6' // If you keep training
+/** Both lines and the dots; the methodology page's swatches use it too. */
+export const CURVE_STROKE = 'stroke-brand-vivid'
 
 const HEIGHT = 220
 const M = { top: 16, right: 16, bottom: 30, left: 36 }
@@ -80,8 +82,8 @@ export function ProgressCurve({ history, now }: ProgressCurveProps) {
               </text>
             </g>
           ))}
-          {keep && <path data-line="keep" d={path(keep) ?? ''} fill="none" strokeWidth={2.5} strokeDasharray={DASHED} className="stroke-brand-vivid" />}
-          <path data-line="actual" d={path(actual) ?? ''} fill="none" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" className="stroke-brand-vivid" />
+          {keep && <path data-line="keep" d={path(keep) ?? ''} fill="none" strokeWidth={2.5} strokeDasharray={DASHED} className={CURVE_STROKE} />}
+          <path data-line="actual" d={path(actual) ?? ''} fill="none" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" className={CURVE_STROKE} />
           {actual.map((p, i) => (
             <circle key={i} data-session cx={x(p.at)} cy={y(p.score)} r={4} className="fill-brand-vivid" />
           ))}
@@ -103,7 +105,7 @@ export function ProgressCurve({ history, now }: ProgressCurveProps) {
         {legend.map((item) => (
           <li key={item.label} className="flex items-center gap-2">
             <svg aria-hidden="true" width={28} height={8} className="shrink-0">
-              <line x1={2} x2={26} y1={4} y2={4} strokeWidth={item.width} strokeLinecap={item.dash ? 'butt' : 'round'} strokeDasharray={item.dash} className="stroke-brand-vivid" />
+              <line x1={2} x2={26} y1={4} y2={4} strokeWidth={item.width} strokeLinecap={item.dash ? 'butt' : 'round'} strokeDasharray={item.dash} className={CURVE_STROKE} />
             </svg>
             {item.label}
           </li>

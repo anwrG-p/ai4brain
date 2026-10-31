@@ -53,15 +53,15 @@ export function ldi(similarLures: number, nLures: number, similarNew: number, nN
 
 // Scale anchors and gates (listed in pillars.ts). ASSUMPTIONS to tune against Member 3's data,
 // not evidence, except the UFOV range (the payload's duration grid) and Stroop chance (4 inks).
-const D_PRIME_MAX = 4 // d' 0 -> 0, 4 -> 100
+export const D_PRIME_MAX = 4 // d' 0 -> 0, 4 -> 100
 const D_PRIME_GATE = 1 // the switch cost counts fully from d' 1
-const SWITCH_COST_MAX = 0.5 // switch cost 0 -> 100, 0.5 -> 0
-const STROOP_COST_MAX_MS = 300 // RT cost 0 ms -> 100, 300 ms -> 0
+export const SWITCH_COST_MAX = 0.5 // switch cost 0 -> 100, 0.5 -> 0
+export const STROOP_COST_MAX_MS = 300 // RT cost 0 ms -> 100, 300 ms -> 0
 const STROOP_CHANCE = 0.25 // red, green, blue, yellow (README payload contract)
-const PLAN_SHARE = 0.8 // OTS_Planning = 0.8 x solved in minimum moves + 0.2 x planning speed
-const PLAN_TIME_MAX_MS = 30_000 // half of the TOL-F 60 s limit
-const UFOV_MIN_MS = 17 // one 60 Hz frame
-const UFOV_MAX_MS = 500 // the top of the UFOV duration grid
+export const PLAN_SHARE = 0.8 // OTS_Planning = 0.8 x solved in minimum moves + 0.2 x planning speed
+export const PLAN_TIME_MAX_MS = 30_000 // half of the TOL-F 60 s limit
+export const UFOV_MIN_MS = 17 // one 60 Hz frame
+export const UFOV_MAX_MS = 500 // the top of the UFOV duration grid
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length

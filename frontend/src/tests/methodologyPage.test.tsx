@@ -4,8 +4,10 @@ import { describe, expect, it } from 'vitest'
 import { EXERCISE_NAME } from '../features/assessment/names'
 import type { Dimension, TelemetryEvent, TrialMeta } from '../features/assessment/telemetry/types'
 import { MIN_COVERAGE, PILLAR_IDS, PILLAR_LABELS, PILLAR_WEIGHTS, type InputId } from '../features/insights/pillars'
-import { DEFAULT_LAMBDA, DEFAULT_TMAX, FALLBACK_ALPHA, GRACE_DAYS, RCI_THRESHOLD, rci } from '../features/insights/projection'
-import { dPrime, taskScores } from '../features/insights/taskScores'
+import { MAX_HORIZON_DAYS } from '../features/insights/dashboard'
+import { ProgressCurve, PROJECT_FROM } from '../features/insights/ProgressCurve'
+import { ALPHA_MAX, ALPHA_MIN, DEFAULT_TMAX, RCI_R, RCI_SD, RCI_THRESHOLD, SESSIONS_PER_WEEK, rci } from '../features/insights/projection'
+import { PLAN_SHARE, PLAN_TIME_MAX_MS, SWITCH_COST_MAX, dPrime, taskScores } from '../features/insights/taskScores'
 import MethodologyPage from '../pages/MethodologyPage'
 import { lintCopyText } from '../utils/copyLinter'
 
@@ -128,6 +130,11 @@ describe('How we calculate this (/methodology)', () => {
     expect(section).toHaveTextContent('d′ 0 → 0, 4 → 100')
     expect(section).toHaveTextContent('0 ms → 100, 300 ms → 0')
     expect(section).toHaveTextContent('17 ms → 100, 500 ms → 0')
+    // The planning and switching constants come from taskScores, not from the page.
+    expect(section).toHaveTextContent(
+      `${PLAN_SHARE} × share solved in the fewest moves + ${+(1 - PLAN_SHARE).toFixed(2)} × planning speed on those (0 s → 1, ${PLAN_TIME_MAX_MS / 1000} s → 0)`,
+    )
+    expect(section).toHaveTextContent(`Scale: 0 → 100, ${SWITCH_COST_MAX} → 0`)
     expect(section).toHaveTextContent('Stark et al. 2023')
     expect(section).toHaveTextContent('Time-cost scores are unreliable from one test to the next')
 
@@ -157,27 +164,44 @@ describe('How we calculate this (/methodology)', () => {
     expect(section).toHaveTextContent(/hippocampus/i)
   })
 
-  it('describes the projection with the code’s defaults and the dashed and dotted lines', () => {
+  it('describes the projection as the curve draws it: one dashed line from session 3, no pause line or decay (R11)', () => {
     renderPage()
     const section = open(TOPICS[3]!)
     expect(section).toHaveTextContent(`Tmax = ${DEFAULT_TMAX}`)
-    expect(section).toHaveTextContent(`λ = ${DEFAULT_LAMBDA}`)
-    expect(section).toHaveTextContent(`after ${GRACE_DAYS} days`)
-    expect(section).toHaveTextContent(`α = ${FALLBACK_ALPHA}`)
-    expect(section).toHaveTextContent('between 0.01 and 0.3')
+    expect(section).toHaveTextContent(`between ${ALPHA_MIN} and ${ALPHA_MAX}`)
+    expect(section).toHaveTextContent(`once you have ${PROJECT_FROM} sessions`)
+    expect(section).toHaveTextContent(`${SESSIONS_PER_WEEK} sessions a week`)
+    expect(section).toHaveTextContent(`up to ${MAX_HORIZON_DAYS} days ahead`)
     expect(section).toHaveTextContent(/Dashed: If you keep training/)
-    expect(section).toHaveTextContent(/Dotted: If you pause/)
     expect(section).toHaveTextContent('These are working values we will tune as data comes in.')
+    const text = section.textContent ?? ''
+    for (const gone of [/λ/, /idle/i, /Dotted/, /If you pause/, /Both lines/, /90 days/]) expect(text, String(gone)).not.toMatch(gone)
+    expect(section.querySelectorAll('svg line')).toHaveLength(2)
+  })
+
+  it('draws its swatches in the progress curve’s own stroke colour and dash', () => {
+    renderPage()
+    const swatches = Array.from(open(TOPICS[3]!).querySelectorAll('svg line'))
+    const now = new Date('2026-10-31T12:00:00')
+    const { container } = render(
+      <ProgressCurve history={[40, 44, 47].map((score, i) => ({ at: new Date(now.getTime() - (3 - i) * 86_400_000).toISOString(), score }))} now={now} />,
+    )
+    const actual = container.querySelector('[data-line="actual"]')!
+    const keep = container.querySelector('[data-line="keep"]')!
+    expect(swatches[0]!.getAttribute('class')).toBe(actual.getAttribute('class'))
+    expect(swatches[0]).not.toHaveAttribute('stroke-dasharray')
+    expect(swatches[1]!.getAttribute('class')).toBe(keep.getAttribute('class'))
+    expect(swatches[1]!.getAttribute('stroke-dasharray')).toBe(keep.getAttribute('stroke-dasharray'))
   })
 
   it('explains RCI with the threshold and the defaults the code uses', () => {
     renderPage()
     const section = open(TOPICS[4]!)
     expect(section).toHaveTextContent(`RCI ≥ ${RCI_THRESHOLD}`)
-    expect(section).toHaveTextContent('SD = 10')
-    expect(section).toHaveTextContent('r = 0.8')
+    expect(section).toHaveTextContent(`SD = ${RCI_SD} points`)
+    expect(section).toHaveTextContent(`r = ${RCI_R}`)
     // The page's SD and r are rci()'s defaults.
-    expect(rci(1, 0)).toBeCloseTo(1 / (Math.SQRT2 * 10 * Math.sqrt(1 - 0.8)), 12)
+    expect(rci(1, 0)).toBeCloseTo(1 / (Math.SQRT2 * RCI_SD * Math.sqrt(1 - RCI_R)), 12)
     expect(section).toHaveTextContent(`about ${Math.round(RCI_THRESHOLD / rci(1, 0))} points`)
     expect(section).toHaveTextContent(/Jacobson & Truax 1991/)
   })

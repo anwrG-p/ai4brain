@@ -96,7 +96,7 @@ export function goalLines(stored: StoredGoals, pillars: Pillars, now: Date): Goa
 }
 
 const MIN_PAST_DAYS = 21
-const MAX_HORIZON_DAYS = 30
+export const MAX_HORIZON_DAYS = 30
 
 /** The progress curve's time range: at least 21 past days, and a forecast of at most 30% of the whole
     range (spec charts table), capped at 30 days. */
