@@ -36,6 +36,16 @@ test.describe('App shell (ticket 09a)', () => {
         expect(axe.violations).toEqual([])
         expect(await noOverflow(page)).toBe(true)
 
+        // Touch targets (UI/UX Pro Max §2): below lg (touch layouts, bottom tabs) every header control
+        // is at least 44 px tall and wide. The desktop top nav is for a pointer (WCAG 2.5.8: 24 px).
+        const small = await page.evaluate(() =>
+          [...document.querySelectorAll('header a[href], header button')]
+            .map((el) => ({ name: el.getAttribute('aria-label') ?? el.textContent, r: el.getBoundingClientRect() }))
+            .filter(({ r }) => r.width > 0 && (r.width < 44 || r.height < 44))
+            .map(({ name, r }) => `${name} ${r.width}x${r.height}`),
+        )
+        if (width < 1024) expect(small).toEqual([])
+
         await page.goto('/dashboard', { waitUntil: 'networkidle' })
         await setTheme(page, theme) // a full load starts in the default theme
         await page.screenshot({ path: shot(`shell-${width}-${theme}.png`) })
