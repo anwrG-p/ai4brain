@@ -1,10 +1,9 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '../../../state/useAppStore'
 import { useEmilyStore } from '../../../state/useEmilyStore'
-import { Mascot, type MascotState } from '../brand/Mascot'
 import { Dolphin, type DolphinPose } from './Dolphin'
 import { Loti, type LotiPose } from './Loti'
 import { Momo, MomoFromStore, EMOTION_TO_MOOD, type MomoMood } from './Momo'
@@ -191,40 +190,6 @@ describe('reduced motion', () => {
     expect(lock).toMatch(/\[data-reduced-motion="true"\] \[class\*="char-anim-"\]/)
     expect(lock).toMatch(/\[data-timed-trial="true"\] \[class\*="char-anim-"\]/)
     expect(lock).toMatch(/animation: none !important/)
-  })
-})
-
-describe('Mascot wrapper', () => {
-  const STATES: [MascotState, RegExp][] = [
-    ['idle', /loti/i],
-    ['hello', /waving/i],
-    ['curious', /thinking/i],
-    ['thinking', /thinking/i],
-    ['celebrate', /happy/i],
-    ['rest', /loti/i],
-    ['calm-shrug', /loti/i],
-  ]
-
-  it.each(STATES)('renders Loti for the %s state', (state, label) => {
-    const { container } = render(<Mascot state={state} size="md" showSpeechBubble={false} />)
-    expect(screen.getByRole('img', { name: label })).toBeInTheDocument()
-    expectCleanSvg(container)
-  })
-
-  it('renders nothing visible for the hidden state', () => {
-    const { container } = render(<Mascot state="hidden" />)
-    expect(container.querySelector('svg')).toBeNull()
-  })
-
-  it('keeps the speech bubble API and hides the figure behind a titled bubble', () => {
-    render(<Mascot state="thinking" message="Let me look at that." />)
-    expect(screen.getByText('Let me look at that.')).toBeInTheDocument()
-    expect(screen.queryByText(/State:/i)).toBeNull() // no default badge (ticket 09a)
-    cleanup()
-    render(<Mascot state="thinking" message="Let me look at that." badgeLabel="Saved" />)
-    expect(screen.getByText('Saved')).toBeInTheDocument() // a passed badgeLabel still renders
-    expect(screen.getByText(/^Loti$/)).toBeInTheDocument()
-    expect(screen.queryByRole('img')).toBeNull()
   })
 })
 

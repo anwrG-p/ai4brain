@@ -30,7 +30,7 @@ export interface MomoProps {
   className?: string
 }
 
-/** How the emotion store (useEmilyStore / EmilyMoodPill) maps onto Momo's moods.
+/** How the emotion store (useEmilyStore) maps onto Momo's moods.
     hesitant -> focused: the learner is slowing down to think, so Momo shows careful attention,
     not worry. */
 export const EMOTION_TO_MOOD: Record<EmilyEmotion, MomoMood> = {

@@ -1,104 +1,14 @@
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, expect, it, beforeEach, vi } from 'vitest'
-import { EmilyMoodPill } from '../components/common/EmilyMoodPill'
 import { HumanReviewGate } from '../components/dev/HumanReviewGate'
 import { useEmilyStore } from '../state/useEmilyStore'
 import { EMILY_EMOTION_CONFIGS } from '../styles/emilyTokens'
 
-describe('EMILY Mood Pill & Designer / Evaluator UX Review Gate Suite', () => {
+describe('Designer / Evaluator UX Review Gate Suite', () => {
   beforeEach(() => {
     useEmilyStore.getState().reset()
     localStorage.clear()
     vi.restoreAllMocks()
-  })
-
-  describe('Part 1: EmilyMoodPill Component', () => {
-    it('renders default Calm Flow mood pill with color dot and accessible semantics', () => {
-      render(<EmilyMoodPill />)
-
-      const pillBtn = screen.getByRole('button', {
-        name: /EMILY Atmosphere: Calm Flow/i,
-      })
-      expect(pillBtn).toBeInTheDocument()
-      expect(screen.getByText('Calm Flow')).toBeInTheDocument()
-      expect(screen.getByText('🌿')).toBeInTheDocument()
-      expect(document.documentElement.getAttribute('data-emotion')).toBe('calm_flow')
-    })
-
-    it('opens popover dialog on pill click displaying kinematics summary and emotion options', () => {
-      render(<EmilyMoodPill />)
-
-      const pillBtn = screen.getByRole('button', {
-        name: /EMILY Atmosphere: Calm Flow/i,
-      })
-      fireEvent.click(pillBtn)
-
-      // Popover should now be visible
-      expect(screen.getByRole('dialog', { name: /EMILY Emotion Atmosphere/i })).toBeInTheDocument()
-      expect(screen.getByText(/Live Pointer Dynamics/i)).toBeInTheDocument()
-      expect(screen.getByText(/Pointer Rhythm: Smooth arcs/i)).toBeInTheDocument()
-
-      // Should render all 5 emotion buttons
-      expect(screen.getByText('Curious Spark')).toBeInTheDocument()
-      expect(screen.getByText('Gentle De-Escalation')).toBeInTheDocument()
-      expect(screen.getByText('Reassuring Guidance')).toBeInTheDocument()
-      expect(screen.getByText('Restorative Wind-Down')).toBeInTheDocument()
-    })
-
-    it('allows manually selecting an emotion and activates human lock', () => {
-      render(<EmilyMoodPill />)
-
-      const pillBtn = screen.getByRole('button', {
-        name: /EMILY Atmosphere: Calm Flow/i,
-      })
-      fireEvent.click(pillBtn)
-
-      // Click on Curious Spark (energized)
-      const sparkBtn = screen.getByText('Curious Spark')
-      fireEvent.click(sparkBtn)
-
-      expect(useEmilyStore.getState().currentEmotion).toBe('energized')
-      expect(useEmilyStore.getState().isHumanLocked).toBe(true)
-      expect(document.documentElement.getAttribute('data-emotion')).toBe('energized')
-    })
-
-    it('shows non-intrusive BRIAN approval bubble when proposedEmotion is set', () => {
-      render(<EmilyMoodPill />)
-
-      // Simulate store receiving a proposed frustrated state wrapped in act
-      act(() => {
-        useEmilyStore.setState({ proposedEmotion: 'frustrated' })
-      })
-
-      expect(screen.getByRole('status')).toBeInTheDocument()
-      expect(screen.getByText(/BRIAN Companion Check-In/i)).toBeInTheDocument()
-      expect(screen.getByText(/Notice rapid bursts and elevated cursor tension/i)).toBeInTheDocument()
-
-      const applyBtn = screen.getByRole('button', { name: /Apply Calm Mode/i })
-      const keepBtn = screen.getByRole('button', { name: /Keep Current/i })
-      expect(applyBtn).toBeInTheDocument()
-      expect(keepBtn).toBeInTheDocument()
-
-      // Clicking apply mode adopts the proposed state
-      fireEvent.click(applyBtn)
-      expect(useEmilyStore.getState().currentEmotion).toBe('frustrated')
-      expect(useEmilyStore.getState().proposedEmotion).toBeNull()
-    })
-
-    it('clears proposedEmotion when user clicks Keep Current', () => {
-      render(<EmilyMoodPill />)
-
-      act(() => {
-        useEmilyStore.setState({ proposedEmotion: 'hesitant' })
-      })
-      expect(screen.getByText(/Notice wandering arcs and searching pauses/i)).toBeInTheDocument()
-
-      const keepBtn = screen.getByRole('button', { name: /Keep Current/i })
-      fireEvent.click(keepBtn)
-
-      expect(useEmilyStore.getState().proposedEmotion).toBeNull()
-      expect(useEmilyStore.getState().currentEmotion).toBe('calm_flow')
-    })
   })
 
   describe('Part 2: HumanReviewGate Evaluator Controls', () => {

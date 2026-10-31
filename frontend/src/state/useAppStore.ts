@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import type { DimensionPresetKey } from '../config/dimensions'
 
 export type ThemeMode = 'light' | 'dark'
-export type TextScale = '100' | '115' | '130'
 export type PersonaId =
   | 'new-user'
   | 'steady-improver'
@@ -63,26 +62,11 @@ interface AppState {
   showMascot: boolean
   activePersona: PersonaId
   simulateOffline: boolean
-  simulateLlmDown: boolean
   consentPreferences: ConsentPreferences
   userProfile: UserProfile | null
   isAuthenticated: boolean
   loginUser: (profile: UserProfile) => void
   logoutUser: () => void
-  textScale: TextScale
-  enhancedGlyphs: boolean
-  soundEffects: boolean
-  blurAutoPause: boolean
-  studyWindow: string
-  restDays: string[]
-  setTextScale: (scale: TextScale) => void
-  setEnhancedGlyphs: (enhanced: boolean) => void
-  setSoundEffects: (sound: boolean) => void
-  setBlurAutoPause: (blur: boolean) => void
-  setStudyWindow: (window: string) => void
-  setRestDays: (days: string[]) => void
-  toggleRestDay: (day: string) => void
-  resetSettingsToDefault: () => void
   setTheme: (theme: ThemeMode) => void
   toggleTheme: () => void
   setReducedMotion: (reduced: boolean) => void
@@ -90,21 +74,19 @@ interface AppState {
   setShowMascot: (show: boolean) => void
   setActivePersona: (persona: PersonaId) => void
   setSimulateOffline: (offline: boolean) => void
-  setSimulateLlmDown: (llmDown: boolean) => void
   updateConsentPreferences: (patch: Partial<ConsentPreferences>) => void
   applyFastTrackConsent: () => void
   resetConsentPreferences: () => void
   resetDemoState: () => void
 }
 
-function syncDocumentAttributes(theme: ThemeMode, reducedMotion: boolean, textScale: TextScale = '100') {
+function syncDocumentAttributes(theme: ThemeMode, reducedMotion: boolean) {
   if (typeof document !== 'undefined') {
     document.documentElement.setAttribute('data-theme', theme)
     document.documentElement.setAttribute(
       'data-reduced-motion',
       reducedMotion ? 'true' : 'false',
     )
-    document.documentElement.setAttribute('data-text-scale', textScale)
   }
 }
 
@@ -138,70 +120,31 @@ export const useAppStore = create<AppState>((set) => ({
   showMascot: true,
   activePersona: 'steady-improver',
   simulateOffline: false,
-  simulateLlmDown: false,
   consentPreferences: DEFAULT_CONSENT_PREFERENCES,
   userProfile: null,
   isAuthenticated: false,
   loginUser: (profile: UserProfile) => set({ userProfile: profile, isAuthenticated: true }),
   logoutUser: () => set({ userProfile: null, isAuthenticated: false }),
-  textScale: '100',
-  enhancedGlyphs: true,
-  soundEffects: true,
-  blurAutoPause: true,
-  studyWindow: 'morning',
-  restDays: ['Wednesday', 'Sunday'],
-  setTextScale: (textScale) =>
-    set((state) => {
-      syncDocumentAttributes(state.theme, state.reducedMotion, textScale)
-      return { textScale }
-    }),
-  setEnhancedGlyphs: (enhancedGlyphs) => set({ enhancedGlyphs }),
-  setSoundEffects: (soundEffects) => set({ soundEffects }),
-  setBlurAutoPause: (blurAutoPause) => set({ blurAutoPause }),
-  setStudyWindow: (studyWindow) => set({ studyWindow }),
-  setRestDays: (restDays) => set({ restDays }),
-  toggleRestDay: (day) =>
-    set((state) => ({
-      restDays: state.restDays.includes(day)
-        ? state.restDays.filter((d) => d !== day)
-        : [...state.restDays, day],
-    })),
-  resetSettingsToDefault: () =>
-    set(() => {
-      syncDocumentAttributes('light', false, '100')
-      return {
-        theme: 'light',
-        reducedMotion: false,
-        dimensionPreset: '7',
-        textScale: '100',
-        enhancedGlyphs: true,
-        soundEffects: true,
-        blurAutoPause: true,
-        studyWindow: 'morning',
-        restDays: ['Wednesday', 'Sunday'],
-      }
-    }),
   setTheme: (theme) =>
     set((state) => {
-      syncDocumentAttributes(theme, state.reducedMotion, state.textScale)
+      syncDocumentAttributes(theme, state.reducedMotion)
       return { theme }
     }),
   toggleTheme: () =>
     set((state) => {
       const next: ThemeMode = state.theme === 'light' ? 'dark' : 'light'
-      syncDocumentAttributes(next, state.reducedMotion, state.textScale)
+      syncDocumentAttributes(next, state.reducedMotion)
       return { theme: next }
     }),
   setReducedMotion: (reducedMotion) =>
     set((state) => {
-      syncDocumentAttributes(state.theme, reducedMotion, state.textScale)
+      syncDocumentAttributes(state.theme, reducedMotion)
       return { reducedMotion }
     }),
   setDimensionPreset: (dimensionPreset) => set({ dimensionPreset }),
   setShowMascot: (showMascot) => set({ showMascot }),
   setActivePersona: (activePersona) => set({ activePersona }),
   setSimulateOffline: (simulateOffline) => set({ simulateOffline }),
-  setSimulateLlmDown: (simulateLlmDown) => set({ simulateLlmDown }),
   updateConsentPreferences: (patch) =>
     set((state) => ({
       consentPreferences: {
@@ -234,7 +177,7 @@ export const useAppStore = create<AppState>((set) => ({
     }),
   resetDemoState: () =>
     set(() => {
-      syncDocumentAttributes('light', false, '100')
+      syncDocumentAttributes('light', false)
       return {
         theme: 'light',
         reducedMotion: false,
@@ -242,16 +185,9 @@ export const useAppStore = create<AppState>((set) => ({
         showMascot: true,
         activePersona: 'steady-improver',
         simulateOffline: false,
-        simulateLlmDown: false,
         consentPreferences: DEFAULT_CONSENT_PREFERENCES,
         userProfile: null,
         isAuthenticated: false,
-        textScale: '100',
-        enhancedGlyphs: true,
-        soundEffects: true,
-        blurAutoPause: true,
-        studyWindow: 'morning',
-        restDays: ['Wednesday', 'Sunday'],
       }
     }),
 }))
