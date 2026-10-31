@@ -43,7 +43,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const status = useSyncExternalStore(subscribeTracker, trackerStatus)
 
   // R3: after a decline nothing is kept to send, so being offline changes nothing for the user.
-  const offline = status.consent !== 'denied' && (simulateOffline || !status.isOnline)
+  // Never during an exercise: nothing above a stimulus may appear or move (anti-slop rule 10).
+  const offline = !isTaskRoute && status.consent !== 'denied' && (simulateOffline || !status.isOnline)
   const themeLabel = theme === 'light' ? 'Switch to Dark (Night Lab)' : 'Switch to Light (Playful Lab)'
 
   return (
@@ -54,7 +55,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         Skip to main content
       </a>
-      <EmotionListener />
+      {/* Only on the nav pages: not in the welcome flow (before consent) or during timed trials. */}
+      {withNav && <EmotionListener />}
 
       {offline && (
         <p

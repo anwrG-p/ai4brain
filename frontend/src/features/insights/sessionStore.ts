@@ -1,5 +1,8 @@
 import { create } from 'zustand'
+import type { TelemetryEvent } from '../assessment/telemetry/types'
+import { newId } from '../assessment/tasks/taskSource'
 import { isInputId, type InputScore, type TaskScores } from './pillars'
+import { taskScores } from './taskScores'
 
 /* Completed sessions on this device (R5): each one's per-input scores from taskScores(). Versioned
    like the goals slice and cleared by the privacy purge. Member 3's server profile can replace it. */
@@ -85,3 +88,15 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }
   },
 }))
+
+/** Saves one finished run as a session (R5): scores only the events of `taskIds` (every event when
+    omitted), so a discarded attempt never counts. Returns whether a session was added. Shared by the
+    baseline and the task runner. */
+export function saveRun(events: readonly TelemetryEvent[], taskIds?: Iterable<string>): boolean {
+  const ids = taskIds ? new Set(taskIds) : null
+  const own = ids ? events.filter((e) => ids.has(e.task_id)) : events
+  const inputs = taskScores(own)
+  if (Object.keys(inputs).length === 0) return false
+  useSessionStore.getState().addSession({ id: newId(), at: new Date().toISOString(), inputs })
+  return true
+}

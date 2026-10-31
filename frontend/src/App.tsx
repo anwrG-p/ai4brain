@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
 import { ErrorBoundary } from './components/layout/ErrorBoundary'
 
@@ -40,6 +40,12 @@ const REDIRECTS: Record<string, string> = {
   '/dimensions/:dimId': '/you',
 }
 
+// The query string rides along (e.g. ?judge=1, ?fast=1).
+function RedirectKeepQuery({ to }: { to: string }) {
+  const { search } = useLocation()
+  return <Navigate to={{ pathname: to, search }} replace />
+}
+
 function RouteLoadingSkeleton() {
   return (
     <div role="status" aria-label="Loading page" className="space-y-4">
@@ -70,7 +76,7 @@ export function App() {
               <Route path="/offline" element={<SystemPage view="offline" />} />
               <Route path="/system-error" element={<SystemPage view="error" />} />
               {Object.entries(REDIRECTS).map(([from, to]) => (
-                <Route key={from} path={from} element={<Navigate to={to} replace />} />
+                <Route key={from} path={from} element={<RedirectKeepQuery to={to} />} />
               ))}
               <Route path="*" element={<SystemPage />} />
             </Routes>
