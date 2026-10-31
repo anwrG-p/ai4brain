@@ -1,148 +1,315 @@
-"""Non-Clinical Safety Guardrails for Member 2 (AI Coach).
+"""Safety guardrails for Loti, the coach (Member 2).
 
-Enforces non-clinical boundaries by:
-1. Detecting medical, psychiatric, and diagnostic labels (e.g., ADHD, impairment, pathology).
-2. Sanitizing and redacting diagnostic deficit labels into growth-oriented terminology.
-3. Ensuring coach responses maintain an empowering, neuroplasticity-focused, non-clinical tone.
-4. Providing system instruction fragments for LLM context steering.
+Two separate parts. Neither one ever rewrites or euphemises what the user wrote.
+
+1. OUTPUT guardrail (`SafetyGuardrailEngine.check_safety` / `sanitize`): lints Loti's own replies
+   against `banned_terms.json` (clinical labels, guilt, brain regions, chemicals, neuroplasticity,
+   transfer and comparison claims). A reply that trips a rule is withheld whole and a fixed,
+   pre-checked fallback goes out instead. No word-for-word substitution: the old rewrite map turned
+   "dementia" into "cognitive endurance challenge" and "disability" into "distinct cognitive
+   modality", which hid real needs instead of pointing to help (research area 7).
+
+2. INPUT gates on the user's text, run before any LLM call:
+   - `crisis_check(text)`: deterministic self-harm, suicide and acute-distress phrases (English and
+     French). A hit returns a fixed, calm reply pointing to local emergency services and a crisis
+     line; the LLM is never consulted.
+   - `health_signpost(text)`: the user raises a diagnosis, a condition or a symptom. A hit returns
+     "I can't assess health. A doctor can." instead of an LLM reply.
+   Both return `GateResult(hit, reply)`, the shape of the frontend seam `crisisGate(text) => { hit, reply? }`.
 """
 
 from __future__ import annotations
 
+import json
 import re
-from typing import Dict, List, Tuple
-from ai_coach.schemas import SafetyMetadata, SafetyViolation
+import unicodedata
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, Iterator, List, Optional, Pattern, Tuple
+
+from ai_coach.schemas import GateResult, SafetyMetadata, SafetyViolation
+
+BANNED_TERMS_PATH = Path(__file__).resolve().parent / "banned_terms.json"
 
 
-# Dictionary mapping clinical / deficit patterns to growth-mindset alternatives.
-CLINICAL_TERM_REPLACEMENTS: Dict[str, str] = {
-    r"\b(adhd|a\.d\.h\.d\.)\b": "divergent attentional style",
-    r"\b(add|a\.d\.d\.)\b": "fluctuating focus pattern",
-    r"\b(autism|autistic)\b": "systematizing cognitive profile",
-    r"\b(ocd|o\.c\.d\.)\b": "high-precision focus tendency",
-    r"\b(dyslexia|dyslexic)\b": "alternative visual-linguistic processing",
-    r"\b(dementia|alzheimer'?s)\b": "cognitive endurance challenge",
-    r"\b(bipolar|schizophreni[ac])\b": "variable cognitive rhythm",
-    r"\b(clinical depression|depressive disorder)\b": "reduced energy episode",
-    r"\b(anxiety disorder|clinical anxiety)\b": "elevated stress state",
-    r"\b(cognitive impairment|mild cognitive impairment|mci)\b": "developing processing capacity",
-    r"\b(impairment|impairments)\b": "developing capacity",
-    r"\b(cognitive deficit|mental deficit)\b": "targeted growth opportunity",
-    r"\b(deficit|deficits)\b": "targeted growth area",
-    r"\b(brain damage|brain injury)\b": "adaptive neural restructuring",
-    r"\b(neurological disorder|neurodegenerative disorder)\b": "distinct neural pattern",
-    r"\b(disorder|disorders)\b": "cognitive style variation",
-    r"\b(mental retardation|retarded)\b": "unique learning pace",
-    r"\b(pathology|pathological)\b": "atypical variance",
-    r"\b(abnormal|abnormality)\b": "divergent baseline",
-    r"\b(dysfunctional|dysfunction)\b": "suboptimal strategy",
-    r"\b(mental handicap|handicapped)\b": "differential accessibility profile",
-    r"\b(disability|disabled)\b": "distinct cognitive modality",
-    r"\b(patient|patients)\b": "learner",
-    r"\b(symptom|symptoms)\b": "observable behavioral signal",
-    r"\b(syndrome)\b": "cognitive pattern",
-    r"\b(subnormal)\b": "baseline",
-    r"\b(diagnosis|diagnosed|diagnosing)\b": "performance assessment",
-    r"\b(prognosis)\b": "growth trajectory",
-    r"\b(clinical condition)\b": "cognitive state",
-}
+# ---------------------------------------------------------------------------------------------
+# Part 1: output guardrail (Loti's replies)
+# ---------------------------------------------------------------------------------------------
 
-# Compiled regex patterns for fast detection
-COMPILED_PATTERNS = [
-    (re.compile(pattern, re.IGNORECASE), replacement, pattern)
-    for pattern, replacement in CLINICAL_TERM_REPLACEMENTS.items()
-]
 
-# Additional strictly prohibited diagnostic phrases that must trigger immediate rejection/remediation
-BLOCKED_DIAGNOSTIC_QUERIES = [
-    re.compile(r"\bdo i have (adhd|autism|dementia|depression|ocd|a disorder)\b", re.IGNORECASE),
-    re.compile(r"\bam i (bipolar|autistic|mentally ill|retarded|brain-damaged)\b", re.IGNORECASE),
-    re.compile(r"\bdiagnose me\b", re.IGNORECASE),
-]
+@dataclass(frozen=True)
+class BannedRule:
+    """One rule from banned_terms.json, compiled for Python."""
+
+    term_label: str
+    category: str
+    source: str
+    flags: str
+    regex: Pattern[str]
+    # JS negative lookbehinds may be variable-width, which Python's `re` rejects. A leading
+    # `(?<!X)` is split off and checked as "the text before the match must not end with X".
+    not_after: Optional[Pattern[str]] = None
+
+    def find(self, text: str) -> Iterator[str]:
+        for match in self.regex.finditer(text):
+            if self.not_after is not None and self.not_after.search(text[: match.start()]):
+                continue
+            yield match.group(0)
+
+
+def _split_leading_lookbehind(source: str) -> Tuple[Optional[str], str]:
+    """Return (lookbehind body, rest) for a source starting with `(?<!...)`, else (None, source)."""
+    if not source.startswith("(?<!"):
+        return None, source
+    depth = 0
+    i = 0
+    while i < len(source):
+        ch = source[i]
+        if ch == "\\":
+            i += 2
+            continue
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                return source[len("(?<!") : i], source[i + 1 :]
+        i += 1
+    raise ValueError(f"Unbalanced lookbehind in banned-term pattern: {source!r}")
+
+
+def _compile_rule(entry: Dict[str, str]) -> BannedRule:
+    flags = entry.get("flags", "")
+    re_flags = re.IGNORECASE if "i" in flags else 0
+    source = entry["pattern"]
+    lookbehind, body = _split_leading_lookbehind(source)
+    return BannedRule(
+        term_label=entry["termLabel"],
+        category=entry["category"],
+        source=source,
+        flags=flags,
+        regex=re.compile(body, re_flags),
+        not_after=re.compile(f"(?:{lookbehind})$", re_flags) if lookbehind is not None else None,
+    )
+
+
+def load_banned_terms(path: Path = BANNED_TERMS_PATH) -> Dict[str, List[Dict[str, str]]]:
+    """Raw JSON sections: `shared` (parity with copyLinter.ts) and `coach_only`."""
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return {"shared": data["shared"], "coach_only": data["coach_only"]}
+
+
+_SECTIONS = load_banned_terms()
+SHARED_RULES: Tuple[BannedRule, ...] = tuple(_compile_rule(e) for e in _SECTIONS["shared"])
+COACH_ONLY_RULES: Tuple[BannedRule, ...] = tuple(_compile_rule(e) for e in _SECTIONS["coach_only"])
+BANNED_RULES: Tuple[BannedRule, ...] = SHARED_RULES + COACH_ONLY_RULES
+
+# Kept (empty) only because src/coach/safety_guardrails.py re-exports the name. The rewrite map is
+# gone on purpose (BE-05): the coach never substitutes words, it withholds a bad reply whole.
+CLINICAL_TERM_REPLACEMENTS: Dict[str, str] = {}
+
+# Sent when Loti's reply is withheld and the caller has no better fallback. Lint-clean, <= 12 words.
+SAFE_FALLBACK_REPLY = "Let's keep going with your exercises."
+
+# Fixed signpost when the user raises health. Lint-clean: no labels, no assessment.
+HEALTH_SIGNPOST_REPLY = "I can't assess health. A doctor can."
 
 DISCLAIMER_TEXT = (
-    "Note: AI4Brain is a non-clinical cognitive fitness and skill-building system. "
-    "We evaluate cognitive agility, working memory, and focus strategies through dynamic "
-    "neuroplasticity principles and do not provide medical or psychiatric diagnoses."
+    f"{HEALTH_SIGNPOST_REPLY} This app is non-clinical cognitive fitness practice; "
+    "we do not provide medical or psychiatric diagnoses."
 )
 
 
+def lint_text(text: str, rules: Tuple[BannedRule, ...] = BANNED_RULES) -> List[Tuple[BannedRule, str]]:
+    """Every (rule, matched text) in `text`. Detection only: the text is never changed."""
+    if not text:
+        return []
+    return [(rule, hit) for rule in rules for hit in rule.find(text)]
+
+
+# ---------------------------------------------------------------------------------------------
+# Part 2: input gates (the user's text). Detection only; the user's words are never changed.
+# ---------------------------------------------------------------------------------------------
+
+
+def normalise_user_text(text: str) -> str:
+    """Lowercase, strip accents and apostrophes, turn other punctuation into spaces.
+
+    "I CAN'T go on!!!" -> "i cant go on"; "J’ai des idées noires…" -> "jai des idees noires";
+    "self-harm" -> "self harm". Used for matching only.
+    """
+    decomposed = unicodedata.normalize("NFKD", text or "")
+    no_accents = "".join(c for c in decomposed if not unicodedata.combining(c))
+    lowered = no_accents.lower()
+    no_apostrophes = re.sub(r"['’‘`]", "", lowered)
+    spaced = re.sub(r"[^\w\s]|_", " ", no_apostrophes)
+    return re.sub(r"\s+", " ", spaced).strip()
+
+
+# Fixed crisis replies. The English one starts with the frontend's CRISIS_MESSAGE text
+# (features/loti/coachAdapter.ts) and adds numbers: 112 is the EU emergency number, 3114 the French
+# national suicide prevention line, 988 the US Suicide & Crisis Lifeline.
+CRISIS_REPLY_EN = (
+    "I'm really glad you told me. Please call your local emergency number now, "
+    "or a suicide and crisis line. Emergency in Europe: 112. France: 3114. US: 988."
+)
+CRISIS_REPLY_FR = (
+    "Merci de me l'avoir dit. Appelez maintenant le numéro d'urgence local, "
+    "ou une ligne de prévention du suicide. Urgences en Europe : 112. France : 3114. États-Unis : 988."
+)
+
+# Phrases on normalised text (see normalise_user_text). Language: "en", "fr" or None (both).
+# Choices, erring towards answering (a calm false hit costs less than a miss):
+# - Caught: "suicide/suicidal", self-harm, "kill/hurt/harm/cut/hang myself", "end my life", "end it
+#   all", "want to die", "can't go on" (frontend parity), "better off dead", "don't want to live",
+#   overdose, "not safe"; French "me tuer", "me suicider", "envie de mourir", "idées noires",
+#   "mettre fin à mes jours", "ne veux plus vivre", "en finir avec la vie".
+# - Let through, as everyday idioms with no self-reference: "this task is killing me", "I'm dying
+#   to…", "I could kill for a coffee", "dead tired", "ça me tue", "mort de fatigue", "me tuer à la
+#   tâche", "j'en peux plus de ce chrono", "going to die of boredom".
+# - Known false hits we accept: "I hurt myself playing football", "caffeine overdose", "I can't go on
+#   to the next level".
+_CRISIS_PHRASES: Tuple[Tuple[str, Optional[str]], ...] = (
+    (r"\bsuicid\w*", None),
+    (r"\bself ?harm\w*", "en"),
+    (r"\b(?:kill|hurt|harm|cut|hang|starve) my ?self\b", "en"),
+    (r"\bend (?:my (?:own )?life|it all)\b", "en"),
+    (r"\btake my (?:own )?life\b", "en"),
+    (r"\b(?:want|wanna|wish|ready) (?:to )?die\b", "en"),
+    (r"\bi wish i (?:was|were) dead\b", "en"),
+    (r"\bbetter off dead\b", "en"),
+    (r"\b(?:dont|do not) want to (?:live|be alive|wake up)\b", "en"),
+    (r"\bno reason to live\b", "en"),
+    (r"\bnot worth living\b", "en"),
+    (r"\b(?:cant|can ?not|can t) go on\b", "en"),
+    (r"\boverdos(?:e|ed|ing)\b", "en"),
+    (r"\btake all (?:of )?(?:my|the) (?:pills|meds|tablets)\b", "en"),
+    (r"\b(?:im|i am) not safe\b", "en"),
+    (r"\b(?:dont|do not) feel safe\b", "en"),
+    (r"\bme tuer\b(?! a la tache)", "fr"),
+    (r"\bme (?:pendre|faire du mal|mutiler|scarifier)\b", "fr"),
+    (r"\bautomutil\w*", "fr"),
+    (r"\bmettre fin a (?:mes jours|ma vie)\b", "fr"),
+    (r"\ben finir avec (?:la vie|ma vie|tout|moi)\b", "fr"),
+    (r"\b(?:veux|vais|voudrais) en finir$", "fr"),
+    (r"\b(?:veux|voudrais|envie de|prefere|prefererais) mourir\b", "fr"),
+    (r"\b(?:plus|pas) envie de vivre\b", "fr"),
+    (r"\bveux plus vivre\b", "fr"),
+    (r"\bidees noires\b", "fr"),
+    (r"\bpas en securite\b", "fr"),
+)
+_CRISIS_PATTERNS: Tuple[Tuple[Pattern[str], Optional[str]], ...] = tuple(
+    (re.compile(rx), lang) for rx, lang in _CRISIS_PHRASES
+)
+_FRENCH_HINTS = re.compile(r"\b(?:je|jai|suis|veux|moi|pas|mes|mon|vie|envie|pense|penser|au|des)\b")
+
+
+def crisis_check(user_text: str) -> GateResult:
+    """Deterministic crisis gate on the user's text. Case-, accent- and punctuation-insensitive.
+
+    A hit returns a fixed reply in French when the text reads as French, else in English.
+    """
+    text = normalise_user_text(user_text)
+    if not text:
+        return GateResult(hit=False)
+    langs = [lang for rx, lang in _CRISIS_PATTERNS if rx.search(text)]
+    if not langs:
+        return GateResult(hit=False)
+    french = "fr" in langs or ("en" not in langs and bool(_FRENCH_HINTS.search(text)))
+    return GateResult(hit=True, reply=CRISIS_REPLY_FR if french else CRISIS_REPLY_EN)
+
+
+# The user raises a diagnosis, a condition, a symptom or medication (English, plus French words as
+# they read after accent stripping). Detection only. Narrower than the output list on purpose:
+# "patient", "decline" or "anxious" are everyday words in user text, and "do I have…" alone is
+# usually about time or tries, so a question only counts when it names a topic or asks to be
+# assessed outright.
+_HEALTH_TOPICS = re.compile(
+    r"\b(?:adhd|tdah|autis\w*|dementia|demence|alzheimer\w*|dyslexi\w*|depress(?:ion|ed)|"
+    r"bipolar\w*|schizophren\w*|ocd|parkinson\w*|(?:had|having|have) a stroke|avc|concussion|"
+    r"commotion cerebrale|brain (?:damage|injury|tumou?r)|memory loss|perte de memoire|"
+    r"disabilit(?:y|ies)|disabled|handicap\w*|disorders?|trouble (?:de|du|des)|diagnos\w*|"
+    r"symptom\w*|medication|medicament\w*|supplements?|complements? alimentaires?|"
+    r"anxiety disorder|panic attacks?|crise dangoisse|seizures?|epilep\w*)\b"
+)
+_ASSESS_ME = re.compile(r"\b(?:am i (?:sick|ill|normal|mentally ill)|diagnose me|suis je malade)\b")
+
+
+def health_signpost(user_text: str) -> GateResult:
+    """The user raises health: point to a doctor, never assess, never relabel their words."""
+    text = normalise_user_text(user_text)
+    if text and (_HEALTH_TOPICS.search(text) or _ASSESS_ME.search(text)):
+        return GateResult(hit=True, reply=HEALTH_SIGNPOST_REPLY)
+    return GateResult(hit=False)
+
+
 class SafetyGuardrailEngine:
-    """Engine for inspecting and enforcing non-clinical safety boundaries."""
+    """Output lint for Loti's replies, plus the two input gates as methods."""
 
     def __init__(self, strict_mode: bool = True):
         self.strict_mode = strict_mode
 
+    # Part 1: output ---------------------------------------------------------------------------
+
     def check_safety(self, text: str) -> SafetyMetadata:
-        """Scan text for clinical, diagnostic, or deficit terminology."""
-        if not text:
+        """Lint a reply against banned_terms.json. Reports matches; changes nothing."""
+        hits = lint_text(text)
+        if not hits:
             return SafetyMetadata(is_safe=True)
-
-        detected_terms: List[str] = []
-        violations: List[SafetyViolation] = []
-
-        for compiled_rx, replacement, raw_pattern in COMPILED_PATTERNS:
-            matches = compiled_rx.findall(text)
-            if matches:
-                for match in matches:
-                    term_str = match if isinstance(match, str) else match[0]
-                    detected_terms.append(term_str.strip())
-                    violations.append(
-                        SafetyViolation(
-                            detected_phrase=term_str.strip(),
-                            rule_category="non_clinical_boundary",
-                            remediation_applied=f"Substitute with growth-aligned term: '{replacement}'"
-                        )
-                    )
-
-        is_safe = len(detected_terms) == 0
         return SafetyMetadata(
-            is_safe=is_safe,
-            clinical_terms_detected=list(set(detected_terms)),
+            is_safe=False,
+            clinical_terms_detected=sorted({term.strip() for _, term in hits}),
             sanitized=False,
-            violations=violations
+            violations=[
+                SafetyViolation(
+                    detected_phrase=term.strip(),
+                    rule_category=rule.category,
+                    remediation_applied="Reply withheld; fixed fallback sent.",
+                )
+                for rule, term in hits
+            ],
         )
 
-    def is_diagnostic_inquiry(self, text: str) -> bool:
-        """Check if user prompt is explicitly asking for medical diagnosis."""
-        return any(rx.search(text) for rx in BLOCKED_DIAGNOSTIC_QUERIES)
+    def sanitize(self, text: str, fallback: str = SAFE_FALLBACK_REPLY) -> Tuple[str, SafetyMetadata]:
+        """Return `text` if it is clean, else `fallback` whole. Never rewrites words.
 
-    def sanitize(self, text: str) -> Tuple[str, SafetyMetadata]:
-        """Sanitize text by replacing clinical and deficit terms with growth-mindset phrasing.
-        
-        Returns:
-            Tuple of (sanitized_text, safety_metadata)
+        `fallback` must itself be lint-clean (callers pass pre-checked deterministic copy).
         """
-        if not text:
-            return text, SafetyMetadata(is_safe=True)
-
         meta = self.check_safety(text)
         if meta.is_safe:
             return text, meta
-
-        sanitized_text = text
-        for compiled_rx, replacement, _ in COMPILED_PATTERNS:
-            sanitized_text = compiled_rx.sub(replacement, sanitized_text)
-
         meta.sanitized = True
-        return sanitized_text, meta
+        return fallback, meta
+
+    # Part 2: input gates ------------------------------------------------------------------------
+
+    @staticmethod
+    def crisis_check(user_text: str) -> GateResult:
+        return crisis_check(user_text)
+
+    @staticmethod
+    def health_signpost(user_text: str) -> GateResult:
+        return health_signpost(user_text)
+
+    def is_diagnostic_inquiry(self, text: str) -> bool:
+        """True when the user asks about or names a health condition."""
+        return health_signpost(text).hit
 
     def wrap_with_disclaimer_if_needed(self, text: str, user_prompt: str = "") -> str:
-        """Append non-clinical disclaimer if user sought medical diagnosis or advice."""
+        """Append the doctor signpost and non-clinical note when the user raised health."""
         if self.is_diagnostic_inquiry(user_prompt):
-            return f"{text}\n\n---\n*{DISCLAIMER_TEXT}*"
+            return f"{text}\n\n{DISCLAIMER_TEXT}"
         return text
 
     @staticmethod
     def get_system_prompt_guardrails() -> str:
-        """Return the strict system instruction snippet to inject into LLM prompts."""
+        """Safety rules injected into the LLM system prompt. Contains no banned term itself."""
         return (
-            "STRICT NON-CLINICAL SAFETY MANDATE:\n"
-            "1. You are a cognitive fitness coach, NOT a medical or clinical diagnostic tool.\n"
-            "2. NEVER use diagnostic or pathological labels (e.g., ADHD, autism, dementia, "
-            "impairment, deficit, disorder, pathology, dysfunction).\n"
-            "3. ALWAYS frame cognitive performance through a growth-mindset and neuroplasticity lens "
-            "(e.g., 'focus modulation', 'working memory endurance', 'pattern induction agility').\n"
-            "4. If the user asks whether they have a medical/psychiatric condition, gently decline "
-            "and redirect to cognitive exercise habits and professional medical consultation if desired.\n"
+            "SAFETY RULES:\n"
+            "1. You are an AI guide, not a doctor or therapist. You never assess health.\n"
+            "2. Never use medical or health labels, and never guess at one.\n"
+            "3. Never name parts of the brain or body chemicals.\n"
+            "4. Never claim practice changes the brain itself, or helps outside these exercises.\n"
+            "5. If the person raises health, say: \"I can't assess health. A doctor can.\"\n"
+            "6. Only use numbers that appear in the context below. Never invent one.\n"
         )

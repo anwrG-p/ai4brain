@@ -1,18 +1,21 @@
-"""AI Coach Agent & Conversational LLM Runner for Member 2.
+"""Loti's conversational runner (Member 2).
 
-Handles:
-- Natural-language dialogue with the user.
-- Explainability injection using Member 3's differential vector Δc.
-- Real-time AI Collaboration Score calculation across the 5 dimensions.
-- Strict non-clinical safety post-processing and guardrail filtering.
-- Skill-building learning path recommendations.
+Order of a chat turn:
+1. Input gates on the user's words as written: crisis check, then health signpost. A hit sends a
+   fixed reply and the LLM is never called. The user's text is never rewritten.
+2. AI Collaboration Score and the XAI adaptation reason (Member 3's Δc).
+3. Loti's reply: the LLM if one is configured, else the deterministic offline reply. An LLM error
+   is logged, counted and answered with the offline reply; nothing fails silently.
+4. Output guardrail: a reply that trips banned_terms.json is withheld whole and the offline reply
+   goes out instead.
 """
 
 from __future__ import annotations
 
-import os
+import logging
+from collections import Counter
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from ai_coach.collaboration_scorer import CollaborationScorer
 from ai_coach.safety_guardrails import SafetyGuardrailEngine
@@ -23,13 +26,23 @@ from ai_coach.schemas import (
     ChatRequest,
     CoachingResponse,
     CollaborationScoreResult,
-    DimensionScores,
+    ReplySource,
     SafetyMetadata,
 )
 from ai_coach.xai_explainer import XAIExplainer
 
+logger = logging.getLogger(__name__)
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
+
+# Loti's voice: at most 12 words per bubble. Bubbles in one reply are separated by a blank line.
+MAX_BUBBLE_WORDS = 12
+BUBBLE_SEPARATOR = "\n\n"
+
+
+def split_bubbles(text: str) -> List[str]:
+    """Split a reply into its speech bubbles (blank-line separated)."""
+    return [b.strip() for b in text.split(BUBBLE_SEPARATOR) if b.strip()]
 
 
 def _load_prompt_template(filename: str, fallback_default: str = "") -> str:
@@ -41,7 +54,7 @@ def _load_prompt_template(filename: str, fallback_default: str = "") -> str:
 
 
 class AICoachAgent:
-    """Conversational AI Coach Agent with explainability injection and safety guardrails."""
+    """Loti's runner: input gates, XAI injection, LLM call with explicit fallback, output guardrail."""
 
     def __init__(
         self,
@@ -54,11 +67,13 @@ class AICoachAgent:
         self.explainer = explainer or XAIExplainer()
         self.guardrail = guardrail or SafetyGuardrailEngine()
         self.llm_callable = llm_callable
+        # Every non-LLM reply path is counted (research area 7, "Log fallbacks"). Keys: ReplySource values.
+        self.fallback_counts: Counter[str] = Counter()
 
         # Cache base prompt
         self.system_prompt_base = _load_prompt_template(
             "system_coach.txt",
-            fallback_default="You are the AI Cognitive Fitness Coach. Guide the user with growth mindset."
+            fallback_default="You are Loti, a guide inside SynapseTwin. Warm, short, specific.",
         )
 
     def assemble_system_prompt(
@@ -67,7 +82,7 @@ class AICoachAgent:
         delta_vector: Optional[Dict[str, float]] = None,
         uncertainty: float = 0.0,
     ) -> str:
-        """Compose the full system instruction with XAI injection and safety mandates."""
+        """Compose the full system instruction with XAI injection and safety rules."""
         xai_context = self.explainer.format_xai_prompt_context(
             delta_vector=delta_vector,
             cluster_id=cluster_id,
@@ -81,42 +96,41 @@ class AICoachAgent:
         )
 
     def handle_chat(self, request: ChatRequest) -> CoachingResponse:
-        """Process user message, evaluate collaboration score, inject XAI, and generate safe reply."""
+        """Gate the user's text, then score, explain, reply and lint Loti's reply."""
+        # 1. Input gates on the user's words as written. On a hit nothing reaches the LLM.
+        crisis = self.guardrail.crisis_check(request.message)
+        if crisis.hit:
+            return self._fixed_reply(crisis.reply or "", ReplySource.CRISIS)
+        signpost = self.guardrail.health_signpost(request.message)
+        if signpost.hit:
+            return self._fixed_reply(signpost.reply or "", ReplySource.HEALTH_SIGNPOST)
+
         cluster_id = request.active_cluster_id if request.active_cluster_id is not None else 4
         delta_vec = request.delta_vector or {}
 
-        # 1. Update chat history with current message
         session_history = list(request.chat_history)
         session_history.append(ChatMessage(role=ChatMessageRole.USER, content=request.message))
 
-        # 2. Evaluate Dynamic AI Collaboration Score
+        # 2. AI Collaboration Score and the adaptation reason
         dimension_scores = self.scorer.evaluate_interaction_signals(session_history)
         collab_result: CollaborationScoreResult = self.scorer.calculate_score(
             dimension_scores=dimension_scores,
             cluster_id=cluster_id,
         )
-
-        # 3. Derive XAI Adaptation Justification
         xai_justification = self.explainer.generate_adaptation_rationale(
             delta_vector=delta_vec,
             active_cluster_id=cluster_id,
         )
 
-        # 4. Generate Coach Response
-        raw_reply = self._generate_response(
+        # 3 + 4. Loti's reply, linted, with an explicit fallback
+        safe_reply, safety_meta, source = self._generate_response(
             message=request.message,
             history=session_history,
             cluster_id=cluster_id,
             delta_vector=delta_vec,
-            xai_justification=xai_justification,
             collab_result=collab_result,
         )
 
-        # 5. Enforce Non-Clinical Guardrails on Coach Response
-        safe_reply, safety_meta = self.guardrail.sanitize(raw_reply)
-        safe_reply = self.guardrail.wrap_with_disclaimer_if_needed(safe_reply, user_prompt=request.message)
-
-        # 6. Generate Contextual Suggested Actions
         suggested_actions = self._generate_suggested_actions(
             cluster_id=cluster_id,
             collab_result=collab_result,
@@ -129,6 +143,19 @@ class AICoachAgent:
             suggested_actions=suggested_actions,
             collab_score_snapshot=collab_result,
             safety_metadata=safety_meta,
+            reply_source=source,
+        )
+
+    def _fixed_reply(self, text: str, source: ReplySource) -> CoachingResponse:
+        """A scripted reply from an input gate: no LLM, no chips, no scores."""
+        self.fallback_counts[source.value] += 1
+        # The user's text is not logged: it may be the most sensitive thing they ever type here.
+        logger.info("coach input gate hit (%s); fixed reply sent, LLM not called", source.value)
+        return CoachingResponse(
+            reply_text=text,
+            suggested_actions=[],
+            safety_metadata=SafetyMetadata(is_safe=True),
+            reply_source=source,
         )
 
     def _generate_response(
@@ -137,80 +164,84 @@ class AICoachAgent:
         history: List[ChatMessage],
         cluster_id: int,
         delta_vector: Dict[str, float],
-        xai_justification: str,
         collab_result: CollaborationScoreResult,
-    ) -> str:
-        """Dispatch to LLM callable or high-fidelity internal fallback."""
+    ) -> Tuple[str, SafetyMetadata, ReplySource]:
+        """Call the LLM if one is configured. Any failure is logged, counted and answered offline."""
+        offline_reply = self._generate_offline_coaching_response(
+            message=message,
+            cluster_id=cluster_id,
+            collab_result=collab_result,
+        )
+
+        if self.llm_callable is None:
+            return offline_reply, self.guardrail.check_safety(offline_reply), ReplySource.OFFLINE
+
         system_prompt = self.assemble_system_prompt(
             cluster_id=cluster_id,
             delta_vector=delta_vector,
         )
+        messages_payload = [{"role": "system", "content": system_prompt}]
+        for msg in history[-8:]:  # Sliding window of last 8 turns
+            messages_payload.append({"role": msg.role.value, "content": msg.content})
 
-        # If custom LLM runner is supplied, invoke it
-        if self.llm_callable is not None:
-            messages_payload = [{"role": "system", "content": system_prompt}]
-            for msg in history[-8:]:  # Sliding window of last 8 turns
-                messages_payload.append({"role": msg.role.value, "content": msg.content})
-            try:
-                return self.llm_callable(messages_payload)
-            except Exception as exc:
-                # Graceful degradation to deterministic cognitive coach fallback
-                pass
+        try:
+            raw_reply: Any = self.llm_callable(messages_payload)
+            if not isinstance(raw_reply, str) or not raw_reply.strip():
+                raise ValueError(f"LLM returned an empty or non-text reply ({type(raw_reply).__name__})")
+        except Exception as exc:  # noqa: BLE001 - an LLM failure must degrade the reply, never the chat
+            self.fallback_counts[ReplySource.OFFLINE_AFTER_LLM_ERROR.value] += 1
+            # Log the error type and message only, never the payload: it holds the user's words.
+            logger.warning(
+                "coach LLM call failed (%s: %s); sending the offline reply",
+                type(exc).__name__,
+                exc,
+            )
+            return (
+                offline_reply,
+                self.guardrail.check_safety(offline_reply),
+                ReplySource.OFFLINE_AFTER_LLM_ERROR,
+            )
 
-        # Deterministic / Offline Cognitive Coach Fallback Engine
-        return self._generate_offline_coaching_response(
-            message=message,
-            cluster_id=cluster_id,
-            xai_justification=xai_justification,
-            collab_result=collab_result,
-        )
+        safe_reply, meta = self.guardrail.sanitize(raw_reply, fallback=offline_reply)
+        if meta.sanitized:
+            self.fallback_counts[ReplySource.OFFLINE_AFTER_LINT.value] += 1
+            logger.warning(
+                "coach LLM reply withheld (banned terms: %s); sending the offline reply",
+                ", ".join(meta.clinical_terms_detected),
+            )
+            return safe_reply, meta, ReplySource.OFFLINE_AFTER_LINT
+        return safe_reply, meta, ReplySource.LLM
 
     def _generate_offline_coaching_response(
         self,
         message: str,
         cluster_id: int,
-        xai_justification: str,
         collab_result: CollaborationScoreResult,
     ) -> str:
-        """High-fidelity local cognitive coach response generator."""
+        """Deterministic reply in Loti's voice: at most 12 words per bubble, lint-clean.
+
+        The adaptation reason itself travels in `CoachingResponse.xai_explanation`.
+        """
         lower_msg = message.lower()
         tier = self.scorer.get_tier_for_cluster(cluster_id)
 
-        # If user is asking why task changed or adapted
         if any(w in lower_msg for w in ["why", "harder", "faster", "change", "adapted", "pacing", "different"]):
-            return (
-                f"That adjustment was guided directly by your recent cognitive telemetry. {xai_justification} "
-                "By calibrating task parameters to match your current cognitive velocity, we keep you in an optimal "
-                "neuroplastic growth zone—challenging enough to expand capacity without causing unnecessary cognitive fatigue."
-            )
+            return "I tuned the pace to fit your recent rounds." + BUBBLE_SEPARATOR + "The reason is just below."
 
-        # If user is asking about their collaboration score
         if any(w in lower_msg for w in ["score", "collab", "collaboration", "rating", "progress"]):
             return (
-                f"Your active AI Collaboration Index is currently {collab_result.composite_score:.1f}/100 "
-                f"within the {collab_result.archetype_tier.value.title()} tier. "
-                f"{collab_result.growth_recommendation} "
-                f"Remember: {xai_justification}"
+                f"Your AI teamwork score is {collab_result.composite_score:.0f} out of 100."
+                + BUBBLE_SEPARATOR
+                + "Want one tip to grow it?"
             )
 
-        # Default conversational guidance with growth framing
         tier_guidance = {
-            ArchetypeTier.EXPLORER: (
-                "Focus on building steady task rhythm and taking brief clarity pauses before multi-step choices."
-            ),
-            ArchetypeTier.PRACTITIONER: (
-                "You're demonstrating solid operational agility. Try challenging your initial intuitions by testing edge cases."
-            ),
-            ArchetypeTier.STRATEGIST: (
-                "Excellent strategic independence. Maintain high critical verification while exploring advanced multidimensional patterns."
-            ),
+            ArchetypeTier.EXPLORER: "Small, steady steps work well right now.",
+            ArchetypeTier.PRACTITIONER: "Nice rhythm. Try testing your first guess.",
+            ArchetypeTier.STRATEGIST: "You're steering well. Keep checking your answers.",
         }[tier]
 
-        return (
-            f"I hear you. As we progress through this session, {tier_guidance} "
-            f"\n\nContextual Note: {xai_justification} "
-            f"\n\nWhat specific dimension would you like to focus on refining next?"
-        )
+        return tier_guidance + BUBBLE_SEPARATOR + "What would you like to work on next?"
 
     def _generate_suggested_actions(
         self,
@@ -227,12 +258,11 @@ class AICoachAgent:
         # Dimension targeted exercise tip
         if delta_vector:
             top_dim = max(delta_vector, key=lambda k: abs(delta_vector[k]))
-            actions.append(f"Engage next 3-minute challenge targeting {top_dim.replace('_', ' ')}.")
+            actions.append(f"Try a 3-minute round on {top_dim.replace('_', ' ')}.")
         else:
-            actions.append("Launch next calibrated task block from cache.")
+            actions.append("Start your next short round.")
 
-        # Autonomy / Reflection tip
-        actions.append("Reflect on your problem-solving strategy and compare with previous attempts.")
+        actions.append("Compare your approach with your last try.")
 
         return actions
 

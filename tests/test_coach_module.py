@@ -1,22 +1,54 @@
 """Comprehensive test suite for Member 2 (AI Coach & Collaboration Engine)."""
 
+import json
+import logging
+import re
+import typing
+from pathlib import Path
+
 import pytest
-from ai_coach.agent import AICoachAgent
+from ai_coach import agent as agent_module
+from ai_coach.agent import MAX_BUBBLE_WORDS, AICoachAgent, split_bubbles
 from ai_coach.collaboration_scorer import (
     ARCHETYPE_WEIGHT_PROFILES,
     CollaborationScorer,
 )
-from ai_coach.safety_guardrails import SafetyGuardrailEngine
+from ai_coach.safety_guardrails import (
+    BANNED_RULES,
+    BANNED_TERMS_PATH,
+    CLINICAL_TERM_REPLACEMENTS,
+    COACH_ONLY_RULES,
+    CRISIS_REPLY_EN,
+    CRISIS_REPLY_FR,
+    DISCLAIMER_TEXT,
+    HEALTH_SIGNPOST_REPLY,
+    SAFE_FALLBACK_REPLY,
+    SHARED_RULES,
+    SafetyGuardrailEngine,
+    crisis_check,
+    health_signpost,
+    lint_text,
+)
 from ai_coach.schemas import (
+    PILLAR_LABELS,
     ArchetypeTier,
     ChatMessage,
     ChatMessageRole,
     ChatRequest,
+    CognitiveDimension,
     DimensionScores,
     DimensionWeights,
+    GateResult,
+    PillarId,
+    ReplySource,
 )
 from ai_coach.xai_explainer import XAIExplainer
 import src.coach as src_coach
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+COPY_LINTER_TS = REPO_ROOT / "frontend" / "src" / "utils" / "copyLinter.ts"
+PILLARS_TS = REPO_ROOT / "frontend" / "src" / "features" / "insights" / "pillars.ts"
+PROMPTS_DIR = REPO_ROOT / "ai_coach" / "prompts"
 
 
 class TestSafetyGuardrails:
@@ -44,14 +76,15 @@ class TestSafetyGuardrails:
         assert any("abnormal" in t for t in detected)
         assert any("dysfunction" in t for t in detected)
 
-    def test_sanitizes_clinical_terms_to_growth_mindset(self):
+    def test_sanitize_withholds_the_reply_instead_of_rewriting_it(self):
+        # BE-05 replaced the old rewrite map ("patient" -> "learner", "deficit" -> "targeted growth
+        # opportunity"): a reply with a banned term is withheld whole, never reworded.
         clinical_text = "Treating this patient for cognitive deficit and neurological disorder."
-        sanitized, meta = self.guardrail.sanitize(clinical_text)
+        sanitized, meta = self.guardrail.sanitize(clinical_text, fallback="Let's try a round.")
         assert meta.sanitized is True
-        assert "patient" not in sanitized.lower()
-        assert "deficit" not in sanitized.lower()
-        assert "learner" in sanitized.lower()
-        assert "targeted growth opportunity" in sanitized.lower()
+        assert sanitized == "Let's try a round."
+        assert "learner" not in sanitized.lower()
+        assert "targeted growth opportunity" not in sanitized.lower()
 
     def test_diagnostic_inquiry_detection_and_disclaimer(self):
         user_prompt = "Do I have ADHD or dementia?"
@@ -202,3 +235,348 @@ class TestSrcCoachCompatibility:
         assert hasattr(src_coach, "CollaborationScorer")
         assert hasattr(src_coach, "SafetyGuardrailEngine")
         assert hasattr(src_coach, "XAIExplainer")
+
+
+# ---------------------------------------------------------------------------------------------
+# BE-05: domain alignment
+# ---------------------------------------------------------------------------------------------
+
+
+class TestDomainEnums:
+    def test_episodic_memory_is_a_dimension_and_matches_the_telemetry_contract(self):
+        from routes.telemetry import Dimension
+
+        assert CognitiveDimension("episodic_memory") is CognitiveDimension.EPISODIC_MEMORY
+        assert {d.value for d in CognitiveDimension} == set(typing.get_args(Dimension))
+
+    def test_pillar_ids_and_labels_match_the_frontend(self):
+        source = PILLARS_TS.read_text(encoding="utf-8")
+        ids = re.search(r"PILLAR_IDS = \[([^\]]*)\]", source)
+        assert ids, "PILLAR_IDS not found in pillars.ts"
+        assert [p.value for p in PillarId] == re.findall(r"'([a-z]+)'", ids.group(1))
+        labels = dict(re.findall(r"^\s+([a-z]+): '([^']+)',$", source.split("PILLAR_LABELS")[1].split("}")[0], re.M))
+        assert {p.value: PILLAR_LABELS[p] for p in PillarId} == labels
+
+    def test_episodic_memory_has_its_own_rationale(self):
+        rationale = XAIExplainer().generate_adaptation_rationale({"episodic_memory": 0.12}, active_cluster_id=2)
+        assert "visual memory clarity improved by 12%" in rationale
+
+
+def _parse_copy_linter_rules(source: str):
+    """Pull BANNED_RULES out of copyLinter.ts: (pattern, flags, termLabel, category, suggestion)."""
+    block = source.split("export const BANNED_RULES")[1].split("\n]")[0]
+    rule_rx = re.compile(
+        r"\{\s*pattern:\s*/(?P<src>(?:\\/|[^/\n])+)/(?P<flags>[a-z]*),\s*"
+        r"termLabel:\s*(?P<q1>['\"])(?P<label>.*?)(?P=q1),\s*"
+        r"category:\s*'(?P<cat>[a-z_]+)',\s*"
+        r"replacementSuggestion:\s*(?P<q2>['\"])(?P<sugg>.*?)(?P=q2),\s*\}",
+        re.S,
+    )
+    rules = [
+        (m["src"], m["flags"], m["label"], m["cat"], m["sugg"]) for m in rule_rx.finditer(block)
+    ]
+    assert len(rules) == block.count("pattern:"), "a copyLinter rule did not parse; update the parser"
+    return rules
+
+
+class TestBannedTermsParity:
+    """One banned list: `shared` in banned_terms.json must equal copyLinter.ts BANNED_RULES."""
+
+    def test_shared_rules_match_copy_linter_rule_for_rule(self):
+        ts_rules = _parse_copy_linter_rules(COPY_LINTER_TS.read_text(encoding="utf-8"))
+        json_rules = [
+            (r["pattern"], r["flags"], r["termLabel"], r["category"], r["replacementSuggestion"])
+            for r in json.loads(BANNED_TERMS_PATH.read_text(encoding="utf-8"))["shared"]
+        ]
+        assert json_rules == ts_rules
+
+    def test_every_rule_compiles_and_python_matches_like_js(self):
+        assert len(BANNED_RULES) == len(SHARED_RULES) + len(COACH_ONLY_RULES)
+        # The JS lookbehind on "diagnosis" is emulated in Python.
+        assert lint_text("This is not a diagnosis.") == []
+        assert lint_text("A non-diagnostic estimate.") == []
+        assert [t for _, t in lint_text("Your diagnosis is ready.")] == ["diagnosis"]
+        assert [t for _, t in lint_text("You broke your 7-day streak")] == ["broke your 7-day streak"]
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "Practice grows your neuroplasticity.",
+            "This lights up your prefrontal cortex.",
+            "Your hippocampus is working hard.",
+            "Each win gives you a dopamine hit.",
+            "Colours that lower cortisol.",
+            "We will rewire your brain.",
+            "You'll be smarter at work.",
+            "You scored better than 80% of players.",
+        ],
+    )
+    def test_u5_and_claim_terms_are_banned_in_loti_output(self, text):
+        assert lint_text(text), text
+
+
+class TestPromptsInLotisVoice:
+    def _all_prompt_text(self):
+        agent = AICoachAgent()
+        assembled = agent.assemble_system_prompt(cluster_id=3, delta_vector={"working_memory": 0.2})
+        files = [p.read_text(encoding="utf-8") for p in sorted(PROMPTS_DIR.glob("*.txt"))]
+        return [assembled, *files]
+
+    def test_prompts_contain_no_banned_or_u5_terms(self):
+        for text in self._all_prompt_text():
+            hits = [(r.term_label, t) for r, t in lint_text(text)]
+            assert hits == [], hits
+            lowered = text.lower()
+            for word in ("neuroplastic", "neuro", "brain region", "cortex", "dopamine", "cognitive fitness coach"):
+                assert word not in lowered, word
+
+    def test_system_prompt_is_loti_with_the_12_word_rule(self):
+        prompt = (PROMPTS_DIR / "system_coach.txt").read_text(encoding="utf-8")
+        assert prompt.startswith("You are Loti")
+        assert "12 words per bubble" in prompt
+        assert "not a person, a doctor or a therapist" in prompt
+
+    @pytest.mark.parametrize(
+        "message,cluster",
+        [
+            ("Why did it get harder?", 3),
+            ("What is my score?", 4),
+            ("hello", 0),
+            ("hello", 4),
+            ("hello", 8),
+        ],
+    )
+    def test_offline_replies_are_short_bubbles_and_lint_clean(self, message, cluster):
+        resp = AICoachAgent().handle_chat(ChatRequest(user_id="u", message=message, active_cluster_id=cluster))
+        assert resp.reply_source == ReplySource.OFFLINE
+        bubbles = split_bubbles(resp.reply_text)
+        assert 1 <= len(bubbles) <= 3
+        for bubble in bubbles:
+            assert len(bubble.split()) <= MAX_BUBBLE_WORDS, bubble
+        assert lint_text(resp.reply_text) == []
+
+    def test_fixed_replies_are_lint_clean(self):
+        for text in (SAFE_FALLBACK_REPLY, HEALTH_SIGNPOST_REPLY, DISCLAIMER_TEXT, CRISIS_REPLY_EN):
+            assert lint_text(text) == [], text
+        assert len(SAFE_FALLBACK_REPLY.split()) <= MAX_BUBBLE_WORDS
+        assert len(HEALTH_SIGNPOST_REPLY.split()) <= MAX_BUBBLE_WORDS
+
+
+# ---------------------------------------------------------------------------------------------
+# Research backlog #1 (backend half): crisis layer and signposting instead of euphemism
+# ---------------------------------------------------------------------------------------------
+
+
+class TestNoEuphemism:
+    def test_rewrite_map_is_gone(self):
+        assert CLINICAL_TERM_REPLACEMENTS == {}
+        old_euphemisms = (
+            "cognitive endurance challenge",
+            "distinct cognitive modality",
+            "adaptive neural restructuring",
+            "divergent attentional style",
+            "learner",
+            "growth opportunity",
+        )
+        engine = SafetyGuardrailEngine()
+        for word in ("dementia", "disability", "brain injury", "ADHD", "patient", "deficit"):
+            out, _ = engine.sanitize(f"Note on {word} here.")
+            assert not any(e in out for e in old_euphemisms), out
+
+    @pytest.mark.parametrize(
+        "llm_text",
+        [
+            "Your dementia risk looks like a cognitive endurance challenge.",
+            "With your disability, try this.",
+            "Brain injury can slow you down.",
+        ],
+    )
+    def test_output_with_health_words_is_withheld_not_reworded(self, llm_text):
+        out, meta = SafetyGuardrailEngine().sanitize(llm_text)
+        assert meta.sanitized is True
+        assert out == SAFE_FALLBACK_REPLY
+        for euphemism in ("cognitive endurance challenge", "distinct cognitive modality", "adaptive neural restructuring"):
+            assert euphemism not in out
+
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "I think I might have dementia, my memory is bad",
+            "I have a disability, can I still play?",
+            "Do I have ADHD?",
+            "My doctor said it's a brain injury",
+            "Est-ce que j'ai un TDAH ?",
+            "Should I take supplements for memory?",
+        ],
+    )
+    def test_user_raising_health_gets_the_doctor_signpost_and_no_llm(self, message):
+        calls = []
+        agent = AICoachAgent(llm_callable=lambda msgs: calls.append(msgs) or "Sure!")
+        resp = agent.handle_chat(ChatRequest(user_id="u", message=message))
+        assert resp.reply_source == ReplySource.HEALTH_SIGNPOST
+        assert resp.reply_text == "I can't assess health. A doctor can."
+        assert calls == []
+
+    def test_user_words_reach_the_llm_unchanged(self):
+        seen = []
+        agent = AICoachAgent(llm_callable=lambda msgs: seen.append(msgs) or "Nice work today.")
+        message = "Patient mode please: I decline the hint and feel behind."
+        agent.handle_chat(ChatRequest(user_id="u", message=message))
+        assert seen[0][-1] == {"role": "user", "content": message}
+
+    @pytest.mark.parametrize(
+        "message",
+        ["Do I have time for one more round?", "I'm being patient with this timer", "I decline the hint"],
+    )
+    def test_everyday_words_do_not_trigger_the_signpost(self, message):
+        assert health_signpost(message) == GateResult(hit=False)
+
+
+class TestCrisisCheck:
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "I want to kill myself",
+            "I want to KILL myself!!!",
+            "thinking about SUICIDE",
+            "i feel suicidal",
+            "self-harm again",
+            "self harm",
+            "selfharm",
+            "I want to hurt myself",
+            "I can't go on",
+            "i cant go on anymore",
+            "I can’t go on",
+            "I cannot go on",
+            "I want to end my life",
+            "I want to end it all",
+            "I wanna die",
+            "I don't want to live anymore",
+            "everyone would be better off dead without me",
+            "I'm not safe right now",
+            "thinking of taking an overdose",
+        ],
+    )
+    def test_english_crisis_phrases_are_caught(self, text):
+        result = crisis_check(text)
+        assert result.hit is True
+        assert result.reply == CRISIS_REPLY_EN
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "Je veux me tuer",
+            "j'ai envie de mourir",
+            "J’ai envie de mourir…",
+            "je pense au suicide",
+            "Je veux me suicider",
+            "J'ai des idées noires",
+            "Je ne veux plus vivre",
+            "je veux mettre fin à mes jours",
+            "Je n'ai plus envie de vivre",
+            "je veux en finir",
+            "JE VEUX MOURIR",
+        ],
+    )
+    def test_french_crisis_phrases_are_caught_and_answered_in_french(self, text):
+        result = crisis_check(text)
+        assert result.hit is True
+        assert result.reply == CRISIS_REPLY_FR
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "this task is killing me",
+            "This timer is KILLING me!!",
+            "I'm dying to see my score",
+            "I could kill for a coffee",
+            "that round killed me",
+            "I'm dead tired",
+            "I'm going to die of boredom",
+            "go on then",
+            "I am tired today",
+            "Great",
+            "ça me tue",
+            "je suis mort de fatigue",
+            "je vais me tuer à la tâche",
+            "j'en peux plus de ce chrono",
+            "je veux en finir avec cet exercice",
+            "",
+        ],
+    )
+    def test_everyday_idioms_are_not_flagged(self, text):
+        assert crisis_check(text) == GateResult(hit=False)
+
+    def test_reply_is_calm_and_points_to_emergency_services_and_a_crisis_line(self):
+        assert "emergency" in CRISIS_REPLY_EN and "crisis line" in CRISIS_REPLY_EN
+        assert "urgence" in CRISIS_REPLY_FR and "prévention du suicide" in CRISIS_REPLY_FR
+        for reply in (CRISIS_REPLY_EN, CRISIS_REPLY_FR):
+            for number in ("112", "3114", "988"):
+                assert number in reply
+            assert "!" not in reply
+
+    def test_shape_matches_the_frontend_seam(self):
+        assert crisis_check("hello").model_dump(exclude_none=True) == {"hit": False}
+        assert set(crisis_check("I want to die").model_dump(exclude_none=True)) == {"hit", "reply"}
+        assert SafetyGuardrailEngine().crisis_check("I want to die") == crisis_check("I want to die")
+
+    def test_crisis_hit_never_reaches_the_llm_and_has_no_chips(self):
+        calls = []
+        agent = AICoachAgent(llm_callable=lambda msgs: calls.append(msgs) or "Sure!")
+        resp = agent.handle_chat(ChatRequest(user_id="u", message="I want to end my life"))
+        assert calls == []
+        assert resp.reply_source == ReplySource.CRISIS
+        assert resp.reply_text == CRISIS_REPLY_EN
+        assert resp.suggested_actions == []
+        assert resp.collab_score_snapshot is None
+        assert agent.fallback_counts[ReplySource.CRISIS.value] == 1
+
+    def test_crisis_check_runs_before_the_health_signpost(self):
+        resp = AICoachAgent().handle_chat(ChatRequest(user_id="u", message="my depression makes me want to die"))
+        assert resp.reply_source == ReplySource.CRISIS
+
+
+class TestLLMFallback:
+    def _request(self):
+        return ChatRequest(user_id="u", message="hello", active_cluster_id=4)
+
+    def test_llm_error_is_logged_counted_and_answered_offline(self, caplog):
+        def broken_llm(messages):
+            raise TimeoutError("upstream timed out")
+
+        agent = AICoachAgent(llm_callable=broken_llm)
+        with caplog.at_level(logging.WARNING, logger=agent_module.__name__):
+            resp = agent.handle_chat(self._request())
+
+        offline = AICoachAgent().handle_chat(self._request())
+        assert resp.reply_source == ReplySource.OFFLINE_AFTER_LLM_ERROR
+        assert resp.reply_text == offline.reply_text
+        assert agent.fallback_counts[ReplySource.OFFLINE_AFTER_LLM_ERROR.value] == 1
+        assert any("TimeoutError" in r.getMessage() for r in caplog.records)
+        assert all("hello" not in r.getMessage() for r in caplog.records)
+
+    @pytest.mark.parametrize("bad", [None, "", "   ", 42])
+    def test_empty_or_non_text_llm_reply_falls_back(self, bad, caplog):
+        agent = AICoachAgent(llm_callable=lambda msgs: bad)
+        with caplog.at_level(logging.WARNING, logger=agent_module.__name__):
+            resp = agent.handle_chat(self._request())
+        assert resp.reply_source == ReplySource.OFFLINE_AFTER_LLM_ERROR
+        assert resp.reply_text.strip()
+        assert caplog.records
+
+    def test_banned_llm_reply_is_withheld_logged_and_replaced_offline(self, caplog):
+        agent = AICoachAgent(llm_callable=lambda msgs: "Great job, that's real neuroplasticity!")
+        with caplog.at_level(logging.WARNING, logger=agent_module.__name__):
+            resp = agent.handle_chat(self._request())
+        assert resp.reply_source == ReplySource.OFFLINE_AFTER_LINT
+        assert "neuroplastic" not in resp.reply_text.lower()
+        assert resp.safety_metadata.sanitized is True
+        assert agent.fallback_counts[ReplySource.OFFLINE_AFTER_LINT.value] == 1
+        assert any("withheld" in r.getMessage() for r in caplog.records)
+
+    def test_clean_llm_reply_is_used_as_is(self):
+        agent = AICoachAgent(llm_callable=lambda msgs: "Nice rhythm today.")
+        resp = agent.handle_chat(self._request())
+        assert resp.reply_source == ReplySource.LLM
+        assert resp.reply_text == "Nice rhythm today."
+        assert not agent.fallback_counts

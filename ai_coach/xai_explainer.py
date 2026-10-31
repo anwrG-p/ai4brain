@@ -15,6 +15,8 @@ from typing import Dict, List, Optional
 from ai_coach.schemas import CognitiveDimension, StateBusEvent
 from ai_coach.safety_guardrails import SafetyGuardrailEngine
 
+NEUTRAL_RATIONALE = "We adjusted this round to fit your recent results."
+
 
 class XAIExplainer:
     """Engine for decoding Member 3 prototype deltas into natural-language rationales."""
@@ -74,6 +76,10 @@ class XAIExplainer:
                 "positive": f"We tightened response windows to match your faster, jitter-free cognitive throughput (+{pct_change}%).",
                 "negative": f"We extended pacing windows to encourage deliberate, high-accuracy problem analysis.",
             },
+            CognitiveDimension.EPISODIC_MEMORY.value: {
+                "positive": f"We added closer look-alikes because your visual memory clarity improved by {pct_change}%.",
+                "negative": f"We spaced out the look-alikes so each picture is easier to tell apart.",
+            },
         }
 
         dim_key = top_dim.lower().strip()
@@ -89,8 +95,9 @@ class XAIExplainer:
         if uncertainty > 0.4:
             rationale += " (Adaptive calibration active: exploratory tolerance widened)."
 
-        # Ensure non-clinical safety
-        safe_rationale, _ = self.safety_guardrail.sanitize(rationale)
+        # Ensure non-clinical safety: a rationale that trips a banned term (e.g. from an unknown
+        # dimension key) is withheld whole, never reworded.
+        safe_rationale, _ = self.safety_guardrail.sanitize(rationale, fallback=NEUTRAL_RATIONALE)
         return safe_rationale
 
     def format_xai_prompt_context(
