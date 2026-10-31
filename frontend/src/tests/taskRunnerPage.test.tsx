@@ -194,6 +194,31 @@ describe('TaskRunnerPage mounts the real exercises', () => {
     expect(useSessionStore.getState().sessions).toHaveLength(0)
   })
 
+  // One real answer in a multi-trial exercise: the run has events of its own task but has not ended.
+  const answerOneShapeTurn = async () => {
+    renderAt('/task/visuospatial_planning_gf?schema=mental_rotation&judge=1')
+    const region = await begin('Shape Turn')
+    act(() => void fireEvent.pointerDown(within(region).getByRole('button', { name: /turned/i })))
+    expect(await screen.findByText('Recorded: 1')).toBeInTheDocument()
+  }
+
+  it('Escape, then the judge "Block Summary": the discarded attempt is not saved', async () => {
+    await answerOneShapeTurn()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(paused()).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Block Summary' }))
+    expect(screen.getByText('No answers this time.')).toBeInTheDocument()
+    expect(useSessionStore.getState().sessions).toHaveLength(0)
+  })
+
+  it('a judge Fast-Forward mid-run shows the summary without saving a session', async () => {
+    await answerOneShapeTurn()
+    fireEvent.click(screen.getByRole('button', { name: /Fast-Forward to Summary/i }))
+    expect(completed()).toBeInTheDocument()
+    expect(screen.queryByText(/Added to your progress/)).toBeNull()
+    expect(useSessionStore.getState().sessions).toHaveLength(0)
+  })
+
   it('Back to another dimension resets the block, so its summary never shows the old totals', async () => {
     render(
       <MemoryRouter

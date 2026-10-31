@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { act, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '../../../state/useAppStore'
 import { useEmilyStore } from '../../../state/useEmilyStore'
@@ -220,6 +220,9 @@ describe('Mascot wrapper', () => {
     render(<Mascot state="thinking" message="Let me look at that." />)
     expect(screen.getByText('Let me look at that.')).toBeInTheDocument()
     expect(screen.queryByText(/State:/i)).toBeNull() // no default badge (ticket 09a)
+    cleanup()
+    render(<Mascot state="thinking" message="Let me look at that." badgeLabel="Saved" />)
+    expect(screen.getByText('Saved')).toBeInTheDocument() // a passed badgeLabel still renders
     expect(screen.getByText(/^Loti$/)).toBeInTheDocument()
     expect(screen.queryByRole('img')).toBeNull()
   })

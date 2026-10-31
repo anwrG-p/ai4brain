@@ -105,6 +105,13 @@ describe('App shell (ticket 09a)', () => {
     expect(status).not.toHaveTextContent(/sync|queue|telemetry|buffer/i)
     act(() => useAppStore.getState().setSimulateOffline(false))
   })
+
+  it.each(['/baseline', '/task/working_memory'])('no offline line on %s: nothing appears above a stimulus', (url) => {
+    useAppStore.getState().setSimulateOffline(true)
+    shellAt(url)
+    expect(screen.queryByText(/You're offline/)).toBeNull()
+    act(() => useAppStore.getState().setSimulateOffline(false))
+  })
 })
 
 describe('Emotion engine without the mood pill (gap FE-03)', () => {
@@ -123,6 +130,23 @@ describe('Emotion engine without the mood pill (gap FE-03)', () => {
       vi.useRealTimers()
     }
   })
+
+  it.each(['/', '/results', '/baseline', '/task/working_memory'])(
+    'the engine does not run on %s (welcome flow before consent, timed trials)',
+    (url) => {
+      vi.useFakeTimers()
+      try {
+        useEmilyStore.getState().reset()
+        const before = useEmilyStore.getState().metrics
+        shellAt(url)
+        for (let i = 0; i < 6; i++) fireEvent.click(document.body, { clientX: 10 * i, clientY: 5 * i })
+        act(() => void vi.advanceTimersByTime(3100))
+        expect(useEmilyStore.getState().metrics).toBe(before)
+      } finally {
+        vi.useRealTimers()
+      }
+    },
+  )
 })
 
 describe('Judge mode (R6)', () => {
@@ -215,6 +239,17 @@ describe('Routes and redirects (ticket 09a)', () => {
     await at(url)
     expect(screen.getByRole('heading', { level: 1, name: h1 })).toBeInTheDocument()
     expect(document.querySelector('main')?.textContent).not.toMatch(/telemetry|queue|boundary|diagnostic/i)
+  })
+
+  it('a redirect keeps the query string', async () => {
+    await at('/assessment?judge=1')
+    expect(window.location.pathname + window.location.search).toBe('/train?judge=1')
+  })
+
+  // Re-run after the merge, when /dashboard, /train, /coach and /you are the real pages.
+  it.each(['/', '/dashboard', '/train', '/coach', '/you'])('%s shows no v1/, QUEST, JSON or SAT-JEPA', async (url) => {
+    await at(url)
+    expect(document.querySelector('main')?.textContent).not.toMatch(/v1\/|QUEST|JSON|SAT-JEPA/)
   })
 
   it('/ and the shell show none of the technical clutter', async () => {

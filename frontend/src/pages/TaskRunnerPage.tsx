@@ -6,27 +6,16 @@ import type { DimensionConfig, TaskSchemaType } from '../types'
 import { useAppStore } from '../state/useAppStore'
 import { ExerciseHost } from '../features/assessment/ExerciseHost'
 import { EXERCISE_NAME } from '../features/assessment/names'
-import { newId } from '../features/assessment/tasks/taskSource'
 import { tracker } from '../features/assessment/telemetry/tracker'
 import type { TelemetryEvent } from '../features/assessment/telemetry/types'
-import { useSessionStore } from '../features/insights/sessionStore'
-import { taskScores } from '../features/insights/taskScores'
+import { saveRun } from '../features/insights/sessionStore'
 import { Loti } from '../components/features/characters'
 import { useJudgeMode } from '../components/layout/judgeMode'
 import { Button } from '../components/ui/Button'
 
 type Stage = 'running' | 'paused-blur' | 'completed' | 'error'
 
-const MAX_EVENTS = 50 // table rows kept; counts and metrics cover the whole block
-
-// Running sums over every event of the block, so nothing silently caps at MAX_EVENTS.
-type Totals = { n: number; rtSum: number; errors: number }
-const NO_TOTALS: Totals = { n: 0, rtSum: 0, errors: 0 }
-const addEvent = (t: Totals, e: TelemetryEvent): Totals => ({
-  n: t.n + 1,
-  rtSum: t.rtSum + e.response_time_ms,
-  errors: t.errors + (e.error_flag ? 1 : 0),
-})
+const MAX_EVENTS = 50 // judge table rows kept; counts and metrics cover the whole run
 
 const ICON = { strokeWidth: 1.75, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true } as const
 const QUIET_LINK =
@@ -97,69 +86,66 @@ export default function TaskRunnerPage() {
   // The exercise reached its end card: the block is finished and only waits for Continue.
   const [blockEnded, setBlockEnded] = useState(false)
   const [showTable, setShowTable] = useState(false)
-  // Real events from the tracker (R5): the latest MAX_EVENTS for the judge table, newest first, plus
-  // uncapped block totals. Both reset when a new block starts.
-  const [events, setEvents] = useState<TelemetryEvent[]>([])
-  const [totals, setTotals] = useState<Totals>(NO_TOTALS)
-  // Every event of the current task, uncapped, for its session. A new task (a start, a resume after
-  // a pause, another dimension) starts over, so a discarded attempt is never scored.
-  const runEvents = useRef<TelemetryEvent[]>([])
+  // Every event of the current run, from the tracker (R5). A new task (a start, a resume, another
+  // dimension) and a pause both start it over, so a discarded attempt is never scored or shown.
+  // ponytail: copied per event; a block is tens of trials, so the O(n) append is fine.
+  const [runEvents, setRunEvents] = useState<TelemetryEvent[]>([])
+  const taskId = useRef<string | null>(null)
   const saved = useRef(false)
   const [savedRun, setSavedRun] = useState(false)
-  const addSession = useSessionStore((s) => s.addSession)
 
-  useEffect(
-    () =>
-      tracker.onEvent((e) => {
-        runEvents.current.push(e)
-        setEvents((prev) => [e, ...prev].slice(0, MAX_EVENTS))
-        setTotals((t) => addEvent(t, e))
-      }),
-    [],
-  )
+  useEffect(() => tracker.onEvent((e) => setRunEvents((prev) => [...prev, e])), [])
 
-  const onTask = useCallback(() => {
-    runEvents.current = []
+  const onTask = useCallback((id: string) => {
+    taskId.current = id
     saved.current = false
     setSavedRun(false)
-    setEvents([])
-    setTotals(NO_TOTALS)
+    setRunEvents([])
   }, [])
 
-  // Any (re)start mounts a fresh task; a remount with the same attempt would repeat item_ids.
+  const totals = useMemo(
+    () =>
+      runEvents.reduce(
+        (t, e) => ({ n: t.n + 1, rtSum: t.rtSum + e.response_time_ms, errors: t.errors + (e.error_flag ? 1 : 0) }),
+        { n: 0, rtSum: 0, errors: 0 },
+      ),
+    [runEvents],
+  )
+  const tableEvents = useMemo(() => runEvents.slice(-MAX_EVENTS).reverse(), [runEvents])
+
+  // Any (re)start mounts a fresh task (onTask resets the run); a remount with the same attempt
+  // would repeat item_ids.
   const run = useCallback(() => {
     setAttempt((a) => a + 1)
     setBlockEnded(false)
     setStage('running')
   }, [])
-  const startBlock = useCallback(() => {
-    setEvents([])
-    setTotals(NO_TOTALS)
-    run()
-  }, [run])
   // A new dimension (Back/Forward, the switcher, a link) is a new block: reset while rendering,
   // so the completed screen can never pair the old block's totals with the new dimension.
   const [blockDimId, setBlockDimId] = useState(currentDim.id)
   if (blockDimId !== currentDim.id) {
     setBlockDimId(currentDim.id)
-    setEvents([])
-    setTotals(NO_TOTALS)
+    setRunEvents([])
     setAttempt((a) => a + 1)
     setBlockEnded(false)
     setStage('running')
   }
   const handleBlockEnd = useCallback(() => setBlockEnded(true), [])
-  // The end of a run: save its scores once (like BaselinePage), then the result screen.
+  // The result screen. Only a run that reached its end card is saved, once, and only its own
+  // task's events (like BaselinePage); a judge jump mid-run shows the summary without saving.
   const complete = useCallback(() => {
-    if (!saved.current && runEvents.current.length > 0) {
+    if (blockEnded && !saved.current && taskId.current) {
       saved.current = true
-      setSavedRun(true)
-      addSession({ id: newId(), at: new Date().toISOString(), inputs: taskScores(runEvents.current) })
+      setSavedRun(saveRun(runEvents, [taskId.current]))
     }
     setStage('completed')
-  }, [addSession])
-  // Pausing discards the running block (R3); a finished one on its end card completes instead.
-  const pause = useCallback(() => (blockEnded ? complete() : setStage('paused-blur')), [blockEnded, complete])
+  }, [blockEnded, runEvents])
+  // Pausing discards the running block and its events (R3); a finished one completes instead.
+  const pause = useCallback(() => {
+    if (blockEnded) return complete()
+    setRunEvents([])
+    setStage('paused-blur')
+  }, [blockEnded, complete])
   const handleError = useCallback((msg: string) => {
     setErrorMsg(msg)
     setStage('error')
@@ -361,7 +347,7 @@ export default function TaskRunnerPage() {
                     variant={isCurrent ? 'primary' : 'secondary'}
                     aria-pressed={isCurrent}
                     // Another dimension resets the block on render; the current one restarts it here.
-                    onClick={() => (isCurrent ? startBlock() : navigate(`/task/${dim.id}`))}
+                    onClick={() => (isCurrent ? run() : navigate(`/task/${dim.id}`))}
                   >
                     {dim.markerGlyph} {dim.code}
                   </Button>
@@ -371,7 +357,7 @@ export default function TaskRunnerPage() {
 
             {showTable && (
               <div className="w-full mt-2">
-                <EventsTable events={events} />
+                <EventsTable events={tableEvents} />
               </div>
             )}
           </div>
