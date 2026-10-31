@@ -12,11 +12,13 @@ import { useSessionStore } from '../features/insights/sessionStore'
 const subscribe = (fn: () => void) => tracker.subscribe(fn)
 const consentNow = () => tracker.getStatus().consent
 
+const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']
+
 // Honest about a run where some exercise could not be shown. Without the baseline's count (a later
 // visit), it claims nothing.
 function finishedLine(run: BaselineResult | null): string {
   if (!run || typeof run.finished !== 'number') return 'Good job!'
-  if (run.finished === run.total) return 'Good job! You finished all six.' // the baseline has six
+  if (run.finished === run.total) return `Good job! You finished all ${WORDS[run.total] ?? run.total}.`
   if (run.finished === 0) return `You finished 0 of ${run.total}.`
   return `Good job! You finished ${run.finished} of ${run.total}.`
 }

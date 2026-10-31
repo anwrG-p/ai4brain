@@ -19,9 +19,9 @@ export type BaselineResult = { finished: number; total: number }
    trials, end card). Continue on an end card goes straight to the next exercise. Telemetry stays
    held on the device (consent is asked on /results). The page collects the events of its own tasks
    and, after the last one, saves the session's scores (R5) and moves on to /results.
-   Exit leaves at any time. A hidden tab or Escape pauses a running block, and the exercise starts
-   over (R3): the paused attempt's events are dropped from the scores. Before the trials start
-   (instruction, fixation) and on the end card there is nothing to discard, so neither pauses. */
+   Exit leaves at any time. A hidden tab or Escape pauses a started block (fixation or trials), and
+   the exercise starts over (R3): the paused attempt's events are dropped. On the instruction
+   screen and the end card there is nothing to discard, so neither pauses. */
 export default function BaselinePage() {
   const navigate = useNavigate()
   const { search } = useLocation()
@@ -65,14 +65,16 @@ export default function BaselinePage() {
   const onDone = useCallback(() => next(true), [next])
   const onError = useCallback(() => next(false), [next]) // could not be shown: skipped, not counted
 
-  // Only a block whose trials are running pauses: ExerciseFrame puts the motion lock
-  // ([data-timed-trial]) on the exercise for exactly that time.
+  // Only a started block pauses: ExerciseFrame marks the fixation and the trials with
+  // [data-block-running], from Begin until the end card. The abandoned attempt leaves no trace:
+  // its events are dropped from the scores and from the tracker's queue, so they are never sent.
   const pause = useCallback(() => {
-    if (!root.current?.querySelector('[data-timed-trial="true"]')) return
+    if (!root.current?.querySelector('[data-block-running="true"]')) return
     const id = current.current
     if (id) {
       taskIds.current.delete(id)
       events.current = events.current.filter((e) => e.task_id !== id)
+      tracker.dropTask(id)
     }
     setPaused(true)
   }, [])

@@ -156,10 +156,12 @@ function Locked({ children }: { children: ReactNode }) {
 
 // The running block: dots and the exercise. Focus moves here (not to <body>) so the exercise's keys
 // and Tab start inside it; tabIndex -1 keeps it out of the tab order.
+// [data-block-running] (here and on the fixation) tells a host the block has started: from Begin
+// until the end card, a pause must discard it (BaselinePage).
 function TrialArea({ done, total, children }: { done: number; total: number; children: ReactNode }) {
   const area = useFocusOnMount<HTMLDivElement>()
   return (
-    <div ref={area} tabIndex={-1} className="flex w-full flex-col items-center gap-4 outline-none">
+    <div ref={area} tabIndex={-1} data-block-running="true" className="flex w-full flex-col items-center gap-4 outline-none">
       <ProgressDots done={done} total={total} />
       <Locked>{children}</Locked>
     </div>
@@ -242,7 +244,12 @@ export function ExerciseFrame({ task, onDone, onBlockEnd, children }: Props) {
 
   useStartKeys(!intro ? null : phase === 'intro' ? begin : phase === 'end' ? finish : null)
 
-  if (!intro) return <Locked>{children(onDone)}</Locked>
+  if (!intro)
+    return (
+      <div data-block-running="true" className="contents">
+        <Locked>{children(onDone)}</Locked>
+      </div>
+    )
 
   switch (phase) {
     case 'intro':
@@ -250,7 +257,7 @@ export function ExerciseFrame({ task, onDone, onBlockEnd, children }: Props) {
     case 'fixation':
       // R9: the cross appears at once, at full contrast for all of its 500 ms (jsPsych convention).
       return (
-        <div className="flex min-h-64 items-center justify-center">
+        <div data-block-running="true" className="flex min-h-64 items-center justify-center">
           <span role="img" aria-label="Look at the cross" className="select-none text-5xl font-bold text-ink">
             +
           </span>

@@ -677,6 +677,26 @@ describe('Tracker', () => {
   })
 
   describe('subscribe, getStatus and clear', () => {
+    test('dropTask removes only that task\'s unsent events, here and in storage, and is never sent', async () => {
+      const storage = memStorage({}, null) // pending: everything is held
+      const fetchFn = okFetch()
+      const t = make({ fetchFn, beacon: vi.fn(), storage })
+      const listener = vi.fn()
+      t.subscribe(listener)
+      t.push({ ...full(1), task_id: 'paused' })
+      t.push(full(2))
+      t.push({ ...full(3), task_id: 'paused' })
+      expect(t.dropTask('paused')).toBe(2)
+      expect(listener).toHaveBeenCalledTimes(4)
+      expect(t.getStatus().queuedCount).toBe(1)
+      expect((JSON.parse(storage.getItem(KEY)!) as TelemetryEvent[]).map((e) => e.task_id)).toEqual(['t1'])
+      expect(t.dropTask('unknown')).toBe(0)
+      expect(listener).toHaveBeenCalledTimes(4) // nothing changed, nobody told
+      t.grantConsent()
+      await vi.waitFor(() => expect(fetchFn).toHaveBeenCalled())
+      expect(sent(fetchFn)).toEqual([2])
+    })
+
     test('listeners hear push and clear; clear empties buffer and storage', () => {
       const storage = memStorage()
       const t = make({ fetchFn: okFetch(), beacon: vi.fn(), storage })

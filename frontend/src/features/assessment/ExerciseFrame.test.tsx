@@ -311,3 +311,25 @@ test('the end card: Loti pops in happy with one burst of 6 to 8 sparkles, hidden
   expect(n).toBeGreaterThanOrEqual(6)
   expect(n).toBeLessThanOrEqual(8)
 })
+
+// A host pauses only a running block: from Begin (the fixation) to the end card.
+test('[data-block-running] marks the fixation and the trials, not the instruction or the end card', () => {
+  const task = byType('matrix')
+  const { container } = render(
+    <ExerciseFrame task={task} onDone={vi.fn()}>
+      {(end) => (
+        <button type="button" onClick={end}>
+          finish
+        </button>
+      )}
+    </ExerciseFrame>,
+  )
+  const running = () => container.querySelector('[data-block-running="true"]')
+  expect(running()).toBeNull()
+  space()
+  expect(running()).toContainElement(screen.getByRole('img', { name: 'Look at the cross' }))
+  advance(FIXATION_MS)
+  expect(running()).toContainElement(screen.getByRole('button', { name: 'finish' }))
+  act(() => void fireEvent.click(screen.getByRole('button', { name: 'finish' })))
+  expect(running()).toBeNull()
+})

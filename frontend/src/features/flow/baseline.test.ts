@@ -39,8 +39,8 @@ describe('the ?fast=1 test hook', () => {
     expect(fastTask(fixture('stroop')).params).toMatchObject({ time_limit_ms: 800 })
   })
 
-  it('has six exercises, Color Clash 4th (Impulse Control gets a first score)', () => {
-    expect(BASELINE_SCHEMAS).toEqual(['relational', 'n_back', 'tower', 'stroop', 'ufov', 'mst'])
+  it('has six exercises, Color Clash 3rd (Impulse Control gets a first score; apart from Perceptual Radar)', () => {
+    expect(BASELINE_SCHEMAS).toEqual(['relational', 'n_back', 'stroop', 'tower', 'ufov', 'mst'])
   })
 
   it('leaves other exercises alone', () => {

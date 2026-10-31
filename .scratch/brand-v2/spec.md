@@ -60,6 +60,7 @@ Each ruling ends with what it costs if it turns out to be wrong.
 - **R6. Evaluator and judge tools** survive only behind `?judge=1`, never visible otherwise. This keeps the CISTAC demo controls without cluttering real users' screens. *(If wrong: delete them.)*
 - **R7. Tests that pinned the old design's content are rewritten** for the new pages (team-approved redesign). DEC-007's "keep selectors" is superseded by DEC-011 for the redesigned pages. Theme-toggle names and the e2e axe/overflow checks stay.
 - **R8 (user, 2026-10-31): Welcome and exercises should feel more dynamic.** Characters may have a nearly-imperceptible idle (breathing, blink); event motion is richer. Trial stimuli and timing stay untouched — motion lives in transitions, instruction demos, presses and end cards. *(If wrong: delete the `anim-*` classes; every one is off under reduced motion already.)*
+- **R9 (controller, 2026-10-31): the block fixation '+' appears instantly (jsPsych convention).** No fade or scale: it holds its 500 ms at full contrast.
 
 ## Brand system (binding)
 
