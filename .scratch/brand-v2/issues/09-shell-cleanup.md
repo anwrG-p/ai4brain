@@ -53,3 +53,17 @@ New tests:
 ## Done when
 
 `qa:checks` is green, the e2e passes on Edge, and the commit has no AI attribution.
+
+## Copy trim, every page (user, 2026-10-31: "remove unnecessary bulky text from all parts of the platform")
+
+Go through every page that stays, plus the shared components: headers, empty states, toasts, the sheets and the Privacy, Settings and Profile pages.
+
+- **Rewrite the copy:** at most one heading and one line of support per block. Paragraphs are 2 lines or fewer.
+- **Delete text:**
+  - text that repeats the heading
+  - text that explains what a button does
+  - "Note:" and "Tip:" lines
+  - legal or technical wording. The only exception is `/methodology`, which keeps it behind its plain intro.
+- **Hide details** behind a single quiet "More" only when the user may need them. Otherwise delete them.
+- **Word budget:** test that visible text above the fold is ≤ 60 words on `/dashboard`, `/train`, `/coach` and `/you`. Welcome stays at ≤ 40.
+- **Comments:** list every removed block, as before → after.
