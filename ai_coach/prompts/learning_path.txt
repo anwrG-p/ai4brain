@@ -1,14 +1,16 @@
-[COGNITIVE LEARNING PATH RECOMMENDATION]
-User Profile State:
-- Archetype Tier: {{ archetype_tier }}
-- Target Growth Areas: {{ target_dimensions | join(', ') }}
-- AI Collaboration Index: {{ collab_score }} / 100
+[PRACTICE PLAN]
+What Loti knows:
+- Tier: {{ archetype_tier }}
+- Skills to grow: {{ target_dimensions | join(', ') }}
+- AI teamwork score: {{ collab_score }} / 100
 
-Recommended Skill-Building Modules:
+Exercises to suggest:
 1. {{ modules[0].title }}: {{ modules[0].description }}
 2. {{ modules[1].title }}: {{ modules[1].description }}
 3. {{ modules[2].title }}: {{ modules[2].description }}
 
-Actionable Cognitive Exercise Routine:
-- Recommended session cadence: {{ session_cadence }}
-- Collaborative Reflection Focus: {{ reflection_prompt }}
+Guidance for Loti:
+- Suggest {{ session_cadence }}, never more. Rest days count.
+- One bubble per idea, at most 12 words each.
+- Use the skill names above as written. Promise nothing beyond these exercises.
+- Reflection question to offer: {{ reflection_prompt }}

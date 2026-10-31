@@ -1,0 +1,22 @@
+# The API server alone. The frontend runs with `cd frontend && npm run dev` (Vite proxies /v1 to :8000).
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: synapsetwin_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS:-http://localhost:5173}
+    volumes:
+      # A named volume, not a bind mount: the image runs as uid 10001, and Docker seeds a new
+      # named volume from the image's /data/telemetry (owned by that user), so writes work on
+      # Linux with no host chown. The JSONL stays off the host folder; read it through
+      # GET /v1/user/export or `docker compose cp backend:/data/telemetry ./out`. Retention:
+      # docker compose exec backend python -m backend.app.privacy.retention --days 30
+      - telemetry:/data/telemetry
+
+volumes:
+  telemetry:

@@ -1,9 +1,17 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const docPath = path.resolve('docs/architecture/SEQUENCE_DIAGRAMS.md')
-const diagramsDir = path.resolve('docs/architecture/diagrams')
-const outputPath = path.resolve('docs/architecture/sequence_diagrams_viewer.html')
+// Paths are relative to the repo root, whatever the working directory. No dependencies.
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const docPath = path.join(ROOT, 'docs/architecture/SEQUENCE_DIAGRAMS.md')
+const diagramsDir = path.join(ROOT, 'docs/architecture/diagrams')
+const outputPath = path.join(ROOT, 'docs/architecture/sequence_diagrams_viewer.html')
+
+if (!fs.existsSync(docPath)) {
+  console.error(`Missing ${docPath}.\nUsage: node scripts/build_html_viewer.mjs   (reads docs/architecture/SEQUENCE_DIAGRAMS.md and diagrams/, writes sequence_diagrams_viewer.html)`)
+  process.exit(1)
+}
 
 const diagramsMeta = [
   { id: '01-high-level-closed-loop', num: 'Overview', title: '5-Subsystem Closed-Loop Overview', category: 'Core Architecture' },

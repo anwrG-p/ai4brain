@@ -1,6 +1,6 @@
 # 03: Loti chat (bubbles, scripted brain, coach adapter stub)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 02
 Spec: `../spec.md` (R2, U5, Anti-slop rule 4). Source: `docs/Loti interface.docx`.
 
@@ -54,3 +54,7 @@ interface LotiBrain {
 ## Done when
 
 `qa:checks` is green, and the commit has no AI attribution.
+
+## Comments
+
+- 2026-10-31 (TD-03 tracker hygiene): Done in 665927b..b1041e5, review clean (brand-v2 ledger).

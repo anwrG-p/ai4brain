@@ -1,6 +1,6 @@
 # 04: Onboarding (`/onboarding`)
 
-Status: ready-for-agent
+Status: wontfix
 Blocked by: 02
 Spec: `../spec.md` (Goal, R1, R2, R5). Evidence: UI simplification review §1.5 (no tutorial decks) and §1.6 (fair consent).
 
@@ -43,3 +43,7 @@ Three steps stay, but each is lighter.
 ## Done when
 
 `qa:checks` is green, the onboarding e2e passes, and the commit has no AI attribution.
+
+## Comments
+
+- 2026-10-31 (TD-03 tracker hygiene): Superseded by `.scratch/brand-v2/` (its ledger: "Supersedes ui-calm-clean tickets 04–07").

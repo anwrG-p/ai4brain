@@ -1,6 +1,6 @@
 # 03: Welcome page (`/`)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 02
 Spec: `../spec.md` (Goal, R1, R2, R5)
 
@@ -42,3 +42,7 @@ A single column, max width about 720 px, centred. From top to bottom:
 ## Done when
 
 `qa:checks` is green, the Welcome e2e passes, and the commit has no AI attribution.
+
+## Comments
+
+- 2026-10-31 (TD-03 tracker hygiene): Done in 5c74f79, review clean (ui-calm-clean ledger).

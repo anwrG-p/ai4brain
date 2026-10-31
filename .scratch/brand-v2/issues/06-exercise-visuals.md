@@ -1,6 +1,6 @@
 # 06: Exercise visuals (jsPsych-style screens, brand v2, consumer names)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 01
 Spec: `../spec.md` (Brand system, IA exercise names, Anti-slop rules 6, 10, 11). Landing doc: "WORK ON THE VISUALS FOR THE TESTS (take jspsych into consideration)".
 
@@ -70,3 +70,5 @@ Add an `ExerciseFrame` wrapper in `features/assessment/`. Every exercise renders
 | dark | `#FF5C5C` | 5.39 | 4.65 | 14.7 (`#FF9F86`) | — / 14.3 (`#F28B9E`) |
 
 Tower disc slot 1 keeps `--color-danger` (its id label tells discs apart). Progress dot (brand fill on canvas): 5.08 light, 9.58 dark. New frame text uses ink / ink-muted on canvas and ink on surface keycaps (pairs already audited). No other exercise token changed.
+
+- 2026-10-31 (TD-03 tracker hygiene): Done in 3d2b34b..d6ae10d, review clean (brand-v2 ledger).

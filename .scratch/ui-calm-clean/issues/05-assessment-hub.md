@@ -1,6 +1,6 @@
 # 05: Assessment hub (`/assessment`)
 
-Status: ready-for-agent
+Status: wontfix
 Blocked by: 02
 Spec: `../spec.md` (Goal, R1, R2, R5)
 
@@ -43,3 +43,7 @@ Spec: `../spec.md` (Goal, R1, R2, R5)
 ## Done when
 
 `qa:checks` is green, the assessmentHub e2e passes, and the commit has no AI attribution.
+
+## Comments
+
+- 2026-10-31 (TD-03 tracker hygiene): Superseded by `.scratch/brand-v2/` (its ledger: "Supersedes ui-calm-clean tickets 04–07").

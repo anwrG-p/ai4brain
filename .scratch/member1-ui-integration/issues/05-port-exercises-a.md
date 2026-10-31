@@ -1,6 +1,6 @@
 # 05: Port exercises A (N-back, Stroop, Matrix, Mental rotation)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 04
 Spec: `../spec.md` (R6, Constraints)
 
@@ -52,3 +52,5 @@ From `frontend/`: `npx vitest run src/features/assessment`, typecheck, `lint:tok
 Rejected: `--color-success` (green, 3.30 light), `--dim-5` (yellow, 4.29 light; fine for the ≥ 3:1 glyphs in `svg.tsx`), `--color-warning` (3.19 light), `--dim-9` (green alt., 5.47 / 7.61 but reads teal in light). `--dim-3` is the thinnest margin (4.58 light). Light `--dim-7` is a dark olive-yellow; dark `--dim-7` is the Okabe-Ito yellow.
 
 N-back grid (graphics, ≥ 3:1): lit `--dim-1` vs unlit `--color-surface-raised` = 4.64 light / 5.37 dark. The centre symbol is `--color-ink` with an unlit-colour halo (ink on surface-raised 15.88 / 12.39), so it stays readable on a lit centre cell (ink on `--dim-1` alone is 3.42 / 2.31).
+
+- 2026-10-31 (TD-03 tracker hygiene): Done in 6342784..20f9870, review clean (member1-ui-integration ledger).

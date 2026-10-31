@@ -1,6 +1,6 @@
 # 01: Tokens, base styles, fonts, contrast metadata, DEC-010
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: —
 Spec: `../spec.md` (Design system, R4, R6, Constraints)
 
@@ -108,3 +108,5 @@ Graphics (≥ 3:1):
 Text: Tower hint `.text-danger` (light override `#B91C1C`, dark `--color-danger`) on canvas 6.18 light (`#F8FAFC`), 6.81 dark (`#0B1120`).
 
 Notes: the light disc label never changed (white), so the light disc column is identical; the thinnest margins are still `--dim-3` 4.58 light (Stroop green and Tower slot 2). Light border-strong dropped from 11.05 to 4.76 on surface but stays well above 3:1. Ink on a lit N-back cell alone is still under 3:1 (3.44 light, 2.21 dark), which is why the centre symbol keeps its unlit-colour halo.
+
+- 2026-10-31 (TD-03 tracker hygiene): Done in 886d5f2, review clean (ui-calm-clean ledger).

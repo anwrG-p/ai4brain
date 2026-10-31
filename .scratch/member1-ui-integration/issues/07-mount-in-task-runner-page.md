@@ -1,6 +1,6 @@
 # 07: Mount the real exercises in `TaskRunnerPage`
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 03, 05, 06
 Spec: `../spec.md` (R1–R7, DEC-007 selectors)
 
@@ -115,3 +115,7 @@ The instruction is the exercise's own single line.
 - From `frontend/`, `npm run qa:checks` is green.
 - Manual: `npm run dev` with the API running. Play one exercise of each schema type, using the evaluator buttons for tower, relational and rotation. The API log shows only 202 responses.
 - Commit with no AI attribution.
+
+## Comments
+
+- 2026-10-31 (TD-03 tracker hygiene): Done in f7d503b..0145622, review clean (member1-ui-integration ledger).

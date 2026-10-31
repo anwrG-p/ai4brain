@@ -1,7 +1,14 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const docPath = path.resolve('docs/architecture/SEQUENCE_DIAGRAMS.md')
+// Paths are relative to the repo root, whatever the working directory. No dependencies.
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const docPath = path.join(ROOT, 'docs/architecture/SEQUENCE_DIAGRAMS.md')
+if (!fs.existsSync(docPath)) {
+  console.error(`Missing ${docPath}.\nUsage: node scripts/update_sequence_diagrams_md.mjs   (rewrites docs/architecture/SEQUENCE_DIAGRAMS.md in place)`)
+  process.exit(1)
+}
 const content = fs.readFileSync(docPath, 'utf8')
 
 const diagramsData = [

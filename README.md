@@ -80,7 +80,7 @@ The platform uses a closed-loop system divided into **5 decoupled modules**:
 
   * Build the natural-language **AI Coach Chatbot** that guides the user, explains task adaptations, and suggests skill-building learning paths.
 
-  * Implement **Explainability Injection**: ingest the differential vector $\Delta c$ from Member 3 to justify recommendations (e.g., *"We adjusted task pacing because your working memory stability improved by 20%"*).
+  * Implement **Explainability Injection**: ingest the differential vector $\Delta c$ from Member 3 to justify recommendations (e.g., *"We adjusted the working memory pacing and added an item to remember. Your last few rounds were steady."*). Reasons stay at exercise level: no "improved" and no percentages until a calibrated reliable-change gate exists.
 
   * Implement the **Dynamic AI Collaboration Score (0–100)**:
     

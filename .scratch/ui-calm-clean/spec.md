@@ -1,6 +1,6 @@
 # Spec: "Calm & Clean" redesign of the SynapseTwin UI
 
-Status: ready-for-agent
+Status: resolved
 Owner: Member 1 (Mazen), with team agreement. The PR goes to the UI owner for review (DEC-001).
 Date: 2026-10-30
 Branch: `feat/ui-calm-clean` (based on `feat/member1-ui-integration`)
@@ -153,3 +153,7 @@ Other colour rules:
   - technical detail only inside drawers
 - Screenshots in `docs/ui/screenshots/` are regenerated.
 - DEC-010 is recorded.
+
+## Comments
+
+- 2026-10-31 (TD-03 tracker hygiene): Closed: tickets 01–03 done (886d5f2, 9c6065a, 5c74f79); tickets 04–07 `wontfix`, superseded by `.scratch/brand-v2/spec.md`.

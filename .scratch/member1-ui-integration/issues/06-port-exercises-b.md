@@ -1,6 +1,6 @@
 # 06: Port exercises B (Relational, Tower, UFOV, MST)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 04
 Spec: `../spec.md` (R6, Constraints). Restyle rules: see `05-port-exercises-a.md`.
 
@@ -55,3 +55,5 @@ From `frontend/`: `npx vitest run src/features/assessment`, typecheck and both l
 Hue order mirrors the old hex palette (blue, red, green, purple, yellow, then orange for teal, pink, slate). Rejected: `--dim-5` (4.29 light), `--dim-6` / `--dim-9` (pass, but near-duplicates of `--dim-1` / `--dim-3`), `--dim-10` (passes, near-duplicate of `--dim-4`). Thinnest margins: `--dim-3` 4.58 light, `--dim-8` 4.90 dark.
 
 Other graphics (≥ 3:1): Tower selected peg `ring-brand` over the Card surface 3.21 light / 6.37 dark (plus `aria-pressed` and a `bg-surface-raised` fill); peg base `--color-border-strong` on surface 11.05 / 6.37. Relational inverted-rule border `--color-warning` on surface 3.19 / 8.76 (the "Rule inverted" text carries the meaning). UFOV canvas: `--color-ink` on `--color-surface` 17.74 / 14.63. MST strokes are `currentColor` = `--color-ink` on the Card surface (same ratios). Tower hint uses `.text-danger` (`#B91C1C` override) 6.02 on canvas light, 6.20 dark.
+
+- 2026-10-31 (TD-03 tracker hygiene): Done in 20f9870..f7d503b, review clean (member1-ui-integration ledger).

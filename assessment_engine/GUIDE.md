@@ -60,7 +60,7 @@ Following a single answer through the system is the fastest way to understand th
 5. The user answers. The screen compares the answer with the **correct answer that came inside the task JSON** (the client never works out the truth itself) and calls **`recorder.finish({correct, meta})`**.
 6. `finish()` builds one **telemetry event** and hands it to **`tracker.push(event)`**. `push` returns instantly: no waiting on the network.
 7. The **Tracker** batches events and sends them every 2 s, or when 20 are waiting, or when the page is hidden or closed (via `sendBeacon`).
-8. On the server, **`routes/telemetry.py`** validates the batch strictly and appends one JSON line per event to `data/raw/telemetry/<user_id>.jsonl`.
+8. On the server, **`backend/app/api/routes/v1_telemetry.py`** validates the batch strictly and appends one JSON line per event to `data/raw/telemetry/<user_id>.jsonl`.
 9. Member 3 reads those files.
 
 ---
@@ -178,10 +178,9 @@ Voice is **not shipped in the UI** (decision D1): the UI never asks for the micr
 ## 6. Running and testing it
 
 ```powershell
-# API (terminal 1)
-cd assessment_engine\api
-.\.venv\Scripts\python -m uvicorn main:app --port 8000     # docs: http://localhost:8000/docs
-.\.venv\Scripts\python -m pytest -q                          # 22 tests
+# API (terminal 1), from the repo root: the one API server is backend/app
+.\.venv\Scripts\python -m uvicorn app.main:app --app-dir backend --port 8000   # docs: http://localhost:8000/docs
+.\.venv\Scripts\python -m pytest -q                                            # every Python suite, API included
 
 # UI (terminal 2): mock tasks are the default
 cd frontend

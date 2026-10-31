@@ -1,6 +1,6 @@
 # 02: Shared components and AppShell
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 01
 Spec: `../spec.md` (Components, R1, R3, R5)
 
@@ -87,3 +87,5 @@ Badge tones (subtle tinted fill, toned text, no border):
 | low-confidence | ink-muted on surface, dashed 1 px border-strong | 7.58 | 6.92 |
 
 Header: logo is `BrianLogo` (currentColor = `--color-ink`): 17.85 light, 16.96 dark on surface. Active nav = brand text + 2 px brand underline (6.29 / 5.95); inactive = ink-muted (7.58 / 6.92).
+
+- 2026-10-31 (TD-03 tracker hygiene): Done in 9c6065a; its Important was ruled to 06 (now wontfix) and is covered by brand-v2 08 (ui-calm-clean ledger).
