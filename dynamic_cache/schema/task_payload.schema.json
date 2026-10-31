@@ -1,0 +1,878 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TaskPayload",
+  "description": "GET /v1/tasks/next reply. Mirrors TaskPayload and the *Params types in frontend/src/features/assessment/telemetry/types.ts, plus the rules the client enforces (assessment_engine/HANDOVER.md, Member 5). dynamic_cache/tests/test_schema.py fails when types.ts and this file drift apart.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "dimension",
+    "schema_type",
+    "params",
+    "surface_seed"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_:.-]{1,48}$"
+    },
+    "dimension": {
+      "enum": [
+        "working_memory",
+        "pattern_induction",
+        "executive_function",
+        "spatial_orientation",
+        "processing_speed",
+        "episodic_memory"
+      ]
+    },
+    "schema_type": {
+      "enum": [
+        "n_back",
+        "stroop",
+        "matrix",
+        "mental_rotation",
+        "relational",
+        "tower",
+        "ufov",
+        "mst"
+      ]
+    },
+    "params": {
+      "type": "object"
+    },
+    "surface_seed": {
+      "type": "integer"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schema_type": {
+            "const": "n_back"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "dimension": {
+            "const": "working_memory"
+          },
+          "params": {
+            "$ref": "#/definitions/NBackParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schema_type": {
+            "const": "stroop"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "dimension": {
+            "const": "executive_function"
+          },
+          "params": {
+            "$ref": "#/definitions/StroopParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schema_type": {
+            "const": "matrix"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "dimension": {
+            "const": "pattern_induction"
+          },
+          "params": {
+            "$ref": "#/definitions/MatrixParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schema_type": {
+            "const": "mental_rotation"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "dimension": {
+            "const": "spatial_orientation"
+          },
+          "params": {
+            "$ref": "#/definitions/RotationParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schema_type": {
+            "const": "relational"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "dimension": {
+            "const": "pattern_induction"
+          },
+          "params": {
+            "$ref": "#/definitions/RelationalParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schema_type": {
+            "const": "tower"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "dimension": {
+            "const": "executive_function"
+          },
+          "params": {
+            "$ref": "#/definitions/TowerParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schema_type": {
+            "const": "ufov"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "dimension": {
+            "const": "processing_speed"
+          },
+          "params": {
+            "$ref": "#/definitions/UfovParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schema_type": {
+            "const": "mst"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "dimension": {
+            "const": "episodic_memory"
+          },
+          "params": {
+            "$ref": "#/definitions/MstParams"
+          }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "ms": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 600000
+    },
+    "intPair": {
+      "type": "array",
+      "items": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "integer"
+        }
+      ],
+      "additionalItems": false,
+      "minItems": 2
+    },
+    "numPair": {
+      "type": "array",
+      "items": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "additionalItems": false,
+      "minItems": 2
+    },
+    "Glyph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "shape",
+        "count",
+        "color",
+        "rotation_deg"
+      ],
+      "properties": {
+        "shape": {
+          "enum": [
+            "circle",
+            "square",
+            "triangle",
+            "diamond"
+          ]
+        },
+        "count": {
+          "enum": [
+            1,
+            2,
+            3
+          ]
+        },
+        "color": {
+          "description": "CSS colour names that svg.tsx GLYPH_COLORS maps to theme tokens; any other name paints in ink.",
+          "enum": [
+            "blue",
+            "red",
+            "green",
+            "yellow"
+          ]
+        },
+        "rotation_deg": {
+          "type": "number"
+        }
+      }
+    },
+    "Poly": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "points",
+        "edges"
+      ],
+      "properties": {
+        "points": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/numPair"
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "integer",
+                "minimum": 0
+              }
+            ],
+            "additionalItems": false,
+            "minItems": 2
+          }
+        }
+      }
+    },
+    "Statement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "a",
+        "rel",
+        "b"
+      ],
+      "properties": {
+        "a": {
+          "type": "string",
+          "pattern": "^[a-z]{2,8}$"
+        },
+        "rel": {
+          "enum": [
+            "same",
+            "opposite",
+            "more",
+            "less",
+            "before",
+            "after",
+            "contains"
+          ]
+        },
+        "b": {
+          "type": "string",
+          "pattern": "^[a-z]{2,8}$"
+        }
+      }
+    },
+    "NBackParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "n",
+        "stimulus_ms",
+        "interval_ms",
+        "streams",
+        "trials"
+      ],
+      "properties": {
+        "n": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "stimulus_ms": {
+          "$ref": "#/definitions/ms"
+        },
+        "interval_ms": {
+          "$ref": "#/definitions/ms"
+        },
+        "streams": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "position",
+              "symbol"
+            ]
+          }
+        },
+        "trials": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "pos",
+              "symbol",
+              "rule",
+              "trial_type",
+              "answer"
+            ],
+            "properties": {
+              "pos": {
+                "description": "[row, col] on the 3x3 grid",
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "array",
+                    "items": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2
+                      },
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2
+                      }
+                    ],
+                    "additionalItems": false,
+                    "minItems": 2
+                  }
+                ]
+              },
+              "symbol": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2
+                  }
+                ]
+              },
+              "rule": {
+                "enum": [
+                  "position",
+                  "symbol",
+                  "parity"
+                ]
+              },
+              "trial_type": {
+                "enum": [
+                  "target",
+                  "standard",
+                  "lure_minus",
+                  "lure_plus",
+                  "switch"
+                ]
+              },
+              "answer": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "position": {
+                    "type": "boolean"
+                  },
+                  "symbol": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "StroopParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "colors",
+        "trials",
+        "time_limit_ms"
+      ],
+      "$comment": "Inks: red, green, blue, yellow are what Stroop.tsx INK maps today (the default preset). black is the CVD-safe preset's fourth ink; Stroop.tsx must map it before that preset is served.",
+      "properties": {
+        "colors": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 9,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/definitions/StroopInk"
+          }
+        },
+        "trials": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "word",
+              "ink",
+              "answer"
+            ],
+            "properties": {
+              "word": {
+                "type": "string",
+                "pattern": "^[A-Z]+$"
+              },
+              "ink": {
+                "$ref": "#/definitions/StroopInk"
+              },
+              "answer": {
+                "$ref": "#/definitions/StroopInk"
+              }
+            }
+          }
+        },
+        "time_limit_ms": {
+          "$ref": "#/definitions/ms"
+        }
+      }
+    },
+    "StroopInk": {
+      "enum": [
+        "red",
+        "green",
+        "blue",
+        "yellow",
+        "black"
+      ]
+    },
+    "MatrixParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cells",
+        "options",
+        "answer",
+        "time_limit_ms"
+      ],
+      "properties": {
+        "cells": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "items": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/definitions/Glyph"
+              }
+            ]
+          },
+          "contains": {
+            "type": "null"
+          },
+          "$comment": "Draft-07 can say 'at least one null' only; solvers.solve_matrix rejects more than one."
+        },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/definitions/Glyph"
+          }
+        },
+        "answer": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 7
+        },
+        "time_limit_ms": {
+          "$ref": "#/definitions/ms"
+        }
+      }
+    },
+    "RotationParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trials",
+        "time_limit_ms"
+      ],
+      "properties": {
+        "trials": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "cells",
+              "angle_deg",
+              "mirrored",
+              "answer"
+            ],
+            "properties": {
+              "cells": {
+                "type": "array",
+                "minItems": 2,
+                "items": {
+                  "$ref": "#/definitions/intPair"
+                }
+              },
+              "angle_deg": {
+                "type": "number",
+                "minimum": 0,
+                "exclusiveMaximum": 360
+              },
+              "mirrored": {
+                "type": "boolean"
+              },
+              "answer": {
+                "enum": [
+                  "same",
+                  "different"
+                ]
+              }
+            }
+          }
+        },
+        "time_limit_ms": {
+          "$ref": "#/definitions/ms"
+        }
+      }
+    },
+    "RelationalParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "n_trials",
+        "time_limit_ms",
+        "levels"
+      ],
+      "properties": {
+        "n_trials": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "time_limit_ms": {
+          "$ref": "#/definitions/ms"
+        },
+        "levels": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "premises",
+                "question",
+                "inverted",
+                "hops",
+                "answer"
+              ],
+              "properties": {
+                "premises": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "$ref": "#/definitions/Statement"
+                  }
+                },
+                "question": {
+                  "$ref": "#/definitions/Statement"
+                },
+                "inverted": {
+                  "type": "boolean"
+                },
+                "hops": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "answer": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "TowerParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capacities",
+        "start",
+        "goal",
+        "l_min",
+        "optimal_moves",
+        "counter_intuitive"
+      ],
+      "properties": {
+        "capacities": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "start": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z]$"
+            }
+          }
+        },
+        "goal": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z]$"
+            }
+          }
+        },
+        "l_min": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "optimal_moves": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "array",
+            "items": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "integer",
+                "minimum": 0
+              }
+            ],
+            "additionalItems": false,
+            "minItems": 2
+          }
+        },
+        "counter_intuitive": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "time_limit_ms": {
+          "$ref": "#/definitions/ms"
+        }
+      }
+    },
+    "UfovParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "duration_grid_ms",
+        "similarity",
+        "mask_noise",
+        "trials"
+      ],
+      "properties": {
+        "duration_grid_ms": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "similarity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "mask_noise": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "trials": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "central",
+              "peripheral_dir",
+              "distractors"
+            ],
+            "properties": {
+              "central": {
+                "enum": [
+                  "A",
+                  "B"
+                ]
+              },
+              "peripheral_dir": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 7
+              },
+              "distractors": {
+                "type": "array",
+                "maxItems": 23,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "dir",
+                    "ring"
+                  ],
+                  "properties": {
+                    "dir": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 7
+                    },
+                    "ring": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 3
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "MstParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "encode_ms",
+        "encode",
+        "test"
+      ],
+      "properties": {
+        "encode_ms": {
+          "$ref": "#/definitions/ms"
+        },
+        "encode": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/Poly"
+          }
+        },
+        "test": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "item",
+              "kind",
+              "delta"
+            ],
+            "properties": {
+              "item": {
+                "$ref": "#/definitions/Poly"
+              },
+              "kind": {
+                "enum": [
+                  "old",
+                  "lure",
+                  "new"
+                ]
+              },
+              "delta": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
