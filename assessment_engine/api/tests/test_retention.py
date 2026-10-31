@@ -1,5 +1,6 @@
 import json
 import os
+import queue
 import subprocess
 import sys
 import threading
@@ -10,7 +11,8 @@ from pathlib import Path
 import pytest
 
 import retention
-from routes.telemetry import telemetry_lock
+import telemetry_store
+from telemetry_store import telemetry_lock
 
 API_DIR = Path(retention.__file__).resolve().parent
 NOW = datetime(2026, 10, 31, 12, 0, tzinfo=timezone.utc)
@@ -47,7 +49,7 @@ def test_keeps_fresh_lines_and_drops_expired(tmp_path):
     write(tmp_path / "u1.jsonl", [line(31, n=0), fresh[0], line(400), fresh[1]])
     report = retention.purge_expired(tmp_path, days=30, now=NOW)
     assert read(tmp_path / "u1.jsonl") == fresh
-    assert report == {"files": 1, "kept": 2, "dropped": 2, "removed_files": 0}
+    assert report == {"files": 1, "kept": 2, "dropped": 2, "undated": 0, "removed_files": 0}
 
 
 def test_file_with_only_expired_lines_is_removed(tmp_path):
@@ -56,7 +58,7 @@ def test_file_with_only_expired_lines_is_removed(tmp_path):
     report = retention.purge_expired(tmp_path, days=30, now=NOW)
     assert not (tmp_path / "old.jsonl").exists()
     assert len(read(tmp_path / "u1.jsonl")) == 1
-    assert report == {"files": 2, "kept": 1, "dropped": 2, "removed_files": 1}
+    assert report == {"files": 2, "kept": 1, "dropped": 2, "undated": 0, "removed_files": 1}
 
 
 def test_undated_or_corrupt_lines_are_dropped(tmp_path):
@@ -65,7 +67,7 @@ def test_undated_or_corrupt_lines_are_dropped(tmp_path):
                                   json.dumps({"received_at": "yesterday"})])
     report = retention.purge_expired(tmp_path, days=30, now=NOW)
     assert read(tmp_path / "u1.jsonl") == [line(1)]
-    assert report["dropped"] == 3
+    assert report["undated"] == 3 and report["dropped"] == 0
 
 
 def test_ignores_non_jsonl_files(tmp_path):
@@ -76,7 +78,7 @@ def test_ignores_non_jsonl_files(tmp_path):
 
 def test_missing_dir_is_a_no_op(tmp_path):
     report = retention.purge_expired(tmp_path / "absent", days=30, now=NOW)
-    assert report == {"files": 0, "kept": 0, "dropped": 0, "removed_files": 0}
+    assert report == {"files": 0, "kept": 0, "dropped": 0, "undated": 0, "removed_files": 0}
 
 
 def test_concurrent_append_during_retention_loses_nothing(client, tmp_path, monkeypatch):
@@ -113,15 +115,34 @@ def test_cli_waits_for_the_ingest_lock(tmp_path):
     with telemetry_lock(tmp_path):
         proc = subprocess.Popen(
             [sys.executable, "-m", "retention", "--days", "30"],
-            cwd=API_DIR, env=env, stdout=subprocess.PIPE, text=True,
+            cwd=API_DIR, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
         )
-        time.sleep(2)  # long enough for the process to start and block on the lock
+        # Ready signal: the job says on stderr that it found the lock busy.
+        lines = queue.Queue()
+        threading.Thread(target=lambda: lines.put(proc.stderr.readline()), daemon=True).start()
+        assert "waiting for the telemetry lock" in lines.get(timeout=30)
         assert proc.poll() is None
         assert len(read(tmp_path / "u1.jsonl")) == 2
     out, _ = proc.communicate(timeout=30)
     assert proc.returncode == 0
     assert json.loads(out)["dropped"] == 1
     assert len(read(tmp_path / "u1.jsonl")) == 1
+
+
+def test_cli_gives_up_when_the_lock_stays_busy(tmp_path, monkeypatch, capsys):
+    # Also shows the lock is not re-entrant: a second hold in the same thread times out.
+    monkeypatch.setenv("TELEMETRY_DIR", str(tmp_path))
+    monkeypatch.setattr(telemetry_store, "LOCK_TIMEOUT_S", 0.1)
+    write(tmp_path / "u1.jsonl", [line(400)])
+    with telemetry_lock(tmp_path):
+        assert retention.main([]) == 1
+    assert "run again later" in capsys.readouterr().err
+    assert len(read(tmp_path / "u1.jsonl")) == 1
+
+
+def test_store_and_retention_do_not_import_fastapi():
+    code = "import sys, telemetry_store, retention; assert 'fastapi' not in sys.modules"
+    subprocess.run([sys.executable, "-c", code], cwd=API_DIR, check=True, timeout=30)
 
 
 @pytest.mark.parametrize("days", ["0", "-1", "x"])

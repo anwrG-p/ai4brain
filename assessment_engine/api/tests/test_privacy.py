@@ -2,6 +2,9 @@ import json
 
 import pytest
 
+import telemetry_store
+from telemetry_store import delete_user, export_user, telemetry_lock
+
 URL = "/v1/telemetry/event"
 EVENT = {
     "user_id": "u1",
@@ -98,3 +101,63 @@ def test_export_leaves_no_temp_files(client, tmp_path):
 def test_routes_in_openapi(client):
     paths = client.get("/openapi.json").json()["paths"]
     assert "delete" in paths[DELETE] and "get" in paths[EXPORT]
+
+
+def test_delete_counts_are_honest_whatever_the_case(client, tmp_path):
+    # u1 and U1 are one file on a case-insensitive disk (Windows, macOS), two on Linux.
+    ingest(client, 3)
+    before = (tmp_path / "u1.jsonl").exists()
+    r = client.delete(DELETE, params={"user_id": "U1"})
+    removed = before and not (tmp_path / "u1.jsonl").exists()
+    expected = {"deleted_events": 3, "deleted_files": 1} if removed else {
+        "deleted_events": 0, "deleted_files": 0}
+    assert r.status_code == 200 and r.json() == expected
+
+
+def test_delete_user_counts_jsonl_found_under_another_case(tmp_path):
+    (tmp_path / "u1.jsonl").write_text("{}\n{}\n")
+    if not (tmp_path / "U1.jsonl").exists():
+        pytest.skip("case-sensitive filesystem")
+    assert delete_user("U1", tmp_path) == {"deleted_events": 2, "deleted_files": 1}
+
+
+def test_export_over_the_ceiling_is_413(client, tmp_path, monkeypatch):
+    ingest(client, 2)
+    monkeypatch.setattr(telemetry_store, "EXPORT_MAX_BYTES", 10)
+    r = client.get(EXPORT, params={"user_id": "u1"})
+    assert r.status_code == 413
+    assert (tmp_path / "u1.jsonl").exists()
+
+
+def test_export_ceiling_default_is_50_mb():
+    assert telemetry_store.EXPORT_MAX_BYTES == 50 * 1024 * 1024
+
+
+@pytest.mark.parametrize(
+    "method,url,kwargs",
+    [
+        ("delete", DELETE, {"params": {"user_id": "u1"}}),
+        ("get", EXPORT, {"params": {"user_id": "u1"}}),
+        ("post", URL, {"json": EVENT}),
+    ],
+)
+def test_busy_lock_is_503(client, tmp_path, monkeypatch, method, url, kwargs):
+    ingest(client, 1)
+    monkeypatch.setattr(telemetry_store, "LOCK_TIMEOUT_S", 0.1)
+    with telemetry_lock(tmp_path):
+        r = getattr(client, method)(url, **kwargs)
+    assert r.status_code == 503 and r.headers["retry-after"] == "1"
+    assert len((tmp_path / "u1.jsonl").read_text().splitlines()) == 1
+
+
+@pytest.mark.parametrize("fn", [delete_user, export_user])
+def test_store_functions_check_the_id_themselves(tmp_path, fn):
+    (tmp_path / "x.jsonl").write_text("{}\n")
+    for bad in ["../x", "x.jsonl", "u1\n", ""]:
+        with pytest.raises(ValueError):
+            fn(bad, tmp_path)
+    assert (tmp_path / "x.jsonl").exists()
+
+
+def test_export_user_returns_none_when_nothing_is_stored(tmp_path):
+    assert export_user("nobody", tmp_path) is None

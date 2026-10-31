@@ -1,17 +1,12 @@
 import json
-import os
-import time
-from collections.abc import Iterator
-from contextlib import contextmanager
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
-# Also the anonymous device id in the privacy routes; it is a file name, so no dots or slashes.
-ID_PATTERN = r"^[A-Za-z0-9_-]{1,64}$"
+from telemetry_store import ID_PATTERN, LockTimeout, telemetry_dir, telemetry_lock
+
 Id = Annotated[str, StringConstraints(pattern=ID_PATTERN)]
 MetaKey = Annotated[str, StringConstraints(pattern=r"^[a-z0-9_]{1,32}$")]
 MetaValue = Annotated[str, StringConstraints(max_length=64)] | int | float | bool
@@ -60,47 +55,6 @@ Batch = Annotated[list[TelemetryEvent], Field(max_length=100)]
 
 router = APIRouter()
 
-# routes/ -> api/ -> assessment_engine/ -> repo root, whose data/raw/* is gitignored.
-REPO_ROOT = Path(__file__).resolve().parents[3]
-
-
-def telemetry_dir() -> Path:
-    env = os.environ.get("TELEMETRY_DIR")
-    return Path(env) if env else REPO_ROOT / "data" / "raw" / "telemetry"
-
-
-@contextmanager
-def telemetry_lock(directory: Path) -> Iterator[None]:
-    """Exclusive lock over every file in `directory`, across threads and processes.
-
-    Ingest, delete, export and the retention job all hold it, so a rewrite never drops an append.
-    """
-    directory.mkdir(parents=True, exist_ok=True)
-    with open(directory / ".lock", "a+b") as f:
-        if os.name == "nt":
-            import msvcrt
-
-            f.seek(0)
-            while True:
-                try:
-                    msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
-                    break
-                except OSError:
-                    time.sleep(0.01)
-            try:
-                yield
-            finally:
-                f.seek(0)
-                msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
-        else:
-            import fcntl
-
-            fcntl.flock(f, fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
-                fcntl.flock(f, fcntl.LOCK_UN)
-
 
 @router.post("/v1/telemetry/event", status_code=202)
 def ingest(body: TelemetryEvent | Batch) -> dict[str, int]:
@@ -113,8 +67,13 @@ def ingest(body: TelemetryEvent | Batch) -> dict[str, int]:
         for e in events
     ]
     # ponytail: one lock for the whole directory; per-user locks only if ingest ever contends.
-    with telemetry_lock(out_dir):
-        for e, row in zip(events, rows):
-            with open(out_dir / f"{e.user_id}.jsonl", "a", encoding="utf-8") as f:
-                f.write(row + "\n")
+    try:
+        with telemetry_lock(out_dir):
+            for e, row in zip(events, rows):
+                with open(out_dir / f"{e.user_id}.jsonl", "a", encoding="utf-8") as f:
+                    f.write(row + "\n")
+    except LockTimeout:
+        raise HTTPException(
+            status_code=503, detail="telemetry store busy", headers={"Retry-After": "1"}
+        )
     return {"accepted": len(events)}
