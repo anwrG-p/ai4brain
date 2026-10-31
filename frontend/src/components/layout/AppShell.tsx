@@ -69,7 +69,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       )}
 
       {!isTaskRoute && (
-        <header className="sticky top-0 z-50 w-full h-16 bg-surface border-b border-border px-4 flex items-center">
+        <header className="sticky top-0 z-50 w-full h-16 bg-canvas border-b border-border px-4 flex items-center">
           <div className="max-w-6xl w-full mx-auto flex items-center justify-between gap-3">
             <Link
               to={isFlowRoute ? '/' : '/dashboard'}
@@ -149,16 +149,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       )}
 
       {withNav && (
-        <footer className="border-t border-border bg-surface px-4 py-4 text-xs text-ink-muted">
+        <footer className="border-t border-border px-4 py-4 text-xs text-ink-muted">
           <p className="m-0 max-w-6xl mx-auto text-center">{BRAND_CONFIG.nonClinicalNotice}</p>
         </footer>
       )}
 
-      {/* Mobile bottom tabs: the same 4 items, Lucide icons with labels */}
+      {/* Mobile bottom tabs: the same 4 items, Lucide icons with labels. Header, footer and tabs are the
+          board itself (its canvas colour, or see-through), divided by a border only, never a second
+          surface on the board (INT-1). The sticky header and the fixed tabs need the opaque canvas. */}
       {withNav && (
         <nav
           aria-label="Tabs"
-          className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t border-border flex items-center justify-around px-2"
+          className="board-tabs lg:hidden fixed z-40 bg-canvas border-t border-border flex items-center justify-around px-2"
         >
           {NAV.map((item) => {
             const Icon = item.icon

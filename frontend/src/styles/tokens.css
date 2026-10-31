@@ -1035,23 +1035,31 @@ html[data-theme="dark"][data-emotion="fatigued"] {
    The page is a wooden frame; the app sits on the board inside it: a dotted whiteboard in light,
    a chalkboard in dark (--color-canvas is the board surface). Flat wood, no gradient. Static, so
    nothing moves behind a stimulus. */
-body {
-  background-color: var(--color-wood);
-  padding: var(--space-2);
+/* --board-gap: the wood frame's width (body padding); --board-edge: the board's border. The board's
+   min-height is the viewport minus the frame (border-box, so the edge is inside it): a short page is
+   exactly one screen tall. */
+:root {
+  --board-gap: var(--space-2);
+  --board-edge: 2.5px;
 }
 
 @media (min-width: 640px) {
-  body {
-    padding: var(--space-4);
+  :root {
+    --board-gap: var(--space-4);
   }
 }
 
+body {
+  background-color: var(--color-wood);
+  padding: var(--board-gap);
+}
+
 #root {
-  min-height: calc(100dvh - 2 * var(--space-2));
+  min-height: calc(100dvh - 2 * var(--board-gap));
   background-color: var(--color-canvas);
   background-image: radial-gradient(color-mix(in srgb, var(--color-ink) 9%, transparent) 1.2px, transparent 1.2px);
   background-size: 24px 24px;
-  border: 2.5px solid var(--color-border-strong);
+  border: var(--board-edge) solid var(--color-border-strong);
   border-radius: var(--radius-xl);
   /* Keep the app's own backgrounds inside the board's rounded edge (ticket 08 review). */
   overflow: clip;
@@ -1059,10 +1067,14 @@ body {
   flex-direction: column;
 }
 
-@media (min-width: 640px) {
-  #root {
-    min-height: calc(100dvh - 2 * var(--space-4));
-  }
+/* The phone tab bar is fixed to the viewport, so it is inset by the frame and the board's edge: it
+   sits on the bottom of the board, inside the wood, with the board's rounded corners. */
+.board-tabs {
+  left: calc(var(--board-gap) + var(--board-edge));
+  right: calc(var(--board-gap) + var(--board-edge));
+  bottom: calc(var(--board-gap) + var(--board-edge));
+  border-bottom-left-radius: calc(var(--radius-xl) - var(--board-edge));
+  border-bottom-right-radius: calc(var(--radius-xl) - var(--board-edge));
 }
 
 [data-theme="dark"] #root {

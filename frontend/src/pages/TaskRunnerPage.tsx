@@ -185,7 +185,7 @@ export default function TaskRunnerPage() {
   )
 
   return (
-    <div className="w-full flex-1 flex flex-col justify-between min-h-[calc(100vh-2rem)]">
+    <div className="w-full flex-1 flex flex-col justify-between">
       {stage === 'running' && (
         <div className="flex-1 flex flex-col gap-4 w-full max-w-2xl mx-auto pt-2">
           <h1 className="sr-only">{name}</h1>

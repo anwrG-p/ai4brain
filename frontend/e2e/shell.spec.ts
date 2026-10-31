@@ -43,6 +43,47 @@ test.describe('App shell (ticket 09a)', () => {
     }
   }
 
+  // INT-1: the board (#root) fills the wood frame exactly; nothing adds height to a short page.
+  for (const [width, height] of [[375, 812], [1440, 900]] as const) {
+    for (const url of ['/you', '/task/working_memory?schema=n_back']) {
+      test(`at ${width}px a short page (${url}) is no taller than the viewport`, async ({ page }) => {
+        await page.setViewportSize({ width, height })
+        await page.goto(url, { waitUntil: 'networkidle' })
+        expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(height)
+      })
+    }
+  }
+
+  test('the phone tabs sit on the board, inside the wood frame; header, footer and tabs are the board', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    await page.goto('/you', { waitUntil: 'networkidle' })
+    for (const theme of ['light', 'dark'] as const) {
+      await setTheme(page, theme)
+      const m = await page.evaluate(() => {
+        const root = document.getElementById('root')!
+        const edge = parseFloat(getComputedStyle(root).borderBottomWidth)
+        const board = root.getBoundingClientRect()
+        const tabs = document.querySelector('nav[aria-label="Tabs"]')!
+        const bg = (el: Element) => getComputedStyle(el).backgroundColor
+        return {
+          board: { left: board.left + edge, right: board.right - edge, bottom: Math.min(board.bottom, innerHeight - parseFloat(getComputedStyle(document.body).paddingBottom)) - edge },
+          tabs: tabs.getBoundingClientRect().toJSON() as DOMRect,
+          canvas: bg(root),
+          header: bg(document.querySelector('header')!),
+          footer: bg(document.querySelector('footer')!),
+          tabsBg: bg(tabs),
+        }
+      })
+      expect(m.tabs.left).toBeGreaterThanOrEqual(m.board.left - 0.5)
+      expect(m.tabs.right).toBeLessThanOrEqual(m.board.right + 0.5)
+      expect(m.tabs.bottom).toBeLessThanOrEqual(m.board.bottom + 0.5)
+      // The board's own colour (or see-through to it), never a separate surface.
+      for (const bg of [m.header, m.tabsBg]) expect(bg).toBe(m.canvas)
+      expect(m.footer).toBe('rgba(0, 0, 0, 0)')
+      expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+    }
+  })
+
   test('/ shows none of the technical clutter, and keeps its minimal chrome', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
     await expect(page.getByRole('heading', { level: 1, name: "Hi, I'm Loti." })).toBeVisible()
