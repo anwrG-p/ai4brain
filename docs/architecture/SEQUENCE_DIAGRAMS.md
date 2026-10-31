@@ -1,7 +1,8 @@
 # System Architecture Sequence Diagrams
 
-> **CISTAC 1.0 (AI4Brain Challenge)** — 5-Subsystem Interoperability & Closed-Loop Protocol  
-> **Source of Truth**: Root `README.md` · `docs/ui/contracts.md` · `assessment_engine/`  
+> **What is built (2026-10-31).** Sections 1–6 are the original challenge design (see [TEAM_PLAN.md](TEAM_PLAN.md)), not the running system. Live today in `backend/app`: telemetry ingest (`POST /v1/telemetry/event`), export (`GET /v1/user/export`) and delete (`DELETE /v1/user/telemetry`). These answer 501 until their ticket lands: `GET /v1/tasks/next` (BE-04), `POST /v1/coach/chat` and `GET /v1/coach/collaboration-score` (BE-06), `POST /v1/clustering/evaluate` (BE-11); `GET /v1/dashboard/profile` returns `not_enough_data` until BE-11. Section 7 describes the current consumer flows.
+>
+> **Source of truth**: `backend/app` · [`docs/ui/contracts.md`](../ui/contracts.md) · the root [`README.md`](../../README.md)  
 > 🚀 **Interactive Visual Viewer**: Open [`sequence_diagrams_viewer.html`](./sequence_diagrams_viewer.html) in any browser to zoom, pan, inspect and export the 8 rendered diagrams. Section 7's diagrams 1, 2 and 4 were rewritten for brand v2 on 2026-10-31 and render from their Mermaid source only (GitHub draws them inline).
 
 ---
@@ -354,7 +355,7 @@ sequenceDiagram
     end
 ```
 
-`POST /v1/coach/chat` answers 501 until BE-06 ships it. The Collaboration Score (`GET /v1/coach/collaboration-score`) is computed from real chat history only, and Home shows it only when there is enough data.
+`POST /v1/coach/chat` answers 501 until BE-06 ships it. The Collaboration Score (`GET /v1/coach/collaboration-score`, also 501 until BE-06) will be computed from real chat history only, and will appear only in Home's "Further explore" when there is enough data (BE-06/F-C).
 
 ---
 

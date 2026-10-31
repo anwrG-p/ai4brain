@@ -6,13 +6,15 @@ Users are anonymous. Scores are computed on the device, and nothing is sent unti
 
 ## The 5 skills (pillars)
 
-| Skill | Exercises |
+| Skill | Listed under (Train) |
 |---|---|
 | Focus & Strategy | Logic Web, Strategic Blueprint, Pattern Puzzle |
 | Mental Agility | Memory Gauntlet, Shape Turn |
 | Impulse Control | Color Clash |
 | Deep Memory | Precision Archive |
 | Visual Radar | Perceptual Radar |
+
+Scores use a weighted mix of exercises per skill: see [docs/architecture/TASKS_AND_DIMENSIONS.md](docs/architecture/TASKS_AND_DIMENSIONS.md).
 
 ## Run it
 

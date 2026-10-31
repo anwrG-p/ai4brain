@@ -14,7 +14,7 @@
 - The AI Act's biometric data includes *behavioural* characteristics (Art 3(34), Recital 14). Inferring "frustrated" from pointer kinematics is therefore likely emotion recognition (Art 3(39)). "Tired" is a physical state and is excluded (Recital 18).
 - Consumer use is not banned. Art 5(1)(f) covers only workplaces and education.
 - The evidence is weak. In the best field study, cursor speed and distance explained about 17% of the variance in self-reported negative emotion (out-of-sample R² .17, n = 80). Negative emotion made cursors **slower**, not jerkier (Hibbeln et al. 2017). A mood presented as a reading would overclaim.
-- An inferred emotion used to treat people differently may be special-category data under GDPR (ICO guidance). Processing that stays on the device keeps it out of ePrivacy Art 5(3).
+- An inferred emotion used to treat people differently may be special-category data under GDPR (ICO guidance). Processing that stays on the device likely keeps it out of ePrivacy Art 5(3) (EDPB Guidelines 2/2023, via a summary).
 
 **Consequences.**
 - Changing to a trained model, or to any server-side mood inference, needs a new ADR, a DPIA and the Annex III high-risk obligations (now due 2 Dec 2027 under the Digital Omnibus).

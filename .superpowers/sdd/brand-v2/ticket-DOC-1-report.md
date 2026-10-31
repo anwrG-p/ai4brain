@@ -27,7 +27,7 @@
 | 1. ADR "no server-side emotion inference" | `docs/adr/0002-no-server-side-emotion-inference.md`. It covers: a guess made on the device by hand-written rules that the user can correct; the server never infers emotion (it names `brain_twin_jepa`, `clustering_engine`, `ai_coach`, `dynamic_cache`, and the fields `hesitation_jitter`/`keystroke_latency_ms`); not a trained model, since one would be Annex III 1(c) high-risk; Recital 12; the Art 50(3) first-exposure notice; the mood never goes into telemetry or `POST /v1/coach/chat`. It cites research §5 and items 5 and 8. |
 | 2. EMILY doc | "100% compliant … non-biometric" removed and replaced by the accurate position (probably emotion recognition, not banned, not an AI system while rule-based, Art 50(3)), with a link to the ADR. Evidence limits: R² .17 (about 17% variance), cursors slower rather than jerkier (contradicts the rules), staircase errors. The cortisol, parasympathetic and dopamine claims are withdrawn. BRIAN and Doodle are gone; the mapping to Momo's moods is added. |
 | 3. Stale docs | See the file list. Current docs were rewritten; history docs got a banner at the top. |
-| 4. Root README | Product, 5 skills with their exercises, how to run the frontend and backend, the docs index, and the module map. 47 lines. The old work breakdown moved, unchanged apart from a history note, to `docs/architecture/TEAM_PLAN.md`. |
+| 4. Root README | Product, 5 skills with their exercises, how to run the frontend and backend, the docs index, and the module map. 47 lines. The old work breakdown was copied, unchanged apart from a history note, to `docs/architecture/TEAM_PLAN.md`, and the README was rewritten. |
 | 5. `file:///` test + fixes | Done (see Tests). There are 0 hits under `docs/`. |
 
 ## Files changed and why
@@ -35,7 +35,7 @@
 **New**
 - `docs/adr/0002-no-server-side-emotion-inference.md`: the ADR (item 1).
 - `docs/research/2026-10-31-improvement-opportunities.md`: a byte-identical copy of the untracked file in the main checkout. The ADR, EMILY doc and TASKS doc link to it, and the link test needs it to exist. If the controller commits the same file elsewhere, the identical add merges cleanly.
-- `docs/architecture/TEAM_PLAN.md`: the old root README (a `git mv`), with a history note on top (Layer A/B/C, `src/` paths never created, dimensions → skills).
+- `docs/architecture/TEAM_PLAN.md`: a copy of the old root README (git records it as a new file; the root README was rewritten), with a history note on top (Layer A/B/C, `src/` paths never created, dimensions → skills).
 
 **Rewritten (current docs)**
 - `README.md`: item 4.
@@ -89,10 +89,34 @@
 
 ## Requests and follow-ups
 - **BRAND-V2.md links:** `docs/design/BRAND-V2.md` lives on `wave-integration`, so the new docs name it in code spans, not links. That keeps the link test green on this branch. After both merge, these can become relative links (`DESIGN.md`, `docs/README.md`, `ui/README.md`, `ui/JUDGES-UI.md`, the banners).
-- **Diagram scripts:** `scripts/{build_html_viewer,parse_and_render_diagrams,update_sequence_diagrams_md}.mjs` still list diagrams 07, 08 and 10 (code, out of scope). Re-running them with mermaid-cli would re-render the new Mermaid sources. Otherwise drop those entries (TD-05).
-- **Stale PNG:** `09-telemetry-jepa-cache.png` still says "Layer A Client". Only the SVG and the viewer were relabelled.
 - **Old UI docs:** `docs/ui/pages/` and `docs/ui/screenshots/` are now bannered history. TD-05 ("remaining docs/ui stale pages") may delete them.
 - **ADR 0002 consequences for F-D/F-C:**
   - the Art 50(3) notice and opt-in;
   - staircase errors must not count as strain (note that `EmotionListener` does not pass `consecutiveErrors` today);
   - the FE-05 coach transport must not send the mood.
+
+## Fix round 1 (review: 1 Important, 5 Minor)
+- **Important. `SEQUENCE_DIAGRAMS.md`:**
+  - **New note under the H1:**
+    - sections 1–6 are the original challenge design (link to `TEAM_PLAN.md`);
+    - live today: telemetry, export and delete;
+    - 501 until their ticket lands: `tasks/next` (BE-04), coach chat and collaboration score (BE-06), clustering (BE-11);
+    - profile returns `not_enough_data` until BE-11.
+  - **Source-of-truth line:** now `backend/app` · `contracts.md` · root `README.md`. It no longer names `assessment_engine/`.
+- **Minor. Collaboration Score.**
+  - **Glossary row:** "Not shown yet. Will appear only in Further explore with enough chat data (BE-06/F-C)".
+  - **Diagram 4 footnote:** reworded the same way, and notes the route is 501 until BE-06.
+- **Minor. Skill tables.**
+  - **Column header:** now "Listed under (Train)" in `README.md` and the glossary.
+  - **Scoring map:** both point to `TASKS_AND_DIMENSIONS.md` for which exercises feed which score.
+- **Minor. ADR 0002 ePrivacy line.** Now reads "likely keeps it out of ePrivacy Art 5(3)", with the source (EDPB Guidelines 2/2023, via a summary; research grade M).
+- **Minor. Report.** `TEAM_PLAN.md` is now described as a copy plus a README rewrite, not a `git mv`.
+- **Minor. Diagram scripts:**
+  - **Entries 07, 08 and 10:** set to `null` in `scripts/{build_html_viewer,parse_and_render_diagrams,update_sequence_diagrams_md}.mjs`, with a comment. Index-based mapping to the Mermaid blocks stays aligned.
+  - **How each script skips them:** the viewer builder uses `flatMap` to skip them; the renderer `continue`s; the MD updater already returns the block unchanged.
+  - **Checks:** `node --check` passes on all three. Re-running `node scripts/build_html_viewer.mjs` regenerates `sequence_diagrams_viewer.html` byte-identical to the committed one (8 diagrams).
+- **Minor. PNG 09.**
+  - `09-telemetry-jepa-cache.png` was re-rendered from the relabelled SVG with headless Edge, using the renderer's wrapper CSS at 2× (4354×1262, same size and frame as before). It now says "Client tracker (tracker.ts)".
+  - I did not run the full mermaid renderer: it needs `frontend/node_modules` (Playwright) and the mermaid CDN.
+
+**Tests after the fix round:** `pytest -q` from the repo root: 862 passed, 1 xfailed, 0 warnings.

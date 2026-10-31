@@ -24,9 +24,9 @@
 | **Momo** | The mood companion. It shows an on-device *guess* of your mood (calm, happy, focused, tired, frustrated), which you can change. | Home |
 
 ### Skills (the 5 pillars)
-The UI says **skills**; code and docs say **pillars** (`frontend/src/features/insights/pillars.ts`).
+The UI says **skills**; code and docs say **pillars** (`frontend/src/features/insights/pillars.ts`). The table follows the Train grouping; which exercises feed which score is in [TASKS_AND_DIMENSIONS.md](architecture/TASKS_AND_DIMENSIONS.md).
 
-| Skill | Exercises (consumer name, `schema_type`) |
+| Skill | Listed under (Train): consumer name, `schema_type` |
 | :--- | :--- |
 | **Focus & Strategy** | Logic Web (`relational`), Strategic Blueprint (`tower`), Pattern Puzzle (`matrix`) |
 | **Mental Agility** | Memory Gauntlet (`n_back`), Shape Turn (`mental_rotation`) |
@@ -58,7 +58,7 @@ The **baseline** is 6 exercises in this order: Logic Web, Memory Gauntlet, Color
 | Doodle, Calm & Clean (design systems) | **the classroom board** | Wood frame, dotted whiteboard (light) or green chalkboard (dark). |
 | 7 (or 6, 10) dimensions; "dimension" in the UI | **5 skills** | Dimension ids stay in telemetry and code. |
 | ✨ Why Brian Suggests This | **Why Loti picked this** | |
-| Co-Pilot Synergy with Brian | **Collaboration Score** | Shown only in "Further explore", and only with enough chat data. |
+| Co-Pilot Synergy with Brian | **Collaboration Score** | Not shown yet. Will appear only in "Further explore" with enough chat data (BE-06/F-C). |
 | Weekly Progress Boost (+12%) | nothing | No improvement claims or percentages before a calibrated reliable-change check. |
 | Clarity Range (±%), Calibration Confidence (92%) | a range in "View as table" | R12. |
 | Rest-Protected Streak | a weekly goal that tolerates a miss | Streaks frame stopping as a loss. |
