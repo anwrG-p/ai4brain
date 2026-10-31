@@ -46,7 +46,7 @@ from brain_twin_jepa.jepa_model import (  # noqa: E402
     session_matrix,
     session_record,
 )
-from brain_twin_jepa.telemetry_io import dedupe, group_sessions, read_sessions  # noqa: E402
+from brain_twin_jepa.telemetry_io import EventsTooLarge, dedupe, group_sessions, read_sessions  # noqa: E402
 
 # The variance's growth per session of horizon never drops below this share of its level, so the
 # interval always widens with h. A judgement call: we have no evidence that a forecast six sessions
@@ -84,10 +84,23 @@ def synthetic_histories(users: int, sessions_per_user: int, seed: int) -> list[l
     return [history_from_events(simulate_user(seed, i, sessions_per_user)[0]) for i in range(users)]
 
 
-def directory_histories(directory: str | Path) -> list[list[dict]]:
-    """Session records per user from DIR/<user_id>.jsonl, read with BE-07's `read_sessions`."""
+def directory_histories(directory: str | Path, max_bytes: int | None = None) -> tuple[list[list[dict]], dict[str, int]]:
+    """Session records per user from DIR/<user_id>.jsonl, read with BE-07's `read_sessions`, and
+    the users skipped: a file over the read limit (`too_large`, EventsTooLarge) or a name that is
+    not a user id (`bad_id`, ID_PATTERN). One bad file never aborts the run."""
     directory = Path(directory)
-    return [[session_record(s) for s in read_sessions(p.stem, directory)] for p in sorted(directory.glob("*.jsonl"))]
+    histories, skipped = [], {"too_large": 0, "bad_id": 0}
+    for p in sorted(directory.glob("*.jsonl")):
+        try:
+            sessions = read_sessions(p.stem, directory, max_bytes)
+        except EventsTooLarge:
+            skipped["too_large"] += 1
+            continue
+        except ValueError:  # user_key: the name fails ID_PATTERN
+            skipped["bad_id"] += 1
+            continue
+        histories.append([session_record(s) for s in sessions])
+    return histories, skipped
 
 
 def synthetic_source(users: int, sessions: int, data_seed: int) -> str:
@@ -232,7 +245,10 @@ def calibrate(model: SATJEPA, x: torch.Tensor, y: torch.Tensor, lengths: torch.T
     if not len(fc.n):
         raise ValueError(f"no calibration user has more than {MIN_SESSIONS} sessions")
     cal = fit_interval(fc.by_h(), level)
-    cal.source, cal.n_min, cal.n_max = source, int(fc.n.min()), int(fc.n.max())
+    cal.source, cal.n_min = source, int(fc.n.min())
+    # A row exists at (n, h) only when a user had n + h sessions, so the longest calibrated context
+    # shrinks as h grows (and every h below the largest has rows too).
+    cal.n_max_by_h = [int(fc.n[fc.h == h].max()) for h in range(1, cal.h_max + 1)]
     return cal
 
 
@@ -314,7 +330,7 @@ def format_report(twin: BrainTwin, report: dict) -> str:
         lines.append(f"{c['step']:>5}  {c['total']:.5f}  {c['jepa']:.5f}  {c['anchor']:.5f}  {c['forecast']:.5f}")
     lines.append(
         f"\nheld-out coverage at nominal {cal.level:.0%} ({cal.held_out_users} test users, {cal.held_out_residuals} forecasts,"
-        f" contexts {cal.n_min}..{cal.n_max} sessions; {cal.scope})"
+        f" contexts from {cal.n_min} sessions, longest by h {cal.n_max_by_h}; {cal.scope})"
     )
     lines.append("pillar   " + "  ".join(f"h={h}  " for h in range(1, cal.h_max + 1)) + "  all    half-width h=1..h=max")
     for k, p in enumerate(PILLARS):
@@ -343,7 +359,10 @@ def main(argv: list[str] | None = None) -> int:
     if a.data and not a.source:
         ap.error("--source is required with --data")
     cfg = TrainConfig(users=a.users, sessions=a.sessions, data_seed=a.data_seed, seed=a.seed, steps=a.steps, level=a.level)
-    histories = directory_histories(a.data) if a.data else None
+    histories = None
+    if a.data:
+        histories, skipped = directory_histories(a.data)
+        print(f"read {len(histories)} users from {a.data}; skipped {sum(skipped.values())} {skipped}")
     twin, report = fit(cfg, histories, a.source if a.data else None)
     print(format_report(twin, report))
     print(f"\ncheckpoint -> {twin.save(a.out)} (shadow mode: validated false until validate.py promotes it)")

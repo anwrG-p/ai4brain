@@ -123,7 +123,8 @@ def test_forecast_carries_its_calibration_evidence(trained):
 
 def test_generator_files_read_back_as_the_same_sessions(tmp_path):
     generate(2, 3, 11, tmp_path)
-    from_files = directory_histories(tmp_path)  # BE-07 read_sessions; _truth/ is not read
+    from_files, skipped = directory_histories(tmp_path)  # BE-07 read_sessions; _truth/ is not read
+    assert skipped == {"too_large": 0, "bad_id": 0}
     assert from_files == [history_from_events(simulate_user(11, i, 3)[0]) for i in range(2)]
 
 
@@ -136,6 +137,32 @@ def test_cli_trains_and_writes_a_loadable_checkpoint(tmp_path, capsys):
 
 
 def test_cli_with_data_requires_a_source(tmp_path, capsys):
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as exc:
         main(["--data", str(tmp_path)])
+    assert exc.value.code == 2
     assert "--source is required with --data" in capsys.readouterr().err
+
+
+def test_directory_skips_and_counts_unreadable_users(tmp_path):
+    generate(2, 3, 11, tmp_path)
+    good = sorted(tmp_path.glob("*.jsonl"))
+    limit = max(p.stat().st_size for p in good)
+    text = good[0].read_text(encoding="utf-8")
+    (tmp_path / "big-user.jsonl").write_text(text + text, encoding="utf-8")  # over the read limit
+    (tmp_path / "not a user!.jsonl").write_text(text, encoding="utf-8")  # fails ID_PATTERN
+    histories, skipped = directory_histories(tmp_path, max_bytes=limit)
+    assert len(histories) == 2
+    assert skipped == {"too_large": 1, "bad_id": 1}
+
+
+def test_calibration_is_a_triangle_not_a_rectangle(trained):
+    """A calibration user with T sessions gives contexts n only with a session h later (n + h <= T):
+    12-session users calibrate n up to 11 at h = 1 but only up to 6 at h = 6."""
+    twin, _, _ = trained
+    cal = twin.calibration
+    assert cal.n_max_by_h == [12 - h for h in range(1, H_MAX + 1)]
+    assert not cal.covers(cal.n_max, cal.h_max)
+    hist = synthetic_histories(1, cal.n_max, seed=13)[0]
+    assert twin.forecast(hist, 1)["calibrated"] is True
+    corner = twin.forecast(hist, cal.h_max)
+    assert corner["calibrated"] is False and "coverage" not in corner["calibration"]

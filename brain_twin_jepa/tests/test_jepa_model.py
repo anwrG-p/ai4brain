@@ -42,7 +42,7 @@ def history(n: int, **kw) -> list[dict]:
 
 
 def calibration(**kw) -> Calibration:
-    base = {"level": 0.8, "a": [100.0] * 5, "b": [10.0] * 5, "z": [1.28] * 5, "source": "test fixture", "n_min": 3, "n_max": 8}
+    base = {"level": 0.8, "a": [100.0] * 5, "b": [10.0] * 5, "z": [1.28] * 5, "source": "test fixture", "n_min": 3, "n_max_by_h": [8, 7, 6, 5, 4, 3]}
     return Calibration(**{**base, **kw})
 
 
@@ -89,11 +89,11 @@ def test_losses_ignore_padding_after_a_short_history():
     m = SATJEPA(latent=8, hidden=16)
     x, y = torch.rand(2, 8, N_FEATURES), torch.rand(2, 8, 5)
     lengths = torch.tensor([8, 5])
-    y[1, 5:] = float("nan")
     base = m.losses(x, y, lengths)
-    x2 = x.clone()
-    x2[1, 5:] = 123.0  # garbage in the padding changes nothing
-    padded = m.losses(x2, y, lengths)
+    x2, y2 = x.clone(), y.clone()
+    x2[1, 5:] = 123.0  # garbage (not NaN) in the padding of x and y changes nothing
+    y2[1, 5:] = -77.0
+    padded = m.losses(x2, y2, lengths)
     for k in base:
         assert torch.allclose(base[k], padded[k]), k
 
@@ -142,15 +142,15 @@ def test_leaky_integrator_formula_and_causality():
 def test_fewer_than_three_sessions_is_not_enough_data():
     t = twin()
     for n in range(MIN_SESSIONS):
-        assert t.forecast(history(n), 1) == {"status": "not_enough_data", "sessions": n, "min_sessions": 3}
+        assert t.forecast(history(n), 1) == {"status": "not_enough_data", "validated": False, "sessions": n, "min_sessions": 3}
     assert t.forecast(history(3), 1)["status"] == "ok"
 
 
 def test_module_forecast_needs_no_checkpoint_for_not_enough_data(monkeypatch, tmp_path):
     monkeypatch.setattr(jepa_model, "DEFAULT_CHECKPOINT", tmp_path / "missing.pt")
     monkeypatch.setattr(jepa_model, "_default", None)
-    assert jepa_model.forecast(history(2), 3)["status"] == "not_enough_data"
-    with pytest.raises(FileNotFoundError):
+    assert jepa_model.forecast(history(2), 3) == {"status": "not_enough_data", "validated": False, "sessions": 2, "min_sessions": 3}
+    with pytest.raises(FileNotFoundError, match="missing.pt"):
         jepa_model.forecast(history(3), 3)
 
 
@@ -170,13 +170,26 @@ def test_payload_is_shadow_mode_with_source_and_marginal_scope():
     assert ev["coverage_at_h"] == {p: 0.8 for p in PILLARS}
 
 
-@pytest.mark.parametrize("n, h", [(9, 1), (12, 3), (4, 5)])
+# Calibration users had (n, h) only where n + h <= their history: a triangle. With n_max_by_h
+# [8, 7, 6, 5], (8, 1) and (5, 4) were calibrated; (8, 4), the rectangle's corner (n_max, h_max), was not.
+TRIANGLE = {"n_max_by_h": [8, 7, 6, 5], "h_max": 4, "coverage": [[0.8] * 4] * 5, "coverage_overall": [0.8] * 5}
+
+
+@pytest.mark.parametrize("n, h", [(3, 1), (8, 1), (7, 2), (5, 4)])
+def test_inside_the_calibrated_triangle_claims_coverage(n, h):
+    out = twin(**TRIANGLE).forecast(history(n), h)
+    assert out["calibrated"] is True and out["calibration"]["coverage_at_h"] is not None
+
+
+@pytest.mark.parametrize("n, h", [(8, 4), (7, 3), (8, 2), (9, 1), (12, 3), (4, 5)])
 def test_outside_the_calibrated_range_makes_no_coverage_claim(n, h):
-    t = twin(n_max=8, h_max=4, coverage=[[0.8] * 4] * 5, coverage_overall=[0.8] * 5)
+    t = twin(**TRIANGLE)
+    assert (t.calibration.n_max, t.calibration.h_max) == (8, 4)
     out = t.forecast(history(n), h)
     assert out["status"] == "ok" and out["calibrated"] is False and out["validated"] is False
     ev = out["calibration"]
-    assert ev["calibrated"] is False and ev["range"] == {"sessions": [3, 8], "h": [1, 4]}
+    assert ev["calibrated"] is False
+    assert ev["range"] == {"min_sessions": 3, "max_sessions_by_h": [8, 7, 6, 5], "h": [1, 4]}
     assert not {"coverage", "coverage_at_h", "held_out_users", "scope"} & set(ev)
 
 

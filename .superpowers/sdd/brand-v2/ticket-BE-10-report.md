@@ -1,4 +1,4 @@
-# Ticket BE-10 report: SAT-JEPA brain twin (after the review fix round)
+# Ticket BE-10 report: SAT-JEPA brain twin (after review fix rounds 1 and 2)
 
 ## Branch and commits
 - Branch: `worktree-agent-abcde342e9ec768d4`, based on `ae67522` (the BE-PORT tip).
@@ -6,8 +6,9 @@
   - `9373880` feat: first version of the SAT-JEPA brain twin
   - `e48f8d9` docs: first report (superseded by this one)
   - `b6b0546` merge of `d9655cb` (BE-07: `telemetry_io.py`, `features.py`, golden vectors, from `feat/ui-calm-clean`)
-  - `4e8ffe0` fix: review round (shadow mode, promotion gate, BE-07 features, ragged histories)
-  - this report
+  - `4e8ffe0` fix: review round 1 (shadow mode, promotion gate, BE-07 features, ragged histories)
+  - `54c92c8` docs: report after round 1
+  - round 2 (one commit, code and this report): triangular calibrated range, padding masks, independent RNG streams in the gate, skipped-user counts, `validated` on `not_enough_data`
 
 ## Headline (read this first)
 - **The twin runs in shadow mode (R17).**
@@ -19,7 +20,7 @@
 - **Its forecasts are barely better than averaging the user's past sessions, and in the CI config they are worse:**
   - **Full run (1000 users, 1500 steps):** the twin beats the mean of history by 0.55–0.90 points of MAE per h (15.9 vs 16.4–16.9).
   - **CI-test config (400 users, 400 steps):** the twin is **worse than the mean of history by 1.4–1.5 points at every h** (MAE 18.0–18.5 vs 16.4–17.1).
-  - **Gate dry run on fresh synthetic users (seed 2027):** the full-run twin gains 0.41 points with 95% CI [−0.05, 0.90]. The gate refuses it, as it should.
+  - **Gate dry run on fresh synthetic users (seed 2027):** the full-run twin gains 0.40 points with 95% CI [−0.00, 0.87]. The gate refuses it, as it should.
 
 ## Files
 | File | What |
@@ -93,6 +94,20 @@
 11. **Evidence seed.** The final evidence uses `data_seed` **2026**, untouched during development (seeds 0–3, 1, 5, 7, 11 and 99 were used in sweeps and tests). The gate dry run uses **2027**, also untouched.
 12. **`pytest.raises(..., match=...)`** throughout.
 
+## What review round 2 changed
+1. **The calibrated range is a triangle.**
+   - A calibration row at (n, h) exists only when a user had n + h sessions. `Calibration.n_max_by_h[h-1]` records the longest calibrated context at each h, and `covers(n, h)` checks against it.
+   - The full run's range is `[13, 12, 11, 10, 9, 8]` for h = 1..6.
+   - Old behaviour: `forecast(13 sessions, h=6)` claimed coverage. Now it says `calibrated: false`, and the payload's `range` shows `max_sessions_by_h`.
+   - Tests: (n_max, h_max) → `calibrated: false` on a fixture and on the trained twin; inside and outside cases of the triangle.
+2. **Bare `pytest.raises` replaced.** `FileNotFoundError` now uses `match="missing.pt"`; the `SystemExit` test asserts code 2.
+3. **Padding masks.** In `SATJEPA.losses`, the anchor and forecast masks are ANDed with `real` from `lengths`. The padding test now puts non-NaN garbage in both x and y padding and checks every loss is unchanged.
+4. **Independent RNG streams in the gate.** The split and the bootstrap draw from two independent generators spawned from one `SeedSequence(seed)`.
+5. **Unreadable users are skipped and counted.** `directory_histories` skips users whose file is over the read limit (`EventsTooLarge`) or whose name fails `ID_PATTERN`. It returns `(histories, skipped)`; both CLIs print the count, and the gate records it as `skipped_users` in its evidence. Tested in `test_directory_skips_and_counts_unreadable_users` and the gate CLI test.
+6. **`validated: false` on every payload.** `not_enough_data` now carries `validated: false` too, and the pinned-keys tests are updated.
+
+The checkpoint was retrained after round 2, because `Calibration` gained `n_max_by_h`. The training curve, coverage table and MAE are identical to round 1: equal-length synthetic histories have no padding, so the new masks change nothing there.
+
 ## Full evidence run (untouched seed 2026)
 ```
 python -m data.synthetic.generate --users 1000 --sessions 14 --seed 2026 --out data/raw/synthetic-2026
@@ -124,7 +139,7 @@ python -m brain_twin_jepa.train --data data/raw/synthetic-2026 --source "synthet
 The JEPA term bottoms out around step 1200 and creeps up as the EMA target moves. The forecast term keeps falling slowly.
 
 ### Calibration table: held-out coverage at nominal 80%
-- 200 test users, 10,200 forecasts, contexts of 3–13 sessions, h = 1–6.
+- 200 test users, 10,200 forecasts, h = 1–6; contexts from 3 sessions up to 13 (h=1) … 8 (h=6), the triangle `n_max_by_h = [13, 12, 11, 10, 9, 8]`.
 - Coverage is marginal, pooled over users.
 
 | pillar | h=1 | h=2 | h=3 | h=4 | h=5 | h=6 | all | half-width h=1..6 (points) |
@@ -147,14 +162,15 @@ python -m data.synthetic.generate --users 300 --sessions 12 --seed 2027 --out da
 python -m brain_twin_jepa.validate --data data/raw/synthetic-2027 --source "synthetic: BE-08 CLI seed 2027 (gate dry run, not real users)"
 ```
 ```
-held-out users 150 (eligible 150), coverage {'focus': 0.8113, 'agility': 0.806, 'impulse': 0.7918, 'memory': 0.8044, 'visual': 0.7617}
-gain over the mean of history: 0.41 points, 95% CI [-0.05, 0.9]
+read 300 users from data\raw\synthetic-2027; skipped 0 {'too_large': 0, 'bad_id': 0}
+held-out users 150 (eligible 150), coverage {'focus': 0.8222, 'agility': 0.8005, 'impulse': 0.8036, 'memory': 0.8026, 'visual': 0.7968}
+gain over the mean of history: 0.4 points, 95% CI [-0.0, 0.865]
 NOT PROMOTED: the twin stays in shadow mode (validated: false). Failed checks:
-- the 95% interval of the gain over the mean of history [-0.05, 0.9] does not exclude 0
-- margin 0.41 points over the mean of history is below 1.0
+- the 95% interval of the gain over the mean of history [-0.0, 0.865] does not exclude 0
+- margin 0.4 points over the mean of history is below 1.0
 exit=1
 ```
-The user-count and coverage checks passed. Visual (0.762) is the closest to the ±0.05 edge. Only the two gain checks failed.
+The user-count and coverage checks passed; only the two gain checks failed. The CI's lower bound prints as −0.0: it is a small negative rounded to 3 decimals, so it does not exclude 0. These numbers come after round 2. Round 1 printed a gain of 0.41, CI [−0.05, 0.90]; the difference is the new split and bootstrap streams.
 
 ## CI-test config (stated plainly)
 - Config: the shared fixture, `TrainConfig(users=400, sessions=12, data_seed=0, seed=0, steps=400)`, 80 test users, 3120 forecasts. It trains and calibrates in about 11 s, under an asserted budget of 120 s.
@@ -163,12 +179,12 @@ The user-count and coverage checks passed. Visual (0.762) is the closest to the 
   - mean of history: 16.84, 16.95, 16.56, 16.44, 16.66, 17.07
   - That is 1.4–1.5 points worse. 400 steps are too few for the model to learn more than a noisy average.
 - **Coverage:** per cell 0.744–0.833. Per pillar overall: focus 0.769, agility 0.761, impulse 0.793, memory 0.811, visual 0.780.
-- **Gate:** run on 240 fresh synthetic users (seed 7), it refuses this twin. The gain is −1.27 points, 95% CI [−1.72, −0.81]. This is `test_refuses_when_the_margin_over_the_mean_of_history_is_too_small`.
+- **Gate:** run on 240 fresh synthetic users (seed 7), it refuses this twin. The gain is −1.18 points, 95% CI [−1.66, −0.68], after round 2's independent split and bootstrap streams (round 1 gave −1.27). This is `test_refuses_when_the_margin_over_the_mean_of_history_is_too_small`.
 - **Why CI uses this config:** the CI tests check mechanics and calibration, not forecast quality. Forecast quality is exactly what the promotion gate exists to judge.
 
 ## Tests
-- `pytest -q` from the repo root: **934 passed, 1 xfailed, 0 warnings, 51 s**.
-- `brain_twin_jepa/tests`: 76 passed in about 20 s (including BE-07's 41).
+- `pytest -q` from the repo root: **943 passed, 1 xfailed, 0 warnings**.
+- `brain_twin_jepa/tests`: 85 passed in about 20 s (including BE-07's 41).
 
 ## Acceptance-criteria mapping
 | Criterion | Where | Test |
@@ -185,7 +201,7 @@ The user-count and coverage checks passed. Visual (0.762) is the closest to the 
 | held-out coverage near nominal, in CI under a budget | `coverage`, `measure` | `test_held_out_coverage_is_near_nominal` (±0.10 pooled, ±0.12 per cell, 120 s) |
 | review 1: marginal scope | `COVERAGE_SCOPE` | `test_payload_is_shadow_mode_with_source_and_marginal_scope`, `test_forecast_carries_its_calibration_evidence` |
 | review 2: source from the origin | `fit`, `synthetic_source`, `--source` | `test_fit_needs_a_source_for_supplied_histories_and_users_long_enough`, `test_cli_with_data_requires_a_source`, `test_fit_keeps_every_session...` |
-| review 3: calibrated range | `Calibration.covers` | `test_outside_the_calibrated_range_makes_no_coverage_claim` |
+| review 3 / round 2.1: calibrated range (a triangle) | `Calibration.covers`, `n_max_by_h` | `test_inside_the_calibrated_triangle_claims_coverage`, `test_outside_the_calibrated_range_makes_no_coverage_claim` (incl. (n_max, h_max)), `test_calibration_is_a_triangle_not_a_rectangle` |
 | review 4: `validated` | `BrainTwin.validated` | `test_validated_only_from_the_promotion_metadata` |
 | review 5: promotion gate | `validate.py` | `test_validate.py` (4 tests) |
 | review 6: BE-07 swap | merge `b6b0546`, `session_record` | adapter tests removed; BE-07's tests pass |

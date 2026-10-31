@@ -38,13 +38,18 @@ BOOTSTRAP = 2000
 CI = 0.95
 
 
-def evaluate(twin: BrainTwin, histories: list[list], source: str, seed: int = 0) -> tuple[dict, Calibration]:
-    """The gate's evidence, and the calibration refitted on the calibration half."""
+def evaluate(
+    twin: BrainTwin, histories: list[list], source: str, seed: int = 0, skipped: dict[str, int] | None = None
+) -> tuple[dict, Calibration]:
+    """The gate's evidence, and the calibration refitted on the calibration half. `skipped`: users
+    the reader could not use (directory_histories), recorded in the evidence. The split and the
+    bootstrap draw from two independent streams spawned from `seed`."""
     histories = [h for h in histories if h]
     if len(histories) < 2:
         raise ValueError("need at least two users to split")
     x, y, lengths = to_tensors(histories)
-    order = np.random.default_rng(seed).permutation(len(histories))
+    split_rng, boot_rng = (np.random.default_rng(s) for s in np.random.SeedSequence(seed).spawn(2))
+    order = split_rng.permutation(len(histories))
     ca, te = order[: len(order) // 2], order[len(order) // 2 :]
     cal = calibrate(twin.model, x[ca], y[ca], lengths[ca], twin.calibration.level, source)
     fc = forecasts(twin.model, x[te], y[te], lengths[te])
@@ -58,7 +63,7 @@ def evaluate(twin: BrainTwin, histories: list[list], source: str, seed: int = 0)
             gains.append(float(np.abs(nv[both]).mean() - np.abs(t[both]).mean()))
     gains_a = np.array(gains)
     if len(gains_a):
-        boot = gains_a[np.random.default_rng(seed).integers(0, len(gains_a), (BOOTSTRAP, len(gains_a)))].mean(axis=1)
+        boot = gains_a[boot_rng.integers(0, len(gains_a), (BOOTSTRAP, len(gains_a)))].mean(axis=1)
         ci = [float(np.quantile(boot, (1 - CI) / 2)), float(np.quantile(boot, 1 - (1 - CI) / 2))]
         margin = float(gains_a.mean())
     else:
@@ -67,6 +72,7 @@ def evaluate(twin: BrainTwin, histories: list[list], source: str, seed: int = 0)
         "source": source,
         "level": cal.level,
         "held_out_users": int(len(te)),
+        "skipped_users": dict(skipped or {}),
         "eligible_users": int((lengths[te] >= MIN_SESSIONS + H_MAX).sum()),
         "coverage": dict(zip(PILLARS, cal.coverage_overall, strict=True)),
         "coverage_scope": cal.scope,
@@ -117,7 +123,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--seed", type=int, default=0)
     a = ap.parse_args(argv)
     twin = BrainTwin.load(a.checkpoint)
-    evidence, cal = evaluate(twin, directory_histories(a.data), a.source, a.seed)
+    histories, skipped = directory_histories(a.data)
+    print(f"read {len(histories)} users from {a.data}; skipped {sum(skipped.values())} {skipped}")
+    evidence, cal = evaluate(twin, histories, a.source, a.seed, skipped)
     print(f"held-out users {evidence['held_out_users']} (eligible {evidence['eligible_users']}), coverage {evidence['coverage']}")
     print(f"gain over the mean of history: {evidence['margin_points']} points, {CI:.0%} CI {evidence['margin_ci']}")
     reasons = failures(evidence)

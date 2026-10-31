@@ -35,6 +35,7 @@ def test_refuses_when_the_margin_over_the_mean_of_history_is_too_small(trained):
     assert any("margin" in r for r in reasons), (evidence, reasons)
     assert evidence["margin_points"] < validate.MARGIN_POINTS
     assert cal.source == "test: synthetic seed 7" and evidence["bootstrap_users"] == evidence["held_out_users"]
+    assert evidence["skipped_users"] == {}
 
 
 def test_every_check_must_pass():
@@ -68,8 +69,10 @@ def test_cli_refuses_and_leaves_the_checkpoint_in_shadow_mode(trained, tmp_path,
     ckpt = twin.save(tmp_path / "twin.pt")
     before = ckpt.read_bytes()
     generate(12, 9, 5, tmp_path / "data")
+    (tmp_path / "data" / "not a user!.jsonl").write_text("{}\n", encoding="utf-8")
     code = validate.main(["--data", str(tmp_path / "data"), "--source", "test", "--checkpoint", str(ckpt)])
     out = capsys.readouterr().out
     assert code == 1 and "NOT PROMOTED" in out and "held-out users" in out
+    assert "read 12 users" in out and "skipped 1 " in out
     assert ckpt.read_bytes() == before
     assert BrainTwin.load(ckpt).validated is False

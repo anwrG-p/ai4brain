@@ -190,13 +190,13 @@ class SATJEPA(nn.Module):
         them, default all T). Every (t, h) with t + h < length and h <= H_MAX."""
         B, T = x.shape[:2]
         lengths = torch.full((B,), T) if lengths is None else lengths
-        mask = ~torch.isnan(y)
+        real = torch.arange(T)[None, :] < lengths[:, None]  # [B, T]
+        mask = ~torch.isnan(y) & real[..., None]  # a score counts only inside the user's history
         y0 = torch.nan_to_num(y)
         e = self.context_encoder(x)
         sbar = self.integrator(e)
         with torch.no_grad():
             z = self.target_encoder(x)
-        real = torch.arange(T)[None, :] < lengths[:, None]  # [B, T]
         anchor = _masked_mse(self.readout(e), y0, mask)
         # The latent error relative to the target's spread: scale-free, so the term cannot drop by
         # shrinking the latent, and it reads the same while the EMA target's scale drifts.
@@ -232,9 +232,11 @@ def _masked_mse(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) ->
 class Calibration:
     """Interval half-width for pillar p at horizon h, in score points: z[p] * sqrt(a[p] + b[p] * h).
 
-    Calibrated range: contexts of `n_min`..`n_max` sessions and horizons 1..`h_max`, the ones the
-    calibration users had. `coverage[p][h-1]` is the share of held-out forecasts the interval
-    covered (`scope`); `source` says whose data that was."""
+    Calibrated range: the (n, h) pairs the calibration users had. A context of n sessions with a
+    target h sessions later needs a history of n + h sessions, so the range is a triangle, not a
+    rectangle: `n_max_by_h[h-1]` is the longest context calibrated at horizon h (horizons
+    1..`h_max`), `n_min` the shortest. `coverage[p][h-1]` is the share of held-out forecasts the
+    interval covered (`scope`); `source` says whose data that was."""
 
     level: float
     a: list[float]
@@ -243,18 +245,23 @@ class Calibration:
     source: str = "unknown"
     scope: str = COVERAGE_SCOPE
     n_min: int = MIN_SESSIONS
-    n_max: int = MIN_SESSIONS
+    n_max_by_h: list[int] = field(default_factory=list)
     h_max: int = H_MAX
     coverage: list[list[float]] = field(default_factory=list)
     coverage_overall: list[float] = field(default_factory=list)
     held_out_users: int = 0
     held_out_residuals: int = 0
 
+    @property
+    def n_max(self) -> int:
+        return max(self.n_max_by_h, default=self.n_min)
+
     def half_width(self, k: int, h: int) -> float:
         return self.z[k] * math.sqrt(self.a[k] + self.b[k] * h)
 
     def covers(self, n: int, h: int) -> bool:
-        return self.n_min <= n <= self.n_max and 1 <= h <= self.h_max
+        """True when some calibration user had a context of n sessions AND a session h later."""
+        return 1 <= h <= min(self.h_max, len(self.n_max_by_h)) and self.n_min <= n <= self.n_max_by_h[h - 1]
 
 
 class BrainTwin:
@@ -299,7 +306,8 @@ class BrainTwin:
         evidence: dict[str, Any] = {
             "source": cal.source,
             "calibrated": calibrated,
-            "range": {"sessions": [cal.n_min, cal.n_max], "h": [1, cal.h_max]},
+            # max_sessions_by_h[h-1]: the longest calibrated context at horizon h
+            "range": {"min_sessions": cal.n_min, "max_sessions_by_h": list(cal.n_max_by_h), "h": [1, cal.h_max]},
         }
         if calibrated:
             evidence.update(
@@ -339,11 +347,13 @@ class BrainTwin:
 
 
 def _not_enough_data(history: Sequence[Any], h: int) -> dict | None:
-    """ValueError for a horizon outside 1..H_MAX; the not_enough_data answer below MIN_SESSIONS."""
+    """ValueError for a horizon outside 1..H_MAX; the not_enough_data answer below MIN_SESSIONS.
+    That answer says `validated: false` too: every payload carries the flag (R17), and there is no
+    forecast here for any gate to have validated."""
     if not isinstance(h, int) or isinstance(h, bool) or not 1 <= h <= H_MAX:
         raise ValueError(f"h must be an integer from 1 to {H_MAX} sessions")
     if len(history) < MIN_SESSIONS:
-        return {"status": "not_enough_data", "sessions": len(history), "min_sessions": MIN_SESSIONS}
+        return {"status": "not_enough_data", "validated": False, "sessions": len(history), "min_sessions": MIN_SESSIONS}
     return None
 
 
