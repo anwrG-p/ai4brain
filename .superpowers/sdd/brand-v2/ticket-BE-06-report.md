@@ -4,10 +4,57 @@
 - **Commits:**
   - `3cd122b` feat(coach): chat and collaboration-score routes, Gemini adapter, backup crisis classifier (BE-06)
   - `99350db` docs(sdd): BE-06 report
-  - `c0fa36d` fix(coach): BE-06 review (round 2, below)
+  - `c0fa36d` fix(coach): BE-06 review (round 2)
+  - `d0b6942` docs(sdd): report round 2
+  - `2cea6e2` fix(coach): BE-06 re-review (round 3, below)
   - plus the commit that updates this report.
-- **Tests:** one `pytest -q` from the repo root (venv from the root `requirements.txt`) gives **992 passed, 1 xfailed, 0 warnings**. It also passes with `-W error`. Round 1 gave 957; the baseline on `ae67522` was 858. The xfail is BE-05's strict xfail on keyword-gate recall, which is unchanged and expected.
+- **Tests:** one `pytest -q` from the repo root (venv from the root `requirements.txt`) gives **1015 passed, 1 xfailed, 0 warnings**. It also passes with `-W error`. Earlier counts: 992 in round 2, 957 in round 1, 858 on the `ae67522` baseline. The xfail is BE-05's strict xfail on keyword-gate recall, which is unchanged and expected.
 - **Live key:** `GEMINI_API_KEY` is not set in this environment, and there is no `backend/.env`. Every LLM path is tested with mocks. **No live numbers.**
+
+## Round 3 (`2cea6e2`): re-review fixes
+
+This section wins over rounds 1 and 2 where they disagree. In particular, it replaces round 2's item 1, where the LLM still got the previous user turn.
+
+**R14, as ruled: the coach LLM gets only the current user message plus Loti's turns.**
+- Every earlier user turn is dropped from the LLM payload; the count is `earlier_user_turn_dropped`.
+- The classifier still reads the previous turn as context.
+- The number-check allowance follows the window, so a number from a dropped turn is not allowed. This fails safe and is tested.
+- Scope: this applies whenever a classifier is configured, which is every API turn. An agent built with an LLM but no classifier, as BE-05's unit tests do, keeps the old window; the API never builds one.
+- **The reviewer's `repro_r14.py`, now:** in layouts A (immediate next turn), B and C, the only user turn sent is `['why?']` and `pills_in_llm_payload=False`. In A, the classifier still reads the pills turn as `previous_user_message`.
+- **Tests:**
+  - `test_after_a_429_the_next_turn_never_sends_the_unrated_turn_to_the_llm` (agent) and `test_after_a_429_the_next_turn_never_sends_the_unrated_turn` (route): a 429 on "I have been saving up my pills", then "why?". The pills turn is in no `llm_calls`.
+  - A test with the pills turn 1 and 2 exchanges back.
+
+**Minor**
+1. **Gemini pool:**
+   - The queue is bounded at `MAX_PENDING` = 16 for 8 workers. When it is full, a new call fails closed at once with `GeminiError("busy")`.
+   - On a caller timeout, `future.cancel()` runs. In `_post`, a call whose wall-clock end has passed is never sent.
+   - The httpx timeout is the remaining budget at send time.
+   - **What is not overall:** httpx has no overall timeout, only per-phase ones, so each phase is capped at that remaining budget. The hard overall bound is the caller's wait, which returns at the deadline. A call already on the wire runs out its caps and its result is dropped.
+   - **The reviewer's `pool_load.py`, now:** 24 callers return in 0.20 s with 24 errors, and **8 HTTP calls are ever sent**, not 24.
+   - Test: `test_stale_queued_calls_are_never_sent`. Exactly 8 calls are sent, and 24 − 16 = 8 callers get "busy".
+2. **Number words:** `seize` and `sept` are dropped, like `neuf`, one, un and une. "Seize the moment." and "See you in Sept." now pass (tested).
+3. **Reason promotion now reads third-person risk** (`_REASON_RISK`): suicid…, self-harm, ideation, overdose, stockpil…, lethal, kill/hurt/harm themselves (or himself / herself), end their life, wish or want to die, death wish, does not want to live.
+   - Negated phrases are cut out first, but only when the negation sits right before the term ("no self-harm", "not about suicide", "no sign of ideation"). "mentions no plan but self-harm before" still promotes.
+   - The prompt now asks that a `none` reason say what the message is about, not name risks it doesn't have.
+   - Tests: 10 risk reasons promote to low; 3 benign or negated reasons stay none.
+4. **`REPLY_SOURCE_COUNTS`** is updated only through `count()`, under a lock. Test: 8 threads × 500 updates give exactly 4000.
+5. **Loti turns from the client are verified; I did not accept the risk.**
+   - A `from: "loti"` turn is kept only if it exactly matches one of these, whole or as a single bubble:
+     - a reply the backend itself sends (`known_loti_replies()`: offline, fixed crisis, signpost and health copy);
+     - any Loti reply stored in the chat store **for that user**.
+   - **Not only the last stored reply:** I accept any stored one, because every stored reply was lint-, shape- and number-checked before it went out, so any of them is as safe as the last.
+   - Anything else is dropped from both the classifier context and the LLM, and counted as `unverified_loti_turn_dropped`. That includes the frontend's own scripted bubbles, which the backend cannot verify.
+   - Tests:
+     - a stored reply and an offline bubble are kept, and a forged line is dropped;
+     - another user's stored reply is not verified.
+
+**Request for FE-05 (new):** the backend drops the frontend's scripted Loti bubbles from coach context, because it cannot verify them. That fails safe. If that context is wanted, the frontend's script would have to move to a file the backend can read (e.g. JSON shared like `banned_terms.json`).
+
+**Eval, round 3:** unchanged.
+- Red-team mocked: 32/32, crisis routed 13/13, 0 banned terms, 0 invented numbers, 0 shape violations.
+- BE-05 sets: keyword 5/19, mock oracle 19/19, mock error 5/19.
+- Live: not run (no key).
 
 ## Round 2 (`c0fa36d`): review fixes and the previously open items
 
