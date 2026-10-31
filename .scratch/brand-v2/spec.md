@@ -139,6 +139,25 @@ The skill's "App Store landing" pattern (ratings, stars, device mockups) is also
 10. **Motion only with meaning:** an entrance, a celebration, a state change. Idle loops are none or nearly imperceptible.
 11. **One primary action per screen.** Layout follows a 4/8 spacing rhythm and a max-width; no edge-to-edge text.
 12. **Real content only.** Any number on screen comes from data or is clearly labelled as an example. No placeholder lorem, no fake progress.
+13. **Need-to-know only (user, 2026-10-31: "many infos make the site bulky and the user don't need them").** The default view shows only what helps the user act right now. Everything else is behind one quiet "More" or "Details" control, or removed.
+    - **Visible by default:**
+      - one primary action
+      - one line of Loti
+      - the main visual (radar or curve), with plain labels
+      - plain numbers
+    - **Hidden by default:**
+      - uncertainty bands and confidence ranges
+      - RCI values and statistics
+      - legends beyond 2 items
+      - chart toggles other than a single small "View as table" link
+      - explanations and methodology
+      - history tables and heatmaps
+      - per-exercise breakdowns
+    - **Limits:**
+      - No more than **3 content blocks** above the fold on any page.
+      - No paragraph longer than 2 lines.
+      - When in doubt, leave it out.
+    - **Accessibility features stay** (the table view, labels, screen-reader summaries), but they are compact or visually hidden. They do not add visible bulk.
 
 ## Information architecture
 

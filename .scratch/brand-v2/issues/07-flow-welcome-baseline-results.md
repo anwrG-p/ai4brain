@@ -2,7 +2,7 @@
 
 Status: ready-for-agent
 Blocked by: 02, 03, 05, 06
-Spec: `../spec.md` (IA flow, R3, R4, U1, all Anti-slop rules). Source: `docs/Landing page.docx`.
+Spec: `../spec.md` (IA flow, R3, R4, U1, all Anti-slop rules — esp. 13 need-to-know only: each Results step shows one message + one action). Source: `docs/Landing page.docx`.
 
 ## Pages
 

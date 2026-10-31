@@ -4,32 +4,40 @@ Status: ready-for-agent
 Blocked by: 02, 03, 04
 Spec: `../spec.md` (Design intelligence: charts; R5; U5; Anti-slop rules). Source: `docs/Dashboard.docx`.
 
-## Layout (`/dashboard`, max-width about 1040 px, one column on mobile)
+## Layout (`/dashboard`, max-width about 960 px, one column on mobile)
 
-1. **Header row**
-   - A greeting h1 (Quicksand) and one line of Loti `LotiBubbles` (one bubble, clickable).
-   - **Momo** sits beside the greeting. `MomoFromStore` follows the mood.
-   - **The page tone follows the mood.** The doc says the "page changes depending on mood". Do it with a subtle canvas tint plus Momo's line, e.g. tired → "Short session today?". No flashing and no red.
+**Anti-slop rule 13 is binding: need-to-know only.** Above the fold there are exactly 3 blocks, and anything not listed below stays hidden.
+
+**Above the fold:**
+1. **Hello.**
+   - A short greeting h1 ("Hi, Mazen").
+   - **Momo** beside it. `MomoFromStore` follows the mood.
+   - **One** Loti bubble line from `LotiBubbles`, which is clickable.
+   - The page tone follows the mood through a subtle canvas tint only. No banner and no red.
 2. **One primary action:** "Start today's session". It targets the weakest pillar.
-3. **Radar (5 pillars)**
-   - Sky fill at 20%, with a full-opacity border.
-   - The axes carry plain text labels.
-   - Toggle: **Radar / Bars / Table**. The fallback is mandatory.
-   - Each pillar shows its score, or "Not measured yet", and an uncertainty band.
-   - If the pillar passes the RCI gate, a text badge "Real improvement" appears.
-4. **Progress curve**
-   - Unified score over time as a solid sky line, with smooth curves.
-   - Two dashed projections: "If you keep training" (optimal) and "If you pause" (decay), told apart by style **and** label, each with a 15% band.
-   - Goal markers come from the goals store; goal tracking is folded into the curve, as the doc asks.
-   - Coral is used only for milestones and breakthroughs.
-   - An actual-only toggle.
-   - A text summary for screen readers.
-   - Empty state: Loti with "Finish one session to see your curve."
-5. **"Further explore my training"**
-   - A disclosure, closed by default.
-   - Inside: a heatmap of historical results (exercise × week), on a sky-to-coral scale (never red), with a numeric legend and values on hover and focus.
-   - Below it, short explainability lines ("Why Loti picked this"), in consumer wording.
-   - With fewer than 20 cells, show a list instead of a heatmap.
+3. **Radar (5 pillars).**
+   - Sky fill at 20% with a full-opacity border.
+   - Plain axis labels, each with its score number or "—" when the pillar has no data yet.
+   - A small coral text tag "Real improvement" appears only on a pillar that passes RCI ≥ 1.96.
+   - One small "View as table" text link (the accessibility fallback; the table has 5 rows).
+   - **No** uncertainty bands, legend, or Radar/Bars toggle on the default view.
+
+**Below the fold:**
+
+4. **Progress curve.**
+   - The unified score as a smooth, solid sky line.
+   - One dashed line "If you keep training" and one dotted line "If you pause". This is the doc's dual curve.
+   - The legend has exactly those 2 items, labelled by style and text.
+   - A goal shows as one thin horizontal marker, using the goals store.
+   - Coral marks milestones only.
+   - **No** confidence bands and **no** toggles by default.
+   - A visually hidden summary for screen readers.
+   - Empty state: Loti saying "Finish one session to see your curve."
+5. **"Further explore my training".** One quiet disclosure, closed by default. **Everything else lives here:**
+   - uncertainty ranges per pillar
+   - the projection bands
+   - the heatmap of past results (exercise × week, sky → coral, never red, numeric legend, values on hover and focus; a list when there are fewer than 20 cells)
+   - short "Why Loti picked this" lines
 
 **Remove the old dashboard entirely:** the classroom board, podium, Teacher Brian, SlideDeck, wood and dashed strip. This also resolves the tablet issue where the SlideDeck nav button was hidden under the bottom tab bar.
 
@@ -39,7 +47,9 @@ Spec: `../spec.md` (Design intelligence: charts; R5; U5; Anti-slop rules). Sourc
 
 - One primary CTA.
 - Momo is present and its mood changes the tint class.
-- The radar toggle switches to Bars and to Table, and the table has 5 rows.
+- At most 3 top-level blocks before the progress curve.
+- The default view has no uncertainty-band element and no legend with more than 2 items.
+- The "View as table" link reveals a 5-row table.
 - "Not measured yet" shows when a pillar has no data.
 - The "Real improvement" badge shows only when RCI ≥ 1.96.
 - The projection lines carry distinct `stroke-dasharray` values and labels.

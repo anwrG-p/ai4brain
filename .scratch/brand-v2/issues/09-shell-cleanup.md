@@ -2,7 +2,7 @@
 
 Status: ready-for-agent
 Blocked by: 02, 03
-Spec: `../spec.md` (U1, R6, R7, IA nav, Anti-slop rules)
+Spec: `../spec.md` (U1, R6, R7, IA nav, Anti-slop rules — esp. 13: every page ≤ 3 blocks above the fold, details behind one disclosure)
 
 ## Shell (`AppShell`)
 
