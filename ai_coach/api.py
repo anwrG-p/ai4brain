@@ -107,11 +107,18 @@ def count(counts: Optional[Counter] = None, **extra: int) -> None:
 KNOWN_LOTI_REPLIES = frozenset(known_loti_replies())
 
 
-def stored_loti_replies(key: str) -> frozenset:
+def stored_loti_replies(key: str, timeout: float) -> frozenset:
+    """Loti replies stored for this user, read within `timeout` (the turn's remaining budget).
+
+    A busy store past that time gives an empty set: the turns are unverifiable now, so they are
+    dropped rather than trusted, and the route keeps its time bound.
+    """
+    if timeout <= 0:
+        return frozenset()
     try:
-        rows = chat_store.read_turns(key)
+        rows = chat_store.read_turns(key, timeout=timeout)
     except LockTimeout:
-        return frozenset()  # unverifiable now: drop rather than trust
+        return frozenset()
     return frozenset(
         part
         for r in rows
@@ -193,7 +200,7 @@ def coach_chat(
 ) -> CoachChatResponse:
     deadline = time.monotonic() + TURN_DEADLINE_S
     key = user_key(req.user_id)
-    verified = KNOWN_LOTI_REPLIES | stored_loti_replies(key)
+    verified = KNOWN_LOTI_REPLIES | stored_loti_replies(key, timeout=deadline - time.monotonic())
     kept = [t for t in req.transcript if t.from_ == "you" or t.text in verified]
     unverified = len(req.transcript) - len(kept)
     history = [

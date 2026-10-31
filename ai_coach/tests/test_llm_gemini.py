@@ -117,22 +117,45 @@ def test_failures_raise_gemini_error_without_user_text_or_key(handler, message):
     assert SECRET not in str(exc.value) and KEY not in str(exc.value)
 
 
-def test_the_deadline_is_a_hard_wait(monkeypatch):
+def test_the_deadline_is_a_hard_wait():
+    """State, not wall-clock: the caller gets its error while the HTTP call is still blocked."""
+    import threading
     import time
 
-    calls = []
+    release, finished = threading.Event(), threading.Event()
 
-    def slow(request):
-        calls.append(request)
-        time.sleep(0.5)
+    def blocked(request):
+        release.wait(10)
+        finished.set()
         return ok("late")
 
-    runner = runner_with(slow)
-    start = time.monotonic()
-    with pytest.raises(GeminiError, match="deadline exceeded") as exc:
-        runner([{"role": "user", "content": SECRET}], deadline=time.monotonic() + 0.1)
-    assert time.monotonic() - start < 0.4
-    assert exc.value.__context__ is None
+    runner = runner_with(blocked)
+    try:
+        with pytest.raises(GeminiError, match="deadline exceeded") as exc:
+            runner([{"role": "user", "content": SECRET}], deadline=time.monotonic() + 0.1)
+        assert not finished.is_set()  # the caller did not wait for the call
+        assert exc.value.__context__ is None
+    finally:
+        release.set()
+        _drain_pool()
+
+
+def test_a_failed_submit_gives_its_slot_back(monkeypatch):
+    from ai_coach import llm_gemini
+
+    _drain_pool()
+
+    class ShutDown:
+        def submit(self, *a, **kw):
+            raise RuntimeError("cannot schedule new futures after shutdown")
+
+    monkeypatch.setattr(llm_gemini, "_POOL", ShutDown())
+    runner = runner_with(lambda r: ok("x"))
+    for _ in range(llm_gemini.MAX_PENDING + 2):  # more attempts than slots: none may leak
+        with pytest.raises(GeminiError, match="pool unavailable") as exc:
+            runner.generate("s", [])
+        assert exc.value.__context__ is None
+    _drain_pool()  # every slot is free again
 
 
 def test_a_passed_deadline_sends_nothing():
@@ -156,7 +179,11 @@ def _drain_pool():
 
 
 def test_stale_queued_calls_are_never_sent():
-    """The reviewer's pool_load scenario: 24 callers, a 0.2 s deadline, a 0.5 s transport."""
+    """The reviewer's pool_load scenario: 24 callers on a transport that blocks.
+
+    Counts and states only, no wall-clock bound: the transport blocks until every caller has
+    returned, so the outcome does not depend on how fast the machine is.
+    """
     import threading
     import time
 
@@ -164,30 +191,33 @@ def test_stale_queued_calls_are_never_sent():
 
     _drain_pool()  # an earlier test's slow call may still hold a slot
     started, errors, lock = [], [], threading.Lock()
+    release = threading.Event()
+    ready = threading.Barrier(24)
 
-    def slow(request):
+    def blocked(request):
         with lock:
-            started.append(time.monotonic())
-        time.sleep(0.5)
+            started.append(request)
+        release.wait(10)
         return ok("x")
 
-    runner = runner_with(slow)
+    runner = runner_with(blocked)
 
     def caller():
+        ready.wait(10)  # all 24 submit together, well inside the 1 s deadline
         try:
-            runner([{"role": "user", "content": "hi"}], deadline=time.monotonic() + 0.2)
+            runner([{"role": "user", "content": "hi"}], deadline=time.monotonic() + 1.0)
         except GeminiError as e:
             with lock:
                 errors.append(str(e))
 
-    t0 = time.monotonic()
     threads = [threading.Thread(target=caller) for _ in range(24)]
     for t in threads:
         t.start()
     for t in threads:
-        t.join()
-    assert time.monotonic() - t0 < 0.5 and len(errors) == 24
+        t.join(15)
+    assert len(errors) == 24  # every caller got its error; none waited on the blocked calls
     assert errors.count("busy") == 24 - llm_gemini.MAX_PENDING  # the queue is bounded
+    release.set()
     _drain_pool()
     # Only the calls a worker picked up at once were ever sent; the queued ones were not.
     assert len(started) == llm_gemini.WORKERS

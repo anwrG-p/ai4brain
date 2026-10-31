@@ -6,9 +6,26 @@
   - `99350db` docs(sdd): BE-06 report
   - `c0fa36d` fix(coach): BE-06 review (round 2)
   - `d0b6942` docs(sdd): report round 2
-  - `2cea6e2` fix(coach): BE-06 re-review (round 3, below)
-  - plus the commit that updates this report.
-- **Tests:** one `pytest -q` from the repo root (venv from the root `requirements.txt`) gives **1015 passed, 1 xfailed, 0 warnings**. It also passes with `-W error`. Earlier counts: 992 in round 2, 957 in round 1, 858 on the `ae67522` baseline. The xfail is BE-05's strict xfail on keyword-gate recall, which is unchanged and expected.
+  - `2cea6e2` fix(coach): BE-06 re-review (round 3)
+  - `7757be7` docs(sdd): report round 3
+  - the final commit (round 4, below), code and this report together.
+- **Tests:** one `pytest -q` from the repo root (venv from the root `requirements.txt`) gives **1017 passed, 1 xfailed, 0 warnings**. It also passes with `-W error`. Earlier counts: 1015 in round 3, 992 in round 2, 957 in round 1, 858 on the `ae67522` baseline. The xfail is BE-05's strict xfail on keyword-gate recall, which is unchanged and expected.
+
+## Round 4 (final): the last three items after the passed re-review
+1. **Time bound on reading stored replies.** `chat_store.read_turns(..., timeout=)` passes the timeout to the lock. `stored_loti_replies(key, timeout)` gets the turn's remaining budget (deadline − now).
+   - A busy store (`LockTimeout`) or a spent budget gives an empty set. Unverifiable Loti turns are then dropped, which fails safe, and the ~6 s route bound holds.
+   - Test `test_a_busy_store_bounds_the_read_and_drops_unverifiable_turns`: it holds the coach store lock for the whole turn and checks three things:
+     - the read was given a timeout of at most the turn budget;
+     - the route still answers 200 / llm;
+     - the stored Loti turn was dropped.
+2. **Semaphore leak:** if `_POOL.submit` raises (e.g. the pool was shut down), the slot is released, and a safe `GeminiError("pool unavailable")` is raised outside the `except`.
+   - Test: MAX_PENDING + 2 failed submits in a row. Each fails with nothing chained, and every slot is free afterwards.
+3. **Timing tests use states, not wall clock.** No test asserts elapsed time any more:
+   - `test_the_deadline_is_a_hard_wait` and the route's `test_turn_deadline_is_shared_and_fails_closed`: the transport blocks on an Event, and the test asserts the caller got its answer while the call was still blocked.
+   - `test_stale_queued_calls_are_never_sent`:
+     - The transport blocks until every caller has returned. A Barrier makes all 24 callers submit together, with a 1 s deadline.
+     - It asserts 24 errors, exactly 24 − 16 = 8 "busy", and exactly 8 calls ever sent.
+   - These tests passed 5 runs in a row.
 - **Live key:** `GEMINI_API_KEY` is not set in this environment, and there is no `backend/.env`. Every LLM path is tested with mocks. **No live numbers.**
 
 ## Round 3 (`2cea6e2`): re-review fixes

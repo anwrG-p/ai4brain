@@ -57,13 +57,18 @@ def append_exchange(
     return len(rows)
 
 
-def read_turns(user_id: str, directory: Optional[Path] = None) -> List[Dict]:
-    """Every stored row for the user, oldest first. Unreadable lines are skipped."""
+def read_turns(
+    user_id: str, directory: Optional[Path] = None, timeout: Optional[float] = None
+) -> List[Dict]:
+    """Every stored row for the user, oldest first. Unreadable lines are skipped.
+
+    Raises LockTimeout if the lock stays busy past `timeout` (default: the store's 10 s).
+    """
     key = user_key(user_id)
     path = (directory or coach_dir()) / f"{key}.jsonl"
     if not path.is_file():
         return []
-    with telemetry_lock(path.parent):
+    with telemetry_lock(path.parent, timeout=timeout):
         try:
             text = path.read_text(encoding="utf-8")
         except FileNotFoundError:

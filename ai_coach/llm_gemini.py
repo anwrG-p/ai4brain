@@ -153,7 +153,13 @@ class GeminiRunner:
 
         if not _SLOTS.acquire(blocking=False):
             raise GeminiError("busy")  # the queue is full: fail closed now, never wait in line
-        future = _POOL.submit(self._post, body, end)
+        future = None
+        try:
+            future = _POOL.submit(self._post, body, end)
+        except Exception:  # noqa: BLE001 - e.g. the pool is shut down
+            _SLOTS.release()  # give the slot back, or the queue shrinks for good
+        if future is None:  # raised outside the except: nothing chained
+            raise GeminiError("pool unavailable")
         future.add_done_callback(lambda _f: _SLOTS.release())
         failure: Optional[str] = None
         response: Optional[httpx.Response] = None

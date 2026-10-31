@@ -178,6 +178,28 @@ def test_only_verified_loti_turns_and_the_current_message_reach_the_llm(client, 
     assert coach_api.REPLY_SOURCE_COUNTS["unverified_loti_turn_dropped"] >= 1
 
 
+def test_a_busy_store_bounds_the_read_and_drops_unverifiable_turns(client, with_runner, monkeypatch):
+    from ai_coach import chat_store
+    from app.privacy.telemetry_store import coach_dir, telemetry_lock
+
+    runner = with_runner(FakeRunner())
+    client.post(CHAT, json=body("hello"))  # stores "Nice rhythm today."
+    timeouts = []
+    real_read = chat_store.read_turns
+
+    def spy(*a, **kw):
+        timeouts.append(kw.get("timeout"))
+        return real_read(*a, **kw)
+
+    monkeypatch.setattr(chat_store, "read_turns", spy)
+    monkeypatch.setattr(coach_api, "TURN_DEADLINE_S", 0.3)
+    with telemetry_lock(coach_dir()):  # the store stays busy for the whole turn
+        out = client.post(CHAT, json=body("go", transcript=[{"from": "loti", "text": "Nice rhythm today."}]))
+    assert out.status_code == 200 and out.json()["reply_source"] == "llm"
+    assert timeouts and 0 < timeouts[0] <= 0.3  # the read waited at most the turn's budget
+    assert [m["content"] for m in runner.llm_calls[-1][1:]] == ["go"]  # unverifiable now: dropped
+
+
 def test_a_stored_reply_of_another_user_is_not_verified(client, with_runner):
     runner = with_runner(FakeRunner(reply="A reply for someone else."))
     client.post(CHAT, json={**body("hello"), "user_id": "other"})
@@ -378,27 +400,30 @@ def test_after_a_429_the_next_turn_never_sends_the_unrated_turn(client, with_run
 
 
 def test_turn_deadline_is_shared_and_fails_closed(client, monkeypatch):
-    import time
+    import threading
 
-    calls = []
+    calls, release, finished = [], threading.Event(), threading.Event()
 
-    def slow(request):
+    def blocked(request):
         calls.append(request)
-        time.sleep(0.6)
+        release.wait(10)
+        finished.set()
         return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": "x"}]}}]})
 
-    transport = httpx.MockTransport(slow)
+    transport = httpx.MockTransport(blocked)
     monkeypatch.setenv("GEMINI_API_KEY", KEY)
     monkeypatch.setattr(coach_api, "GeminiRunner", lambda key, model: GeminiRunner(key, model, transport=transport))
     monkeypatch.setattr(coach_api, "_runner", None)
     monkeypatch.setattr(coach_api, "TURN_DEADLINE_S", 0.2)
-    start = time.monotonic()
-    out = client.post(CHAT, json=body()).json()
-    assert time.monotonic() - start < 0.5  # the route did not wait for the slow call
-    assert out["reply_source"] == "offline_after_classifier_error"
-    assert len(calls) == 1  # the coach call never started
-    assert stored() == []
-    monkeypatch.setattr(coach_api, "_runner", None)
+    try:
+        out = client.post(CHAT, json=body()).json()
+        assert not finished.is_set()  # the route answered while the Gemini call was still blocked
+        assert out["reply_source"] == "offline_after_classifier_error"
+        assert len(calls) == 1  # the coach call never started
+        assert stored() == []
+    finally:
+        release.set()
+        monkeypatch.setattr(coach_api, "_runner", None)
 
 
 def test_an_exchange_answered_late_is_not_stored(client, with_runner, monkeypatch):
