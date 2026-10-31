@@ -2,14 +2,14 @@
 
 None of them computes anything yet; each says so instead of inventing values. Each moves to its
 module's router (main.py mounts those first, so the module's route wins):
-- GET  /v1/tasks/next                -> dynamic_cache.api (BE-04, with the BE-03 generators)
 - POST /v1/coach/chat                -> ai_coach.api (BE-06; R14: no user-facing LLM path
                                         without the backup crisis classifier)
 - GET  /v1/coach/collaboration-score -> ai_coach.api (BE-06)
 - GET  /v1/dashboard/profile         -> brain_twin_jepa.api (BE-11)
 - POST /v1/clustering/evaluate       -> brain_twin_jepa.api (BE-11)
 
-Telemetry ingest is app/api/routes/v1_telemetry.py; the user delete is v1_privacy.py.
+GET /v1/tasks/next moved to dynamic_cache.api (BE-04). Telemetry ingest is
+app/api/routes/v1_telemetry.py; the user delete is v1_privacy.py.
 """
 
 from typing import Annotated
@@ -28,12 +28,6 @@ BodyUserId = Annotated[str, StringConstraints(pattern=ID_PATTERN)]
 
 def not_yet(what: str) -> HTTPException:
     return HTTPException(status_code=501, detail=f"{what} not available yet")
-
-
-@router.get("/tasks/next", status_code=501, responses={501: {}})
-def get_next_task(user_id: UserId):
-    """BE-04 serves the BE-03 generators here."""
-    raise not_yet("task service")
 
 
 @router.get("/dashboard/profile")

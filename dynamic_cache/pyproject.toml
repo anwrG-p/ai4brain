@@ -13,7 +13,8 @@ requires-python = ">=3.11"
 dependencies = ["fastjsonschema==2.21.2"]
 
 [project.optional-dependencies]
-# dynamic_cache.api (the router) needs FastAPI; the generators do not.
+# dynamic_cache.api (the router) needs FastAPI and the server's app package (backend/app); the
+# generators, dispatcher, Bloom filter and projector need neither.
 api = ["fastapi>=0.110"]
 
 [tool.setuptools]

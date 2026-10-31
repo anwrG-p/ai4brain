@@ -26,6 +26,19 @@ EXPORT_MAX_BYTES = 50 * 1024 * 1024
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
+# Per-user data kept outside the telemetry directory (BE-04's task registry, ...). Each store
+# registers here once, so the privacy delete and export cover it:
+#   delete(key) -> how many files it removed;  export(key) -> its record for the user, or None.
+# key is user_key() output. Registering a name again replaces the earlier hooks.
+_USER_STORES: dict[str, tuple[Callable[[str], int], Callable[[str], dict | None]]] = {}
+
+
+def register_user_store(
+    name: str, delete: Callable[[str], int], export: Callable[[str], dict | None]
+) -> None:
+    _USER_STORES[name] = (delete, export)
+
+
 class LockTimeout(TimeoutError):
     """The telemetry lock stayed busy past the timeout. HTTP callers answer 503."""
 
@@ -132,7 +145,8 @@ def append_events(
 
 
 def delete_user(user_id: str, directory: Path | None = None) -> dict[str, int]:
-    """Remove `{user_key}.jsonl` and every `{user_key}.*` state file. Counts only what was removed.
+    """Remove `{user_key}.jsonl`, every `{user_key}.*` state file and the user's records in every
+    registered store. Counts only what was removed.
 
     Matches file names case-insensitively, so a file written under another case before ids
     were lowercased (possible on Linux) is still found and counted.
@@ -140,26 +154,28 @@ def delete_user(user_id: str, directory: Path | None = None) -> dict[str, int]:
     key = user_key(user_id)
     directory = directory or telemetry_dir()
     events = files = 0
-    if not directory.is_dir():
-        return {"deleted_events": 0, "deleted_files": 0}
-    with telemetry_lock(directory):
-        # Ids have no dots, so the part before the first dot is the owner: `u1` never matches
-        # `u10.jsonl`, and `.lock` (empty owner) is never anyone's.
-        for path in list(directory.iterdir()):
-            if path.name.split(".", 1)[0].lower() != key or not path.is_file():
-                continue
-            if path.suffix.lower() == ".jsonl":
-                text = path.read_text(encoding="utf-8")
-                events += sum(1 for line in text.splitlines() if line.strip())
-            path.unlink()
-            files += 1
+    if directory.is_dir():
+        with telemetry_lock(directory):
+            # Ids have no dots, so the part before the first dot is the owner: `u1` never matches
+            # `u10.jsonl`, and `.lock` (empty owner) is never anyone's.
+            for path in list(directory.iterdir()):
+                if path.name.split(".", 1)[0].lower() != key or not path.is_file():
+                    continue
+                if path.suffix.lower() == ".jsonl":
+                    text = path.read_text(encoding="utf-8")
+                    events += sum(1 for line in text.splitlines() if line.strip())
+                path.unlink()
+                files += 1
+    for delete, _ in list(_USER_STORES.values()):
+        files += delete(key)
     return {"deleted_events": events, "deleted_files": files}
 
 
 def export_user(
     user_id: str, directory: Path | None = None, max_bytes: int | None = None
 ) -> bytes | None:
-    """The user's raw events as stored (JSONL), or None if nothing is stored.
+    """The user's raw events as stored (JSONL), then one line per registered store that keeps
+    something for them (`{"store": name, "user_id": key, "data": ...}`); None if nothing is stored.
 
     Read whole under the lock, so the caller can send it without holding the lock.
     Raises ExportTooLarge above `max_bytes` (default EXPORT_MAX_BYTES), LockTimeout if busy.
@@ -167,13 +183,22 @@ def export_user(
     key = user_key(user_id)
     limit = EXPORT_MAX_BYTES if max_bytes is None else max_bytes
     path = (directory or telemetry_dir()) / f"{key}.jsonl"
-    if not path.is_file():
+    data = None
+    if path.is_file():
+        with telemetry_lock(path.parent):
+            try:
+                size = path.stat().st_size
+                if size > limit:
+                    raise ExportTooLarge(f"{size} bytes is over the {limit}-byte export limit")
+                data = path.read_bytes()
+            except FileNotFoundError:
+                pass
+    records = []
+    for name, (_, export) in list(_USER_STORES.items()):
+        record = export(key)
+        if record is not None:
+            line = json.dumps({"store": name, "user_id": key, "data": record}, allow_nan=False)
+            records.append(line.encode("utf-8") + b"\n")
+    if data is None and not records:
         return None
-    with telemetry_lock(path.parent):
-        try:
-            size = path.stat().st_size
-            if size > limit:
-                raise ExportTooLarge(f"{size} bytes is over the {limit}-byte export limit")
-            return path.read_bytes()
-        except FileNotFoundError:
-            return None
+    return (data or b"") + b"".join(records)
