@@ -41,6 +41,7 @@ flowchart LR
   B --> R["/results<br/>blurred → Dolphin → data choice → reveal"]
   R --> H["/dashboard Home"]
 ```
+Returning devices (at least one saved session) go straight to Home: `/` and `/baseline` redirect to `/dashboard` (`/baseline?again=1` is the retake).
 
 ### Route map
 
