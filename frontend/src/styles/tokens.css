@@ -276,12 +276,12 @@
   --shadow-hero: none;
 
   --clay: 0 12px 28px rgb(0 0 0 / 0.35), inset 0 2px 6px rgb(255 255 255 / 0.14), inset 0 -4px 10px rgb(0 0 0 / 0.3);
-  --clay-drop: drop-shadow(0 6px 12px rgb(0 0 0 / 0.4));
+  --clay-drop: drop-shadow(0 8px 14px rgb(0 0 0 / 0.55));
   --char-sky-lo: #2272B0;
   --char-pale-lo: #6AAFE0;
   --char-mist-lo: #8C9FB0;
   --char-shadow: #000000;
-  --char-shadow-alpha: 0.55;
+  --char-shadow-alpha: 0.75;
 
   /* EMILY Dark Emotion Adaptive Color Tokens (Default: Calm Flow) */
   --color-emotion-accent: #4FD1C5;

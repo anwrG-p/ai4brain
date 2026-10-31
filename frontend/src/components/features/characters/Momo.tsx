@@ -65,7 +65,7 @@ export function Momo({ mood = 'calm', size = 'md', title, className }: MomoProps
     <CharacterSvg label={title ?? `Momo looks ${mood}`} width={CHARACTER_PX[size]} viewBox="0 0 120 110" aspect={110 / 120} className={className}>
       <defs>
         <ClayGradient id={id('body')} tone={tone} />
-        <SheenGradient id={id('sheen')} opacity={0.55} />
+        <SheenGradient id={id('sheen')} />
         <radialGradient id={id('cheek')}>
           <stop offset="0" stopColor="var(--char-coral)" stopOpacity={mood === 'happy' ? 0.85 : 0.65} />
           <stop offset="0.5" stopColor="var(--char-coral)" stopOpacity={mood === 'happy' ? 0.6 : 0.4} />
@@ -122,8 +122,9 @@ function MomoFace({ mood }: { mood: MomoMood }) {
     case 'frustrated':
       return (
         <g>
-          <path d="M42 57 Q47 57.4 51 59.4" {...line(2.2)} />
-          <path d="M78 57 Q73 57.4 69 59.4" {...line(2.2)} />
+          {/* Worried, not cross: the inner ends of the brows lift (a supportive, zero-guilt face). */}
+          <path d="M42 59 Q46.5 58.5 51 55.5" {...line(2.2)} />
+          <path d="M78 59 Q73.5 58.5 69 55.5" {...line(2.2)} />
           <Eye cx={47} cy={66} rx={3.6} ry={4.6} />
           <Eye cx={73} cy={66} rx={3.6} ry={4.6} />
           <path d="M52 79 Q56 75.5 60 79 Q64 82.5 68 79" {...line(2.5)} />
@@ -134,9 +135,9 @@ function MomoFace({ mood }: { mood: MomoMood }) {
         <g>
           <path d="M43 56 Q47 55 51 56" {...line(2)} />
           <path d="M69 56 Q73 55 77 56" {...line(2)} />
-          <Eye cx={47} cy={65} rx={4.2} ry={3.8} look={[1, 0.8]} />
-          <Eye cx={73} cy={65} rx={4.2} ry={3.8} look={[1, 0.8]} />
-          <path d="M55.5 77.5 Q60 79 64.5 77.5" {...line(2.5)} />
+          <Eye cx={47} cy={65} rx={4} ry={4.6} look={[1, 0.8]} />
+          <Eye cx={73} cy={65} rx={4} ry={4.6} look={[1, 0.8]} />
+          <path d="M55.5 77 Q60 80 64.5 77" {...line(2.5)} />
         </g>
       )
     default:

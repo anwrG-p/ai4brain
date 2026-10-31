@@ -34,6 +34,9 @@ const LABEL: Record<DolphinPose, string> = {
 
 const BODY =
   'M34 100 C44 80 70 56 108 48 C138 42 164 54 170 72 C172 77 176 79 182 80 C190 82 194 89 189 94 C184 98 174 98 166 100 C150 114 120 122 92 120 C66 118 46 112 34 100 Z'
+/** Cheer drops the jaw: a fuller chin, so the open mouth sits inside the head, not on the background. */
+const BODY_CHEER =
+  'M34 100 C44 80 70 56 108 48 C138 42 164 54 170 72 C172 77 176 79 182 80 C190 82 194 89 190 94 C189 103 181 109 170 109 C150 116 120 122 92 120 C66 118 46 112 34 100 Z'
 const FLUKES = 'M42 101 C34 93 24 83 13 82 C7 84 10 94 24 102 C12 108 8 118 14 122 C24 122 34 112 44 106 Z'
 const DORSAL = 'M92 54 C96 43 94 33 86 26 C102 28 114 38 120 48 Z'
 
@@ -44,20 +47,21 @@ export function Dolphin({ pose = 'swim-in', size = 'lg', title, className }: Dol
   const sky = ramp('sky')
   const coral = ramp('coral')
   const cheer = pose === 'cheer'
+  const body = cheer ? BODY_CHEER : BODY
 
   return (
     <CharacterSvg label={title ?? LABEL[pose]} width={CHARACTER_PX[size]} viewBox="0 0 200 150" aspect={0.75} className={className}>
       <defs>
         <ClayGradient id={id('body')} tone={sky} cx={0.38} cy={0.2} r={0.75} />
         <ClayGradient id={id('belly')} tone={coral} cx={0.4} cy={0.1} r={0.9} />
-        <SheenGradient id={id('sheen')} opacity={0.5} />
+        <SheenGradient id={id('sheen')} />
         <radialGradient id={id('cheek')}>
           <stop offset="0" stopColor={coral.hi} />
           <stop offset="0.55" stopColor="var(--char-peach)" stopOpacity={0.9} />
           <stop offset="1" stopColor="var(--char-peach)" stopOpacity={0} />
         </radialGradient>
         <clipPath id={id('clip')}>
-          <path d={BODY} />
+          <path d={body} />
         </clipPath>
       </defs>
 
@@ -75,7 +79,7 @@ export function Dolphin({ pose = 'swim-in', size = 'lg', title, className }: Dol
         <g transform={cheer ? 'rotate(-9 104 92)' : undefined}>
           <path d={FLUKES} fill={url(id('body'))} />
           <path d={DORSAL} fill={url(id('body'))} />
-          <path d={BODY} fill={url(id('body'))} />
+          <path d={body} fill={url(id('body'))} />
 
           <g clipPath={url(id('clip'))}>
             <ellipse cx={122} cy={132} rx={82} ry={27} fill={url(id('belly'))} />
@@ -106,10 +110,10 @@ export function Dolphin({ pose = 'swim-in', size = 'lg', title, className }: Dol
   )
 }
 
-/** Cheer's open smile under the beak, with a coral tongue. */
+/** Cheer's open smile under the beak, with a peach tongue. */
 function OpenMouth() {
   const id = useCharIds('dolphin-mouth')
-  const d = 'M187 92 Q176 97 164 93 Q167 105 176 105 Q185 103 187 92 Z'
+  const d = 'M186 92 Q176 97 162 93 Q165 105 175 105 Q184 103 186 92 Z'
   return (
     <g>
       <defs>
@@ -118,7 +122,7 @@ function OpenMouth() {
         </clipPath>
       </defs>
       <path d={d} fill={FACE} stroke={FACE} strokeWidth={1.5} strokeLinejoin="round" />
-      <ellipse cx={175} cy={107} rx={9} ry={5.5} fill="var(--char-coral)" clipPath={url(id('m'))} />
+      <ellipse cx={174} cy={107} rx={10} ry={6} fill="var(--char-peach)" clipPath={url(id('m'))} />
     </g>
   )
 }

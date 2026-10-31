@@ -8,6 +8,7 @@ import { Mascot, type MascotState } from '../brand/Mascot'
 import { Dolphin, type DolphinPose } from './Dolphin'
 import { Loti, type LotiPose } from './Loti'
 import { Momo, MomoFromStore, EMOTION_TO_MOOD, type MomoMood } from './Momo'
+import { CHARACTER_PX } from './shared'
 
 const LOTI_POSES: LotiPose[] = ['idle', 'talk', 'think', 'happy', 'wave']
 const DOLPHIN_POSES: DolphinPose[] = ['swim-in', 'cheer']
@@ -73,10 +74,34 @@ describe('Loti', () => {
     expect(container.querySelector('.char-anim-wave')).not.toBeNull()
   })
 
-  it.each(['sm', 'md', 'lg', 'xl'] as const)('sizes the %s figure', (size) => {
-    render(<Loti pose="idle" size={size} />)
-    const svg = screen.getByRole('img')
-    expect(Number(svg.getAttribute('width'))).toBeGreaterThan(0)
+  it.each(['sm', 'md', 'lg', 'xl'] as const)('renders the %s figure at its exact pixel width', (size) => {
+    expect(CHARACTER_PX).toEqual({ sm: 48, md: 96, lg: 144, xl: 192 })
+    const { unmount } = render(<Loti pose="idle" size={size} />)
+    expect(screen.getByRole('img').getAttribute('width')).toBe(String(CHARACTER_PX[size]))
+    unmount()
+    render(
+      <>
+        <Dolphin pose="cheer" size={size} />
+        <Momo mood="calm" size={size} />
+      </>,
+    )
+    for (const svg of screen.getAllByRole('img')) {
+      expect(svg.getAttribute('width')).toBe(String(CHARACTER_PX[size]))
+    }
+  })
+
+  it('has no <title>, so no native hover tooltip', () => {
+    const { container } = render(<Loti pose="wave" />)
+    expect(container.querySelector('title')).toBeNull()
+  })
+
+  it('keeps the coral core apart from the mouth and uses a peach tongue', () => {
+    for (const pose of ['talk', 'happy', 'wave'] as const) {
+      const { container, unmount } = render(<Loti pose={pose} />)
+      expect(container.innerHTML).not.toContain('fill="var(--char-coral)"')
+      expect(container.innerHTML).toContain('fill="var(--char-peach)"')
+      unmount()
+    }
   })
 })
 
@@ -191,9 +216,11 @@ describe('Mascot wrapper', () => {
     expect(container.querySelector('svg')).toBeNull()
   })
 
-  it('keeps the speech bubble API', () => {
+  it('keeps the speech bubble API and hides the figure behind a titled bubble', () => {
     render(<Mascot state="thinking" message="Let me look at that." />)
     expect(screen.getByText('Let me look at that.')).toBeInTheDocument()
     expect(screen.getByText(/State: thinking/i)).toBeInTheDocument()
+    expect(screen.getByText(/^Loti ·/)).toBeInTheDocument()
+    expect(screen.queryByRole('img')).toBeNull()
   })
 })

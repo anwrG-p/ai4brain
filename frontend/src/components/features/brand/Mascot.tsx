@@ -129,6 +129,9 @@ export function Mascot({
   const resolvedBadge = badgeLabel ?? spec.defaultBadge
   const isHero = size === 'hero'
   const isDocked = size === 'docked'
+  const bubble = showSpeechBubble && Boolean(resolvedTitle || resolvedMessage)
+  // With a titled bubble, the bubble names Loti; hide the figure so screen readers say it once.
+  const hideFigure = ariaHidden || (bubble && Boolean(resolvedTitle))
 
   return (
     <div
@@ -142,11 +145,11 @@ export function Mascot({
               : 'items-center justify-center'
       } ${className}`}
     >
-      <span aria-hidden={ariaHidden || undefined} className="inline-flex shrink-0 select-none">
+      <span aria-hidden={hideFigure || undefined} className="inline-flex shrink-0 select-none">
         <Loti pose={STATE_TO_POSE[state]} size={SIZE_TO_LOTI[size]} />
       </span>
 
-      {showSpeechBubble && (resolvedTitle || resolvedMessage) && (
+      {bubble && (
         <div
           role={state === 'calm-shrug' || state === 'celebrate' ? 'status' : undefined}
           className={isHero ? 'max-w-md space-y-2' : 'space-y-1 rounded-xl border border-border bg-surface p-4 min-w-0'}

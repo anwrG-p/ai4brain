@@ -67,8 +67,8 @@ export function ClayGradient({ id, tone, cx = 0.36, cy = 0.3, r = 0.78 }: { id: 
   )
 }
 
-/** Soft matte sheen: the glint colour fading to nothing. */
-export function SheenGradient({ id, opacity = 0.75 }: { id: string; opacity?: number }) {
+/** Soft matte sheen: the glint colour fading to nothing. Low, so the clay stays matte, not vinyl. */
+export function SheenGradient({ id, opacity = 0.3 }: { id: string; opacity?: number }) {
   return (
     <radialGradient id={id}>
       <stop offset="0" stopColor={GLINT} stopOpacity={opacity} />
@@ -98,8 +98,8 @@ export function Eye({ cx, cy, rx, ry, look = [0, 0] }: { cx: number; cy: number;
   return (
     <g>
       <ellipse cx={cx + dx} cy={cy + dy} rx={rx} ry={ry} fill={FACE} />
-      <circle cx={cx + dx - rx * 0.32} cy={cy + dy - ry * 0.38} r={rx * 0.42} fill={GLINT} />
-      <circle cx={cx + dx + rx * 0.35} cy={cy + dy + ry * 0.35} r={rx * 0.17} fill={GLINT} opacity={0.8} />
+      <circle cx={cx + dx - rx * 0.3} cy={cy + dy - ry * 0.36} r={rx * 0.32} fill={GLINT} />
+      <circle cx={cx + dx + rx * 0.35} cy={cy + dy + ry * 0.35} r={rx * 0.14} fill={GLINT} opacity={0.7} />
     </g>
   )
 }
@@ -133,7 +133,7 @@ export function CharacterSvg({
       viewBox={viewBox}
       className={`char-figure shrink-0 ${className}`}
     >
-      <title>{label}</title>
+      {/* aria-label only: a <title> would pop a native tooltip on hover. */}
       {children}
     </svg>
   )

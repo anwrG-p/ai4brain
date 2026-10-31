@@ -38,6 +38,10 @@ const LABEL: Record<LotiPose, string> = {
   wave: 'Loti is waving hello',
 }
 
+/** The face is lifted 8 units and the core lowered, leaving clay between the mouth and the core. */
+const FACE_LIFT = -8
+const CORE_Y = 119
+
 const BODY = 'M80 30 C112 30 136 56 136 90 C136 118 112 136 80 136 C48 136 24 118 24 90 C24 56 48 30 80 30 Z'
 
 type Arm = { cx: number; cy: number; deg: number }
@@ -67,11 +71,18 @@ export function Loti({ pose = 'idle', size = 'md', title, className }: LotiProps
     <CharacterSvg label={title ?? LABEL[pose]} width={CHARACTER_PX[size]} viewBox="0 0 160 160" aspect={1} className={className}>
       <defs>
         <ClayGradient id={id('body')} tone={sky} />
-        <ClayGradient id={id('core')} tone={coral} cx={0.35} cy={0.3} r={0.85} />
-        <SheenGradient id={id('sheen')} opacity={0.5} />
+        <SheenGradient id={id('sheen')} />
+        {/* The core is sub-surface: a feathered warm window, a soft glow and a heart with no hard
+            edge or specular, under a thin film of sky skin. */}
         <radialGradient id={id('window')}>
-          <stop offset="0" stopColor={sky.hi} stopOpacity={0.75} />
-          <stop offset="1" stopColor={sky.hi} stopOpacity={0} />
+          <stop offset="0" stopColor="var(--char-peach-hi)" stopOpacity={0.7} />
+          <stop offset="0.6" stopColor="var(--char-peach-hi)" stopOpacity={0.25} />
+          <stop offset="1" stopColor="var(--char-peach-hi)" stopOpacity={0} />
+        </radialGradient>
+        <radialGradient id={id('heart')}>
+          <stop offset="0" stopColor={coral.hi} />
+          <stop offset="0.45" stopColor={coral.mid} stopOpacity={0.95} />
+          <stop offset="1" stopColor={coral.mid} stopOpacity={0} />
         </radialGradient>
         <radialGradient id={id('cheek')}>
           <stop offset="0" stopColor={coral.hi} />
@@ -79,8 +90,8 @@ export function Loti({ pose = 'idle', size = 'md', title, className }: LotiProps
           <stop offset="1" stopColor="var(--char-peach)" stopOpacity={0} />
         </radialGradient>
         <radialGradient id={id('glow')}>
-          <stop offset="0" stopColor={coral.mid} stopOpacity={0.6} />
-          <stop offset="0.45" stopColor={coral.hi} stopOpacity={0.35} />
+          <stop offset="0" stopColor={coral.mid} stopOpacity={0.55} />
+          <stop offset="0.5" stopColor={coral.mid} stopOpacity={0.2} />
           <stop offset="1" stopColor={coral.mid} stopOpacity={0} />
         </radialGradient>
         <clipPath id={id('clip')}>
@@ -107,20 +118,21 @@ export function Loti({ pose = 'idle', size = 'md', title, className }: LotiProps
         {/* Matte key-light sheen, broad and soft. */}
         <ellipse cx={58} cy={54} rx={28} ry={17} transform="rotate(-32 58 54)" fill={url(id('sheen'))} />
 
-        {/* The coral core, glowing through the translucent clay. */}
+        {/* The coral core, glowing inside the clay, well below the mouth. */}
         <g className={pose === 'happy' ? anim('pulse') : undefined}>
-          <circle cx={80} cy={118} r={20} fill={url(id('window'))} />
-          <circle cx={80} cy={118} r={pose === 'happy' ? 26 : 19} fill={url(id('glow'))} />
-          <circle cx={80} cy={118} r={8.5} fill={url(id('core'))} />
-          <circle cx={77.3} cy={115.3} r={2.1} fill={GLINT} opacity={0.8} />
+          <circle cx={80} cy={CORE_Y} r={19} fill={url(id('window'))} />
+          <circle cx={80} cy={CORE_Y} r={pose === 'happy' ? 19 : 14} fill={url(id('glow'))} />
+          <circle cx={80} cy={CORE_Y} r={10} fill={url(id('heart'))} />
+          <circle cx={80} cy={CORE_Y} r={10} fill={sky.mid} opacity={0.08} />
         </g>
       </g>
 
-      {/* Cheeks */}
-      <ellipse cx={49} cy={94} rx={8} ry={5} fill={url(id('cheek'))} />
-      <ellipse cx={111} cy={94} rx={8} ry={5} fill={url(id('cheek'))} />
-
-      <LotiFace pose={pose} look={look} talkClass={anim('talk')} />
+      {/* The face sits high, so the mouth never meets the core. */}
+      <g transform={`translate(0 ${FACE_LIFT})`}>
+        <ellipse cx={49} cy={94} rx={8} ry={5} fill={url(id('cheek'))} />
+        <ellipse cx={111} cy={94} rx={8} ry={5} fill={url(id('cheek'))} />
+        <LotiFace pose={pose} look={look} talkClass={anim('talk')} />
+      </g>
 
       {pose === 'think' && (
         <g className={anim('think')}>
@@ -159,7 +171,7 @@ function LotiFace({ pose, look, talkClass }: { pose: LotiPose; look: [number, nu
   )
 }
 
-/** An open mouth: navy, with a coral tongue clipped inside. */
+/** An open mouth: navy, with a peach tongue (not coral, so it never merges with the core). */
 function OpenMouth({ d }: { d: string }) {
   const id = useCharIds('mouth')
   return (
@@ -170,7 +182,7 @@ function OpenMouth({ d }: { d: string }) {
         </clipPath>
       </defs>
       <path d={d} fill={FACE} stroke={FACE} strokeWidth={1.5} strokeLinejoin="round" />
-      <ellipse cx={80} cy={108} rx={8} ry={5.5} fill="var(--char-coral)" clipPath={url(id('m'))} />
+      <ellipse cx={80} cy={108} rx={8} ry={5.5} fill="var(--char-peach)" clipPath={url(id('m'))} />
     </g>
   )
 }
