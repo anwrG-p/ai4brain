@@ -235,6 +235,12 @@ export function ExerciseFrame({ task, onDone, onBlockEnd, children }: Props) {
     handed.current = true
     onDone()
   }, [onDone])
+  // Bare (no intro, so no end card): the block ends and hands over at once, onBlockEnd first, so a
+  // host that saves on block end (TaskRunnerPage) still saves the run.
+  const endBare = useCallback(() => {
+    blockEnd.current?.()
+    finish()
+  }, [finish])
 
   useEffect(() => {
     if (phase !== 'fixation') return
@@ -247,7 +253,7 @@ export function ExerciseFrame({ task, onDone, onBlockEnd, children }: Props) {
   if (!intro)
     return (
       <div data-block-running="true" className="contents">
-        <Locked>{children(onDone)}</Locked>
+        <Locked>{children(endBare)}</Locked>
       </div>
     )
 

@@ -234,6 +234,22 @@ test('the consumer names are the spec table', () => {
   })
 })
 
+test('an unknown exercise ends its block before handing over, so its host still saves the run', () => {
+  const task = { ...byType('stroop'), schema_type: 'bogus' } as unknown as TaskPayload
+  const calls: string[] = []
+  render(
+    <ExerciseFrame task={task} onDone={() => calls.push('done')} onBlockEnd={() => calls.push('blockEnd')}>
+      {(end) => (
+        <button type="button" onClick={end}>
+          finish
+        </button>
+      )}
+    </ExerciseFrame>,
+  )
+  act(() => void fireEvent.click(screen.getByRole('button', { name: 'finish' })))
+  expect(calls).toEqual(['blockEnd', 'done'])
+})
+
 test('an unknown exercise skips the frame and runs as before', () => {
   const task = { ...byType('stroop'), schema_type: 'bogus' } as unknown as TaskPayload
   render(<ExerciseFrame task={task} onDone={vi.fn()}>{() => <p>raw task</p>}</ExerciseFrame>)
