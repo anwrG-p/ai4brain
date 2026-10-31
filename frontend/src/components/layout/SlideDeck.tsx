@@ -361,7 +361,7 @@ export function SlideDeck({
               disabled={activeSlide === 0}
               aria-label="Previous slide"
               title="Previous slide (Arrow Up)"
-              className={`fixed top-22 sm:top-24 end-4 sm:end-6 z-40 w-11 h-11 rounded-xl bg-surface/90 backdrop-blur-md border-2 border-border-strong text-ink flex items-center justify-center transition-all cursor-pointer select-none ${
+              className={`fixed top-22 sm:top-24 end-4 sm:end-6 z-40 w-11 h-11 rounded-xl bg-surface border-2 border-border-strong text-ink flex items-center justify-center transition-all cursor-pointer select-none ${
                 activeSlide === 0
                   ? 'opacity-0 pointer-events-none -translate-y-2'
                   : 'opacity-100 translate-y-0 shadow-doodle hover:bg-brand hover:text-brand-ink hover:scale-105 active:scale-95'
@@ -378,7 +378,7 @@ export function SlideDeck({
               disabled={activeSlide === slides.length - 1}
               aria-label="Next slide"
               title="Next slide (Arrow Down)"
-              className={`fixed bottom-20 md:bottom-6 end-4 sm:end-6 z-40 w-11 h-11 rounded-xl bg-surface/90 backdrop-blur-md border-2 border-border-strong text-ink flex items-center justify-center transition-all cursor-pointer select-none ${
+              className={`fixed bottom-20 md:bottom-6 end-4 sm:end-6 z-40 w-11 h-11 rounded-xl bg-surface border-2 border-border-strong text-ink flex items-center justify-center transition-all cursor-pointer select-none ${
                 activeSlide === slides.length - 1
                   ? 'opacity-0 pointer-events-none translate-y-2'
                   : 'opacity-100 translate-y-0 shadow-doodle hover:bg-brand hover:text-brand-ink hover:scale-105 active:scale-95'

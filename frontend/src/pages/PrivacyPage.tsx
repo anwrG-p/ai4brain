@@ -320,7 +320,7 @@ export default function PrivacyPage() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="purge-modal-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/60 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/60"
         >
           <div className="bg-surface border-2 border-danger/40 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in duration-200">
             <div className="flex items-start gap-3">

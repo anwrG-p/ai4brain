@@ -10,8 +10,8 @@ const same = (a: string[][], b: string[][]) => JSON.stringify(a) === JSON.string
 
 // Fixed client palette of theme tokens; payload disc ids never reach CSS. Disc labels are painted in
 // --color-surface (white in light, slate in dark): >= 4.5:1 on every disc token in both themes
-// (ratios in ticket 06's Comments). Not --dim-5 (4.29:1 light). Distinct hues: blue, red, green,
-// indigo, olive, orange, pink, slate.
+// (ratios in brand-v2 ticket 01's Comments). Not --dim-5 (4.29:1 light). Distinct hues: blue, red, green,
+// brown, olive, orange, teal, slate.
 // ponytail: colours repeat after 8 distinct discs; the id text still tells them apart.
 export const PALETTE = [
   'var(--dim-1)',

@@ -1,44 +1,48 @@
 @import "tailwindcss";
 
-/* Calm & Clean design system (DEC-010, .scratch/ui-calm-clean/spec.md).
+/* Brand v2 design system: sky blue + coral, Quicksand + Inter, soft clay shape
+   (.scratch/brand-v2/spec.md "Brand system"; supersedes the Calm & Clean palette of DEC-010).
    Every colour is defined twice: here in @theme (Tailwind utilities) and in the
    :root / [data-theme] blocks below. Keep them in sync; src/styles/tokens.test.ts checks it.
-   Do not add --shadow-* tokens to @theme: it would revive the dead shadow-doodle* utilities. */
+   Do not add --shadow-* tokens to @theme: it would revive the dead shadow-doodle* utilities.
+   No purple, no gradients, no backdrop blur (anti-slop rules 1, 2, 9; tokens.test.ts checks them). */
 @theme {
-  --color-canvas: #F8FAFC;
+  --color-canvas: #F3F9FD;
   --color-surface: #FFFFFF;
-  --color-surface-raised: #F1F5F9;
-  --color-ink: #0F172A;
-  --color-ink-muted: #475569;
-  --color-border: #E2E8F0;
-  --color-border-strong: #64748B;
-  --color-brand: #4F46E5;
-  --color-brand-hover: #4338CA;
-  --color-brand-subtle: #EEF2FF;
+  --color-surface-raised: #E8F3FB;
+  --color-ink: #0F2233;
+  --color-ink-muted: #46617A;
+  --color-border: #D6E7F3;
+  --color-border-strong: #5E7C96;
+  --color-brand: #1E6FA8;
+  --color-brand-hover: #185C8C;
+  --color-brand-subtle: #E1F0FA;
   --color-brand-ink: #FFFFFF;
-  --color-secondary: #334155;
-  --color-reward: #F59E0B;
-  --color-reward-ink: #0F172A;
-  --color-accent: #0F766E;
-  --color-accent-ink: #FFFFFF;
-  --color-success: #15803D;
-  --color-success-subtle: #F0FDF4;
-  --color-warning: #B45309;
-  --color-warning-subtle: #FFFBEB;
-  --color-danger: #B91C1C;
-  --color-danger-subtle: #FEF2F2;
-  --color-info: #4F46E5;
-  --color-info-subtle: #EEF2FF;
+  --color-brand-vivid: #2B8FD6;
+  --color-secondary: #2C4A63;
+  --color-reward: #F2876B;
+  --color-reward-ink: #0F2233;
+  --color-accent: #F2876B;
+  --color-accent-ink: #0F2233;
+  --color-accent-strong: #B94A2F;
+  --color-success: #2D7650;
+  --color-success-subtle: #EAF6EF;
+  --color-warning: #8A5800;
+  --color-warning-subtle: #FBF3E4;
+  --color-danger: #A83A4E;
+  --color-danger-subtle: #FBEEF0;
+  --color-info: #1E6FA8;
+  --color-info-subtle: #E1F0FA;
 
-  --font-display: 'Lexend', system-ui, sans-serif;
-  --font-sans: 'Lexend', system-ui, sans-serif;
+  --font-display: 'Quicksand', 'Inter', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-2xl: 20px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  --radius-2xl: 28px;
   --radius-pill: 9999px;
 
   --color-emotion-accent: var(--color-emotion-accent);
@@ -49,60 +53,78 @@
 
 :root,
 [data-theme="light"] {
-  /* Calm & Clean semantic colour roles (light) */
-  --color-canvas: #F8FAFC;
+  /* Brand v2 semantic colour roles (light). Ratios in token-metadata.ts.
+     --color-brand is the spec's text-safe sky #1E6FA8, used as the fill too: white on the spec
+     fill #2B8FD6 is only 3.50:1. #2B8FD6 survives as --color-brand-vivid for graphics (>= 3:1).
+     --color-accent (coral) is a fill under --color-accent-ink; coral text and marks on a surface
+     use --color-accent-strong. --color-reward is the coral milestone fill. */
+  --color-canvas: #F3F9FD;
   --color-surface: #FFFFFF;
-  --color-surface-raised: #F1F5F9;
-  --color-ink: #0F172A;
-  --color-ink-muted: #475569;
-  --color-border: #E2E8F0;
-  --color-border-strong: #64748B;
-  --color-brand: #4F46E5;
-  --color-brand-hover: #4338CA;
-  --color-brand-subtle: #EEF2FF;
+  --color-surface-raised: #E8F3FB;
+  --color-ink: #0F2233;
+  --color-ink-muted: #46617A;
+  --color-border: #D6E7F3;
+  --color-border-strong: #5E7C96;
+  --color-brand: #1E6FA8;
+  --color-brand-hover: #185C8C;
+  --color-brand-subtle: #E1F0FA;
   --color-brand-ink: #FFFFFF;
-  --color-secondary: #334155;
-  --color-reward: #F59E0B;
-  --color-reward-ink: #0F172A;
-  --color-accent: #0F766E;
-  --color-accent-ink: #FFFFFF;
-  --color-success: #15803D;
-  --color-success-subtle: #F0FDF4;
-  --color-warning: #B45309;
-  --color-warning-subtle: #FFFBEB;
-  --color-danger: #B91C1C;
-  --color-danger-subtle: #FEF2F2;
-  --color-info: #4F46E5;
-  --color-info-subtle: #EEF2FF;
+  --color-brand-vivid: #2B8FD6;
+  --color-secondary: #2C4A63;
+  --color-reward: #F2876B;
+  --color-reward-ink: #0F2233;
+  --color-accent: #F2876B;
+  --color-accent-ink: #0F2233;
+  --color-accent-strong: #B94A2F;
+  --color-success: #2D7650;
+  --color-success-subtle: #EAF6EF;
+  --color-warning: #8A5800;
+  --color-warning-subtle: #FBF3E4;
+  --color-danger: #A83A4E;
+  --color-danger-subtle: #FBEEF0;
+  --color-info: #1E6FA8;
+  --color-info-subtle: #E1F0FA;
 
-  /* Okabe-Ito WCAG >= 3:1 Dimension Palette (3 to 10 Dimensions) */
+  /* Five pillar colours (>= 3:1 on surface, no red, no purple; distinct under deuteranopia,
+     min CIEDE2000 17.8 light / 20.1 dark). Always pair them with a shape or a text label. */
+  --pillar-focus: #2E86C1;
+  --pillar-agility: #0A6B57;
+  --pillar-impulse: #D2691E;
+  --pillar-memory: #34479A;
+  --pillar-visual: #6E560C;
+
+  /* Exercise palette (Okabe-Ito based, >= 3:1 on surface; Stroop and Tower inks >= 4.5:1).
+     --dim-4 and --dim-8 left plum and indigo for teal and brown (anti-slop rule 1). */
   --dim-1: #0072B2;
   --dim-2: #C45100;
   --dim-3: #008662;
-  --dim-4: #9E4778;
+  --dim-4: #00747F;
   --dim-5: #A86E00;
   --dim-6: #0B76A8;
   --dim-7: #7D7300;
-  --dim-8: #4F46E5;
+  --dim-8: #80552A;
   --dim-9: #0F766E;
   --dim-10: #831843;
 
-  /* Uncertainty Tokens */
-  --uncertainty-band-fill: rgba(79, 70, 229, 0.18);
-  --uncertainty-low-stroke: #9E4778;
-  --uncertainty-low-tint: #EEF2FF;
+  /* Uncertainty Tokens: a 15% band in the sky hue */
+  --uncertainty-band-fill: rgba(43, 143, 214, 0.15);
+  --uncertainty-low-stroke: #46617A;
+  --uncertainty-low-tint: #E8F3FB;
 
-  /* One soft elevation for cards and popovers. The legacy names all carry it. */
-  --shadow-elevation: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.06);
-  --shadow-doodle: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.06);
-  --shadow-doodle-sm: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.06);
-  --shadow-doodle-lg: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.06);
-  --shadow-tactile: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.06);
-  --shadow-tactile-active: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.06);
-  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.06);
-  --shadow-soft: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.06);
-  --shadow-soft-hover: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.06);
-  --shadow-hero: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.06);
+  /* One soft elevation for real containers. The legacy names all carry it. */
+  --shadow-elevation: 0 6px 20px rgb(30 111 168 / 0.08);
+  --shadow-doodle: var(--shadow-elevation);
+  --shadow-doodle-sm: var(--shadow-elevation);
+  --shadow-doodle-lg: var(--shadow-elevation);
+  --shadow-tactile: var(--shadow-elevation);
+  --shadow-tactile-active: var(--shadow-elevation);
+  --shadow-card: var(--shadow-elevation);
+  --shadow-soft: var(--shadow-elevation);
+  --shadow-soft-hover: var(--shadow-elevation);
+  --shadow-hero: var(--shadow-elevation);
+
+  /* Clay depth: characters, illustrations and at most the primary CTA (anti-slop rule 9). */
+  --clay: 0 12px 28px rgb(30 111 168 / 0.16), inset 0 2px 6px rgb(255 255 255 / 0.7), inset 0 -4px 10px rgb(15 34 51 / 0.1);
 
   /* EMILY Emotion Adaptive Color Tokens (Default: Calm Flow) */
   --color-emotion-accent: #0D9488;
@@ -110,9 +132,9 @@
   --color-emotion-glow: rgba(13, 148, 136, 0.12);
   --color-emotion-badge: #0D9488;
 
-  /* Typography Families */
-  --font-display: 'Lexend', system-ui, sans-serif;
-  --font-sans: 'Lexend', system-ui, sans-serif;
+  /* Typography Families: Quicksand for headings of 20 px and up, Inter for everything else */
+  --font-display: 'Quicksand', 'Inter', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
   /* Typography Scale (12 / 14 / 16 / 18 / 20 / 24 / 32 px) */
@@ -143,63 +165,73 @@
   --space-12: 3rem;
   --space-16: 4rem;
 
-  /* Radius Scale (cards xl, buttons md) */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  /* Radius Scale: soft clay (cards xl/2xl, buttons pill) */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  --radius-2xl: 28px;
   --radius-pill: 9999px;
 
-  /* Motion Scale (hover and press 150–200 ms) */
+  /* Motion Scale (hover and press 150–200 ms; ease-out to enter, ease-in to exit) */
   --duration-fast: 150ms;
   --duration-base: 200ms;
   --duration-slow: 300ms;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.55, 0, 1, 0.45);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 [data-theme="dark"] {
-  /* Calm & Clean semantic colour roles (dark) */
-  --color-canvas: #0B1120;
-  --color-surface: #111827;
-  --color-surface-raised: #1F2937;
-  --color-ink: #F8FAFC;
-  --color-ink-muted: #94A3B8;
-  --color-border: #334155;
-  --color-border-strong: #94A3B8;
-  --color-brand: #818CF8;
-  --color-brand-hover: #A5B4FC;
-  --color-brand-subtle: #1E1B4B;
-  --color-brand-ink: #0B1120;
-  --color-secondary: #CBD5E1;
-  --color-reward: #FBBF24;
-  --color-reward-ink: #0B1120;
-  --color-accent: #2DD4BF;
-  --color-accent-ink: #0B1120;
-  --color-success: #4ADE80;
-  --color-success-subtle: #052E16;
-  --color-warning: #FBBF24;
-  --color-warning-subtle: #422006;
-  --color-danger: #F87171;
-  --color-danger-subtle: #450A0A;
-  --color-info: #818CF8;
-  --color-info-subtle: #1E1B4B;
+  /* Brand v2 semantic colour roles (dark) */
+  --color-canvas: #0B1622;
+  --color-surface: #122130;
+  --color-surface-raised: #1A2D40;
+  --color-ink: #F2F8FC;
+  --color-ink-muted: #A9C1D6;
+  --color-border: #2A4157;
+  --color-border-strong: #8FB0CC;
+  --color-brand: #7CC4F2;
+  --color-brand-hover: #A5D6F6;
+  --color-brand-subtle: #15304A;
+  --color-brand-ink: #0B1622;
+  --color-brand-vivid: #7CC4F2;
+  --color-secondary: #C5D8E8;
+  --color-reward: #FF9F86;
+  --color-reward-ink: #0B1622;
+  --color-accent: #FF9F86;
+  --color-accent-ink: #0B1622;
+  --color-accent-strong: #FF9F86;
+  --color-success: #6FCF97;
+  --color-success-subtle: #123123;
+  --color-warning: #F2C063;
+  --color-warning-subtle: #33270F;
+  --color-danger: #F28B9E;
+  --color-danger-subtle: #3A1A24;
+  --color-info: #7CC4F2;
+  --color-info-subtle: #15304A;
 
-  /* Okabe-Ito Dark Theme Dimension Palette */
+  --pillar-focus: #8ECDF5;
+  --pillar-agility: #2E9E84;
+  --pillar-impulse: #D97A2E;
+  --pillar-memory: #5B7BDC;
+  --pillar-visual: #F2E29A;
+
+  /* Exercise palette (dark) */
   --dim-1: #56B4E9;
   --dim-2: #FF8C3B;
   --dim-3: #2DD4BF;
-  --dim-4: #E899C8;
+  --dim-4: #7FE0EA;
   --dim-5: #FACC15;
   --dim-6: #38BDF8;
   --dim-7: #F0E442;
-  --dim-8: #818CF8;
+  --dim-8: #E0B48A;
   --dim-9: #34D399;
   --dim-10: #F472B6;
 
-  --uncertainty-band-fill: rgba(129, 140, 248, 0.22);
-  --uncertainty-low-stroke: #F472B6;
-  --uncertainty-low-tint: #1E1B4B;
+  --uncertainty-band-fill: rgba(124, 196, 242, 0.15);
+  --uncertainty-low-stroke: #A9C1D6;
+  --uncertainty-low-tint: #1A2D40;
 
   /* Dark theme: a 1 px border only, no shadow */
   --shadow-elevation: none;
@@ -212,6 +244,8 @@
   --shadow-soft: none;
   --shadow-soft-hover: none;
   --shadow-hero: none;
+
+  --clay: 0 12px 28px rgb(0 0 0 / 0.35), inset 0 2px 6px rgb(255 255 255 / 0.14), inset 0 -4px 10px rgb(0 0 0 / 0.3);
 
   /* EMILY Dark Emotion Adaptive Color Tokens (Default: Calm Flow) */
   --color-emotion-accent: #4FD1C5;
@@ -258,21 +292,21 @@ html[data-emotion="frustrated"]:not([data-theme="dark"]) {
 :root[data-emotion="hesitant"],
 [data-theme="light"][data-emotion="hesitant"],
 html[data-emotion="hesitant"]:not([data-theme="dark"]) {
-  /* Serene Periwinkle & Warm Honey (Cognitive grounding) */
-  --color-emotion-accent: #5A67D8;
-  --color-emotion-tint: #F4F5FC;
-  --color-emotion-glow: rgba(90, 103, 216, 0.14);
+  /* Calm Sky & Warm Honey (Cognitive grounding) */
+  --color-emotion-accent: #2F7AB0;
+  --color-emotion-tint: #EEF5FB;
+  --color-emotion-glow: rgba(47, 122, 176, 0.14);
   --color-emotion-badge: #D97706;
 }
 
 :root[data-emotion="fatigued"],
 [data-theme="light"][data-emotion="fatigued"],
 html[data-emotion="fatigued"]:not([data-theme="dark"]) {
-  /* Twilight Indigo & Revitalizing Mint (Circadian recovery) */
-  --color-emotion-accent: #5C6B9C;
-  --color-emotion-tint: #F3F4F8;
-  --color-emotion-glow: rgba(92, 107, 156, 0.14);
-  --color-emotion-badge: #5C6B9C;
+  /* Dusk Slate & Revitalizing Mint (Circadian recovery) */
+  --color-emotion-accent: #5A7186;
+  --color-emotion-tint: #F1F5F8;
+  --color-emotion-glow: rgba(90, 113, 134, 0.14);
+  --color-emotion-badge: #5A7186;
 }
 
 /* ==========================================================================
@@ -314,10 +348,10 @@ html[data-theme="dark"][data-emotion="hesitant"] {
 
 [data-theme="dark"][data-emotion="fatigued"],
 html[data-theme="dark"][data-emotion="fatigued"] {
-  --color-emotion-accent: #B794F4;
-  --color-emotion-tint: #201D33;
-  --color-emotion-glow: rgba(183, 148, 244, 0.16);
-  --color-emotion-badge: #B794F4;
+  --color-emotion-accent: #A3BBD0;
+  --color-emotion-tint: #1A2330;
+  --color-emotion-glow: rgba(163, 187, 208, 0.16);
+  --color-emotion-badge: #A3BBD0;
 }
 
 @layer base {
@@ -366,13 +400,20 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     transition: background-color var(--duration-base) ease, color var(--duration-base) ease;
   }
 
+  /* Headings default to Inter; Quicksand only from 20 px (text-xl) up, per the spec's Typography. */
   h1,
   h2,
   h3,
-  h4 {
-    font-family: var(--font-display);
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-sans);
     font-weight: 600;
     letter-spacing: normal;
+  }
+
+  :is(h1, h2, h3, h4, h5, h6):is(.text-xl, .text-2xl, .text-3xl, .text-4xl, .text-5xl, .text-6xl) {
+    font-family: var(--font-display);
   }
 }
 
@@ -381,12 +422,13 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     font-family: var(--font-display);
   }
 
+  /* Numbers: Inter with tabular numerals (class name kept for its call sites) */
   .font-mono-tabular {
-    font-family: var(--font-mono);
+    font-family: var(--font-sans);
     font-variant-numeric: tabular-nums;
   }
 
-  /* Card primitives: 1 px border, radius xl, the soft elevation, no movement */
+  /* Card primitives: 1 px border, radius xl (24 px clay), the one soft elevation, no movement */
   .tactile-card {
     background-color: var(--color-surface);
     border: 1px solid var(--color-border);
@@ -413,11 +455,11 @@ html[data-theme="dark"][data-emotion="fatigued"] {
     position: relative;
   }
 
-  /* Buttons: 1 px boundary, colour change only, no offset shadow or press translate */
+  /* Buttons: 44 px pills, 1 px boundary, colour change only, no offset shadow or press translate */
   .tactile-btn {
     min-height: 44px;
     min-width: 44px;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-pill);
     border: 1px solid var(--color-border-strong);
     transition-property: background-color, border-color, color, opacity;
     transition-duration: var(--duration-fast);
@@ -589,6 +631,13 @@ html[data-theme="dark"][data-emotion="fatigued"] {
   transform: none !important;
   opacity: 1 !important;
   transition: none !important;
+}
+
+/* Quicksand is for headings of 20 px and up: a font-display element set at text-lg or smaller
+   falls back to Inter. Unlayered so it beats the font-display utility.
+   ponytail: class-name match; any responsive size (sm:text-2xl) opts the element out entirely. */
+.font-display:is(.text-xs, .text-sm, .text-base, .text-lg):not([class*=":text-"]) {
+  font-family: var(--font-sans);
 }
 
 /* Status and brand text (WCAG 2.1 AA >= 4.5:1 on canvas, surface, surface-raised and the

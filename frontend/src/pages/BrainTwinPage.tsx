@@ -939,7 +939,7 @@ export default function BrainTwinPage() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="modal-dim-title"
-          className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 bg-ink/40 flex items-center justify-center p-4 animate-in fade-in duration-150"
         >
           <div className="max-w-md w-full bg-surface p-6 rounded-2xl border-2 border-border-strong shadow-doodle-lg space-y-4">
             <div className="flex items-center justify-between border-b border-border pb-3">

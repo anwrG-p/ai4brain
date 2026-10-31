@@ -890,7 +890,7 @@ export default function DesignSystemPage() {
         <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="rounded-md border-2 border-border-strong bg-surface-raised p-4">
             <span className="font-mono-tabular text-xs font-semibold uppercase text-ink-muted">
-              --font-display · Lexend 600 (SIL OFL)
+              --font-display · Quicksand 600/700 (SIL OFL)
             </span>
             <p className="font-display text-2xl font-bold mt-2">
               Calm, Readable Headings
@@ -903,7 +903,7 @@ export default function DesignSystemPage() {
 
           <div className="rounded-md border-2 border-border-strong bg-surface-raised p-4">
             <span className="font-mono-tabular text-xs font-semibold uppercase text-ink-muted">
-              --font-sans · Lexend 400 (SIL OFL)
+              --font-sans · Inter 400/500/600 (SIL OFL)
             </span>
             <p className="text-base font-medium mt-2">
               Body text for task instructions and explainability panels,
@@ -916,7 +916,7 @@ export default function DesignSystemPage() {
 
           <div className="rounded-md border-2 border-border-strong bg-surface-raised p-4">
             <span className="font-mono-tabular text-xs font-semibold uppercase text-ink-muted">
-              --font-mono · JetBrains Mono (SIL OFL)
+              Numbers · Inter tabular-nums (SIL OFL)
             </span>
             <p className="font-mono-tabular text-xl font-bold mt-2">
               76% ± 5% · RT: 612 ms · w_i = 0.25

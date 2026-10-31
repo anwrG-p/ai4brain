@@ -532,7 +532,7 @@ export default function AuthPage({ defaultMode }: AuthPageProps) {
           role="dialog"
           aria-modal="true"
           aria-labelledby="modal-title"
-          className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-xs flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-ink/40 flex items-center justify-center p-4"
         >
           <div className="bg-surface max-w-lg w-full rounded-2xl p-6 sm:p-8 border-2 border-border-strong shadow-doodle-lg space-y-6 relative">
             <div className="doodle-tape" />

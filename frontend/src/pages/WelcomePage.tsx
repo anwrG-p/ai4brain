@@ -84,7 +84,7 @@ export default function WelcomePage() {
 
       <div className="flex flex-col gap-2 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-between">
         <p className="flex items-center gap-2 text-sm text-ink">
-          <ShieldCheck aria-hidden="true" className="h-5 w-5 shrink-0 text-accent" />
+          <ShieldCheck aria-hidden="true" className="h-5 w-5 shrink-0 text-accent-strong" />
           Private by design: no camera, no microphone, no biometrics.
         </p>
         <Link
