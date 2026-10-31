@@ -897,6 +897,36 @@ class TestRound5MethodHarms:
     def test_method_harm_hits_whatever_time_or_place_follows(self, text):
         assert crisis_check(text).hit is True
 
+    # Final review: these hit on 5bcc423 and were lost when bare will/ill/might stopped being intents.
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "I'll die tonight",
+            "I'll jump off a bridge tonight",
+            "I'll jump off the roof today",
+            "I will jump in front of a train tomorrow",
+            "I'll never wake up again, I took them all",
+            "I'll be dead by tomorrow",
+            "I might jump off a bridge",
+        ],
+    )
+    def test_ill_or_might_with_a_method_harm_hits(self, text):
+        assert crisis_check(text).hit is True
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "I'll die if I miss my streak",
+            "I'll be dead meat if I lose",
+            "I'll kill this round",
+            "I'll die laughing",
+            "I will jump to the next level",
+            "I might die of boredom",
+        ],
+    )
+    def test_ill_with_an_idiom_stays_benign(self, text):
+        assert crisis_check(text).hit is False
+
     @pytest.mark.parametrize(
         "text",
         [

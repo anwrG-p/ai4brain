@@ -315,6 +315,11 @@ _CRISIS_PHRASES: Tuple[Tuple[str, Optional[str]], ...] = (
     # Composition (see _EN_INTENT / _FR_INTENT above).
     # Method harms: no tail guard, whatever time or place follows.
     (rf"\b{_EN_SUBJECT}{_ADVERBS} {_EN_INTENT}{_FILLER} {_EN_METHOD}\b", "en"),
+    # "I'll / I will / I might" + a method harm (final review after round 5): bare will is not an
+    # intent for soft harms ("my streak will die"), but after a first-person subject a method harm
+    # is a plan ("I'll jump off a bridge tonight", "I'll be dead by tomorrow").
+    (rf"\b(?:ill|i ll|i will|i might|i may){_ADVERBS} {_EN_METHOD}\b", "en"),
+    (r"\b(?:ill|i ll|i will) be dead\b(?! meat\b)", "en"),
     (rf"\b{_FR_SUBJECT}{_ADVERBS} {_FR_INTENT}{_FILLER} {_FR_METHOD}\b", "fr"),
     # Soft harms: cleared by a game, exercise, app or object word after them.
     (rf"\b{_EN_SUBJECT}{_ADVERBS} {_EN_INTENT}{_FILLER} {_EN_SOFT}\b{_BENIGN_TAIL}", "en"),
