@@ -197,34 +197,6 @@ export interface HabitContract {
   rationale: string
 }
 
-
-export type PrivacyEventType =
-  | 'consent_updated'
-  | 'snapshot_stored'
-  | 'telemetry_batched'
-  | 'coach_analyzed'
-  | 'data_exported'
-  | 'data_purged'
-
-export interface PrivacyAuditEvent {
-  id: string
-  timestampIso: string
-  eventType: PrivacyEventType
-  fieldScope: string
-  payloadSummary: string
-  hash: string
-  status: 'verified' | 'pending' | 'revoked'
-}
-
-export interface PurgeCertificate {
-  certificateId: string
-  timestampIso: string
-  userHash: string
-  recordsPurged: number
-  storagePurged: string[]
-  status: 'CONFIRMED_PERMANENT'
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Inter-Member Integrated Contracts (Member 1 Assessment, Member 2 AI Coach, Member 3 Clustering)
 // ─────────────────────────────────────────────────────────────────────────────

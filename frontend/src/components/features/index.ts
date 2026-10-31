@@ -8,7 +8,6 @@ export * from './brain-twin/ProjectionFanChart'
 export * from './radar/UncertaintyRadar'
 export * from './collaboration/CollaborationScoreCard'
 export * from './analytics/FatigueHeatmap'
-export * from './privacy/PrivacyCenter'
 export * from './coach/WhyThisPanel'
 export * from './goals/HabitContractCard'
 
