@@ -87,6 +87,7 @@ describe('App shell (ticket 09a)', () => {
     shellAt('/dashboard')
     const footer = screen.getByRole('contentinfo')
     expect(footer.querySelectorAll('p')).toHaveLength(1)
+    expect(footer).toHaveTextContent(/^For training and self-reflection\. Not a medical tool\.$/)
     expect(within(footer).queryByRole('button')).toBeNull()
   })
 
