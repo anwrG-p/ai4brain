@@ -219,8 +219,8 @@ describe('Mascot wrapper', () => {
   it('keeps the speech bubble API and hides the figure behind a titled bubble', () => {
     render(<Mascot state="thinking" message="Let me look at that." />)
     expect(screen.getByText('Let me look at that.')).toBeInTheDocument()
-    expect(screen.getByText(/State: thinking/i)).toBeInTheDocument()
-    expect(screen.getByText(/^Loti ·/)).toBeInTheDocument()
+    expect(screen.queryByText(/State:/i)).toBeNull() // no default badge (ticket 09a)
+    expect(screen.getByText(/^Loti$/)).toBeInTheDocument()
     expect(screen.queryByRole('img')).toBeNull()
   })
 })
