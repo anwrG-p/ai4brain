@@ -108,8 +108,31 @@ function syncDocumentAttributes(theme: ThemeMode, reducedMotion: boolean, textSc
   }
 }
 
+/** The theme survives a reload; nothing else in this store is stored. */
+export const THEME_KEY = 'synapsetwin_theme_v1'
+
+function loadTheme(): ThemeMode {
+  try {
+    const stored = localStorage.getItem(THEME_KEY)
+    return stored === 'dark' ? 'dark' : 'light'
+  } catch {
+    return 'light' // storage blocked
+  }
+}
+
+function saveTheme(theme: ThemeMode) {
+  try {
+    localStorage.setItem(THEME_KEY, theme)
+  } catch {
+    // Storage full or blocked: the theme holds for this visit.
+  }
+}
+
+const initialTheme = loadTheme()
+syncDocumentAttributes(initialTheme, false)
+
 export const useAppStore = create<AppState>((set) => ({
-  theme: 'light',
+  theme: initialTheme,
   reducedMotion: false,
   dimensionPreset: '7',
   showMascot: true,
@@ -232,6 +255,10 @@ export const useAppStore = create<AppState>((set) => ({
       }
     }),
 }))
+
+useAppStore.subscribe((state, prev) => {
+  if (state.theme !== prev.theme) saveTheme(state.theme)
+})
 
 if (typeof window !== 'undefined') {
   ;(window as any).__appStore = useAppStore
