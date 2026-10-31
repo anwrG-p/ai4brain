@@ -75,7 +75,8 @@ test.describe('Page 13: Privacy (/privacy)', () => {
       ['aura_uid', 'synapsetwin_consent_v1', 'synapsetwin_goals_v1', 'synapsetwin_sessions_v1', 'synapsetwin_telemetry_queue_v2'],
     )
     expect(data.localStorage.synapsetwin_consent_v1).toBe('denied')
-    expect(Object.keys(data.sessionStorage)).toEqual(['synapsetwin_loti_v1'])
+    // Loti's talk comes from its store (INT-1), not a raw sessionStorage key.
+    expect(data.lotiTalk).toEqual({ turns: [], current: null })
     expect(data.app).toHaveProperty('userProfile')
     expect(data.app).toHaveProperty('theme')
   })
