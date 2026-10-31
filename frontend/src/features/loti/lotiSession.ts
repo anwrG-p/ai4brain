@@ -1,5 +1,8 @@
 import { create } from 'zustand'
-import type { LotiChoice, LotiMessage } from './types'
+import type { TaskSchemaType } from '../../types'
+import { sanitizeTarget } from '../insights/goals'
+import { isPillarId } from '../insights/pillars'
+import type { LotiAction, LotiChoice, LotiMessage } from './types'
 
 /* The talk with Loti for this browser session: what Loti said, what the user picked, and the open
    question. Every LotiBubbles records into it, so a talk started on one page continues on /coach.
@@ -34,15 +37,53 @@ const isTurn = (x: unknown): x is LotiTurn => {
   return !!t && (t.from === 'loti' || t.from === 'you') && typeof t.text === 'string'
 }
 
-const isMessage = (x: unknown): x is LotiMessage => {
+const SCHEMA_TYPES = ['n_back', 'stroop', 'matrix', 'mental_rotation', 'relational', 'tower', 'ufov', 'mst'] as const satisfies readonly TaskSchemaType[]
+const isSchemaType = (x: unknown): x is TaskSchemaType => SCHEMA_TYPES.some((t) => t === x)
+/** An in-app path only: one leading slash, no protocol-relative "//", no backslash. */
+const isAppPath = (x: unknown): x is string => typeof x === 'string' && /^\/(?![/\\])[^\\]*$/.test(x)
+
+/** Stored actions are untrusted (anyone can edit sessionStorage): rebuild each from known fields
+    and drop anything that does not check out. */
+function cleanAction(x: unknown): LotiAction | undefined {
+  if (!x || typeof x !== 'object') return undefined
+  const a = x as Record<string, unknown>
+  switch (a.kind) {
+    case 'train': {
+      if (a.pillar !== undefined && !isPillarId(a.pillar)) return undefined
+      if (a.schemaType !== undefined && !isSchemaType(a.schemaType)) return undefined
+      return {
+        kind: 'train',
+        ...(a.pillar !== undefined && { pillar: a.pillar }),
+        ...(a.schemaType !== undefined && { schemaType: a.schemaType }),
+      }
+    }
+    case 'navigate':
+      return isAppPath(a.to) ? { kind: 'navigate', to: a.to } : undefined
+    case 'setGoal': {
+      const target = sanitizeTarget(a.target)
+      return isPillarId(a.pillar) && target !== null ? { kind: 'setGoal', pillar: a.pillar, target } : undefined
+    }
+    case 'reply':
+      return typeof a.nodeId === 'string' ? { kind: 'reply', nodeId: a.nodeId } : undefined
+    default:
+      return undefined
+  }
+}
+
+function cleanMessage(x: unknown): LotiMessage | null {
   const m = x as Partial<LotiMessage> | null
-  return (
-    !!m &&
-    typeof m.id === 'string' &&
-    typeof m.text === 'string' &&
-    Array.isArray(m.choices) &&
-    m.choices.every((c) => !!c && typeof c.id === 'string' && typeof c.label === 'string')
-  )
+  if (!m || typeof m.id !== 'string' || typeof m.text !== 'string' || !Array.isArray(m.choices)) return null
+  const choices: LotiChoice[] = []
+  for (const c of m.choices as unknown[]) {
+    const choice = c as Partial<LotiChoice> | null
+    if (!choice || typeof choice.id !== 'string' || typeof choice.label !== 'string') return null
+    const action = cleanAction(choice.action)
+    // A choice whose action fails the check stays as a plain reply that ends the talk.
+    choices.push(action ? { id: choice.id, label: choice.label, action } : { id: choice.id, label: choice.label })
+  }
+  const message: LotiMessage = { id: m.id, text: m.text, choices }
+  if (m.pose === 'idle' || m.pose === 'talk' || m.pose === 'think' || m.pose === 'happy' || m.pose === 'wave') message.pose = m.pose
+  return message
 }
 
 /** Reads the stored talk; corrupt, foreign or other-version data reads as empty, a bad turn is dropped. */
@@ -52,7 +93,7 @@ export function loadLotiSession(): LotiTalk {
     if (!raw || typeof raw !== 'object') return EMPTY
     const { version, turns, current } = raw as Record<string, unknown>
     if (version !== VERSION || !Array.isArray(turns)) return EMPTY
-    return { turns: turns.filter(isTurn), current: isMessage(current) ? current : null }
+    return { turns: turns.filter(isTurn).map((t) => ({ from: t.from, text: t.text })), current: cleanMessage(current) }
   } catch {
     return EMPTY
   }

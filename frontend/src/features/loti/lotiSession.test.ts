@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LOTI_SESSION_KEY, MAX_TURNS, loadLotiSession, useLotiSession } from './lotiSession'
 import type { LotiMessage } from './types'
 
@@ -21,6 +21,7 @@ const tough: LotiMessage = { id: 'day-tough', text: "Sorry it was tough. Rest co
 const state = () => useLotiSession.getState()
 
 afterEach(() => {
+  vi.restoreAllMocks()
   state().clear()
   sessionStorage.clear()
 })
@@ -93,5 +94,40 @@ describe('lotiSession', () => {
     expect(state().turns).toEqual([])
     expect(state().current).toBeNull()
     expect(sessionStorage.getItem(LOTI_SESSION_KEY)).toBeNull()
+  })
+
+  it('drops tampered actions on load: off-site navigation, unknown pillars, bad goals and schema types', () => {
+    const tampered = {
+      id: 'day-great',
+      text: 'Good to hear! Want to put some time into training?',
+      pose: 'evil',
+      choices: [
+        { id: 'a', label: 'A', action: { kind: 'navigate', to: 'https://example.com' } },
+        { id: 'b', label: 'B', action: { kind: 'navigate', to: '//example.com' } },
+        { id: 'c', label: 'C', action: { kind: 'train', pillar: 'nope' } },
+        { id: 'd', label: 'D', action: { kind: 'train', schemaType: 'rm -rf' } },
+        { id: 'e', label: 'E', action: { kind: 'setGoal', pillar: 'memory', target: 'lots' } },
+        { id: 'f', label: 'F', action: { kind: 'eval', code: 'x' } },
+        { id: 'g', label: 'G', action: { kind: 'train', pillar: 'memory', extra: 1 } },
+        { id: 'h', label: 'H', action: { kind: 'navigate', to: '/train' } },
+        { id: 'i', label: 'I', action: { kind: 'setGoal', pillar: 'focus', target: 500 } },
+      ],
+    }
+    sessionStorage.setItem(LOTI_SESSION_KEY, JSON.stringify({ version: 1, turns: [], current: tampered }))
+    const current = loadLotiSession().current!
+    expect(current.pose).toBeUndefined()
+    expect(current.choices.slice(0, 6).map((c) => c.action)).toEqual([undefined, undefined, undefined, undefined, undefined, undefined])
+    expect(current.choices[6]!.action).toEqual({ kind: 'train', pillar: 'memory' })
+    expect(current.choices[7]!.action).toEqual({ kind: 'navigate', to: '/train' })
+    expect(current.choices[8]!.action).toEqual({ kind: 'setGoal', pillar: 'focus', target: 100 })
+  })
+
+  it('still updates the talk when storage refuses to save', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceededError')
+    })
+    expect(() => state().record(day, day.choices[0]!, great)).not.toThrow()
+    expect(state().turns).toHaveLength(2)
+    expect(state().current).toEqual(great)
   })
 })

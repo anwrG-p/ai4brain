@@ -6,7 +6,8 @@ import CoachPage from '../pages/CoachPage'
 import { useGoalsStore } from '../features/insights/goals'
 import { useSessionStore } from '../features/insights/sessionStore'
 import { LotiBubbles } from '../features/loti/LotiBubbles'
-import { LOTI_SESSION_KEY, useLotiSession } from '../features/loti/lotiSession'
+import { LOTI_SESSION_KEY, loadLotiSession, useLotiSession } from '../features/loti/lotiSession'
+import { createCoachBrain, keywordCrisisGate } from '../features/loti/coachAdapter'
 
 const future = { v7_startTransition: true, v7_relativeSplatPath: true }
 
@@ -15,11 +16,11 @@ function Where() {
   return <p data-testid="where">{loc.pathname + loc.search}</p>
 }
 
-function renderAt(path = '/coach') {
+function renderAt(path = '/coach', page = <CoachPage />) {
   return render(
     <MemoryRouter initialEntries={[path]} future={future}>
       <Routes>
-        <Route path="/coach" element={<CoachPage />} />
+        <Route path="/coach" element={page} />
         <Route path="/dashboard" element={<LotiBubbles context={{ now: new Date(), hasGoalsThisYear: true, sessionsThisWeek: 0 }} />} />
         <Route path="*" element={<Where />} />
       </Routes>
@@ -169,5 +170,63 @@ describe('CoachPage (/coach)', () => {
     await user.keyboard('{Enter}')
     expect(within(log()).getByText(/thanks for telling me/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /yes, let's try one/i })).toHaveFocus()
+  })
+
+  it('a pick keeps the answered question in place: the log gains only the reply and the new bubble', async () => {
+    const user = userEvent.setup()
+    renderAt()
+    const bubble = () => within(log()).getAllByText('How was your day?')[0]!.closest('[data-from="loti"]')
+    const question = bubble()
+    const removed: Node[] = []
+    const added: Node[] = []
+    const observer = new MutationObserver((records) => {
+      for (const r of records) {
+        removed.push(...r.removedNodes)
+        added.push(...r.addedNodes)
+      }
+    })
+    observer.observe(log(), { childList: true })
+    await user.click(screen.getByRole('button', { name: 'Great' }))
+    for (const r of observer.takeRecords()) {
+      removed.push(...r.removedNodes)
+      added.push(...r.addedNodes)
+    }
+    observer.disconnect()
+    expect(bubble()).toBe(question)
+    expect(removed).toHaveLength(0)
+    expect(added.map((n) => n.textContent)).toEqual(['You: Great', expect.stringMatching(/^Loti: Good to hear/)])
+  })
+
+  it('only Loti’s bubble animates in; the chips never start hidden', () => {
+    renderAt()
+    expect(screen.getByRole('group', { name: /reply to loti/i }).className).not.toMatch(/anim-/)
+  })
+
+  it('never runs an action from a tampered session: it only ends the talk', async () => {
+    const user = userEvent.setup()
+    sessionStorage.setItem(
+      LOTI_SESSION_KEY,
+      JSON.stringify({
+        version: 1,
+        turns: [],
+        current: { id: 'day-great', text: 'Want to go?', choices: [{ id: 'go', label: 'Go', action: { kind: 'navigate', to: 'https://example.com' } }] },
+      }),
+    )
+    useLotiSession.setState(loadLotiSession())
+    renderAt()
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(screen.queryByTestId('where')).toBeNull()
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument()
+  })
+
+  it('shows no disclosure while the LLM path is off (the default)', () => {
+    renderAt()
+    expect(screen.queryByText(/not a doctor/i)).toBeNull()
+  })
+
+  it('shows one muted disclosure line when the LLM path is on, still within 60 words', () => {
+    const { container } = renderAt('/coach', <CoachPage brain={createCoachBrain({ enabled: true, crisisGate: keywordCrisisGate })} />)
+    expect(screen.getByText('Loti is an AI guide, not a doctor.')).toBeInTheDocument()
+    expect(visibleWords(container)).toBeLessThanOrEqual(60)
   })
 })
