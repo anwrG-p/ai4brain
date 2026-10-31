@@ -1040,6 +1040,9 @@ body {
   background-size: 24px 24px;
   border: 2.5px solid var(--color-border-strong);
   border-radius: var(--radius-xl);
+  overflow: clip;
+  display: flex;
+  flex-direction: column;
 }
 
 @media (min-width: 640px) {

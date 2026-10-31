@@ -48,7 +48,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const themeLabel = theme === 'light' ? 'Switch to Dark (Night Lab)' : 'Switch to Light (Playful Lab)'
 
   return (
-    <div className={`min-h-screen flex flex-col bg-canvas text-ink ${withNav ? 'pb-16 lg:pb-0' : ''}`}>
+    <div className={`flex-1 flex flex-col text-ink ${withNav ? 'pb-16 lg:pb-0' : ''}`}>
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:start-2 focus:z-50 focus:px-4 focus:py-2 focus:rounded-md focus:bg-brand focus:text-brand-ink focus:font-semibold"
