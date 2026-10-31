@@ -1,446 +1,166 @@
-import { useState, useSyncExternalStore } from 'react'
-import { Link } from 'react-router-dom'
-import { PrivacyCenter } from '../components/features/privacy/PrivacyCenter'
-import { WhyThisPanel } from '../components/features/coach/WhyThisPanel'
-import { Mascot } from '../components/features/brand/Mascot'
-import { Badge } from '../components/ui/Badge'
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 import { Button } from '../components/ui/Button'
-import { Card } from '../components/ui/Card'
-import { DoodleSquiggle } from '../components/ui/DoodleDecorations'
 import { useAppStore } from '../state/useAppStore'
 import { tracker, type Consent } from '../features/assessment/telemetry/tracker'
 import { forgetUserId } from '../features/assessment/tasks/taskSource'
 import { useGoalsStore } from '../features/insights/goals'
 import { useSessionStore } from '../features/insights/sessionStore'
-import { MOCK_PRIVACY_AUDIT_LOG } from '../services/mocks/fixtures'
-import type { PrivacyAuditEvent, PurgeCertificate, WhyThisTrail } from '../types'
-
-const PRIVACY_WHY_THIS_TRAIL: WhyThisTrail = {
-  id: 'why-privacy-01',
-  confidence: 0.99,
-  observedData: [
-    'IEEE P7000 / EDPB Granular Consent Architecture active',
-    'This preview keeps your answers in memory only and stores nothing in your browser',
-    'Zero-Biometrics Software Isolation Proof passed',
-  ],
-  inference:
-    'Hardware-level software lockout permanently guarantees no camera, microphone, or biometric sensors are ever invoked or accessible.',
-  recommendation:
-    'Keeping Historical Snapshots active allows your Personal Cognitive Twin to detect learning plateaus and recommend rest days with zero streak penalties.',
-  counterfactual:
-    'If Core Telemetry were revoked, adaptive staircase latency estimation would be unable to calibrate trial difficulty.',
-  sourceModule: 'quest_staircase',
-}
-
-export default function PrivacyPage() {
-  const {
-    consentPreferences,
-    updateConsentPreferences,
-    simulateOffline,
-    resetDemoState,
-  } = useAppStore()
-
-  const [auditEvents, setAuditEvents] = useState<PrivacyAuditEvent[]>(
-    MOCK_PRIVACY_AUDIT_LOG,
-  )
-  const [isPurgeModalOpen, setIsPurgeModalOpen] = useState(false)
-  const [purgeAckChecked, setPurgeAckChecked] = useState(false)
-  const [purgeCertificate, setPurgeCertificate] = useState<PurgeCertificate | null>(
-    null,
-  )
-  const [downloadSuccessMessage, setDownloadSuccessMessage] = useState<string | null>(
-    null,
-  )
-
-  // Granular consent update with audit log appending
-  const handleUpdateConsent = (patch: Partial<typeof consentPreferences>) => {
-    updateConsentPreferences(patch)
-
-    const patchKey = Object.keys(patch)[0] ?? 'unknown'
-    const patchVal = Object.values(patch)[0]
-
-    const newEvent: PrivacyAuditEvent = {
-      id: `evt-aud-${Date.now()}`,
-      timestampIso: new Date().toISOString(),
-      eventType: 'consent_updated',
-      fieldScope: `${patchKey}: ${String(patchVal)}`,
-      payloadSummary: `User adjusted ${patchKey} preference. Live telemetry schema recalculated.`,
-      hash: `SHA256: ${Math.random().toString(16).substring(2, 10)}${Math.random().toString(16).substring(2, 10)}${Math.random().toString(16).substring(2, 10)}`,
-      status: 'verified',
-    }
-
-    setAuditEvents((prev) => [newEvent, ...prev])
-  }
-
-  // Reject all optional handler (EDPB equal prominence)
-  const handleRejectAllOptional = () => {
-    updateConsentPreferences({
-      historicalSnapshots: false,
-      coachAndCollab: false,
-      researchExport: false,
-    })
-
-    const newEvent: PrivacyAuditEvent = {
-      id: `evt-aud-${Date.now()}`,
-      timestampIso: new Date().toISOString(),
-      eventType: 'consent_updated',
-      fieldScope: 'allOptional: revoked',
-      payloadSummary:
-        'User executed single-click Reject All Optional consent action.',
-      hash: `SHA256: ${Math.random().toString(16).substring(2, 10)}${Math.random().toString(16).substring(2, 10)}${Math.random().toString(16).substring(2, 10)}`,
-      status: 'verified',
-    }
-    setAuditEvents((prev) => [newEvent, ...prev])
-  }
-
-  // Restore defaults handler
-  const handleRestoreDefaults = () => {
-    updateConsentPreferences({
-      historicalSnapshots: true,
-      coachAndCollab: true,
-      researchExport: false,
-    })
-
-    const newEvent: PrivacyAuditEvent = {
-      id: `evt-aud-${Date.now()}`,
-      timestampIso: new Date().toISOString(),
-      eventType: 'consent_updated',
-      fieldScope: 'defaults: restored',
-      payloadSummary: 'User restored default consent profile.',
-      hash: `SHA256: ${Math.random().toString(16).substring(2, 10)}${Math.random().toString(16).substring(2, 10)}${Math.random().toString(16).substring(2, 10)}`,
-      status: 'verified',
-    }
-    setAuditEvents((prev) => [newEvent, ...prev])
-  }
-
-  // GDPR Article 20: Data portability export
-  const handleExportData = () => {
-    const archivePayload = {
-      archiveFormat: 'cistac-v1.0',
-      exportTimestampUtc: new Date().toISOString(),
-      consentReceipt: consentPreferences,
-      auditTrail: auditEvents,
-      activeDimensionsCount: 7,
-      storageClassification: simulateOffline
-        ? 'local_indexed_queue'
-        : 'encrypted_session',
-      nonBiometricCertificate: {
-        enforced: true,
-        camera: 'DISCONNECTED',
-        microphone: 'DISCONNECTED',
-        biometrics: 'ZERO_CAPTURED',
-      },
-    }
-
-    const dataBlob = new Blob([JSON.stringify(archivePayload, null, 2)], {
-      type: 'application/json',
-    })
-    const url = URL.createObjectURL(dataBlob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = `synapsetwin-data-archive-${Date.now()}.json`
-    document.body.appendChild(anchor)
-    anchor.click()
-    document.body.removeChild(anchor)
-    URL.revokeObjectURL(url)
-
-    setDownloadSuccessMessage(
-      '✓ GDPR Article 20 complete data archive downloaded successfully.',
-    )
-    setTimeout(() => setDownloadSuccessMessage(null), 4000)
-
-    const exportEvent: PrivacyAuditEvent = {
-      id: `evt-aud-${Date.now()}`,
-      timestampIso: new Date().toISOString(),
-      eventType: 'data_exported',
-      fieldScope: 'cistac-v1.0 complete archive',
-      payloadSummary:
-        'Self-service machine-readable data portability archive exported.',
-      hash: `SHA256: ${Math.random().toString(16).substring(2, 10)}${Math.random().toString(16).substring(2, 10)}${Math.random().toString(16).substring(2, 10)}`,
-      status: 'verified',
-    }
-    setAuditEvents((prev) => [exportEvent, ...prev])
-  }
-
-  // GDPR Article 17: Right to Erasure confirmation
-  const handleConfirmPurge = () => {
-    resetDemoState()
-    // Drops pending events on this device; server-side deletion is Member 4's route.
-    const recordsPurged = tracker.clear()
-    // Back to not asked: nothing is sent until the user accepts again.
-    tracker.resetConsent()
-    forgetUserId()
-    // The dashboard's local data: completed sessions and yearly goals.
-    useSessionStore.getState().clearSessions()
-    useGoalsStore.getState().clearGoals()
-
-    const cert: PurgeCertificate = {
-      certificateId: `CERT-PURGE-2026-${Math.random()
-        .toString(16)
-        .substring(2, 6)
-        .toUpperCase()}`,
-      timestampIso: new Date().toISOString(),
-      userHash: 'ANON_USER_SALT_8F4A',
-      recordsPurged,
-      storagePurged: [
-        'data/raw/telemetry/*.jsonl',
-        'sat_jepa_latent_snapshots',
-        'collaboration_rubric_logs',
-        'habit_contracts_cache',
-      ],
-      status: 'CONFIRMED_PERMANENT',
-    }
-
-    setPurgeCertificate(cert)
-    setIsPurgeModalOpen(false)
-    setPurgeAckChecked(false)
-
-    const purgeEvent: PrivacyAuditEvent = {
-      id: `evt-aud-${Date.now()}`,
-      timestampIso: new Date().toISOString(),
-      eventType: 'data_purged',
-      fieldScope: 'all_telemetry_and_profiles',
-      payloadSummary: `Irrevocable data purge executed under GDPR Article 17. Certificate ${cert.certificateId} issued.`,
-      hash: `SHA256: 0000000000000000000000000000000000000000000000000000000000000000`,
-      status: 'verified',
-    }
-    setAuditEvents([purgeEvent])
-  }
-
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Page Header Banner */}
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge tone="brand" glyph="★">
-            Layer C Sovereign Hub
-          </Badge>
-          <Badge tone="neutral" glyph="◈">
-            Signature #6 &lt;PrivacyCenter /&gt;
-          </Badge>
-          <Badge tone="success" glyph="●">
-            GDPR Articles 15, 17 &amp; 20 Compliant
-          </Badge>
-        </div>
-
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="font-display font-bold text-3xl sm:text-4xl text-ink tracking-tight">
-              Privacy Center &amp; Sovereign Audit Log
-            </h1>
-            <DoodleSquiggle className="max-w-xs mt-1" />
-            <p className="text-sm sm:text-base text-ink-muted max-w-3xl mt-1 leading-relaxed">
-              Verify mathematical hardware locks, inspect live AI telemetry payloads, manage granular consent, and execute statutory GDPR rights with tamper-evident audit receipts.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <Link to="/dashboard">
-              <Button variant="secondary" size="sm">
-                ← Return to Dashboard
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      <ConsentLine />
-
-      {/* Download Alert Notification */}
-      {downloadSuccessMessage && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="p-4 rounded-xl border border-brand/30 bg-brand/10 text-ink text-sm font-semibold flex items-center gap-2"
-        >
-          <span>✓</span>
-          <span>{downloadSuccessMessage}</span>
-        </div>
-      )}
-
-      {/* Deletion Certificate Banner */}
-      {purgeCertificate && (
-        <Card
-          className="p-5 border-2 border-success/40 bg-success/10 shadow-sm"
-          aria-label="Cryptographic Deletion Certificate"
-        >
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-display font-bold text-ink text-base">
-                  Cryptographic Deletion Certificate Issued
-                </span>
-                <Badge tone="success" glyph="●">
-                  {purgeCertificate.status}
-                </Badge>
-              </div>
-              <p className="text-xs text-ink-muted leading-relaxed">
-                Certificate ID: <code className="font-mono text-ink font-bold">{purgeCertificate.certificateId}</code> · Purged {purgeCertificate.recordsPurged} records across all telemetry queues.
-              </p>
-            </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setPurgeCertificate(null)}
-            >
-              Dismiss
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {/* Signature #6: PrivacyCenter Component */}
-      <PrivacyCenter
-        consentPreferences={consentPreferences}
-        onUpdateConsent={handleUpdateConsent}
-        onRejectAllOptional={handleRejectAllOptional}
-        onRestoreDefaults={handleRestoreDefaults}
-        onExportData={handleExportData}
-        onRequestPurge={() => setIsPurgeModalOpen(true)}
-        simulateOffline={simulateOffline}
-        auditEvents={auditEvents}
-      />
-
-      {/* Companion Mascot & Explainability Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        <div className="lg:col-span-8">
-          <WhyThisPanel
-            trail={PRIVACY_WHY_THIS_TRAIL}
-            defaultExpanded={true}
-            title="Why this privacy architecture?"
-          />
-        </div>
-        <div className="lg:col-span-4">
-          <Card className="p-6 border-border flex flex-col items-center text-center">
-            <Mascot state="idle" size="md" className="mb-3" />
-            <span className="font-display font-bold text-ink text-base mb-1">
-              Privacy Guard Mascot
-            </span>
-            <p className="text-xs text-ink-muted leading-relaxed">
-              "Your cognitive twin stays 100% private and under your sovereign control. We never touch camera or audio sensors."
-            </p>
-          </Card>
-        </div>
-      </div>
-
-      {/* 2-Step Destructive Purge Modal */}
-      {isPurgeModalOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="purge-modal-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/60"
-        >
-          <div className="bg-surface border-2 border-danger/40 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in duration-200">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-danger/10 text-danger flex items-center justify-center shrink-0">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <div>
-                <h3
-                  id="purge-modal-title"
-                  className="font-display font-bold text-lg text-ink"
-                >
-                  Confirm Irrevocable Data Purge (GDPR Art. 17)
-                </h3>
-                <p className="text-xs text-ink-muted mt-1 leading-relaxed">
-                  This action permanently erases all session reaction times, task accuracy logs, 14-snapshot Brain Twin vectors, collaboration scores, and habit contracts from both local storage and mock telemetry queues.
-                </p>
-              </div>
-            </div>
-
-            <div className="p-3.5 rounded-xl border border-danger/20 bg-danger/5 text-xs text-danger leading-relaxed space-y-1">
-              <span className="font-bold block">Consequences of Purging:</span>
-              <ul className="list-disc list-inside space-y-0.5">
-                <li>Brain Twin manifold will reset to initial uncalibrated state.</li>
-                <li>Longitudinal time travel snapshots will be destroyed.</li>
-                <li>A tamper-evident Deletion Certificate will be generated for your records.</li>
-              </ul>
-            </div>
-
-            <label className="flex items-start gap-2.5 cursor-pointer text-xs text-ink">
-              <input
-                type="checkbox"
-                checked={purgeAckChecked}
-                onChange={(e) => setPurgeAckChecked(e.target.checked)}
-                className="mt-0.5 rounded border-border text-danger focus:ring-danger"
-              />
-              <span className="select-none font-semibold">
-                I understand this action is immediate, permanent, and cannot be undone.
-              </span>
-            </label>
-
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setIsPurgeModalOpen(false)
-                  setPurgeAckChecked(false)
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                disabled={!purgeAckChecked}
-                onClick={handleConfirmPurge}
-                className="font-semibold disabled:opacity-40"
-              >
-                Permanently Purge All Data
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
 
 const CONSENT_LINE: Record<Consent, string> = {
-  pending: 'Your answers stay on this device until you choose.',
-  granted: 'You chose to share your answers with us.',
-  denied: 'You chose not to share. Your answers stay on this device.',
+  pending: 'Not chosen yet. Your answers stay on this device.',
+  granted: 'Your answers are saved.',
+  denied: 'Your answers are kept on this device only.',
 }
 
 const subscribeTracker = (onChange: () => void) => tracker.subscribe(onChange)
 const currentConsent = () => tracker.getStatus().consent
 
-// R3 consent in one plain line; the two equal choices sit behind one quiet link (rules 13, 14).
-function ConsentLine() {
+const QUIET = 'focus-ring inline-flex min-h-11 cursor-pointer items-center rounded-sm text-sm font-medium underline underline-offset-4'
+
+/* The privacy purge: everything this device holds about the user. The pending answers (the
+   tracker's queue), the consent choice (back to not chosen, so nothing is sent until they choose
+   again), the anonymous id, the finished sessions and goals, and the profile and app settings.
+   ponytail: device only; server-side deletion is Member 4's route. */
+function deleteMyData() {
+  useAppStore.getState().resetDemoState()
+  tracker.clear()
+  tracker.resetConsent()
+  forgetUserId()
+  useSessionStore.getState().clearSessions()
+  useGoalsStore.getState().clearGoals()
+}
+
+/* Privacy: the consent status in one line with one control to change it (R3, equal choices),
+   one sentence on what is recorded, and "Delete my data" behind a confirmation (rules 13, 14). */
+export default function PrivacyPage() {
   const consent = useSyncExternalStore(subscribeTracker, currentConsent)
-  const [open, setOpen] = useState(false)
-  const choose = (share: boolean) => {
-    if (share) tracker.grantConsent()
+  const [choosing, setChoosing] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [deleted, setDeleted] = useState(false)
+
+  const choose = (save: boolean) => {
+    if (save) tracker.grantConsent()
     else tracker.denyConsent()
-    setOpen(false)
+    setChoosing(false)
+    setDeleted(false)
   }
+
   return (
-    <div className="space-y-2">
-      <p className="text-sm text-ink">
-        {CONSENT_LINE[consent]}{' '}
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={() => setOpen((o) => !o)}
-          className="focus-ring rounded-sm font-semibold text-ink-muted underline underline-offset-2 hover:text-ink"
-        >
-          {consent === 'pending' ? 'Choose' : 'Change my choice'}
+    <div className="mx-auto flex max-w-xl flex-col gap-6 pb-12">
+      <h1 className="font-display text-3xl font-bold text-ink">Privacy</h1>
+
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-x-3">
+          <p data-testid="consent-line" aria-live="polite" className="text-lg text-ink">
+            {CONSENT_LINE[consent]}
+          </p>
+          <button type="button" aria-expanded={choosing} onClick={() => setChoosing((o) => !o)} className={`${QUIET} text-brand`}>
+            {consent === 'pending' ? 'Choose' : 'Change'}
+          </button>
+        </div>
+        {choosing && (
+          // Equal weight (R3): same style, same size, the same words as the login sheet.
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button variant="secondary" onClick={() => choose(true)}>
+              Save my answers
+            </Button>
+            <Button variant="secondary" onClick={() => choose(false)}>
+              Keep them on this device only
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <p className="text-base text-ink-muted">We record answer timing and accuracy only. No camera, no microphone.</p>
+
+      <div>
+        <button type="button" onClick={() => setConfirming(true)} className={`${QUIET} text-danger`}>
+          Delete my data
         </button>
-      </p>
-      {open && (
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" size="sm" onClick={() => choose(true)}>
-            Share my answers
+        <p role="status" className="text-sm text-ink">
+          {deleted ? 'Your data is deleted.' : ''}
+        </p>
+      </div>
+
+      {confirming && (
+        <ConfirmDelete
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => {
+            deleteMyData()
+            setConfirming(false)
+            setChoosing(false)
+            setDeleted(true)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+/* A small modal: Cancel has focus first (the safe choice), Escape cancels, Tab stays inside, and
+   focus goes back to "Delete my data" after. */
+function ConfirmDelete({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
+  const titleId = useId()
+  const bodyId = useId()
+  const cancel = useRef<HTMLButtonElement>(null)
+  const panel = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const opener = document.activeElement
+    cancel.current?.focus()
+    return () => {
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus()
+    }
+  }, [])
+
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.stopPropagation()
+      onCancel()
+      return
+    }
+    if (e.key !== 'Tab' || !panel.current) return
+    const items = Array.from(panel.current.querySelectorAll<HTMLElement>('button'))
+    const first = items[0]
+    const last = items[items.length - 1]
+    if (!first || !last) return
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault()
+      last.focus()
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault()
+      first.focus()
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-canvas/80 sm:items-center sm:p-4">
+      <div
+        ref={panel}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={bodyId}
+        onKeyDown={onKeyDown}
+        className="w-full max-w-md space-y-5 rounded-t-2xl border border-border bg-surface px-6 pt-6 pb-8 shadow-(--shadow-elevation) sm:rounded-2xl"
+      >
+        <div className="space-y-2">
+          <h2 id={titleId} className="font-display text-2xl font-bold text-ink">
+            Delete your data?
+          </h2>
+          <p id={bodyId} className="text-base text-ink">
+            Your results, goals and answers on this device go away. You can't undo this.
+          </p>
+        </div>
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <Button ref={cancel} variant="secondary" onClick={onCancel}>
+            Cancel
           </Button>
-          <Button variant="secondary" size="sm" onClick={() => choose(false)}>
-            Don't share
+          <Button variant="danger" onClick={onConfirm}>
+            Delete
           </Button>
         </div>
-      )}
+      </div>
     </div>
   )
 }

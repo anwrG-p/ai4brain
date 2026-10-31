@@ -19,6 +19,12 @@ afterEach(() => {
   useAppStore.getState().setSimulateOffline(false)
 })
 
+// "Delete my data", then the dialog's Delete (the old two-step purge modal, rewritten by 09d).
+const deleteMyData = () => {
+  fireEvent.click(screen.getByRole('button', { name: 'Delete my data' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+}
+
 describe('UI telemetry goes through the Tracker', () => {
   it('the offline banner shows the tracker queue count', () => {
     vi.spyOn(tracker, 'getStatus').mockReturnValue({
@@ -114,38 +120,38 @@ describe('UI telemetry goes through the Tracker', () => {
     })
 
   it.each([
-    ['pending', /stay on this device until you choose/i],
-    ['granted', /You chose to share your answers/i],
-    ['denied', /You chose not to share/i],
+    ['pending', /Not chosen yet/i],
+    ['granted', /Your answers are saved/i],
+    ['denied', /kept on this device only/i],
   ] as const)('the privacy page states the %s consent in one plain line', (consent, line) => {
     statusWith(consent)
     renderPrivacy()
     expect(screen.getByText(line)).toBeInTheDocument()
     // Only the quiet link is visible; the two equal choices sit behind it.
-    expect(screen.queryByRole('button', { name: /^Share my answers$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Save my answers$/i })).not.toBeInTheDocument()
   })
 
   it('before any choice the link reads "Choose"', () => {
     statusWith('pending')
     renderPrivacy()
     expect(screen.getByRole('button', { name: /^Choose$/ })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Change my choice/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Change$/ })).not.toBeInTheDocument()
   })
 
-  it('"Change my choice" reveals two equal choices that call the tracker', () => {
+  it('"Change" reveals two equal choices that call the tracker', () => {
     statusWith('granted')
     const deny = vi.spyOn(tracker, 'denyConsent').mockImplementation(() => {})
     const grant = vi.spyOn(tracker, 'grantConsent').mockImplementation(() => {})
     renderPrivacy()
-    const toggle = screen.getByRole('button', { name: /Change my choice/i })
+    const toggle = screen.getByRole('button', { name: /^Change$/ })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
     fireEvent.click(toggle)
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    fireEvent.click(screen.getByRole('button', { name: /^Don't share$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Keep them on this device only$/i }))
     expect(deny).toHaveBeenCalledOnce()
-    expect(screen.queryByRole('button', { name: /^Don't share$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Keep them on this device only$/i })).not.toBeInTheDocument()
     fireEvent.click(toggle)
-    fireEvent.click(screen.getByRole('button', { name: /^Share my answers$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Save my answers$/i }))
     expect(grant).toHaveBeenCalledOnce()
   })
 
@@ -153,24 +159,20 @@ describe('UI telemetry goes through the Tracker', () => {
     vi.spyOn(tracker, 'clear').mockReturnValue(0)
     const reset = vi.spyOn(tracker, 'resetConsent').mockImplementation(() => {})
     renderPrivacy()
-    fireEvent.click(screen.getByRole('button', { name: /Purge All Data & Telemetry/i }))
-    fireEvent.click(screen.getByRole('checkbox', { name: /cannot be undone/i }))
-    fireEvent.click(screen.getByRole('button', { name: /Permanently Purge All Data/i }))
+    deleteMyData()
     expect(reset).toHaveBeenCalledOnce()
   })
 
-  it('confirming the privacy purge clears the tracker and certifies the real count', () => {
+  it('confirming the privacy purge clears the tracker queue and says so', () => {
     const clear = vi.spyOn(tracker, 'clear').mockReturnValue(3)
     render(
       <MemoryRouter future={future}>
         <PrivacyPage />
       </MemoryRouter>,
     )
-    fireEvent.click(screen.getByRole('button', { name: /Purge All Data & Telemetry/i }))
-    fireEvent.click(screen.getByRole('checkbox', { name: /cannot be undone/i }))
-    fireEvent.click(screen.getByRole('button', { name: /Permanently Purge All Data/i }))
+    deleteMyData()
     expect(clear).toHaveBeenCalledOnce()
-    expect(screen.getByText(/Purged 3 records/)).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Your data is deleted.')
   })
 
   it('the privacy purge forgets the anonymous id, so later telemetry is not linked to it', () => {
@@ -181,9 +183,7 @@ describe('UI telemetry goes through the Tracker', () => {
         <PrivacyPage />
       </MemoryRouter>,
     )
-    fireEvent.click(screen.getByRole('button', { name: /Purge All Data & Telemetry/i }))
-    fireEvent.click(screen.getByRole('checkbox', { name: /cannot be undone/i }))
-    fireEvent.click(screen.getByRole('button', { name: /Permanently Purge All Data/i }))
+    deleteMyData()
     expect(localStorage.getItem('aura_uid')).toBeNull()
   })
 
@@ -196,9 +196,7 @@ describe('UI telemetry goes through the Tracker', () => {
         <PrivacyPage />
       </MemoryRouter>,
     )
-    fireEvent.click(screen.getByRole('button', { name: /Purge All Data & Telemetry/i }))
-    fireEvent.click(screen.getByRole('checkbox', { name: /cannot be undone/i }))
-    fireEvent.click(screen.getByRole('button', { name: /Permanently Purge All Data/i }))
+    deleteMyData()
     expect(useSessionStore.getState().sessions).toEqual([])
     expect(useGoalsStore.getState().goals).toEqual({})
     expect(localStorage.getItem(SESSIONS_KEY)).toBeNull()
