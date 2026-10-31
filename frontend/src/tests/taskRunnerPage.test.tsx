@@ -178,6 +178,39 @@ describe('TaskRunnerPage mounts the real exercises', () => {
     expect(screen.getByText('No answers recorded')).toBeInTheDocument()
   })
 
+  // A finished block sits on the frame's end card until Continue; a pause there must not discard it.
+  const finishMatrixBlock = async () => {
+    renderAt('/task/visuospatial_planning_gf?schema=matrix')
+    const region = await begin('Pattern Puzzle')
+    fireEvent.pointerDown(within(region).getAllByRole('button')[0]!) // the one trial
+    expect(await screen.findByText('Nice work')).toBeInTheDocument()
+    expect(screen.getByText('Recorded: 1')).toBeInTheDocument()
+  }
+  const paused = () => screen.queryByRole('heading', { name: /Trial Auto-Paused/i })
+
+  it('a tab switch on the end card completes the block instead of pausing it; nothing replays', async () => {
+    await finishMatrixBlock()
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+    act(() => void document.dispatchEvent(new Event('visibilitychange')))
+    expect(paused()).toBeNull()
+    expect(screen.getByRole('heading', { name: /confidence interval narrowed/i })).toBeInTheDocument()
+    expect(screen.getByText(/^Telemetry: 1 recorded/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Begin' })).toBeNull() // no new task fetched
+  })
+
+  it('Escape or Pause on the end card completes the block instead of pausing it', async () => {
+    await finishMatrixBlock()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(paused()).toBeNull()
+    expect(screen.getByRole('heading', { name: /confidence interval narrowed/i })).toBeInTheDocument()
+    cleanup()
+    await finishMatrixBlock()
+    fireEvent.click(screen.getByRole('button', { name: 'Pause trial' }))
+    expect(paused()).toBeNull()
+    expect(screen.getByRole('heading', { name: /confidence interval narrowed/i })).toBeInTheDocument()
+  })
+
   it('the completed drawer has no card chrome around the WhyThisPanel card', async () => {
     renderAt('/task/episodic_pattern_separation')
     await begin('Precision Archive')

@@ -42,6 +42,7 @@ test('the instruction screen shows the consumer name, one line and the keys as k
   const { container } = setup('stroop')
   expect(screen.getByRole('heading', { name: 'Color Clash' })).toBeInTheDocument()
   expect(screen.getByText('Pick the color of the ink, not the word.')).toBeInTheDocument()
+  expect(screen.queryByText(/aloud/)).toBeNull() // the non-voice instruction (voice is not ported)
   const keys = [...container.querySelectorAll('kbd')].map((k) => k.textContent)
   expect(keys).toEqual(expect.arrayContaining(['1', '2', '3', '4', 'Space']))
   expect(screen.getAllByRole('button')).toHaveLength(1) // Begin only (anti-slop rule 14)
@@ -62,18 +63,44 @@ test('Space starts the exercise after a 500 ms fixation cross', () => {
   expect(FIXATION_MS).toBe(500)
 })
 
-test('Enter and the Begin button start it too; a held key does not', () => {
+test('Enter starts it too; a held key does not', () => {
   setup('stroop')
   act(() => void fireEvent.keyDown(window, { key: ' ', repeat: true }))
   expect(screen.getByRole('button', { name: 'Begin' })).toBeInTheDocument()
   act(() => void fireEvent.keyDown(window, { key: 'Enter' }))
   expect(screen.getByRole('img', { name: 'Look at the cross' })).toBeInTheDocument()
+})
 
-  const other = setup('matrix')
+test('the Begin button starts it', () => {
+  setup('matrix')
   act(() => void fireEvent.click(screen.getByRole('button', { name: 'Begin' })))
   advance(FIXATION_MS)
   expect(screen.getByRole('region', { name: 'Pattern Puzzle' })).toBeInTheDocument()
-  other.unmount()
+})
+
+test('focus: Begin on the instruction screen, then the trial area, then Continue', () => {
+  const task = byType('matrix')
+  render(
+    <ExerciseFrame task={task} onDone={vi.fn()}>
+      {(end) => (
+        <section aria-label="Pattern Puzzle">
+          <button type="button" onClick={end}>
+            finish
+          </button>
+        </section>
+      )}
+    </ExerciseFrame>,
+  )
+  // Focused Begin: native Space/Enter activate it (the window listener leaves focused controls alone).
+  expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Begin' }))
+  space()
+  advance(FIXATION_MS)
+  const area = document.activeElement as HTMLElement
+  expect(area).not.toBe(document.body)
+  expect(area.contains(screen.getByRole('region', { name: 'Pattern Puzzle' }))).toBe(true)
+  expect(area.tabIndex).toBe(-1) // focusable by script only, never a tab stop
+  act(() => void fireEvent.click(screen.getByRole('button', { name: 'finish' })))
+  expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Continue' }))
 })
 
 test('Space on a focused control stays with that control', () => {
@@ -118,6 +145,32 @@ test('the progress dots advance as trials finish (n of N)', () => {
   expect(bar.querySelectorAll('[data-dot="done"]')).toHaveLength(1)
 })
 
+test('N-back: two events per trial (one per stream) advance the dots by one', () => {
+  const { task } = setup('n_back')
+  const p = task.params as { trials: unknown[]; streams: string[]; interval_ms: number }
+  expect(p.streams).toHaveLength(2)
+  space()
+  advance(FIXATION_MS)
+  const bar = screen.getByRole('progressbar', { name: 'Progress' })
+  expect(bar).toHaveAttribute('aria-valuemax', String(p.trials.length))
+  advance(p.interval_ms) // the first trial ends with no press: one event per stream
+  expect(bar).toHaveAttribute('aria-valuenow', '1')
+})
+
+test('UFOV counts only valid trials, so the dots can complete', () => {
+  const base = byType('ufov')
+  const p = base.params as { trials: Record<string, unknown>[] }
+  const trials = [...p.trials, { ...p.trials[0], central: 'Q' }] // invalid: skipped by the exercise
+  const task = { ...base, params: { ...p, trials } }
+  render(
+    <ExerciseFrame task={task} onDone={vi.fn()}>
+      {() => null}
+    </ExerciseFrame>,
+  )
+  space()
+  expect(screen.getByRole('progressbar', { name: 'Progress' })).toHaveAttribute('aria-valuemax', String(p.trials.length))
+})
+
 test('UFOV skips the frame fixation: it draws its own', () => {
   setup('ufov')
   space()
@@ -136,8 +189,9 @@ test('MST: the instruction comes before its study phase', () => {
 test('the end card shows one line and a small Loti; Continue (or Space) hands over', () => {
   const task = byType('matrix')
   const onDone = vi.fn()
+  const onBlockEnd = vi.fn()
   render(
-    <ExerciseFrame task={task} onDone={onDone}>
+    <ExerciseFrame task={task} onDone={onDone} onBlockEnd={onBlockEnd}>
       {(end) => (
         <button type="button" onClick={end}>
           finish
@@ -154,6 +208,8 @@ test('the end card shows one line and a small Loti; Continue (or Space) hands ov
   expect(screen.getByText('Nice work')).toBeInTheDocument()
   expect(screen.getByRole('img', { name: /Loti/ })).toHaveAttribute('width', '48') // size sm
   expect(onDone).not.toHaveBeenCalled()
+  // The host hears the block end at once, so a pause on the end card never discards the block.
+  expect(onBlockEnd).toHaveBeenCalledOnce()
   act(() => void fireEvent.keyDown(window, { key: ' ' }))
   expect(onDone).toHaveBeenCalledOnce()
   act(() => void fireEvent.click(screen.getByRole('button', { name: 'Continue' })))

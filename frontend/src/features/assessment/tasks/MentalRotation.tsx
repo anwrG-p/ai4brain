@@ -5,7 +5,7 @@ import { pressProps, useTimedTrials } from '../telemetry/useTimedTrials'
 import type { RotationParams } from '../telemetry/types'
 import type { TaskProps } from './TaskRunner'
 import { CellsView } from './svg'
-import { EXERCISE_NAME } from '../exercises'
+import { EXERCISE_NAME } from '../names'
 
 type Answer = RotationParams['trials'][number]['answer']
 const KEYS: Record<string, Answer> = { f: 'same', j: 'different' }
@@ -34,7 +34,6 @@ export function MentalRotation({ params, recorder, onDone }: TaskProps<RotationP
   if (!t) return null
   return (
     <section aria-label={EXERCISE_NAME.mental_rotation} className="flex flex-col items-center gap-4">
-      <p className="text-ink">Same shape turned, or a mirror image?</p>
       {/* 2 × 128 px + gap fits a 375 px screen inside the Card's padding. */}
       <Card className="flex flex-wrap justify-center gap-6 text-ink" style={{ minHeight: 176 }}>
         {!paused && (
@@ -46,10 +45,10 @@ export function MentalRotation({ params, recorder, onDone }: TaskProps<RotationP
       </Card>
       <div className="flex flex-wrap justify-center gap-3">
         <Button variant="secondary" {...pressProps(() => respond(t.answer === 'same'))}>
-          Same (F)
+          Turned (F)
         </Button>
         <Button variant="secondary" {...pressProps(() => respond(t.answer === 'different'))}>
-          Different (J)
+          Mirrored (J)
         </Button>
       </div>
     </section>

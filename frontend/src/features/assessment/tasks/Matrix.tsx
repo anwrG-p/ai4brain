@@ -4,7 +4,7 @@ import { pressProps, useTimedTrials } from '../telemetry/useTimedTrials'
 import type { MatrixParams } from '../telemetry/types'
 import type { TaskProps } from './TaskRunner'
 import { GlyphView } from './svg'
-import { EXERCISE_NAME } from '../exercises'
+import { EXERCISE_NAME } from '../names'
 
 // Matrix reasoning: a single trial (trial_index 0). The response is the index into options.
 // Glyph colours and aria-labels come from GlyphView (ticket 04).
@@ -14,7 +14,6 @@ export function Matrix({ params, recorder, onDone }: TaskProps<MatrixParams>) {
   if (i > 0) return null
   return (
     <section aria-label={EXERCISE_NAME.matrix} className="flex flex-col items-center gap-4">
-      <p className="text-ink">Which piece completes the pattern?</p>
       <Card className="flex justify-center">
         <div role="group" aria-label="puzzle" className="grid grid-cols-3 gap-2">
           {cells.map((c, k) =>

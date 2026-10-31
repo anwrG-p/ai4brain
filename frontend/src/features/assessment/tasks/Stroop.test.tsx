@@ -191,9 +191,10 @@ test('a detail-0 click with no preceding keydown answers even after a repeating 
   expect(pushed).toHaveLength(2)
 })
 
-test('the instruction is the non-voice one (voice is not ported)', () => {
+// The instruction lives on ExerciseFrame's instruction screen (ExerciseFrame.test.tsx), not here.
+test('the trial area repeats no instruction and asks for no voice', () => {
   setup(params([conflict]))
-  expect(screen.getByText('Pick the color of the ink, not the word.')).toBeTruthy()
+  expect(screen.queryByText('Pick the color of the ink, not the word.')).toBeNull()
   expect(screen.queryByText(/aloud/)).toBeNull()
 })
 

@@ -119,6 +119,8 @@ export default function TaskRunnerPage() {
   // Bumped on every (re)start, so ExerciseHost fetches a fresh task (R3).
   const [attempt, setAttempt] = useState(0)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  // The exercise reached its end card: the block is finished and only waits for Continue.
+  const [blockEnded, setBlockEnded] = useState(false)
   const [showTelemetryTable, setShowTelemetryTable] = useState<boolean>(false)
   // Real events from the tracker (R5): the latest MAX_EVENTS for the table, newest first, plus
   // uncapped block totals. Both reset when a new block starts.
@@ -138,6 +140,7 @@ export default function TaskRunnerPage() {
   // Any (re)start mounts a fresh task; a remount with the same attempt would repeat item_ids.
   const run = useCallback(() => {
     setAttempt((a) => a + 1)
+    setBlockEnded(false)
     setStage('running')
   }, [])
   const startBlock = useCallback(() => {
@@ -153,8 +156,12 @@ export default function TaskRunnerPage() {
     setEvents([])
     setTotals(NO_TOTALS)
     setAttempt((a) => a + 1)
+    setBlockEnded(false)
     setStage('running')
   }
+  const handleBlockEnd = useCallback(() => setBlockEnded(true), [])
+  // Pausing discards the running block (R3); a finished one on its end card completes instead.
+  const pause = useCallback(() => setStage(blockEnded ? 'completed' : 'paused-blur'), [blockEnded])
   const handleDone = useCallback(() => setStage('completed'), [])
   const handleError = useCallback((msg: string) => {
     setErrorMsg(msg)
@@ -165,14 +172,14 @@ export default function TaskRunnerPage() {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden' && stage === 'running') {
-        setStage('paused-blur')
+        pause()
       }
     }
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [stage])
+  }, [stage, pause])
 
   // R4: the exercise owns its answer keys; the page only maps Escape to pause.
   useEffect(() => {
@@ -180,12 +187,12 @@ export default function TaskRunnerPage() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
-        setStage('paused-blur')
+        pause()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [stage])
+  }, [stage, pause])
 
   const metrics =
     totals.n === 0
@@ -248,7 +255,7 @@ export default function TaskRunnerPage() {
 
             <button
               type="button"
-              onClick={() => setStage('paused-blur')}
+              onClick={pause}
               aria-label="Pause trial"
               className="focus-ring px-3.5 py-1.5 rounded-full text-xs font-semibold text-ink-muted hover:text-ink hover:bg-surface-raised border border-border transition-colors cursor-pointer flex items-center gap-1.5"
             >
@@ -268,6 +275,7 @@ export default function TaskRunnerPage() {
             schemaType={schemaType}
             attempt={attempt}
             onDone={handleDone}
+            onBlockEnd={handleBlockEnd}
             onError={handleError}
           />
 

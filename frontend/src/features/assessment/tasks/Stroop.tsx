@@ -4,7 +4,7 @@ import { Card } from '../../../components/ui/Card'
 import { pressProps, useTimedTrials } from '../telemetry/useTimedTrials'
 import type { StroopParams } from '../telemetry/types'
 import type { TaskProps } from './TaskRunner'
-import { EXERCISE_NAME } from '../exercises'
+import { EXERCISE_NAME } from '../names'
 
 // Payload ink names → theme tokens that reach >= 4.5:1 text contrast on --color-surface in light
 // and dark (ratios in brand-v2 tickets 01 and 06). Red is its own pure red: --color-danger reads
@@ -45,7 +45,6 @@ export function Stroop({ params, recorder, onDone }: TaskProps<StroopParams>) {
   if (!t) return null
   return (
     <section aria-label={EXERCISE_NAME.stroop} className="flex flex-col items-center gap-4">
-      <p className="text-ink">Pick the color of the ink, not the word.</p>
       <Card className="flex w-full items-center justify-center" style={{ minHeight: 160 }}>
         {!paused && (
           <p className="text-5xl font-bold" style={{ color: inkOf(t.ink) }}>

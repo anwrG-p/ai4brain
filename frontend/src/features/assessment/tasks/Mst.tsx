@@ -6,7 +6,7 @@ import { pressProps, useTimedTrials } from '../telemetry/useTimedTrials'
 import type { MstParams, Poly } from '../telemetry/types'
 import { PolyView } from './svg'
 import type { TaskProps } from './TaskRunner'
-import { EXERCISE_NAME } from '../exercises'
+import { EXERCISE_NAME } from '../names'
 
 type Response = 'old' | 'similar' | 'new'
 const EXPECTED = { old: 'old', lure: 'similar', new: 'new' } as const
@@ -96,7 +96,7 @@ function Test({ test, recorder, onDone }: { test: MstParams['test']; recorder: T
   if (!t) return null
   return (
     <>
-      <p className="text-ink">Have you seen this exact shape? Old (1), Similar (2) or New (3).</p>
+      <p className="text-ink">Have you seen this exact shape?</p>
       <Stage>{!paused && <PolyView poly={t.item} label="Test shape" />}</Stage>
       <div className="flex flex-wrap justify-center gap-3">
         <Button variant="secondary" {...pressProps(() => answer('old'))}>

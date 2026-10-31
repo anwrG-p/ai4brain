@@ -10,6 +10,8 @@ type ExerciseHostProps = {
   schemaType: SchemaType // chosen by the page (R2); real mode ignores it
   attempt: number // bump to start a fresh task (R3)
   onDone: () => void
+  // The block is over and its end card shows: from here a pause must not discard it.
+  onBlockEnd?: () => void
   onError: (msg: string) => void
 }
 
@@ -22,14 +24,15 @@ let fetchCount = 0
 
 // Fetches one task, records it with its own TrialRecorder and renders the matching exercise inside
 // the jsPsych-style ExerciseFrame (instruction, fixation, progress dots, end card).
-export function ExerciseHost({ schemaType, attempt, onDone, onError }: ExerciseHostProps) {
+export function ExerciseHost({ schemaType, attempt, onDone, onBlockEnd, onError }: ExerciseHostProps) {
   const [run, setRun] = useState<{ task: TaskPayload; recorder: TrialRecorder } | null>(null)
   // The exercises restart their trial loop when onDone changes, so they get a stable callback.
-  const cb = useRef({ onDone, onError })
+  const cb = useRef({ onDone, onBlockEnd, onError })
   useLayoutEffect(() => {
-    cb.current = { onDone, onError }
+    cb.current = { onDone, onBlockEnd, onError }
   })
   const done = useCallback(() => cb.current.onDone(), [])
+  const blockEnd = useCallback(() => cb.current.onBlockEnd?.(), [])
 
   useEffect(() => {
     let live = true
@@ -69,7 +72,7 @@ export function ExerciseHost({ schemaType, attempt, onDone, onError }: ExerciseH
     <div data-timed-trial="true" className="w-full min-w-0">
       {run ? (
         <SkipOnError key={run.task.task_id} taskId={run.task.task_id} onSkip={skip}>
-          <ExerciseFrame task={run.task} onDone={done}>
+          <ExerciseFrame task={run.task} onDone={done} onBlockEnd={blockEnd}>
             {(end) => <TaskRunner task={run.task} recorder={run.recorder} onDone={end} />}
           </ExerciseFrame>
         </SkipOnError>

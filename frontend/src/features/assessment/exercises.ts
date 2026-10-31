@@ -8,19 +8,10 @@ import type {
   TaskPayload,
   UfovParams,
 } from './telemetry/types'
+import { EXERCISE_NAME } from './names'
+import { isValidTrial } from './tasks/Ufov'
 
-// Consumer names (brand v2 spec, IA). Also each exercise's region label, so the screen-reader name
-// matches the heading on its instruction screen.
-export const EXERCISE_NAME: Record<SchemaType, string> = {
-  relational: 'Logic Web',
-  n_back: 'Memory Gauntlet',
-  tower: 'Strategic Blueprint',
-  ufov: 'Perceptual Radar',
-  mst: 'Precision Archive',
-  stroop: 'Color Clash',
-  matrix: 'Pattern Puzzle',
-  mental_rotation: 'Shape Turn',
-}
+export { EXERCISE_NAME }
 
 // One hint: the keycaps and what they answer.
 export type KeyHint = { keys: string[]; label: string }
@@ -71,13 +62,13 @@ export function introFor(task: TaskPayload): Intro | null {
       return {
         name,
         line: 'Say if the right shape is the left one turned or mirrored.',
-        keys: [hint(['F'], 'Same'), hint(['J'], 'Different')],
+        keys: [hint(['F'], 'Turned'), hint(['J'], 'Mirrored')],
       }
   }
 }
 
-// Trials in one block, for the progress dots: one dot per trial the exercise can record.
-// ponytail: UFOV counts invalid trials too (they are skipped and never fill a dot); fixtures have none.
+// Trials in one block, for the progress dots: one dot per trial the exercise can record (UFOV skips
+// invalid trials, so they get no dot and the dots can complete).
 export function trialCount(task: TaskPayload): number {
   const p = task.params
   switch (task.schema_type) {
@@ -92,7 +83,7 @@ export function trialCount(task: TaskPayload): number {
       return levels.some((l) => l.length > 0) ? n_trials : 0
     }
     case 'ufov':
-      return (p as UfovParams).trials.length
+      return (p as UfovParams).trials.filter(isValidTrial).length
     case 'mst':
       return (p as MstParams).test.length
     default:

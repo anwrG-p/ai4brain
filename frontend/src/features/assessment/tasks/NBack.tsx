@@ -6,7 +6,7 @@ import { useInputCapture } from '../telemetry/useInputCapture'
 import { pressProps } from '../telemetry/useTimedTrials'
 import type { NBackParams, TelemetryEvent } from '../telemetry/types'
 import type { TaskProps } from './TaskRunner'
-import { EXERCISE_NAME } from '../exercises'
+import { EXERCISE_NAME } from '../names'
 
 type Stream = NBackParams['streams'][number]
 type Rule = NBackParams['trials'][number]['rule']

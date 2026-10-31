@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { Loti } from '../../components/features/characters/Loti'
 import { Button } from '../../components/ui/Button'
 import { introFor, OWN_FIXATION, trialCount, type Intro } from './exercises'
@@ -11,8 +11,12 @@ type Phase = 'intro' | 'fixation' | 'trials' | 'end'
 
 type Props = {
   task: TaskPayload
+  // Continue on the end card: the user is ready to move on.
   onDone: () => void
-  // Renders the exercise; it calls `end` once its block is over. Must not change identity per render.
+  // The block is over (the end card appears). The host must not pause or replay it from here on.
+  onBlockEnd?: () => void
+  // Renders the exercise, which calls `end` once its block is over. `end` keeps its identity, so a
+  // frame re-render never restarts the exercise's trial loop (it restarts when onDone changes).
   children: (end: () => void) => ReactNode
 }
 
@@ -77,7 +81,19 @@ function ProgressDots({ done, total }: { done: number; total: number }) {
   )
 }
 
+// Moves focus to the element once it mounts, so keyboard and screen-reader users land on each screen.
+function useFocusOnMount<T extends HTMLElement>() {
+  const ref = useRef<T>(null)
+  useEffect(() => ref.current?.focus(), [])
+  return ref
+}
+
+// A held Enter clicks a focused button again on every repeat; it must not skip the end card.
+const noRepeat = (e: ReactKeyboardEvent<HTMLButtonElement>) => e.repeat && e.preventDefault()
+
 function Instructions({ intro, onBegin }: { intro: Intro; onBegin: () => void }) {
+  // Focused Begin: native Space/Enter activate it; the window listener covers an unfocused page.
+  const begin = useFocusOnMount<HTMLButtonElement>()
   // A plain div, not a region: the exercise's own region carries the same name.
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-6 py-8 text-center">
@@ -102,7 +118,7 @@ function Instructions({ intro, onBegin }: { intro: Intro; onBegin: () => void })
         </ul>
       )}
       <div className="flex flex-col items-center gap-2">
-        <Button size="lg" onClick={onBegin}>
+        <Button ref={begin} size="lg" onClick={onBegin} onKeyDown={noRepeat}>
           Begin
         </Button>
         <p className="text-sm text-ink-muted">
@@ -113,22 +129,55 @@ function Instructions({ intro, onBegin }: { intro: Intro; onBegin: () => void })
   )
 }
 
+// The running block: dots and the exercise. Focus moves here (not to <body>) so the exercise's keys
+// and Tab start inside it; tabIndex -1 keeps it out of the tab order.
+function TrialArea({ done, total, children }: { done: number; total: number; children: ReactNode }) {
+  const area = useFocusOnMount<HTMLDivElement>()
+  return (
+    <div ref={area} tabIndex={-1} className="flex w-full flex-col items-center gap-4 outline-none">
+      <ProgressDots done={done} total={total} />
+      {children}
+    </div>
+  )
+}
+
+function EndCard({ onContinue }: { onContinue: () => void }) {
+  const cont = useFocusOnMount<HTMLButtonElement>()
+  return (
+    <div className="mx-auto flex max-w-md flex-col items-center gap-4 py-8 text-center">
+      <Loti pose="happy" size="sm" />
+      <p className="font-display text-2xl font-bold text-ink">Nice work</p>
+      <Button ref={cont} size="lg" onClick={onContinue} onKeyDown={noRepeat}>
+        Continue
+      </Button>
+    </div>
+  )
+}
+
 // jsPsych-style screens around one exercise block: instruction → fixation (500 ms) → trials with
 // progress dots → end card. The exercise mounts only when the trials start, so no trial starts and
 // no event is recorded on the instruction or fixation screens; its timing and telemetry are its own.
 // UFOV skips the fixation here (it draws one before every trial). An unknown schema runs bare.
-export function ExerciseFrame({ task, onDone, children }: Props) {
+// The block ends on the end card: onBlockEnd fires then, onDone only on Continue.
+export function ExerciseFrame({ task, onDone, onBlockEnd, children }: Props) {
   const intro = introFor(task)
   const [phase, setPhase] = useState<Phase>('intro')
   const done = useTrialsDone(task.task_id)
   const handed = useRef(false)
+  const blockEnd = useRef(onBlockEnd)
+  useLayoutEffect(() => {
+    blockEnd.current = onBlockEnd
+  })
   const ownFixation = OWN_FIXATION.has(task.schema_type)
 
   const begin = useCallback(
     () => setPhase((p) => (p === 'intro' ? (ownFixation ? 'trials' : 'fixation') : p)),
     [ownFixation],
   )
-  const end = useCallback(() => setPhase('end'), [])
+  const end = useCallback(() => {
+    setPhase('end')
+    blockEnd.current?.()
+  }, [])
   const finish = useCallback(() => {
     if (handed.current) return
     handed.current = true
@@ -159,20 +208,11 @@ export function ExerciseFrame({ task, onDone, children }: Props) {
     case 'trials':
       // No character and no decoration here: only the dots and the stimulus.
       return (
-        <div className="flex w-full flex-col items-center gap-4">
-          <ProgressDots done={done} total={trialCount(task)} />
+        <TrialArea done={done} total={trialCount(task)}>
           {children(end)}
-        </div>
+        </TrialArea>
       )
     case 'end':
-      return (
-        <div className="mx-auto flex max-w-md flex-col items-center gap-4 py-8 text-center">
-          <Loti pose="happy" size="sm" />
-          <p className="font-display text-2xl font-bold text-ink">Nice work</p>
-          <Button size="lg" onClick={finish}>
-            Continue
-          </Button>
-        </div>
-      )
+      return <EndCard onContinue={finish} />
   }
 }
