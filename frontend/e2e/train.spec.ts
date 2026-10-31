@@ -1,8 +1,10 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page, type TestInfo } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import path from 'node:path'
 
-const SCREENSHOT_DIR = process.env.TRAIN_SHOTS_DIR ?? path.resolve(process.cwd(), '../docs/ui/screenshots')
+// Screenshots go to TRAIN_SHOTS_DIR when set, else to this test's own output folder (never docs/).
+const shotPath = (testInfo: TestInfo, name: string) =>
+  process.env.TRAIN_SHOTS_DIR ? path.join(process.env.TRAIN_SHOTS_DIR, name) : testInfo.outputPath(name)
 
 const VIEWPORTS = [
   { width: 1440, height: 900, label: '1440' },
@@ -58,7 +60,7 @@ async function wordsAboveFold(page: Page): Promise<number> {
   })
 }
 
-async function checkViewports(page: Page, theme: 'light' | 'dark') {
+async function checkViewports(page: Page, theme: 'light' | 'dark', testInfo: TestInfo) {
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height })
     await expect(page.getByRole('heading', { level: 1, name: 'Train' })).toBeVisible()
@@ -67,7 +69,7 @@ async function checkViewports(page: Page, theme: 'light' | 'dark') {
     const axe = await new AxeBuilder({ page }).analyze()
     expect(axe.violations, `axe at ${vp.width}px (${theme})`).toEqual([])
     await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, `09-train-${theme === 'dark' ? 'dark-' : ''}${vp.label}.png`),
+      path: shotPath(testInfo, `09-train-${theme === 'dark' ? 'dark-' : ''}${vp.label}.png`),
       fullPage: true,
     })
   }
@@ -76,16 +78,23 @@ async function checkViewports(page: Page, theme: 'light' | 'dark') {
 test.describe('Train (/train)', () => {
   test.use({ reducedMotion: 'reduce' })
 
-  test('five pillars, one primary; axe light and dark; no overflow at 375/768/1440', async ({ page }) => {
+  test('five pillars, one primary; axe light and dark; no overflow at 375/768/1440', async ({ page }, testInfo) => {
     await seed(page)
     await page.goto('/train', { waitUntil: 'networkidle' })
     await expect(page.getByRole('heading', { level: 2 })).toHaveCount(5)
     await expect(page.getByRole('img', { name: /Loti/ }).first()).toBeVisible()
-    await checkViewports(page, 'light')
+    await checkViewports(page, 'light', testInfo)
 
     await page.getByRole('button', { name: /Dark \(Night Lab\)/i }).first().click()
     await page.waitForTimeout(300)
-    await checkViewports(page, 'dark')
+    await checkViewports(page, 'dark', testInfo)
+  })
+
+  test('reduced motion: no entrance or press classes on the page', async ({ page }) => {
+    await seed(page)
+    await page.goto('/train', { waitUntil: 'networkidle' })
+    await expect(page.getByRole('heading', { level: 1, name: 'Train' })).toBeVisible()
+    await expect(page.locator('[data-testid="train-page"] [class*="anim-"]')).toHaveCount(0)
   })
 
   test('at most 60 words above the fold at 1440x900', async ({ page }) => {
@@ -103,7 +112,10 @@ test.describe('Train (/train)', () => {
     await seed(page)
     await page.goto('/train?pillar=memory', { waitUntil: 'networkidle' })
     await expect(page.getByRole('heading', { level: 2 }).first()).toHaveText('Deep Memory')
-    await expect(page.getByRole('region', { name: 'Deep Memory' })).toBeFocused()
+    const memory = page.getByRole('region', { name: 'Deep Memory' })
+    await expect(memory).toBeFocused()
+    // The focused section shows the focus-ring outline.
+    expect(await memory.evaluate((el) => el.matches(':focus-visible') && getComputedStyle(el).outlineStyle)).toBe('solid')
     await page.getByRole('link', { name: 'Start Precision Archive' }).click()
     await expect(page).toHaveURL(/\/task\/episodic_pattern_separation\?schema=mst$/)
   })

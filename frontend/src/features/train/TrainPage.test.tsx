@@ -82,6 +82,16 @@ describe('Train (/train)', () => {
     expect(screen.getAllByRole('link', { name: /^Start / })).toHaveLength(Object.keys(EXERCISE_NAME).length)
   })
 
+  it('makes each row the link: the name and a chevron, "Start" shown only on the one primary', () => {
+    const page = renderTrain()
+    const row = screen.getByRole('link', { name: 'Start Logic Web' })
+    expect(row).toHaveTextContent(/^Logic Web$/)
+    expect(row.querySelector('svg[aria-hidden="true"]')).not.toBeNull()
+    const startWords = (page.textContent ?? '').match(/\bStart\b/g) ?? []
+    expect(startWords).toHaveLength(1)
+    expect(primaries(page)[0]).toHaveTextContent('Start Strategic Blueprint')
+  })
+
   it('Start opens the runner', () => {
     renderTrain()
     fireEvent.click(screen.getByRole('link', { name: 'Start Logic Web' }))
@@ -115,8 +125,25 @@ describe('Train (/train)', () => {
     const memory = screen.getByRole('region', { name: 'Deep Memory' })
     expect(document.activeElement).toBe(memory)
     expect(memory).toHaveAttribute('data-current', 'true')
+    expect(memory).toHaveClass('focus-ring') // a visible ring on :focus-visible
     expect(screen.getByText(`Let's train ${PILLAR_LABELS.memory} today.`)).toBeInTheDocument()
     expect(primaries(page).map((el) => el.getAttribute('aria-label'))).toEqual(['Start Precision Archive'])
+  })
+
+  it('skips pillars with no exercise in the active set, and never puts them first', () => {
+    act(() => {
+      useSessionStore.setState({ sessions: [SESSION] })
+      useAppStore.getState().setDimensionPreset('3') // n-back and Color Clash only
+    })
+    const page = renderTrain('/train?pillar=memory')
+    // Visual Radar is the weakest overall and Deep Memory was asked for; neither is listed.
+    expect(pillarHeadings()).toEqual(['Mental Agility', 'Impulse Control'])
+    expect(document.activeElement).toBe(document.body)
+    expect(screen.getByText(`${PILLAR_LABELS.agility} could use some care today.`)).toBeInTheDocument()
+    expect(primaries(page).map((el) => el.getAttribute('aria-label'))).toEqual(['Start Memory Gauntlet'])
+    for (const section of screen.getAllByRole('region')) {
+      expect(within(section).getAllByRole('link').length).toBeGreaterThan(0)
+    }
   })
 
   it('ignores an unknown ?pillar=', () => {
@@ -139,7 +166,7 @@ describe('Train (/train)', () => {
     }
   })
 
-  it('enters gently, and not at all with reduced motion', () => {
+  it('enters gently when motion is on', () => {
     const page = renderTrain()
     expect(page.querySelectorAll('[class*="anim-"]').length).toBeGreaterThan(0)
   })

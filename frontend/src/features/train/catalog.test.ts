@@ -34,8 +34,19 @@ describe('Train catalog', () => {
     expect(weakestPillar(pillarScores({}))).toBeNull()
   })
 
+  it('looks for the weakest only among the pillars on the page', () => {
+    const all = scores({ focus: 80, agility: 60, impulse: 70, memory: 50, visual: 35 })
+    expect(weakestPillar(all, ['agility', 'impulse'])).toBe('agility')
+    expect(weakestPillar(all, [])).toBeNull()
+  })
+
   it('puts the chosen pillar first and keeps the rest in order', () => {
     expect(trainOrder('memory')).toEqual(['memory', 'focus', 'agility', 'impulse', 'visual'])
     expect(trainOrder(null)).toEqual([...PILLAR_IDS])
+  })
+
+  it('orders only the pillars on the page', () => {
+    expect(trainOrder('impulse', ['agility', 'impulse'])).toEqual(['impulse', 'agility'])
+    expect(trainOrder('memory', ['agility', 'impulse'])).toEqual(['agility', 'impulse'])
   })
 })

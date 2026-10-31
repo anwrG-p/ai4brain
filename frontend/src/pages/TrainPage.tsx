@@ -1,45 +1,53 @@
 import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode, type Ref } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { ChevronRight } from 'lucide-react'
 import { Loti } from '../components/features/characters'
 import { useCharacterMotion } from '../components/features/characters/shared'
 import { EXERCISE_NAME } from '../features/assessment/names'
-import { isPillarId, PILLAR_LABELS, pillarScores, type PillarId } from '../features/insights/pillars'
+import { isPillarId, PILLAR_IDS, PILLAR_LABELS, pillarScores, type PillarId } from '../features/insights/pillars'
 import { useSessionStore } from '../features/insights/sessionStore'
 import { PILLAR_LINE, startPath, TRAIN_EXERCISES, trainOrder, weakestPillar } from '../features/train/catalog'
 import { useAppStore } from '../state/useAppStore'
+import type { TaskSchemaType } from '../types'
 
-const PRIMARY = 'tactile-btn inline-flex min-h-11 items-center border-transparent bg-brand px-5 text-sm font-semibold text-brand-ink hover:bg-brand-hover'
-const QUIET = 'focus-ring inline-flex min-h-11 items-center rounded-sm px-3 text-sm font-medium text-brand underline-offset-4 hover:underline'
+const PRIMARY = 'tactile-btn my-2 inline-flex min-h-11 items-center gap-1 border-transparent bg-brand px-5 text-base font-semibold text-brand-ink hover:bg-brand-hover'
+const ROW = 'focus-ring -mx-2 flex min-h-12 items-center justify-between gap-4 rounded-md px-2 text-base text-ink hover:text-brand'
 
-/* Train: one line from Loti, then the five pillars, each with its exercises and one Start per row.
-   The pillar asked for in ?pillar= (the dashboard's "Start today's session"), else the weakest
-   scored one, comes first and is highlighted; its first exercise is the page's one primary button
-   (rule 14), so there is no second, duplicate CTA at the top. ?pillar= also moves focus to it.
+/* Train: one line from Loti, then the pillars, each with its exercises. Each row is itself the link
+   (the name and a chevron; its accessible name is "Start <name>"), so "Start" is not repeated down
+   the page (rule 14). The pillar asked for in ?pillar= (the dashboard's "Start today's session"),
+   else the weakest scored one, comes first and is highlighted; its first exercise is the page's one
+   filled button, "Start <name>". ?pillar= also moves focus to it. A pillar with no exercise in the
+   active set of dimensions (judge-mode sets only) is left out, and never leads.
    Scores are the latest session's, like Results. ponytail: latest session only, no trend. */
 export default function TrainPage() {
   const [params] = useSearchParams()
   const asked = params.get('pillar')
-  const chosen = isPillarId(asked) ? asked : null
   const latest = useSessionStore((s) => s.sessions.at(-1))
   const preset = useAppStore((s) => s.dimensionPreset)
   const motion = useCharacterMotion()
   const scores = useMemo(() => pillarScores(latest?.inputs ?? {}), [latest])
-  const weakest = weakestPillar(scores)
+  const rows = useMemo(() => {
+    const out = {} as Record<PillarId, Row[]>
+    for (const pillar of PILLAR_IDS) {
+      out[pillar] = TRAIN_EXERCISES[pillar].flatMap((schema) => {
+        const to = startPath(schema, preset)
+        return to ? [{ schema, name: EXERCISE_NAME[schema], to }] : []
+      })
+    }
+    return out
+  }, [preset])
+  const shown = PILLAR_IDS.filter((p) => rows[p].length > 0)
+  const chosen = isPillarId(asked) && shown.includes(asked) ? asked : null
+  const weakest = weakestPillar(scores, shown)
   const first = chosen ?? weakest
+  const order = trainOrder(first, shown)
+  const primary = order[0] === undefined ? undefined : rows[order[0]][0]?.schema
   const focusRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     if (chosen) focusRef.current?.focus()
   }, [chosen])
-
-  const sections = trainOrder(first).map((pillar) => ({
-    pillar,
-    rows: TRAIN_EXERCISES[pillar].flatMap((schema) => {
-      const to = startPath(schema, preset)
-      return to ? [{ schema, name: EXERCISE_NAME[schema], to }] : []
-    }),
-  }))
-  const primary = sections.find((s) => s.rows.length > 0)?.rows[0]?.schema
 
   const line = chosen
     ? `Let's train ${PILLAR_LABELS[chosen]} today.`
@@ -64,7 +72,7 @@ export default function TrainPage() {
       </div>
 
       <div className="flex flex-col gap-2">
-        {sections.map(({ pillar, rows }, k) => (
+        {order.map((pillar, k) => (
           <PillarSection
             key={pillar}
             pillar={pillar}
@@ -74,12 +82,18 @@ export default function TrainPage() {
             className={enter('anim-cta')}
             style={stagger(k)}
           >
-            {rows.map((row) => (
-              <li key={row.schema} className="flex min-h-12 items-center justify-between gap-4 py-1">
-                <span className="text-base text-ink">{row.name}</span>
-                <Link to={row.to} aria-label={`Start ${row.name}`} className={row.schema === primary ? `${PRIMARY} ${enter('anim-press')}` : QUIET}>
-                  Start
-                </Link>
+            {rows[pillar].map((row) => (
+              <li key={row.schema}>
+                {row.schema === primary ? (
+                  <Link to={row.to} aria-label={`Start ${row.name}`} className={`${PRIMARY} ${enter('anim-press')}`}>
+                    Start <span>{row.name}</span>
+                  </Link>
+                ) : (
+                  <Link to={row.to} aria-label={`Start ${row.name}`} className={ROW}>
+                    <span>{row.name}</span>
+                    <ChevronRight size={20} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0 text-ink-muted" />
+                  </Link>
+                )}
               </li>
             ))}
           </PillarSection>
@@ -88,6 +102,8 @@ export default function TrainPage() {
     </div>
   )
 }
+
+type Row = { schema: TaskSchemaType; name: string; to: string }
 
 interface PillarSectionProps {
   pillar: PillarId
@@ -108,7 +124,7 @@ function PillarSection({ pillar, score, current, sectionRef, className, style, c
       tabIndex={current ? -1 : undefined}
       data-current={current || undefined}
       style={style}
-      className={`rounded-xl px-4 py-3 outline-none ${current ? 'bg-surface-raised' : ''} ${className}`}
+      className={`focus-ring rounded-xl px-4 py-3 ${current ? 'bg-surface-raised' : ''} ${className}`}
     >
       <div className="flex items-baseline justify-between gap-4">
         <h2 id={id} className="flex items-center gap-2 font-display text-xl font-bold text-ink">
