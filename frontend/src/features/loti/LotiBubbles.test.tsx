@@ -178,8 +178,8 @@ describe('LotiBubbles', () => {
     renderBubbles()
     await user.click(screen.getByRole('button', { name: 'Great' }))
     expect(useLotiSession.getState().turns).toEqual([
-      { from: 'loti', text: 'How was your day?' },
-      { from: 'you', text: 'Great' },
+      { n: 0, from: 'loti', text: 'How was your day?' },
+      { n: 1, from: 'you', text: 'Great' },
     ])
     expect(useLotiSession.getState().current?.id).toBe('day-great')
   })
