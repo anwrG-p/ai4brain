@@ -198,8 +198,7 @@ export default function TaskRunnerPage() {
               Exit
             </Link>
             {judge && <span className="font-mono-tabular text-xs text-ink-muted">Recorded: {totals.n}</span>}
-            <Button variant="ghost" size="sm" onClick={pause} aria-label="Pause trial">
-              <Pause size={16} {...ICON} />
+            <Button variant="ghost" size="sm" onClick={pause} aria-label="Pause trial" leftIcon={<Pause size={16} {...ICON} />}>
               Pause
             </Button>
           </div>

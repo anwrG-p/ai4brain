@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { EXERCISE_NAME } from './exercises'
 import { ExerciseFrame, FIXATION_MS } from './ExerciseFrame'
@@ -38,16 +38,41 @@ const space = () => act(() => void fireEvent.keyDown(window, { key: ' ' }))
 const advance = (ms: number) => act(() => void vi.advanceTimersByTime(ms))
 const region = () => screen.queryByRole('region', { name: 'Color Clash' })
 
-test('the instruction screen shows the consumer name, one line and the keys as keycaps', () => {
+test('the instruction screen: name, one line, how to play, the demo with its caption, the pillar, More', () => {
   const { container } = setup('stroop')
   expect(screen.getByRole('heading', { name: 'Color Clash' })).toBeInTheDocument()
   expect(screen.getByText('Pick the color of the ink, not the word.')).toBeInTheDocument()
   expect(screen.queryByText(/aloud/)).toBeNull() // the non-voice instruction (voice is not ported)
+  // How to play: an ordered list of steps, keys as keycaps.
+  const steps = within(screen.getByRole('list', { name: 'How to play' })).getAllByRole('listitem')
+  expect(container.querySelector('ol[aria-label="How to play"]')).not.toBeNull()
+  expect(steps.map((li) => li.textContent)).toEqual(['Ignore what the word says.', 'Tap the ink color, or press 1–4.'])
   const keys = [...container.querySelectorAll('kbd')].map((k) => k.textContent)
-  expect(keys).toEqual(expect.arrayContaining(['1', '2', '3', '4', 'Space']))
-  expect(screen.getAllByRole('button')).toHaveLength(1) // Begin only (anti-slop rule 14)
-  expect(screen.getByRole('button', { name: 'Begin' })).toBeInTheDocument()
+  expect(keys).toEqual(['1', '4', 'Space'])
+  // The caption is visible but hidden from screen readers (the steps already say it), like the demo.
+  const caption = screen.getByText('RED in blue ink → blue')
+  expect(caption.closest('[aria-hidden="true"]')).not.toBeNull()
+  expect(screen.getByText('Trains: Impulse Control')).toBeInTheDocument()
+  // More: one quiet disclosure, closed.
+  const more = container.querySelectorAll('details')
+  expect(more).toHaveLength(1)
+  expect(more[0]!.open).toBe(false)
+  expect(more[0]!.querySelector('summary')).toHaveTextContent('More about this')
+  expect(more[0]).toHaveTextContent('It measures holding back a habit: reading.')
+  // One button: Begin (anti-slop rule 14); the disclosure is the one quiet control.
+  expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Begin'])
   expect(region()).toBeNull() // the exercise is not mounted yet
+  expect(tracker.getStatus().queuedCount).toBe(0) // no telemetry on the instruction screen
+})
+
+test.each(Object.keys(EXERCISE_NAME))('%s: its instruction screen has how-to-play steps, a caption, a pillar and a closed More', (schema) => {
+  const { container } = setup(schema as SchemaType)
+  const items = within(screen.getByRole('list', { name: 'How to play' })).getAllByRole('listitem')
+  expect(items.length).toBeGreaterThanOrEqual(2)
+  expect(items.length).toBeLessThanOrEqual(3)
+  expect(screen.getByText(/^Trains: /)).toBeInTheDocument()
+  expect(container.querySelector('[data-demo-caption]')?.textContent).toBeTruthy()
+  expect(container.querySelector('details')!.open).toBe(false)
 })
 
 test('Space starts the exercise after a 500 ms fixation cross', () => {

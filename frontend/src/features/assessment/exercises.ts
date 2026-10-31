@@ -8,63 +8,34 @@ import type {
   TaskPayload,
   UfovParams,
 } from './telemetry/types'
+import { howToPlay, type HowToPlay } from './howToPlay'
 import { EXERCISE_NAME } from './names'
 import { isValidTrial } from './tasks/Ufov'
 
 export { EXERCISE_NAME }
 
-// One hint: the keycaps and what they answer.
-export type KeyHint = { keys: string[]; label: string }
-export type Intro = { name: string; line: string; keys: KeyHint[] }
+export type Intro = { name: string; line: string } & HowToPlay
 
-const hint = (keys: string[], label: string): KeyHint => ({ keys, label })
+const LINE: Record<SchemaType, string> = {
+  relational: 'Read the clues, then say if the question is true.',
+  n_back: 'Watch the grid. Press when it matches {n} steps back.',
+  tower: 'Guess your moves, then rebuild the goal one disc at a time.',
+  ufov: 'Watch the middle. Then pick the letter and where the circle was.',
+  mst: 'Study the shapes. Then say if each is old, similar or new.',
+  stroop: 'Pick the color of the ink, not the word.',
+  matrix: 'Pick the piece that completes the pattern.',
+  mental_rotation: 'Say if the right shape is the left one turned or mirrored.',
+}
 
-// The instruction screen: the name, one sentence on what to do, the answer keys. Null for a schema
-// without an exercise (TaskRunner skips it). Lines stay under 12 words (anti-slop rule 4).
+// The instruction screen: the name, one sentence on what to do (under 12 words, anti-slop rule 4)
+// and how to play (howToPlay.ts: steps with the keys, the demo's caption, the pillar, More). Null for
+// a schema without an exercise (TaskRunner skips it).
 export function introFor(task: TaskPayload): Intro | null {
   const name = (EXERCISE_NAME as Partial<Record<string, string>>)[task.schema_type]
-  if (!name) return null
-  const p = task.params
-  switch (task.schema_type) {
-    case 'relational':
-      return { name, line: 'Read the clues, then say if the question is true.', keys: [hint(['T'], 'True'), hint(['F'], 'False')] }
-    case 'n_back': {
-      const { n, streams } = p as NBackParams
-      const keys = [
-        ...(streams.includes('position') ? [hint(['A'], 'Same place')] : []),
-        ...(streams.includes('symbol') ? [hint(['L'], 'Same symbol')] : []),
-      ]
-      return { name, line: `Watch the grid. Press when it matches ${n} steps back.`, keys }
-    }
-    case 'tower':
-      return { name, line: 'Guess your moves, then rebuild the goal one disc at a time.', keys: [] }
-    case 'ufov':
-      return {
-        name,
-        line: 'Watch the middle. Then pick the letter and where the circle was.',
-        keys: [hint(['A', 'B'], 'Letter'), hint(['1–8'], 'Direction')],
-      }
-    case 'mst':
-      return {
-        name,
-        line: 'Study the shapes. Then say if each is old, similar or new.',
-        keys: [hint(['1'], 'Old'), hint(['2'], 'Similar'), hint(['3'], 'New')],
-      }
-    case 'stroop':
-      return {
-        name,
-        line: 'Pick the color of the ink, not the word.',
-        keys: (p as StroopParams).colors.slice(0, 9).map((c, k) => hint([String(k + 1)], c)),
-      }
-    case 'matrix':
-      return { name, line: 'Pick the piece that completes the pattern.', keys: [] }
-    case 'mental_rotation':
-      return {
-        name,
-        line: 'Say if the right shape is the left one turned or mirrored.',
-        keys: [hint(['F'], 'Turned'), hint(['J'], 'Mirrored')],
-      }
-  }
+  const how = howToPlay(task)
+  if (!name || !how) return null
+  const n = task.schema_type === 'n_back' ? (task.params as NBackParams).n : 0
+  return { name, line: LINE[task.schema_type].replace('{n}', String(n)), ...how }
 }
 
 // Trials in one block, for the progress dots: one dot per trial the exercise can record (UFOV skips
