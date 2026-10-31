@@ -145,6 +145,54 @@ def test_a_passed_deadline_sends_nothing():
     assert calls == []
 
 
+def _drain_pool():
+    """Wait until every queued or running call is done, so later tests start with a free pool."""
+    from ai_coach import llm_gemini
+
+    taken = [llm_gemini._SLOTS.acquire(timeout=5) for _ in range(llm_gemini.MAX_PENDING)]
+    assert all(taken)
+    for _ in taken:
+        llm_gemini._SLOTS.release()
+
+
+def test_stale_queued_calls_are_never_sent():
+    """The reviewer's pool_load scenario: 24 callers, a 0.2 s deadline, a 0.5 s transport."""
+    import threading
+    import time
+
+    from ai_coach import llm_gemini
+
+    _drain_pool()  # an earlier test's slow call may still hold a slot
+    started, errors, lock = [], [], threading.Lock()
+
+    def slow(request):
+        with lock:
+            started.append(time.monotonic())
+        time.sleep(0.5)
+        return ok("x")
+
+    runner = runner_with(slow)
+
+    def caller():
+        try:
+            runner([{"role": "user", "content": "hi"}], deadline=time.monotonic() + 0.2)
+        except GeminiError as e:
+            with lock:
+                errors.append(str(e))
+
+    t0 = time.monotonic()
+    threads = [threading.Thread(target=caller) for _ in range(24)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert time.monotonic() - t0 < 0.5 and len(errors) == 24
+    assert errors.count("busy") == 24 - llm_gemini.MAX_PENDING  # the queue is bounded
+    _drain_pool()
+    # Only the calls a worker picked up at once were ever sent; the queued ones were not.
+    assert len(started) == llm_gemini.WORKERS
+
+
 def test_each_call_waits_at_most_the_time_left():
     import time
 

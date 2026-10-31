@@ -14,7 +14,8 @@ Verdicts and routing:
 - Gemini's own filter blocks the classifier call: treated as `low`. A block on a message the
   classifier was asked to read is itself a risk signal; a calm signpost costs less than a miss.
 
-- `none` with a reason the keyword crisis gate flags: promoted to `low`.
+- `none` with a reason that names a risk (the keyword gate, or third-person patterns such as
+  "talks about killing themselves", not negated just before): promoted to `low`.
 
 FAIL CLOSED: a timeout, an HTTP or transport error, a reply that is not exactly one
 {"reason": str, "risk": "none"|"low"|"high"} object (duplicate keys included) raises
@@ -27,12 +28,13 @@ The `reason` is for evaluation only. It may quote the user, so it is never logge
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, Optional
 
 from ai_coach.llm_gemini import GeminiBlocked, GeminiError, GeminiRunner
-from ai_coach.safety_guardrails import crisis_check
+from ai_coach.safety_guardrails import crisis_check, normalise_user_text
 
 MAX_REASON_CHARS = 300
 
@@ -63,6 +65,9 @@ ordinary stress; jokes.
 
 When unsure between "none" and "low", answer "low". When unsure between "low" and "high", answer
 "high".
+
+When the risk is "none", the reason says what the message is about ("frustration with a level");
+it does not name risks the message does not have.
 
 Reply with JSON only, the reason first: {"reason": "<at most 12 words>", "risk": "none" | "low" | "high"}.
 Do not quote the user in the reason."""
@@ -150,9 +155,43 @@ def parse_verdict(raw: object) -> Verdict:
     if not isinstance(reason, str) or len(reason) > MAX_REASON_CHARS:
         raise ClassifierError("reason is not a short string")
     verdict = Verdict(Risk(risk), reason)
-    if verdict.risk is Risk.NONE and crisis_check(reason).hit:
+    if verdict.risk is Risk.NONE and reason_names_a_risk(reason):
         return Verdict(Risk.LOW, reason)
     return verdict
+
+
+# A reason describes the user in the third person ("talks about killing themselves"), which the
+# first-person keyword gate does not read. These patterns do, on normalised text. A negation just
+# before a match ("no self-harm", "not about suicide") does not count.
+_REASON_RISK = re.compile(
+    r"\b(?:suicid\w*|self harm\w*|selfharm\w*|ideation|overdos\w*|stockpil\w*|lethal\w*|"
+    r"kill(?:s|ing)? (?:them|him|her)sel(?:f|ves)|"
+    r"hurt(?:s|ing)? (?:them|him|her)sel(?:f|ves)|"
+    r"harm(?:s|ing)? (?:them|him|her)sel(?:f|ves)|"
+    r"end(?:s|ing)? (?:their|his|her) (?:own )?life|"
+    r"(?:wish|wishes|want|wants|wanting) to (?:die|be dead|not exist|stop existing)|"
+    r"death wish|better off dead|(?:does not|doesnt|do not|dont) want to (?:live|be alive))\b"
+)
+# Only a negation right before the term counts ("no self-harm", "not about suicide", "no sign of
+# ideation"); "no plan but self-harm" stays a risk.
+_NEGATION_BEFORE = re.compile(
+    r"\b(?:no|not|without|non|never|nothing)(?: (?:about|any|mention of|sign of|signs of|real))? $"
+)
+
+
+def reason_names_a_risk(reason: str) -> bool:
+    """A risk the reason states: negated risk phrases are cut out first ("no self-harm, just a
+    hard level"), then the first-person keyword gate and the third-person patterns read the rest.
+    """
+    text = normalise_user_text(reason)
+    kept, last = [], 0
+    for m in _REASON_RISK.finditer(text):
+        negation = _NEGATION_BEFORE.search(text[last : m.start()])
+        if negation:
+            kept.append(text[last : last + negation.start()])
+            last = m.end()
+    rest = "".join(kept) + text[last:]
+    return crisis_check(rest).hit or bool(_REASON_RISK.search(rest))
 
 
 class CrisisClassifier:

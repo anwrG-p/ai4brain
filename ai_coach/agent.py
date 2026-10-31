@@ -10,9 +10,10 @@ Order of a chat turn:
    c. the health signpost, when the current message raises health.
    On a hit the LLM is never called. Earlier user turns that trip the crisis check, and fixed
    crisis replies (whole or any bubble) with the user turn they answered, are redacted from the LLM
-   payload, and the chat carries on. With a classifier configured, the LLM sees only the user turns
-   that classifier read this request (the current one and the previous one); older user turns
-   stay out, since they may never have had a verdict.
+   payload, and the chat carries on. With a classifier configured (every API turn), the LLM sees
+   only the current user message plus Loti's turns: no earlier user turn, since it may never have
+   had a verdict of its own. (An agent built with an LLM but no classifier keeps the older window;
+   the API never builds one.)
 2. AI Collaboration Score and the XAI adaptation reason (Member 3's Δc).
 3. Loti's reply: the LLM if one is configured, else the deterministic offline reply. An LLM error
    is logged, counted and answered with the offline reply; nothing fails silently.
@@ -67,6 +68,35 @@ HISTORY_WINDOW = 8
 
 MAX_BUBBLES = 3
 
+# The deterministic offline replies (see _generate_offline_coaching_response).
+# No "see below" in the why reply: the chat route sends no adaptation reason with it.
+OFFLINE_WHY_REPLY = "I tuned the pace to fit your recent rounds." + BUBBLE_SEPARATOR + "Want to try the next one?"
+# No number here (R15): one chat is not enough data. The score has its own route, which answers
+# not_enough_data until the stored chat history supports one.
+OFFLINE_SCORE_REPLY = (
+    "Your scores show on Home once there's enough data." + BUBBLE_SEPARATOR + "Want one tip for your next round?"
+)
+OFFLINE_TIER_GUIDANCE = {
+    ArchetypeTier.EXPLORER: "Small, steady steps work well right now.",
+    ArchetypeTier.PRACTITIONER: "Nice rhythm. Try testing your first guess.",
+    ArchetypeTier.STRATEGIST: "You're steering well. Keep checking your answers.",
+}
+OFFLINE_NEXT_QUESTION = "What would you like to work on next?"
+
+
+def known_loti_replies() -> Set[str]:
+    """Every fixed or scripted reply the backend itself can send, whole and bubble by bubble."""
+    from ai_coach import safety_guardrails as g
+
+    replies = [
+        OFFLINE_WHY_REPLY,
+        OFFLINE_SCORE_REPLY,
+        *(t + BUBBLE_SEPARATOR + OFFLINE_NEXT_QUESTION for t in OFFLINE_TIER_GUIDANCE.values()),
+        g.CRISIS_REPLY_EN, g.CRISIS_REPLY_FR, g.CRISIS_SIGNPOST_EN, g.CRISIS_SIGNPOST_FR,
+        g.FRONTEND_CRISIS_MESSAGE, g.HEALTH_SIGNPOST_REPLY, g.SAFE_FALLBACK_REPLY,
+    ]
+    return {part for r in replies for part in (r, *split_bubbles(r))}
+
 
 def split_bubbles(text: str) -> List[str]:
     """Split a reply into its speech bubbles (blank-line separated)."""
@@ -99,17 +129,17 @@ def fit_bubbles(text: str) -> Optional[str]:
     return BUBBLE_SEPARATOR.join(out)
 
 
-# Spelled-out numbers the check also catches (English and French). Left out on purpose: one / un /
-# une (pronouns and articles: "try that one") and neuf (also "new").
+# Spelled-out numbers the check also catches (English and French). Left out on purpose, as words
+# that are also something else: one / un / une (pronouns and articles: "try that one"), neuf
+# ("new"), seize ("seize the moment") and sept (the English "Sept." for September).
 _NUMBER_WORDS = {
     **dict(zip(
         "two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen "
         "sixteen seventeen eighteen nineteen twenty".split(), range(2, 21))),
     "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70, "eighty": 80,
     "ninety": 90, "hundred": 100, "thousand": 1000,
-    **dict(zip(
-        "deux trois quatre cinq six sept huit".split(), range(2, 9))),
-    "dix": 10, "onze": 11, "douze": 12, "treize": 13, "quatorze": 14, "quinze": 15, "seize": 16,
+    "deux": 2, "trois": 3, "quatre": 4, "cinq": 5, "huit": 8,
+    "dix": 10, "onze": 11, "douze": 12, "treize": 13, "quatorze": 14, "quinze": 15,
     "vingt": 20, "trente": 30, "quarante": 40, "cinquante": 50, "soixante": 60, "cent": 100,
     "mille": 1000,
 }
@@ -192,14 +222,16 @@ class AICoachAgent:
             return gated
         window = session_history[-HISTORY_WINDOW:]
         if classified is not None:
-            # R14: with a classifier, the LLM sees only user turns this request's classifier read
-            # (the current message, and the previous one when it was context). An older user turn
-            # may never have had a verdict (its classifier call failed closed), so it stays out.
-            keep = {id(session_history[-1])} | {id(m) for m in classified}
-            dropped = sum(1 for m in window if m.role == ChatMessageRole.USER and id(m) not in keep)
+            # R14: with a classifier, the LLM sees ONLY the current user message plus Loti's turns.
+            # The classifier rates the current message; an earlier user turn was at most context
+            # here and may never have had a verdict of its own (its call can have failed closed).
+            # The number check's allowance follows the window, so numbers from dropped turns are
+            # not allowed either.
+            current = session_history[-1]
+            dropped = sum(1 for m in window if m.role == ChatMessageRole.USER and m is not current)
             if dropped:
-                self.reply_source_counts["unclassified_history_turn"] += dropped
-            window = [m for m in window if m.role != ChatMessageRole.USER or id(m) in keep]
+                self.reply_source_counts["earlier_user_turn_dropped"] += dropped
+            window = [m for m in window if m.role != ChatMessageRole.USER or m is current]
         llm_window = self._redact_crisis_turns(window)
 
         cluster_id = request.active_cluster_id if request.active_cluster_id is not None else 4
@@ -446,25 +478,12 @@ class AICoachAgent:
         tier = self.scorer.get_tier_for_cluster(cluster_id)
 
         if any(w in lower_msg for w in ["why", "harder", "faster", "change", "adapted", "pacing", "different"]):
-            # No "see below": the chat route sends no adaptation reason with the reply.
-            return "I tuned the pace to fit your recent rounds." + BUBBLE_SEPARATOR + "Want to try the next one?"
+            return OFFLINE_WHY_REPLY
 
         if any(w in lower_msg for w in ["score", "collab", "collaboration", "rating", "progress"]):
-            # No number here (R15): one chat is not enough data. The score has its own route,
-            # which answers not_enough_data until the stored chat history supports one.
-            return (
-                "Your scores show on Home once there's enough data."
-                + BUBBLE_SEPARATOR
-                + "Want one tip for your next round?"
-            )
+            return OFFLINE_SCORE_REPLY
 
-        tier_guidance = {
-            ArchetypeTier.EXPLORER: "Small, steady steps work well right now.",
-            ArchetypeTier.PRACTITIONER: "Nice rhythm. Try testing your first guess.",
-            ArchetypeTier.STRATEGIST: "You're steering well. Keep checking your answers.",
-        }[tier]
-
-        return tier_guidance + BUBBLE_SEPARATOR + "What would you like to work on next?"
+        return OFFLINE_TIER_GUIDANCE[tier] + BUBBLE_SEPARATOR + OFFLINE_NEXT_QUESTION
 
     def _generate_suggested_actions(
         self,

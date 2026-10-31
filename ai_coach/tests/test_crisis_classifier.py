@@ -291,7 +291,7 @@ def test_crisis_replies_and_the_turn_they_answered_never_reach_the_llm(reply):
     resp = chat(spy.agent(), "why?", history)
     assert resp.reply_source is ReplySource.LLM
     sent = [m["content"] for m in spy.llm_calls[0][1:]]
-    assert sent == ["can we do a round?", "Sure.", "why?"]
+    assert sent == ["Sure.", "why?"]  # R14: no earlier user turn, crisis reply dropped too
 
 
 def test_split_signpost_bubbles_and_the_turn_they_answered_never_reach_the_llm():
@@ -300,7 +300,7 @@ def test_split_signpost_bubbles_and_the_turn_they_answered_never_reach_the_llm()
     history = [U("nothing feels worth it"), A(first), A(second), U("can we do a round?"), A("Sure.")]
     chat(spy.agent(), "why?", history)
     sent = [m["content"] for m in spy.llm_calls[0][1:]]
-    assert sent == ["can we do a round?", "Sure.", "why?"]
+    assert sent == ["Sure.", "why?"]
 
 
 def test_a_split_signpost_turn_is_not_classifier_context():
@@ -310,25 +310,43 @@ def test_a_split_signpost_turn_is_not_classifier_context():
     assert spy.classifier_calls[0]["previous_user_message"] == ""
 
 
-# -- R14: the LLM sees only user turns this request's classifier read ---------------------------
+# -- R14: the coach LLM sees only the current user message plus Loti's turns -------------------
 
 
-def test_an_unclassified_old_user_turn_never_reaches_the_llm():
-    # "I have been saving up my pills" got the offline reply when its classifier call failed
-    # (a 429), so it never had a verdict. Later turns pass; it must still stay out of the LLM.
+PILLS = "I have been saving up my pills"
+
+
+class RateLimitedOnPills(Spy):
+    """The reviewer's layout: the classifier 429s on the pills turn, and rates others none."""
+
+    def complete(self, system, payload):
+        self.classifier_calls.append(json.loads(payload))
+        if json.loads(payload)["current_user_message"] == PILLS:
+            raise GeminiError("HTTP 429")
+        return verdict("none")
+
+
+def test_after_a_429_the_next_turn_never_sends_the_unrated_turn_to_the_llm():
+    spy = RateLimitedOnPills()
+    first = chat(spy.agent(), PILLS)
+    assert first.reply_source is ReplySource.OFFLINE_AFTER_CLASSIFIER_ERROR and spy.llm_calls == []
+    # Immediate next turn: the pills turn is the classifier's context, but never the LLM's.
+    resp = chat(spy.agent(), "why?", [U(PILLS), A(first.reply_text)])
+    assert resp.reply_source is ReplySource.LLM
+    assert spy.classifier_calls[-1]["previous_user_message"] == PILLS
+    assert all(PILLS not in m["content"] for call in spy.llm_calls for m in call)
+    assert [m["content"] for m in spy.llm_calls[0] if m["role"] == "user"] == ["why?"]
+
+
+@pytest.mark.parametrize("later", [1, 2])
+def test_no_earlier_user_turn_reaches_the_llm_however_far_back(later):
     offline = AICoachAgent().handle_chat(ChatRequest(user_id="u", message="x")).reply_text
-    old = "I have been saving up my pills"
-    history = [U(old), A(offline), U("ok"), A("Sure."), U("can we do a round?"), A("Here you go.")]
+    history = [U(PILLS), A(offline)] + [U("ok"), A("Sure.")] * later
     spy = Spy()
     agent = spy.agent()
-    resp = chat(agent, "why?", history)
-    assert resp.reply_source is ReplySource.LLM
-    sent = [m["content"] for m in spy.llm_calls[0][1:]]
-    assert all(old not in c for c in sent)
-    users = [m["content"] for m in spy.llm_calls[0] if m["role"] == "user"]
-    assert users == ["can we do a round?", "why?"]  # exactly what the classifier read
-    assert spy.classifier_calls[0]["previous_user_message"] == "can we do a round?"
-    assert agent.reply_source_counts["unclassified_history_turn"] == 2
+    chat(agent, "why?", history)
+    assert [m["content"] for m in spy.llm_calls[0] if m["role"] == "user"] == ["why?"]
+    assert agent.reply_source_counts["earlier_user_turn_dropped"] == 1 + later
 
 
 # -- fail closed, but deterministic signposts still apply ----------------------------------------
@@ -372,10 +390,52 @@ def test_a_number_the_user_never_saw_falls_back_to_scripted(reply):
     assert resp.reply_text != reply
 
 
-def test_a_number_from_the_transcript_is_allowed():
+def test_a_number_from_the_current_message_or_a_loti_turn_is_allowed():
     spy = Spy(llm_reply="Three rounds is a good start.")
-    resp = chat(spy.agent(), "is that good?", [U("I did 3 rounds today")])
+    resp = chat(spy.agent(), "I did 3 rounds today, is that good?")
     assert resp.reply_source is ReplySource.LLM and resp.reply_text == "Three rounds is a good start."
+    spy = Spy(llm_reply="Round 3 is next.")
+    assert chat(spy.agent(), "ok", [A("Round 3 is next.")]).reply_source is ReplySource.LLM
+
+
+def test_a_number_from_a_dropped_user_turn_is_not_allowed():
+    # The LLM never saw that turn (R14), so its numbers are not "context" either: fails safe.
+    spy = Spy(llm_reply="Three rounds is a good start.")
+    resp = chat(spy.agent(), "is that good?", [U("I did 3 rounds today"), A("Nice.")])
+    assert resp.reply_source is ReplySource.OFFLINE_AFTER_CHECK
+
+
+@pytest.mark.parametrize("reply", ["Seize the moment.", "See you in Sept.", "Try that one again."])
+def test_words_that_are_not_reliably_numbers_pass(reply):
+    spy = Spy(llm_reply=reply)
+    assert chat(spy.agent(), "motivate me").reply_source is ReplySource.LLM
+
+
+@pytest.mark.parametrize(
+    "reason",
+    [
+        "expresses a wish to die",
+        "mentions stockpiling pills to overdose",
+        "suicidal ideation, passive",
+        "talks about killing themselves",
+        "wants to end their life",
+        "self-harm mentioned",
+        "says he wants to hurt himself",
+        "does not want to live any more",
+        "mentions no plan but self-harm before",
+        "not suicidal but wants to die",
+    ],
+)
+def test_third_person_risk_in_the_reason_promotes_none_to_low(reason):
+    assert parse_verdict(json.dumps({"reason": reason, "risk": "none"})).risk is Risk.LOW
+
+
+@pytest.mark.parametrize(
+    "reason",
+    ["frustration with a hard level", "no self-harm, just a hard level", "not about suicide, a game idiom"],
+)
+def test_benign_or_negated_reasons_stay_none(reason):
+    assert parse_verdict(json.dumps({"reason": reason, "risk": "none"})).risk is Risk.NONE
 
 
 def test_internal_context_numbers_are_not_allowed():

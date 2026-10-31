@@ -7,6 +7,10 @@ POST /v1/coach/chat
          "transcript": [{"from": "loti" | "you", "text": "..."}],   # bubbles shown, choices picked
          "message": "...",                                           # the typed text or the choice's label
          "kind": "typed" | "choice"}
+    What the server does with the transcript: a "loti" turn is kept only if it exactly matches a
+    reply the backend sends (fixed or offline copy) or one stored for this user; other "loti" turns
+    (the frontend's scripted bubbles included) are dropped. The classifier may read the previous
+    "you" turn as context, but the coach LLM gets only the current message plus Loti's turns (R14).
     Pipeline (R14): keyword crisis gate -> LLM backup crisis classifier -> health signpost ->
     AICoachAgent with GeminiRunner as llm_callable -> output checks (banned terms, at most 3
     bubbles of at most 12 words, no number the user has not seen) -> chat store.
@@ -46,7 +50,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from ai_coach import chat_store
-from ai_coach.agent import AICoachAgent
+from ai_coach.agent import AICoachAgent, known_loti_replies, split_bubbles
 from ai_coach.collaboration_scorer import CollaborationScorer
 from ai_coach.crisis_classifier import CrisisClassifier
 from ai_coach.llm_gemini import GeminiRunner, config_from_env
@@ -82,8 +86,38 @@ MESSAGE_IDS = {
     ReplySource.HEALTH_SIGNPOST: "health-signpost",
 }
 
-# Every reply source since the process started (research area 7, "Log fallbacks").
+# Every reply source since the process started (research area 7, "Log fallbacks"). Requests run on
+# FastAPI's thread pool, so updates go through count(), under a lock.
 REPLY_SOURCE_COUNTS: Counter[str] = Counter()
+_counts_lock = threading.Lock()
+
+
+def count(counts: Optional[Counter] = None, **extra: int) -> None:
+    with _counts_lock:
+        if counts:
+            REPLY_SOURCE_COUNTS.update(counts)
+        REPLY_SOURCE_COUNTS.update({k: v for k, v in extra.items() if v})
+
+
+# Loti turns in a transcript come from the client. Only these are kept: a reply the backend itself
+# can send (fixed and offline copy), or one stored for this user (an earlier exchange it answered:
+# all were lint- and shape-checked before they went out). Each is matched exactly, whole or one
+# bubble at a time. Anything else is dropped, from the classifier context and the LLM alike,
+# including the frontend's own scripted bubbles, which the backend cannot verify; that fails safe.
+KNOWN_LOTI_REPLIES = frozenset(known_loti_replies())
+
+
+def stored_loti_replies(key: str) -> frozenset:
+    try:
+        rows = chat_store.read_turns(key)
+    except LockTimeout:
+        return frozenset()  # unverifiable now: drop rather than trust
+    return frozenset(
+        part
+        for r in rows
+        if r.get("from") == "loti" and isinstance(r.get("text"), str)
+        for part in (r["text"], *split_bubbles(r["text"]))
+    )
 
 
 class ShownTurn(BaseModel):
@@ -159,12 +193,15 @@ def coach_chat(
 ) -> CoachChatResponse:
     deadline = time.monotonic() + TURN_DEADLINE_S
     key = user_key(req.user_id)
+    verified = KNOWN_LOTI_REPLIES | stored_loti_replies(key)
+    kept = [t for t in req.transcript if t.from_ == "you" or t.text in verified]
+    unverified = len(req.transcript) - len(kept)
     history = [
         ChatMessage(
             role=ChatMessageRole.ASSISTANT if t.from_ == "loti" else ChatMessageRole.USER,
             content=t.text,
         )
-        for t in req.transcript
+        for t in kept
     ]
     turn = TurnRunner(runner, deadline) if runner is not None else None
     # R14: one key configures both, so the coach LLM never runs without the backup classifier.
@@ -174,14 +211,13 @@ def coach_chat(
     )
     resp = agent.handle_chat(ChatRequest(user_id=key, message=req.message, chat_history=history))
     source = resp.reply_source
-    REPLY_SOURCE_COUNTS.update(agent.reply_source_counts)
-    REPLY_SOURCE_COUNTS["turns"] += 1
+    count(agent.reply_source_counts, turns=1, unverified_loti_turn_dropped=unverified)
     logger.info("coach chat turn answered (%s)", source.value)
 
     if source in STORED_SOURCES:
         room = deadline + STORE_GRACE_S - time.monotonic()
         if room <= 0:
-            REPLY_SOURCE_COUNTS["late_not_stored"] += 1
+            count(late_not_stored=1)
             logger.warning("coach chat turn answered late; this exchange was not stored")
         else:
             try:

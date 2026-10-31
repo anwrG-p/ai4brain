@@ -7,6 +7,10 @@
   HTTP call runs on a worker thread, and when the wait ends the caller gets GeminiError
   ("deadline exceeded") at once while the late reply is dropped. The chat route passes one
   deadline for the whole turn (classifier + coach), see ai_coach/api.py TURN_DEADLINE_S.
+  Stale work: a call not yet started when its caller gives up is cancelled; a queued call whose
+  deadline passed is never sent; with MAX_PENDING calls in flight a new one fails closed ("busy").
+  A call already on the wire runs out its httpx timeouts (each phase capped at the budget left
+  when it started; httpx has no overall timeout) and its result is dropped.
 - No user text and no key ever reach a log line, an exception message or an exception chain:
   errors carry the HTTP status or an exception type name, and are raised outside any `except`
   block, so no httpx exception (whose request holds the key header) is ever attached. The key
@@ -20,6 +24,7 @@ classifier uses for strict JSON.
 from __future__ import annotations
 
 import os
+import threading
 import time
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
@@ -41,9 +46,13 @@ _HARM_CATEGORIES = (
     "HARM_CATEGORY_DANGEROUS_CONTENT",
 )
 _BLOCKED_FINISH = {"SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII"}
-# Calls run here so a wait can end on time. A call that outlives its wait finishes within its
-# own httpx timeout (<= 3 s) and its result is dropped.
-_POOL = ThreadPoolExecutor(max_workers=8, thread_name_prefix="gemini")
+# Calls run here so a wait can end on time. The queue is bounded: with MAX_PENDING calls already
+# running or queued, a new one fails closed at once ("busy"). A call whose caller gave up is
+# cancelled if it has not started, and a queued call whose deadline passed is never sent.
+WORKERS = 8
+MAX_PENDING = 16
+_POOL = ThreadPoolExecutor(max_workers=WORKERS, thread_name_prefix="gemini")
+_SLOTS = threading.BoundedSemaphore(MAX_PENDING)
 
 
 class GeminiError(Exception):
@@ -119,7 +128,10 @@ class GeminiRunner:
         `relax_safety` turns Gemini's own content filter off. Only the crisis classifier sets it:
         it must be able to read a message about self-harm to route it, and it only emits JSON.
         """
-        wait = self.timeout_s if deadline is None else min(self.timeout_s, deadline - time.monotonic())
+        now = time.monotonic()
+        # One wall-clock end for this call: the turn's deadline, at most timeout_s from now.
+        end = now + self.timeout_s if deadline is None else min(deadline, now + self.timeout_s)
+        wait = end - now
         if wait <= 0:
             raise GeminiError("deadline exceeded")
         config: Dict[str, Any] = {
@@ -139,13 +151,19 @@ class GeminiRunner:
                 {"category": c, "threshold": "BLOCK_NONE"} for c in _HARM_CATEGORIES
             ]
 
-        future = _POOL.submit(self._post, body, wait)
+        if not _SLOTS.acquire(blocking=False):
+            raise GeminiError("busy")  # the queue is full: fail closed now, never wait in line
+        future = _POOL.submit(self._post, body, end)
+        future.add_done_callback(lambda _f: _SLOTS.release())
         failure: Optional[str] = None
         response: Optional[httpx.Response] = None
         try:
             response = future.result(timeout=wait)
         except FutureTimeout:
+            future.cancel()  # not started yet: it never runs
             failure = "deadline exceeded"
+        except GeminiError as exc:  # raised by _post itself: a safe message
+            failure = str(exc)
         except Exception as exc:  # noqa: BLE001 - httpx errors, a closed client: the type name only
             failure = type(exc).__name__
         # Raised here, outside the except blocks: nothing is chained, so no httpx request (with
@@ -165,12 +183,18 @@ class GeminiRunner:
             raise GeminiError(failure)
         return reply_text(data)
 
-    def _post(self, body: Dict[str, Any], wait: float) -> httpx.Response:
+    def _post(self, body: Dict[str, Any], end: float) -> httpx.Response:
+        """Runs on a worker. A call that waited in the queue past its end is never sent."""
+        left = end - time.monotonic()
+        if left <= 0:
+            raise GeminiError("deadline exceeded")
+        # httpx has no overall timeout, only per-phase ones; each phase gets what is left of the
+        # wall-clock budget when the request starts. The caller's wait above is the hard bound.
         return self._client.post(
             API_URL.format(model=self.model),
             headers={"x-goog-api-key": self._api_key},
             json=body,
-            timeout=httpx.Timeout(wait),
+            timeout=httpx.Timeout(left),
         )
 
 
