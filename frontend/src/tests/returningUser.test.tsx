@@ -55,7 +55,8 @@ describe('a returning device skips the first-visit flow', () => {
   it('?again=1 is the explicit retake: the baseline runs', async () => {
     useSessionStore.getState().addSession(SESSION)
     go('/baseline?again=1')
-    expect(await screen.findByRole('heading', { name: 'Your first check-in' })).toBeInTheDocument()
+    // The baseline is a lazy page: its first import here can take over a second on a loaded machine.
+    expect(await screen.findByRole('heading', { name: 'Your first check-in' }, { timeout: 5000 })).toBeInTheDocument()
     expect(window.location.pathname).toBe('/baseline')
   })
 

@@ -41,7 +41,7 @@ jobs:
       - name: WCAG 2.1 AA/AAA Contrast Checker
         run: npm run check:contrast
 
-      - name: Vitest Unit Suite (22/22)
+      - name: Vitest Unit Suite
         run: npm test
 
       - name: Production Bundle Build
@@ -50,5 +50,5 @@ jobs:
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Playwright E2E & Axe-core A11y Suite (18/18)
+      - name: Playwright E2E & Axe-core A11y Suite
         run: npx playwright test

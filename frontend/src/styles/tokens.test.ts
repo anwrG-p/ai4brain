@@ -218,6 +218,13 @@ describe('tokens.css fonts', () => {
     expect(mainSrc).not.toMatch(/@fontsource\/(quicksand\/(400|500)|inter\/700)/)
   })
 
+  // Only the two brand faces ship. Code text (the judge tool) uses the system monospace.
+  it('ships no other web font', () => {
+    expect([...mainSrc.matchAll(/@fontsource\/([\w-]+)\//g)].map((m) => m[1]).filter((f) => f !== 'quicksand' && f !== 'inter')).toEqual([])
+    expect(Object.keys(pkg.dependencies).filter((d) => d.startsWith('@fontsource/')).sort()).toEqual(['@fontsource/inter', '@fontsource/quicksand'])
+    for (const css of [themeBlock, lightBlock]) expect(css).toMatch(/--font-mono:\s*ui-monospace/)
+  })
+
   it('has no Lexend, Delius or Fredoka left', () => {
     for (const src of [tokensCss, mainSrc]) expect(src).not.toMatch(/Lexend|lexend|Delius|delius|Fredoka|fredoka/)
     const deps = Object.keys(pkg.dependencies)

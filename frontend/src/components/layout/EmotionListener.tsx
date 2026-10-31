@@ -2,9 +2,9 @@ import { useEffect } from 'react'
 import { useEmilyStore } from '../../state/useEmilyStore'
 import { startEmilyListener } from '../../utils/emilyEngine'
 
-/* The emotion engine, headless (gap FE-03). It used to run inside the header's EmilyMoodPill; the
-   pill is gone, so the shell mounts this once and Momo on the dashboard keeps reading a live store.
-   It mirrors the current emotion onto <html data-emotion> as the pill did. */
+/* The emotion engine, headless (gap FE-03): the shell mounts this once, so Momo on the dashboard
+   reads a live mood store. It also mirrors the current emotion onto <html data-emotion>, for tests
+   and dev tools only: no style reads it. */
 export function EmotionListener() {
   const currentEmotion = useEmilyStore((s) => s.currentEmotion)
 
