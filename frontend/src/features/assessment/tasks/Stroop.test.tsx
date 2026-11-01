@@ -5,7 +5,7 @@ import { DESIGN_SYSTEM_CONTRAST_PAIRS } from '../../../styles/token-metadata'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { TrialRecorder, tracker } from '../telemetry/tracker'
 import type { StroopParams, TelemetryEvent } from '../telemetry/types'
-import { INK, Stroop } from './Stroop'
+import { CVD_SAFE_INKS, INK, Stroop, toCvdSafe } from './Stroop'
 
 const COLORS = ['red', 'green', 'blue', 'yellow']
 const conflict = { word: 'RED', ink: 'blue', answer: 'blue' }
@@ -263,4 +263,44 @@ test('no element carries a hex or rgb() colour in its style', () => {
   const styled = document.querySelectorAll('[style]')
   expect(styled.length).toBeGreaterThan(0)
   for (const el of styled) expect(el.getAttribute('style')).not.toMatch(HEX_OR_FN)
+})
+
+test('toCvdSafe: a classic block becomes blue, yellow, red, black (green -> black), design unchanged', () => {
+  const classic = params([
+    { word: 'GREEN', ink: 'red', answer: 'red' },
+    { word: 'RED', ink: 'green', answer: 'green' },
+    { word: 'GREEN', ink: 'green', answer: 'green' },
+    { word: 'BLUE', ink: 'yellow', answer: 'yellow' },
+  ])
+  const cvd = toCvdSafe(classic)
+  expect(cvd.colors).toEqual([...CVD_SAFE_INKS])
+  expect(cvd.colors).toEqual(['blue', 'yellow', 'red', 'black'])
+  expect(cvd.trials).toEqual([
+    { word: 'BLACK', ink: 'red', answer: 'red' },
+    { word: 'RED', ink: 'black', answer: 'black' },
+    { word: 'BLACK', ink: 'black', answer: 'black' },
+    { word: 'BLUE', ink: 'yellow', answer: 'yellow' },
+  ])
+  // Congruence is kept trial by trial (word === ink), so the interference contrast is the same.
+  expect(cvd.trials.map((t) => t.word.toLowerCase() === t.ink)).toEqual(classic.trials.map((t) => t.word.toLowerCase() === t.ink))
+  expect(cvd.time_limit_ms).toBe(classic.time_limit_ms)
+  expect(cvd.trials.flatMap((t) => [t.word, t.ink, t.answer]).join()).not.toMatch(/green/i)
+})
+
+test('toCvdSafe leaves a cvd_safe or unknown ink set alone', () => {
+  const already = { colors: ['blue', 'yellow', 'red', 'black'], trials: [{ word: 'RED', ink: 'black', answer: 'black' }], time_limit_ms: 3000 }
+  expect(toCvdSafe(already)).toBe(already)
+  const other = params([conflict])
+  other.colors = ['red', 'blue']
+  expect(toCvdSafe(other)).toBe(other)
+  const broken = { time_limit_ms: 3000 } as unknown as StroopParams
+  expect(toCvdSafe(broken)).toBe(broken)
+})
+
+test('a cvd_safe block draws on the light plate, with one button per ink in the cvd_safe order', () => {
+  setup(toCvdSafe(params([{ word: 'GREEN', ink: 'green', answer: 'green' }])))
+  const word = screen.getByText('BLACK')
+  expect(word.style.color).toBe('var(--color-stroop-black)')
+  expect(word.closest('[data-theme="light"][data-stroop-plate]')).not.toBeNull()
+  expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['blue (1)', 'yellow (2)', 'red (3)', 'black (4)'])
 })

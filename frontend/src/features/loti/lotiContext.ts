@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { EMOTION_TO_MOOD } from '../../components/features/characters'
+import { moodGuessActive, useDevicePrefs } from '../../state/devicePrefs'
 import { useEmilyStore } from '../../state/useEmilyStore'
 import type { EmilyEmotion } from '../../styles/emilyTokens'
 import { currentPillars, sessionsThisWeek, weakestPillar } from '../insights/dashboard'
@@ -35,7 +36,8 @@ export function useLotiContext(): LotiContext {
     return lotiContext({
       sessions: useSessionStore.getState().sessions,
       goals: { year, goals },
-      emotion: useEmilyStore.getState().currentEmotion,
+      // Only an active guess (opted in, notice seen: ADR 0002); otherwise Loti knows no mood.
+      emotion: moodGuessActive(useDevicePrefs.getState()) ? useEmilyStore.getState().currentEmotion : undefined,
       now: new Date(),
     })
   })

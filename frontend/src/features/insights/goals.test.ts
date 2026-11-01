@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { GOALS_KEY, hasGoalsForYear, loadGoals, useGoalsStore } from './goals'
+import { GOALS_KEY, WEEKLY_GOAL, WEEKLY_SKIPS, hasGoalsForYear, loadGoals, useGoalsStore, weeklyGoal, weeklyGoalText } from './goals'
 
 afterEach(() => {
   useGoalsStore.getState().clearGoals()
@@ -79,5 +79,40 @@ describe('goals slice', () => {
       '{"version":1,"year":2026,"goals":{"memory":10,"focus":5,"visual":5},"bases":{"memory":52,"focus":-3,"visual":"x","agility":40}}',
     )
     expect(loadGoals().bases).toEqual({ memory: 52 })
+  })
+})
+
+describe('weekly goal (research #10)', () => {
+  const NOW = new Date('2026-10-28T15:00:00') // a Wednesday
+  const at = (iso: string) => ({ id: iso, at: new Date(iso).toISOString(), inputs: {} })
+
+  it('is 3 sessions a week with one skip, counted from Monday 00:00 local time', () => {
+    expect(WEEKLY_GOAL).toBe(3)
+    expect(WEEKLY_SKIPS).toBe(1)
+    const last = at('2026-10-25T23:59:00') // Sunday: last week
+    expect(weeklyGoal([last], NOW)).toEqual({ done: 0, target: 3, kept: false })
+    expect(weeklyGoal([last, at('2026-10-26T00:00:00')], NOW)).toEqual({ done: 1, target: 3, kept: false })
+    expect(weeklyGoal([at('2026-10-26T08:00:00'), at('2026-10-27T08:00:00')], NOW)).toEqual({ done: 2, target: 3, kept: true })
+  })
+
+  it('reads as one plain line; past the goal it counts on; no streak or guilt words', () => {
+    expect(weeklyGoalText({ done: 0, target: 3, kept: false })).toBe('0 of 3 this week')
+    expect(weeklyGoalText({ done: 1, target: 3, kept: false })).toBe('1 of 3 this week')
+    expect(weeklyGoalText({ done: 2, target: 3, kept: true })).toBe('2 of 3 this week · week kept')
+    expect(weeklyGoalText({ done: 3, target: 3, kept: true })).toBe('3 of 3 this week · week kept')
+    expect(weeklyGoalText({ done: 5, target: 3, kept: true })).toBe('5 this week · week kept')
+    for (let done = 0; done < 6; done++) {
+      expect(weeklyGoalText({ done, target: 3, kept: done >= 2 })).not.toMatch(/streak|miss|broke|lost|behind|fail/i)
+    }
+  })
+
+  it('a missed week resets quietly: the next week starts at 0 with nothing carried over', () => {
+    const full = [at('2026-10-12T08:00:00'), at('2026-10-13T08:00:00'), at('2026-10-14T08:00:00')]
+    expect(weeklyGoal(full, new Date('2026-10-15T12:00:00'))).toMatchObject({ done: 3, kept: true })
+    expect(weeklyGoal(full, NOW)).toEqual({ done: 0, target: 3, kept: false }) // the week of 19 Oct had none
+  })
+
+  it('a session in the future (clock skew) does not count', () => {
+    expect(weeklyGoal([at('2026-10-29T08:00:00')], NOW).done).toBe(0)
   })
 })

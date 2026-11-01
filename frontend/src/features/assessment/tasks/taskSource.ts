@@ -1,5 +1,7 @@
-import type { Dimension, SchemaType, TaskPayload } from '../telemetry/types'
+import { useDevicePrefs } from '../../../state/devicePrefs'
+import type { Dimension, SchemaType, StroopParams, TaskPayload } from '../telemetry/types'
 import fixtures from './fixtures.json'
+import { toCvdSafe } from './Stroop'
 
 type FetchFn = (url: string) => Promise<Response>
 
@@ -41,23 +43,29 @@ export const usingMocks = () => import.meta.env.VITE_USE_MOCKS !== 'false'
 // decides (R2). Real mode has no such guarantee: in dev, StrictMode's double effect sends two GETs
 // and the caller keeps only the second, so the server may hand out (and count) a task nobody sees.
 // Note for Member 5: make /v1/tasks/next idempotent per (user, seq) or tolerate unplayed tasks.
+// `inks: 'cvd_safe'` (default: Settings' "Colour-blind friendly colours") asks for the colour-blind
+// friendly Stroop inks: real mode sends inks=cvd_safe, and a classic Stroop block that still comes
+// back (mock mode, or a server that ignored it) is converted on the device (toCvdSafe).
 export async function fetchNextTask(
   userId: string,
   seq = 0,
-  opts: { schemaType?: SchemaType; fetchFn?: FetchFn } = {},
+  opts: { schemaType?: SchemaType; fetchFn?: FetchFn; inks?: 'cvd_safe' | 'classic' } = {},
 ): Promise<TaskPayload> {
+  const cvd = (opts.inks ?? (useDevicePrefs.getState().cvdSafe ? 'cvd_safe' : 'classic')) === 'cvd_safe'
+  const inks = (task: TaskPayload): TaskPayload =>
+    cvd && task.schema_type === 'stroop' ? { ...task, params: toCvdSafe(task.params as StroopParams) } : task
   if (usingMocks()) {
     const task =
       FIXTURES.find((f) => f.schema_type === opts.schemaType) ?? FIXTURES[seq % FIXTURES.length]
     if (!task) throw new Error(`no task fixture for seq ${seq}`)
-    return task
+    return inks(task)
   }
   const fetchFn = opts.fetchFn ?? ((url: string) => fetch(url))
-  const res = await fetchFn(`/v1/tasks/next?user_id=${encodeURIComponent(userId)}`)
+  const res = await fetchFn(`/v1/tasks/next?user_id=${encodeURIComponent(userId)}${cvd ? '&inks=cvd_safe' : ''}`)
   if (!res.ok) throw new Error(`GET /v1/tasks/next failed: HTTP ${res.status}`)
   const task: unknown = await res.json()
   if (!validTask(task)) throw new Error('GET /v1/tasks/next returned an invalid task payload')
-  return task
+  return inks(task)
 }
 
 // crypto.randomUUID only exists in secure contexts (https, localhost); a plain-http LAN demo lacks it.

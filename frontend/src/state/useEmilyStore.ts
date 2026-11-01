@@ -23,10 +23,9 @@ export interface EmilyStoreState {
   history: EmilyHistoryEntry[]
 
   // Core Actions
-  updateTelemetry: (
-    events: readonly EmilyInteractionEvent[],
-    options?: { consecutiveErrors?: number },
-  ) => void
+  /** Pointer and key events only. Answer errors are never an input: the difficulty staircase causes
+      them on purpose, so they must not read as strain (ADR 0002). */
+  updateTelemetry: (events: readonly EmilyInteractionEvent[]) => void
   setManualEmotion: (emotion: EmilyEmotion) => void
   unlockHuman: () => void
   approveProposedEmotion: () => void
@@ -45,10 +44,10 @@ export const useEmilyStore = create<EmilyStoreState>((set, get) => ({
   metrics: INITIAL_EMILY_METRICS,
   history: [],
 
-  updateTelemetry: (events, options) => {
+  updateTelemetry: (events) => {
     const { isHumanLocked, autoAdapt, currentEmotion } = get()
     const metrics = computeEmilyMetrics(events)
-    const classifiedEmotion = classifyEmilyEmotion(metrics, options)
+    const classifiedEmotion = classifyEmilyEmotion(metrics)
 
     // If human locked, only track metrics, never auto-transition
     if (isHumanLocked) {
@@ -68,13 +67,12 @@ export const useEmilyStore = create<EmilyStoreState>((set, get) => ({
       classifiedEmotion === 'hesitant' ||
       classifiedEmotion === 'fatigued'
 
-    const hasActiveTaskStrain =
-      (options?.consecutiveErrors !== undefined && options.consecutiveErrors >= 2) ||
-      metrics.clickBurstCount >= 1
+    // Rage clicks only. Wrong answers are not strain: the staircase causes them on purpose.
+    const hasActiveTaskStrain = metrics.clickBurstCount >= 1
 
     if (isStrainedState && !autoAdapt) {
-      // Only propose unprompted emotion changes if there is real task strain or rage clicks,
-      // never from passive reading pauses.
+      // Only propose unprompted emotion changes on rage clicks, never from passive reading pauses
+      // or from errors.
       if (hasActiveTaskStrain) {
         set((state) => ({
           metrics,
