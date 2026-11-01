@@ -1,12 +1,15 @@
 import { create } from 'zustand'
 
 /* This device's preferences that F-D adds (ticket F-D), stored under one versioned key:
-   - moodGuess: Momo's mood guess on or off (ADR 0002). Off stops the emotion listener and Momo
-     shows a neutral face.
-   - moodNoticeSeen: the first-exposure notice (AI Act Art 50(3)) was acknowledged with "Got it".
+   - moodGuess: Momo's mood guess, OFF until the user turns it on in Settings (opt-in, ADR 0002, R18).
+   - moodNoticeSeen: the Art 50(3) notice was shown where the user opted in. Turning the guess on in
+     Settings happens beside the notice, so it sets this too.
    - cvdSafe: Color Clash uses the colour-blind friendly inks (blue, yellow, red, black).
-   "Delete my data" resets the two mood fields (they say something about the user); cvdSafe is an
-   accessibility setting like the theme and reduce motion, so it survives. Export includes all. */
+   The guess runs only while BOTH moodGuess and moodNoticeSeen hold (moodGuessActive): every reader
+   of the mood (the listener, Momo's face, Home's tint, Loti's context) checks it.
+   "Delete my data" turns the guess back off and forgets the notice (they say something about the
+   user, and a purge must never switch the guess on); cvdSafe is an accessibility setting like the
+   theme and reduce motion, so it survives. Export includes all. Other tabs follow (storage event). */
 
 export const PREFS_KEY = 'synapsetwin_prefs_v1'
 const VERSION = 1
@@ -18,14 +21,17 @@ export interface StoredPrefs {
 }
 
 export interface DevicePrefsState extends StoredPrefs {
+  /** On also records the notice as seen: the switch sits beside it. */
   setMoodGuess: (on: boolean) => void
-  acknowledgeMoodNotice: () => void
   setCvdSafe: (on: boolean) => void
-  /** The privacy purge: the mood fields go back to their defaults; cvdSafe stays. */
+  /** The privacy purge: the guess back off, the notice unseen; cvdSafe stays. */
   clearMoodPrefs: () => void
 }
 
-export const DEFAULT_PREFS: StoredPrefs = { moodGuess: true, moodNoticeSeen: false, cvdSafe: false }
+export const DEFAULT_PREFS: StoredPrefs = { moodGuess: false, moodNoticeSeen: false, cvdSafe: false }
+
+/** The mood guess may run: opted in, with the notice shown. */
+export const moodGuessActive = (p: StoredPrefs): boolean => p.moodGuess && p.moodNoticeSeen
 
 /** Reads the stored prefs; anything corrupt, foreign or from another version reads as the defaults,
     and each field falls back on its own. */
@@ -59,9 +65,16 @@ export const useDevicePrefs = create<DevicePrefsState>((set, get) => {
   }
   return {
     ...loadPrefs(),
-    setMoodGuess: (on) => update({ moodGuess: on }),
-    acknowledgeMoodNotice: () => update({ moodNoticeSeen: true }),
+    setMoodGuess: (on) => update(on ? { moodGuess: true, moodNoticeSeen: true } : { moodGuess: false }),
     setCvdSafe: (on) => update({ cvdSafe: on }),
     clearMoodPrefs: () => update({ moodGuess: DEFAULT_PREFS.moodGuess, moodNoticeSeen: DEFAULT_PREFS.moodNoticeSeen }),
   }
 })
+
+// Another tab changed the prefs (or cleared storage, key null): this tab follows at once, so a guess
+// switched off or purged elsewhere stops here too.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === PREFS_KEY || e.key === null) useDevicePrefs.setState(loadPrefs())
+  })
+}

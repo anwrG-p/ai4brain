@@ -45,15 +45,9 @@ function sessions(n: number) {
   }))
 }
 
-async function seed(page: Page, n: number, moodNoticeSeen = true) {
+async function seed(page: Page, n: number) {
   const value = JSON.stringify({ version: 1, sessions: sessions(n) })
   await page.addInitScript((v) => window.localStorage.setItem('synapsetwin_sessions_v1', v), value)
-  // A returning device has acknowledged Momo's first-exposure notice; its own test shows it.
-  const prefs = JSON.stringify({ version: 1, moodGuess: true, moodNoticeSeen, cvdSafe: false })
-  // Only when absent, so a reload keeps what the page stored.
-  await page.addInitScript((v) => {
-    if (window.localStorage.getItem('synapsetwin_prefs_v1') === null) window.localStorage.setItem('synapsetwin_prefs_v1', v)
-  }, prefs)
 }
 
 async function shot(page: Page, info: TestInfo, name: string) {
@@ -151,33 +145,23 @@ test.describe('Page 06: Home (/dashboard)', () => {
     await expect(page.getByTestId('weekly-goal')).toHaveText(/^\d+ (of 3 )?this week( · week kept)?$/)
   })
 
-  test('first visit: the mood notice beside Momo, then the correction picker; axe and overflow in light and dark', async ({ page }, info) => {
-    await seed(page, 2, false)
+  test('mood guess opt-in: Home has no notice and Momo is no control; after opting in under Settings, Momo shows the picked mood', async ({ page }) => {
+    await seed(page, 2)
     await page.goto('/dashboard', { waitUntil: 'networkidle' })
-    const note = page.getByRole('note')
-    await expect(note).toHaveText(/Momo guesses your mood from how you use the app, on this device only\. You can change it or turn it off\./)
-    await expect(page.getByRole('dialog')).toHaveCount(0) // inline, not a modal wall
-    for (const theme of ['light', 'dark'] as const) {
-      if (theme === 'dark') await page.getByRole('button', { name: /Dark \(Night Lab\)/i }).first().click()
-      await checkViewports(page, `mood notice, ${theme}`, info, `08-home-notice-${theme}`)
-    }
-    await note.getByRole('button', { name: 'Got it' }).click()
     await expect(page.getByRole('note')).toHaveCount(0)
-    const momo = page.getByRole('button', { name: /^Momo guesses you feel/ })
-    await expect(momo).toBeFocused()
-    await momo.click()
-    const picker = page.getByRole('group', { name: 'How do you feel?' })
-    await expect(picker.getByRole('button')).toHaveText(['Calm', 'Happy', 'Focused', 'Tired', 'Frustrated'])
-    for (const theme of ['dark', 'light'] as const) {
-      if (theme === 'light') await page.getByRole('button', { name: /Light \(Playful Lab\)/i }).first().click()
-      if (!(await picker.isVisible())) await momo.click()
-      await checkViewports(page, `mood picker, ${theme}`, info, `08-home-picker-${theme}`)
-    }
-    if (!(await picker.isVisible())) await momo.click()
-    await picker.getByRole('button', { name: 'Tired' }).click()
+    await expect(page.getByText(/Momo guesses your mood/)).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /Momo/ })).toHaveCount(0)
+    await expect(page.getByRole('img', { name: 'Momo' })).toBeVisible() // still and neutral
+    await expect(page.locator('[data-page="home"]')).toHaveAttribute('data-mood', 'calm')
+    // Opt in where the notice is, correct the guess there, and Home follows.
+    await page.getByRole('link', { name: 'You' }).first().click()
+    await page.getByRole('link', { name: 'Settings' }).click()
+    await page.getByRole('switch', { name: 'Mood guess' }).click()
+    await page.getByRole('button', { name: 'Change' }).click()
+    await page.getByRole('radio', { name: 'Tired' }).click()
+    await page.getByRole('link', { name: 'Home' }).first().click()
     await expect(page.getByRole('img', { name: 'Momo looks tired' })).toBeVisible()
-    await page.reload({ waitUntil: 'networkidle' })
-    await expect(page.getByRole('note')).toHaveCount(0) // acknowledged on this device
+    await expect(page.getByRole('button', { name: /Momo/ })).toHaveCount(0)
   })
 
   test('"View as table" shows the 5 rows with ranges; "Start today\'s session" trains the weakest pillar', async ({ page }) => {

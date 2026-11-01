@@ -118,10 +118,14 @@ export type WeeklyGoal = {
   kept: boolean
 }
 
+/** The week is kept from WEEKLY_GOAL - WEEKLY_SKIPS sessions. Home's line and Loti's weekend nudge
+    both decide with this. */
+export const weekKept = (done: number): boolean => done >= WEEKLY_GOAL - WEEKLY_SKIPS
+
 /** This week's count, the same one Loti reads (sessionsThisWeek: Monday 00:00 local time to now). */
 export function weeklyGoal(sessions: readonly SessionRecord[], now: Date): WeeklyGoal {
   const done = sessionsThisWeek(sessions, now)
-  return { done, target: WEEKLY_GOAL, kept: done >= WEEKLY_GOAL - WEEKLY_SKIPS }
+  return { done, target: WEEKLY_GOAL, kept: weekKept(done) }
 }
 
 /** The one plain line: "1 of 3 this week", and once the week is kept (one skip allowed) "2 of 3

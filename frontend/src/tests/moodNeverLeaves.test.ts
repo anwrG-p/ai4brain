@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TrialRecorder, Tracker } from '../features/assessment/telemetry/tracker'
 import type { TelemetryEvent } from '../features/assessment/telemetry/types'
@@ -68,6 +70,52 @@ describe('the mood never leaves the device (ADR 0002)', () => {
     expect(JSON.stringify(sent)).not.toMatch(MOOD_WORDS)
     expect(coachContext(ctx)).toEqual({ now: ctx.now, hasGoalsThisYear: false, sessionsThisWeek: 1 })
     expect(ctx.mood).toBe('frustrated') // the caller's context is not changed
+  })
+
+  it('the coach context is an allow-list: a field Loti adds later never reaches the coach by default', () => {
+    const ctx = {
+      now: new Date('2026-10-28T15:00:00'),
+      weakestPillar: 'memory',
+      hasGoalsThisYear: true,
+      sessionsThisWeek: 2,
+      mood: 'tired',
+      somethingNew: 'secret',
+    } as unknown as LotiContext
+    expect(Object.keys(coachContext(ctx)).sort()).toEqual(['hasGoalsThisYear', 'now', 'sessionsThisWeek', 'weakestPillar'])
+    expect(Object.keys(coachContext({ now: new Date(), hasGoalsThisYear: false, sessionsThisWeek: 0 })).sort()).toEqual([
+      'hasGoalsThisYear',
+      'now',
+      'sessionsThisWeek',
+    ])
+  })
+
+  it('import boundary: no assessment code and no coach transport imports the mood store, the engine or Loti\'s context', () => {
+    const SRC = path.join(process.cwd(), 'src')
+    const walk = (dir: string): string[] =>
+      readdirSync(dir).flatMap((name) => {
+        const full = path.join(dir, name)
+        if (statSync(full).isDirectory()) return walk(full)
+        return /\.(ts|tsx)$/.test(name) && !/\.test\.(ts|tsx)$/.test(name) ? [full] : []
+      })
+    const files = [...walk(path.join(SRC, 'features', 'assessment')), path.join(SRC, 'features', 'loti', 'coachAdapter.ts')]
+    expect(files.length).toBeGreaterThan(10)
+    const FORBIDDEN = /from\s+['"][^'"]*(useEmilyStore|emilyEngine|lotiContext)['"]/
+    const MOOD_IN_SOURCE = /\b(mood\w*|emotion\w*|frustrat\w*|fatigu\w*|hesitant|energized|calm_flow|emily\w*)\b/i
+    for (const f of files) {
+      const text = readFileSync(f, 'utf8')
+      expect(text, path.relative(SRC, f)).not.toMatch(FORBIDDEN)
+      // Every trial_meta key is a literal in this code, so none can be a mood or emotion key.
+      if (f.includes(`${path.sep}assessment${path.sep}`)) expect(text, path.relative(SRC, f)).not.toMatch(MOOD_IN_SOURCE)
+    }
+  })
+
+  it('trial_meta keys never name a mood or emotion, whatever the meta the task passes', () => {
+    useEmilyStore.getState().setManualEmotion('frustrated')
+    const rec = new TrialRecorder({ user_id: 'u', session_id: 's', task_id: 't', dimension: 'executive_function', voice_opt_in: false })
+    rec.start(0)
+    const event = rec.finish({ correct: true, meta: { congruent: true, trial_type: 'target', rule: 'a' } })
+    for (const key of Object.keys(event.trial_meta ?? {})) expect(key).not.toMatch(MOOD_WORDS)
+    expect(Object.keys(event.trial_meta ?? {}).sort()).toEqual(['congruent', 'item_id', 'rule', 'trial_type'])
   })
 
   it('without the "Let Loti use AI to reply" choice, nothing reaches the coach', () => {

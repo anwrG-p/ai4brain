@@ -218,11 +218,13 @@ describe('/results', () => {
     fireEvent.click(screen.getByRole('button', { name: 'See my results' }))
     const sheet = screen.getByRole('dialog', { name: 'Your choices' })
     const switches = within(sheet).getAllByRole('switch')
-    expect(switches.map((s) => s.textContent)).toEqual(['Save my answers to improve my training', 'Let Loti use AI to reply'])
+    expect(switches.map((s) => s.textContent)).toEqual(['Save my answers to improve my training', "Let Loti use AI to reply when it's available"])
     for (const s of switches) expect(s).toHaveAttribute('aria-checked', 'false')
     expect(switches[0]!.className).toBe(switches[1]!.className) // equal weight
-    const primaries = within(sheet).getAllByRole('button').filter((b) => b.className.includes('bg-brand '))
-    expect(primaries.map((b) => b.textContent)).toEqual(['Continue'])
+    // One action button, "Continue"; besides it only the sheet's Close and the quiet data link.
+    expect(within(sheet).getByRole('button', { name: 'Continue' })).toBeInTheDocument()
+    expect(within(sheet).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent)).toEqual(['Close', 'Continue'])
+    expect(within(sheet).getAllByRole('link').map((a) => a.textContent)).toEqual(['How we handle your data'])
     // Turning a switch on decides nothing yet: nothing is sent before Continue.
     await act(async () => void fireEvent.click(switches[0]!))
     expect(switches[0]).toHaveAttribute('aria-checked', 'true')
@@ -233,7 +235,7 @@ describe('/results', () => {
   it('AI replies on, answers off: nothing is sent, and each purpose keeps its own choice', async () => {
     await runBaseline()
     fireEvent.click(screen.getByRole('button', { name: 'See my results' }))
-    fireEvent.click(screen.getByRole('switch', { name: 'Let Loti use AI to reply' }))
+    fireEvent.click(screen.getByRole('switch', { name: "Let Loti use AI to reply when it's available" }))
     await act(async () => void fireEvent.click(screen.getByRole('button', { name: 'Continue' })))
     expect(tracker.getStatus()).toMatchObject({ consent: 'denied', coachConsent: 'granted', queuedCount: 0 })
     expect(fetchFn).not.toHaveBeenCalled()

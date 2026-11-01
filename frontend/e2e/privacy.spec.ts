@@ -54,7 +54,7 @@ test.describe('Page 13: Privacy (/privacy)', () => {
     await page.goto('/privacy', { waitUntil: 'networkidle' })
     await page.getByRole('button', { name: 'Choose' }).click()
     const save = page.getByRole('switch', { name: 'Save my answers to improve my training' })
-    const ai = page.getByRole('switch', { name: 'Let Loti use AI to reply' })
+    const ai = page.getByRole('switch', { name: "Let Loti use AI to reply when it's available" })
     expect(await save.getAttribute('class')).toBe(await ai.getAttribute('class'))
     for (const [w, h] of [[375, 812], [768, 1024], [1440, 900]] as const) {
       await page.setViewportSize({ width: w, height: h })
@@ -64,7 +64,7 @@ test.describe('Page 13: Privacy (/privacy)', () => {
     await ai.click()
     await page.getByRole('button', { name: 'Done' }).click()
     await expect(page.getByTestId('consent-line')).toHaveText('Your answers are kept on this device only.')
-    await expect(page.getByTestId('coach-line')).toHaveText('Loti may use AI to reply.')
+    await expect(page.getByTestId('coach-line')).toHaveText("Loti may use AI to reply when it's available.")
     await page.getByRole('button', { name: 'Change' }).click()
     await page.getByRole('switch', { name: 'Save my answers to improve my training' }).click()
     await page.getByRole('button', { name: 'Done' }).click()

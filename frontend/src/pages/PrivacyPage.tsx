@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore, type Keyboard
 import { Button } from '../components/ui/Button'
 import { tracker, type Consent } from '../features/assessment/telemetry/tracker'
 import { ConsentChoices, type ConsentChoice } from '../features/flow/ConsentChoices'
+import { COACH_ENABLED } from '../features/loti/coachAdapter'
 import { deleteMyData, downloadMyData } from '../features/privacy/myData'
 
 const CONSENT_LINE: Record<Consent, string> = {
@@ -12,7 +13,8 @@ const CONSENT_LINE: Record<Consent, string> = {
 
 const COACH_LINE: Record<Consent, string> = {
   pending: 'AI replies from Loti: not chosen yet.',
-  granted: 'Loti may use AI to reply.',
+  // While the AI path is off (R14) no reply exists yet, so the line says when it would apply.
+  granted: COACH_ENABLED ? 'Loti may use AI to reply.' : "Loti may use AI to reply when it's available.",
   denied: 'Loti uses scripted replies only.',
 }
 

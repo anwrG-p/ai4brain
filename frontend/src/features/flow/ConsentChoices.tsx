@@ -1,11 +1,14 @@
-import { useId, useState } from 'react'
+import { useState } from 'react'
 import { Button } from '../../components/ui/Button'
+import { Switch } from '../../components/ui/Switch'
 import type { ConsentPurpose } from '../assessment/telemetry/tracker'
+import { COACH_ENABLED } from '../loti/coachAdapter'
 
-/** The two purposes, in the order shown; the same words on the consent step and the privacy page. */
+/** The two purposes, in the order shown; the same words on the consent step and the privacy page.
+    While the AI path is off (R14), purpose 2 says so: no claim of a reply that does not exist. */
 export const PURPOSES: { id: ConsentPurpose; label: string }[] = [
   { id: 'telemetry', label: 'Save my answers to improve my training' },
-  { id: 'coach', label: 'Let Loti use AI to reply' },
+  { id: 'coach', label: COACH_ENABLED ? 'Let Loti use AI to reply' : "Let Loti use AI to reply when it's available" },
 ]
 
 export type ConsentChoice = Record<ConsentPurpose, boolean>
@@ -28,7 +31,12 @@ export function ConsentChoices({
       <ul className="m-0 flex list-none flex-col gap-3 p-0">
         {PURPOSES.map((p) => (
           <li key={p.id}>
-            <PurposeSwitch label={p.label} on={choice[p.id]} onChange={(on) => setChoice((c) => ({ ...c, [p.id]: on }))} />
+            <Switch
+              label={p.label}
+              checked={choice[p.id]}
+              onChange={(on) => setChoice((c) => ({ ...c, [p.id]: on }))}
+              className="rounded-2xl border border-border bg-surface px-4 py-3"
+            />
           </li>
         ))}
       </ul>
@@ -36,31 +44,5 @@ export function ConsentChoices({
         {submitLabel}
       </Button>
     </div>
-  )
-}
-
-function PurposeSwitch({ label, on, onChange }: { label: string; on: boolean; onChange: (on: boolean) => void }) {
-  const labelId = useId()
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      aria-labelledby={labelId}
-      onClick={() => onChange(!on)}
-      className="focus-ring flex min-h-14 w-full cursor-pointer items-center justify-between gap-4 rounded-2xl border border-border bg-surface px-4 py-3 text-left hover:bg-surface-raised"
-    >
-      <span id={labelId} className="text-base font-medium text-ink">
-        {label}
-      </span>
-      <span
-        aria-hidden="true"
-        className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-pill border ${
-          on ? 'border-transparent bg-brand' : 'border-border-strong bg-surface-raised'
-        }`}
-      >
-        <span className={`inline-block size-5 rounded-pill transition-transform ${on ? 'translate-x-6 bg-brand-ink' : 'translate-x-1 bg-border-strong'}`} />
-      </span>
-    </button>
   )
 }

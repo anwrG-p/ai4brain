@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
-import { EMOTION_TO_MOOD, Loti, MomoGuess, MomoNotice, useMoodNoticeDue } from '../components/features/characters'
+import { EMOTION_TO_MOOD, Loti, MomoFromStore } from '../components/features/characters'
 import { useCharacterMotion } from '../components/features/characters/shared'
 import { Button } from '../components/ui/Button'
 import {
@@ -22,7 +22,7 @@ import { ProgressCurve } from '../features/insights/ProgressCurve'
 import { useSessionStore } from '../features/insights/sessionStore'
 import { LotiBubbles, scriptedBrain, useLotiActions, type LotiAction, type LotiBrain } from '../features/loti'
 import { useAppStore } from '../state/useAppStore'
-import { useDevicePrefs } from '../state/devicePrefs'
+import { moodGuessActive, useDevicePrefs } from '../state/devicePrefs'
 import { useEmilyStore } from '../state/useEmilyStore'
 
 /* Home (/dashboard; Dashboard doc). Need-to-know only (rules 13, 14): above the fold exactly three
@@ -52,9 +52,9 @@ export default function DashboardPage() {
   const bases = useGoalsStore((s) => s.bases)
   const setBase = useGoalsStore((s) => s.setBase)
   const emotion = useEmilyStore((s) => s.currentEmotion)
-  const guessOn = useDevicePrefs((s) => s.moodGuess)
-  const mood = guessOn ? EMOTION_TO_MOOD[emotion] : 'calm'
-  const noticeDue = useMoodNoticeDue()
+  // Nothing reads the mood unless the guess is active (opted in, notice seen: ADR 0002).
+  const guessActive = useDevicePrefs(moodGuessActive)
+  const mood = guessActive ? EMOTION_TO_MOOD[emotion] : 'calm'
   const name = useAppStore((s) => s.userProfile?.preferredName)
   // ponytail: "now" is read once per visit; the page does not tick over midnight.
   const [now] = useState(() => new Date())
@@ -80,7 +80,7 @@ export default function DashboardPage() {
   const context = {
     now,
     weakestPillar: weakest,
-    mood,
+    ...(guessActive ? { mood } : {}),
     hasGoalsThisYear: hasGoalsForYear({ year: goalYear, goals }, now.getFullYear()),
     sessionsThisWeek: sessionsThisWeek(sessions, now),
   }
@@ -96,13 +96,10 @@ export default function DashboardPage() {
             <h1 id="home-hello" className="font-display text-3xl font-bold text-ink">
               Hi, {name || 'there'}
             </h1>
-            <MomoGuess size="md" className="shrink-0" />
+            {/* A picture, not a control (rule 14): the mood guess is opted into and corrected in Settings. */}
+            <MomoFromStore size="md" className="shrink-0" />
           </div>
-          {/* The first-exposure notice (Art 50(3)) stands in for Loti's line once, so the fold keeps
-              its word and control budget (rules 13, 14). */}
-          {noticeDue ? (
-            <MomoNotice className="self-end" />
-          ) : sessions.length ? (
+          {sessions.length ? (
             <LotiBubbles collapsed context={context} onAction={onLoti} />
           ) : (
             <div className="flex items-end gap-3">

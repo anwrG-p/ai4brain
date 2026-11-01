@@ -129,7 +129,7 @@ describe('UI telemetry goes through the Tracker', () => {
     fireEvent.click(toggle)
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
     const save = screen.getByRole('switch', { name: 'Save my answers to improve my training' })
-    const ai = screen.getByRole('switch', { name: 'Let Loti use AI to reply' })
+    const ai = screen.getByRole('switch', { name: "Let Loti use AI to reply when it's available" })
     expect(save).toHaveAttribute('aria-checked', 'true')
     expect(ai).toHaveAttribute('aria-checked', 'false')
     expect(save.className).toBe(ai.className) // equal weight (R3)

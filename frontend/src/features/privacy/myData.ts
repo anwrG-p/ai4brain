@@ -10,7 +10,8 @@ import { useLotiSession, type LotiTalk } from '../loti/lotiSession'
 /* Everything this device holds about the user, for "Export my data" and "Delete my data":
    sessions, goals, the two consent choices (saving answers, AI replies from Loti; each 'granted' |
    'denied', absent means not chosen yet), the answers waiting to be sent, the anonymous id, the
-   device prefs (mood guess on/off, the mood notice seen, colour-blind friendly inks) and Loti's talk.
+   device prefs (mood guess on/off, opt-in; the mood notice seen; colour-blind friendly inks) and
+   Loti's talk.
    Momo's mood itself is never stored, so there is none to export.
    Excluded: the judge tool's sign-offs (cistac_ux_review_signoffs, HumanReviewGate), which hold
    reviewers' notes about the UI, not anything about the user. */
@@ -79,10 +80,11 @@ export function downloadMyData(now = new Date()): void {
 
 /* The privacy purge, on this device only (server-side deletion is Member 4's route): the queued
    answers, both consent choices (back to not chosen, so nothing is sent until the user chooses
-   again), the anonymous id, sessions, goals, Loti's talk, the mood prefs (the guess back on by
-   default, so the first-exposure notice shows again) with any mood correction, and the profile
-   (sign-out). The theme, reduce motion and colour-blind friendly inks are preferences, not data,
-   so they survive. */
+   again), the anonymous id, sessions, goals, Loti's talk, the mood prefs (guess off, notice
+   unseen) with any mood correction, and the profile
+   (sign-out). The mood guess goes back OFF (its opt-in default, ADR 0002): a purge never turns it
+   on. The theme, reduce motion and colour-blind friendly inks are preferences, not data, so they
+   survive. */
 export function deleteMyData(): void {
   const { theme, reducedMotion, resetDemoState, setTheme, setReducedMotion } = useAppStore.getState()
   resetDemoState()

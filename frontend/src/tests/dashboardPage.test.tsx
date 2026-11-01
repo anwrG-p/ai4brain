@@ -10,7 +10,7 @@ import DashboardPage from '../pages/DashboardPage'
 import { useAppStore } from '../state/useAppStore'
 import { useEmilyStore } from '../state/useEmilyStore'
 import { MOOD_NOTICE } from '../components/features/characters'
-import { PREFS_KEY, useDevicePrefs } from '../state/devicePrefs'
+import { DEFAULT_PREFS, useDevicePrefs } from '../state/devicePrefs'
 
 /* Home = /dashboard (ticket 08). Real sessions from the session store; need-to-know only (rules 13, 14). */
 
@@ -81,8 +81,8 @@ beforeEach(() => {
   useEmilyStore.getState().reset()
   useSessionStore.getState().clearSessions()
   useGoalsStore.getState().clearGoals()
-  // The mood notice was acknowledged on this device; its own tests set it due.
-  useDevicePrefs.setState({ moodGuess: true, moodNoticeSeen: true, cvdSafe: false })
+  // A fresh device: the mood guess is off until opted into in Settings (ADR 0002).
+  useDevicePrefs.setState(DEFAULT_PREFS)
 })
 
 afterEach(() => {
@@ -111,20 +111,18 @@ describe('Home (/dashboard)', () => {
     expect(screen.getByRole('heading', { name: 'Baseline page' })).toBeInTheDocument()
   })
 
-  it('above the fold: 3 blocks, at most 2 quiet controls besides the primary, and 60 words or fewer', () => {
-    // With the mood notice still due too: it stands in for Loti's line, so the budget holds.
-    for (const noticeSeen of [true, false]) {
+  it('above the fold: 3 blocks, 1 primary + at most 2 quiet controls (buttons AND links, no exemptions), and 60 words or fewer', () => {
+    for (const active of [false, true]) {
       for (const n of [0, 1, 4]) {
-        useDevicePrefs.setState({ moodNoticeSeen: noticeSeen })
+        useDevicePrefs.setState(active ? { moodGuess: true, moodNoticeSeen: true } : DEFAULT_PREFS)
         seed(sessions(n))
         const { unmount } = renderHome()
-        const at = `${n} sessions, notice ${noticeSeen ? 'seen' : 'due'}`
+        const at = `${n} sessions, guess ${active ? 'on' : 'off'}`
         expect(fold().children, at).toHaveLength(3)
         // Nothing else sits before the progress curve.
         const progress = screen.getByRole('region', { name: 'Your progress' })
         expect([...page().children].indexOf(progress)).toBe(1)
-        // Momo itself (the picture you tap to correct its guess, ADR 0002) is not counted as a control.
-        const controls = within(fold()).getAllByRole('button').filter((b) => !b.hasAttribute('data-momo-trigger'))
+        const controls = [...within(fold()).queryAllByRole('button'), ...within(fold()).queryAllByRole('link')]
         expect(controls.length, at).toBeLessThanOrEqual(3)
         expect(visibleWords(fold()), at).toBeLessThanOrEqual(60)
         unmount()
@@ -132,65 +130,34 @@ describe('Home (/dashboard)', () => {
     }
   })
 
-  describe('Momo, a guess you own (ADR 0002, AI Act Art 50(3))', () => {
-    it('the first time, a plain notice sits beside Momo, with "Got it" and a Settings link; Got it hides it for good', async () => {
-      useDevicePrefs.setState({ moodNoticeSeen: false })
+  describe('Momo on Home: a picture, never a control; the mood guess is opt-in (ADR 0002, R18)', () => {
+    it('by default: no notice, Momo a still neutral picture (not a button), the tint calm, whatever the store holds', () => {
+      useEmilyStore.setState({ currentEmotion: 'frustrated' })
       seed(sessions(2))
-      const { unmount } = renderHome()
-      const note = screen.getByRole('note')
-      expect(note).toHaveTextContent(MOOD_NOTICE)
-      expect(within(note).getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
-      // Not a modal wall: no dialog, the page stays usable.
-      expect(screen.queryByRole('dialog')).toBeNull()
-      expect(screen.getByRole('button', { name: "Start today's session" })).toBeEnabled()
-      await userEvent.click(within(note).getByRole('button', { name: 'Got it' }))
-      expect(screen.queryByRole('note')).toBeNull()
-      expect(screen.getByRole('button', { name: /Momo guesses you feel/ })).toHaveFocus()
-      expect(JSON.parse(localStorage.getItem(PREFS_KEY)!)).toMatchObject({ moodNoticeSeen: true })
-      unmount()
       renderHome()
       expect(screen.queryByRole('note')).toBeNull()
+      expect(screen.queryByText(MOOD_NOTICE)).toBeNull()
+      expect(screen.queryByRole('button', { name: /Momo/ })).toBeNull()
+      expect(screen.getByRole('img', { name: 'Momo' })).toBeInTheDocument()
+      expect(page()).toHaveClass('mood-tint-calm')
+      expect(page()).toHaveAttribute('data-mood', 'calm')
     })
 
-    it('no notice while the mood guess is off: Momo is a still, neutral picture', () => {
-      useDevicePrefs.setState({ moodGuess: false, moodNoticeSeen: false })
-      useEmilyStore.setState({ currentEmotion: 'frustrated' })
+    it('a stored moodGuess without the notice seen stays inactive (defence in depth)', () => {
+      useDevicePrefs.setState({ moodGuess: true, moodNoticeSeen: false })
+      useEmilyStore.setState({ currentEmotion: 'fatigued' })
       renderHome()
-      expect(screen.queryByRole('note')).toBeNull()
-      expect(screen.queryByRole('button', { name: /Momo/ })).toBeNull()
       expect(screen.getByRole('img', { name: 'Momo' })).toBeInTheDocument()
       expect(page()).toHaveClass('mood-tint-calm')
     })
 
-    it('tapping Momo opens a picker of its moods; a pick overrides the guess for this visit', async () => {
-      useEmilyStore.setState({ currentEmotion: 'energized' })
+    it('with the guess active, Momo shows it but is still not a button: the correction lives in Settings', () => {
+      useDevicePrefs.getState().setMoodGuess(true)
+      useEmilyStore.setState({ currentEmotion: 'fatigued' })
       renderHome()
-      const momo = screen.getByRole('button', { name: 'Momo guesses you feel happy. Change it' })
-      expect(momo).toHaveAttribute('aria-expanded', 'false')
-      await userEvent.click(momo)
-      const picker = screen.getByRole('group', { name: 'How do you feel?' })
-      expect(within(picker).getAllByRole('button').map((b) => b.textContent)).toEqual(['Calm', 'Happy', 'Focused', 'Tired', 'Frustrated'])
-      expect(within(picker).getByRole('button', { name: 'Happy' })).toHaveAttribute('aria-pressed', 'true')
-      expect(within(picker).getByRole('button', { name: 'Happy' })).toHaveFocus()
-      await userEvent.click(within(picker).getByRole('button', { name: 'Tired' }))
-      expect(screen.queryByRole('group', { name: 'How do you feel?' })).toBeNull()
-      expect(momo).toHaveFocus()
       expect(screen.getByRole('img', { name: 'Momo looks tired' })).toBeInTheDocument()
-      expect(useEmilyStore.getState()).toMatchObject({ currentEmotion: 'fatigued', isHumanLocked: true })
-      // The guess no longer moves it: interaction updates only the metrics while the pick holds.
-      act(() => useEmilyStore.getState().updateTelemetry([]))
-      expect(useEmilyStore.getState().currentEmotion).toBe('fatigued')
-      // In memory only: nothing about the mood is written to storage.
-      expect(Object.values({ ...localStorage }).join()).not.toMatch(/fatigued|tired/)
-    })
-
-    it('Escape closes the picker and returns focus to Momo', async () => {
-      renderHome()
-      const momo = screen.getByRole('button', { name: /Momo guesses you feel/ })
-      await userEvent.click(momo)
-      await userEvent.keyboard('{Escape}')
-      expect(screen.queryByRole('group', { name: 'How do you feel?' })).toBeNull()
-      expect(momo).toHaveFocus()
+      expect(screen.queryByRole('button', { name: /Momo/ })).toBeNull()
+      expect(screen.queryByRole('radiogroup')).toBeNull()
     })
   })
 
@@ -230,7 +197,8 @@ describe('Home (/dashboard)', () => {
     expect(screen.getByRole('img', { name: /Momo/ })).toBeInTheDocument()
   })
 
-  it('Momo follows the mood store, and the mood only changes the canvas tint class (no red, no banner)', () => {
+  it('with the guess active, Momo follows the mood store, and the mood only changes the canvas tint class (no red, no banner)', () => {
+    useDevicePrefs.getState().setMoodGuess(true)
     renderHome()
     expect(page()).toHaveClass('mood-tint-calm')
     act(() => useEmilyStore.setState({ currentEmotion: 'fatigued' }))

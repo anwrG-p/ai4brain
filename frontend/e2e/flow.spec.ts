@@ -110,7 +110,7 @@ async function openConsent(page: Page, info: TestInfo, theme: string) {
   // R4 and rule 14: no client id in this build, so no sign-in step and nothing Google-shaped.
   await expect(sheet.getByRole('heading', { name: 'Your choices' })).toBeFocused()
   // Consent per purpose (research #6): two equal switches, both off until chosen.
-  for (const name of ['Save my answers to improve my training', 'Let Loti use AI to reply'])
+  for (const name of ['Save my answers to improve my training', "Let Loti use AI to reply when it's available"])
     await expect(sheet.getByRole('switch', { name })).toHaveAttribute('aria-checked', 'false')
   await expect(sheet.getByRole('button', { name: 'Continue as guest' })).toHaveCount(0)
   await expect(page.getByTestId('google-signin')).toHaveCount(0)

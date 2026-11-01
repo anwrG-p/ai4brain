@@ -67,22 +67,41 @@ test.describe('Page 14: Settings (/settings)', () => {
     await expect(motion).toHaveAttribute('aria-checked', 'true')
   })
 
-  test('"Mood guess" (on) and "Colour-blind friendly colours" (off) are stored on this device', async ({ page }) => {
+  test('"Mood guess" is off by default with the notice as its description; both switches are stored on this device', async ({ page }) => {
     await page.goto('/settings', { waitUntil: 'networkidle' })
     const mood = page.getByRole('switch', { name: 'Mood guess' })
     const cvd = page.getByRole('switch', { name: 'Colour-blind friendly colours' })
-    await expect(mood).toHaveAttribute('aria-checked', 'true')
+    await expect(mood).toHaveAttribute('aria-checked', 'false')
+    await expect(mood).toHaveAccessibleDescription(
+      'Momo guesses your mood from how you use the app, on this device only. You can change it or turn it off.',
+    )
     await expect(cvd).toHaveAttribute('aria-checked', 'false')
     await mood.click()
     await cvd.click()
     await page.reload({ waitUntil: 'networkidle' })
-    await expect(page.getByRole('switch', { name: 'Mood guess' })).toHaveAttribute('aria-checked', 'false')
+    await expect(page.getByRole('switch', { name: 'Mood guess' })).toHaveAttribute('aria-checked', 'true')
     await expect(page.getByRole('switch', { name: 'Colour-blind friendly colours' })).toHaveAttribute('aria-checked', 'true')
+  })
+
+  test('opted in: today\'s guess and a quiet Change open a 4-mood radio group; axe light and dark; no overflow', async ({ page }) => {
+    await page.goto('/settings', { waitUntil: 'networkidle' })
+    await page.getByRole('switch', { name: 'Mood guess' }).click()
+    await expect(page.getByText("Momo's guess today: Calm")).toBeVisible()
+    await page.getByRole('button', { name: 'Change' }).click()
+    const group = page.getByRole('radiogroup', { name: 'How do you feel?' })
+    await expect(group.getByRole('radio')).toHaveText(['Calm', 'Happy', 'Tired', 'Frustrated'])
+    await expect(group.getByRole('radio', { name: 'Calm' })).toBeFocused()
+    await page.keyboard.press('ArrowRight')
+    await expect(group.getByRole('radio', { name: 'Happy' })).toHaveAttribute('aria-checked', 'true')
+    await expect(page.getByText("Momo's guess today: Happy")).toBeVisible()
+    await checkViewports(page, 'light')
+    await page.getByRole('radio', { name: 'Dark (Night Lab)' }).click()
+    await checkViewports(page, 'dark')
   })
 
   test('with colour-blind friendly colours on, Color Clash uses blue, yellow, red and black on the light plate', async ({ page }) => {
     await page.addInitScript(() =>
-      window.localStorage.setItem('synapsetwin_prefs_v1', JSON.stringify({ version: 1, moodGuess: true, moodNoticeSeen: true, cvdSafe: true })),
+      window.localStorage.setItem('synapsetwin_prefs_v1', JSON.stringify({ version: 1, moodGuess: false, moodNoticeSeen: false, cvdSafe: true })),
     )
     await page.setViewportSize({ width: 375, height: 812 })
     await page.goto('/task/inhibition_control?schema=stroop', { waitUntil: 'networkidle' })

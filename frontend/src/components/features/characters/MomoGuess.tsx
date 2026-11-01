@@ -1,146 +1,117 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
-import { Link } from 'react-router-dom'
-import { Button } from '../../ui/Button'
-import { useDevicePrefs } from '../../../state/devicePrefs'
+import { moodGuessActive, useDevicePrefs } from '../../../state/devicePrefs'
 import { useEmilyStore } from '../../../state/useEmilyStore'
 import type { EmilyEmotion } from '../../../styles/emilyTokens'
-import { EMOTION_TO_MOOD, Momo, type MomoMood } from './Momo'
-import type { CharacterSize } from './shared'
+import { EMOTION_TO_MOOD, type MomoMood } from './Momo'
 
-/* Momo as a guess the user owns (ADR 0002, AI Act Art 50(3)).
-   - MomoGuess: with the "Mood guess" setting on, Momo is a button; tapping it opens a tiny picker of
-     Momo's five moods, and the pick overrides the guess for this visit (the store's human lock, in
-     memory only). With the setting off, Momo is a still picture with a neutral face, not a button.
-   - MomoNotice: the first-exposure notice, an inline bubble shown once per device beside Momo with
-     one quiet "Got it" and one quiet link to Settings. */
+/* Momo's mood guess as something the user opts into and owns (ADR 0002, AI Act Art 50(3), R18).
+   - MOOD_NOTICE: the plain notice, shown as the Settings "Mood guess" description, where the user
+     opts in (turning the switch on counts as seeing it).
+   - useMoodGuessActive: every reader of the mood checks it (opted in AND notice seen).
+   - MoodCorrection: in Settings, under the switch while the guess is on: today's guess and a quiet
+     "Change" that opens a radio group of Momo's moods. The pick overrides the guess for this visit
+     (the store's human lock, in memory only). Home has no control for it (rule 14). */
 
-const MOODS: { mood: MomoMood; label: string; emotion: EmilyEmotion }[] = [
+export const MOOD_NOTICE = 'Momo guesses your mood from how you use the app, on this device only. You can change it or turn it off.'
+
+export const useMoodGuessActive = () => useDevicePrefs(moodGuessActive)
+
+/** The moods a user can pick. Not "focused": it maps to hesitant, which the engine treats as strain. */
+const CHOICES: { mood: MomoMood; label: string; emotion: EmilyEmotion }[] = [
   { mood: 'calm', label: 'Calm', emotion: 'calm_flow' },
   { mood: 'happy', label: 'Happy', emotion: 'energized' },
-  { mood: 'focused', label: 'Focused', emotion: 'hesitant' },
   { mood: 'tired', label: 'Tired', emotion: 'fatigued' },
   { mood: 'frustrated', label: 'Frustrated', emotion: 'frustrated' },
 ]
 
-/** Marks the Momo button, so the notice can hand focus to it when it closes. */
-const TRIGGER = 'data-momo-trigger'
+const LABEL: Record<MomoMood, string> = { calm: 'Calm', happy: 'Happy', tired: 'Tired', frustrated: 'Frustrated', focused: 'Focused' }
 
-export function MomoGuess({ size = 'md', className = '' }: { size?: CharacterSize; className?: string }) {
-  const on = useDevicePrefs((s) => s.moodGuess)
+const STEP: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }
+
+export function MoodCorrection() {
+  const active = useMoodGuessActive()
   const emotion = useEmilyStore((s) => s.currentEmotion)
   const [open, setOpen] = useState(false)
-  const trigger = useRef<HTMLButtonElement>(null)
-  const box = useRef<HTMLDivElement>(null)
+  const change = useRef<HTMLButtonElement>(null)
+  const radios = useRef<(HTMLButtonElement | null)[]>([])
   const groupId = useId()
-
-  // A tap anywhere else closes the picker.
-  useEffect(() => {
-    if (!open) return
-    const away = (e: PointerEvent) => {
-      if (!box.current?.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('pointerdown', away)
-    return () => document.removeEventListener('pointerdown', away)
-  }, [open])
-
-  // Opening puts focus on the current mood.
-  useEffect(() => {
-    if (open) box.current?.querySelector<HTMLElement>('[aria-pressed="true"]')?.focus()
-  }, [open])
-
-  if (!on) return <Momo mood="calm" size={size} title="Momo" className={className} />
-
+  const lineId = useId()
   const mood = EMOTION_TO_MOOD[emotion]
-  const close = () => {
-    setOpen(false)
-    trigger.current?.focus()
+  const at = CHOICES.findIndex((c) => c.mood === mood)
+
+  // Opening puts focus on the checked mood (or the first one); only on open, not on each pick.
+  const first = useRef(at)
+  first.current = at
+  useEffect(() => {
+    if (open) radios.current[Math.max(0, first.current)]?.focus()
+  }, [open])
+
+  if (!active) return null
+
+  const pick = (i: number) => {
+    const c = CHOICES[i]
+    if (c) useEmilyStore.getState().setManualEmotion(c.emotion)
   }
-  const pick = (e: EmilyEmotion) => {
-    useEmilyStore.getState().setManualEmotion(e)
-    close()
-  }
-  const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key !== 'Escape' || !open) return
-    e.stopPropagation()
-    close()
+  // Radio group pattern: one Tab stop (the checked radio); arrow keys move, wrap and choose.
+  const onKeyDown = (e: KeyboardEvent, i: number) => {
+    if (e.key === 'Escape') {
+      e.stopPropagation()
+      setOpen(false)
+      change.current?.focus()
+      return
+    }
+    const step = STEP[e.key]
+    if (!step) return
+    e.preventDefault()
+    const j = (i + step + CHOICES.length) % CHOICES.length
+    pick(j)
+    radios.current[j]?.focus()
   }
 
   return (
-    <div ref={box} onKeyDown={onKeyDown} className={`relative ${className}`}>
-      <button
-        ref={trigger}
-        type="button"
-        {...{ [TRIGGER]: true }}
-        aria-expanded={open}
-        aria-controls={open ? groupId : undefined}
-        aria-label={`Momo guesses you feel ${mood}. Change it`}
-        onClick={() => setOpen((o) => !o)}
-        className="focus-ring block cursor-pointer rounded-2xl"
-      >
-        <Momo mood={mood} size={size} />
-      </button>
-      {open && (
-        <div
-          id={groupId}
-          role="group"
-          aria-label="How do you feel?"
-          className="absolute end-0 top-full z-20 mt-2 flex w-max flex-col gap-1 rounded-2xl border border-border bg-surface p-2 shadow-(--shadow-elevation)"
+    <div className="px-4 pb-4">
+      <div className="flex flex-wrap items-center gap-x-3">
+        <p id={lineId} className="text-sm text-ink">
+          Momo&apos;s guess today: {LABEL[mood]}
+        </p>
+        <button
+          ref={change}
+          type="button"
+          aria-expanded={open}
+          aria-controls={open ? groupId : undefined}
+          aria-describedby={lineId}
+          onClick={() => setOpen((o) => !o)}
+          className="focus-ring inline-flex min-h-11 cursor-pointer items-center rounded-sm text-sm font-medium text-brand underline underline-offset-4"
         >
-          <p aria-hidden="true" className="px-3 pt-1 text-sm text-ink-muted">
-            How do you feel?
-          </p>
-          {MOODS.map((m) => {
-            const here = m.mood === mood
+          Change
+        </button>
+      </div>
+      {open && (
+        <div id={groupId} role="radiogroup" aria-label="How do you feel?" className="mt-1 grid grid-cols-2 gap-1 rounded-2xl bg-surface-raised p-1 sm:grid-cols-4">
+          {CHOICES.map((c, i) => {
+            const on = i === at
             return (
               <button
-                key={m.mood}
+                key={c.mood}
+                ref={(el) => {
+                  radios.current[i] = el
+                }}
                 type="button"
-                aria-pressed={here}
-                onClick={() => pick(m.emotion)}
-                className={`focus-ring min-h-11 cursor-pointer rounded-pill px-4 text-left text-sm font-medium ${
-                  here ? 'bg-brand text-brand-ink' : 'text-ink hover:bg-surface-raised'
+                role="radio"
+                aria-checked={on}
+                tabIndex={on || (at < 0 && i === 0) ? 0 : -1}
+                onClick={() => pick(i)}
+                onKeyDown={(e) => onKeyDown(e, i)}
+                className={`focus-ring min-h-11 flex-1 cursor-pointer rounded-pill px-4 text-sm font-medium whitespace-nowrap ${
+                  on ? 'bg-brand text-brand-ink' : 'text-ink hover:bg-surface'
                 }`}
               >
-                {m.label}
+                {c.label}
               </button>
             )
           })}
         </div>
       )}
-    </div>
-  )
-}
-
-/** The plain words of the first-exposure notice (Art 50(3)); tests pin them. */
-export const MOOD_NOTICE = 'Momo guesses your mood from how you use the app, on this device only. You can change it or turn it off.'
-
-/** True while the notice is due: the mood guess is on and the notice was never acknowledged here. */
-export const useMoodNoticeDue = () => useDevicePrefs((s) => s.moodGuess && !s.moodNoticeSeen)
-
-export function MomoNotice({ className = '' }: { className?: string }) {
-  const acknowledge = useDevicePrefs((s) => s.acknowledgeMoodNotice)
-  const textId = useId()
-  const gotIt = () => {
-    acknowledge()
-    // The bubble goes away: focus moves to Momo, the thing the notice is about.
-    document.querySelector<HTMLElement>(`[${TRIGGER}]`)?.focus()
-  }
-  return (
-    <div role="note" aria-labelledby={textId} className={`tactile-card max-w-md px-4 py-3 ${className}`}>
-      <p id={textId} className="text-base text-ink">
-        {MOOD_NOTICE}
-      </p>
-      <div className="mt-1 flex flex-wrap items-center gap-x-4">
-        <Button variant="ghost" size="sm" onClick={gotIt} className="-ms-3">
-          Got it
-        </Button>
-        <Link
-          to="/settings"
-          className="focus-ring inline-flex min-h-11 items-center rounded-sm text-sm font-medium text-brand underline underline-offset-4"
-        >
-          Settings
-        </Link>
-      </div>
     </div>
   )
 }

@@ -1,4 +1,6 @@
 import { useId, useRef, type KeyboardEvent } from 'react'
+import { MOOD_NOTICE, MoodCorrection } from '../components/features/characters'
+import { Switch } from '../components/ui/Switch'
 import { useDevicePrefs } from '../state/devicePrefs'
 import { useAppStore, type ThemeMode } from '../state/useAppStore'
 
@@ -9,12 +11,16 @@ const THEMES: { id: ThemeMode; label: string }[] = [
 
 const NEXT: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }
 
+const ROW = 'p-4'
+
 /* Settings: only what the app really applies. The theme (data-theme), reduce motion
-   (data-reduced-motion, which turns every anim-* and character idle off), the mood guess (off stops
-   the emotion listener; Momo shows a neutral face, ADR 0002) and the colour-blind friendly Color
-   Clash inks (devicePrefs). Text size, sounds,
-   glyphs, study windows and rest days were never wired to anything, so they are gone; the
-   dimension preset is a judge tool (R6), not a consumer setting. */
+   (data-reduced-motion, which turns every anim-* and character idle off), the mood guess and the
+   colour-blind friendly Color Clash inks (devicePrefs).
+   Mood guess (ADR 0002, R18): off by default. Its description is the Art 50(3) notice itself, so the
+   user reads it where they opt in, and turning it on records it as seen. While on, the row shows
+   today's guess with a quiet "Change" (MoodCorrection); off, the listener stops and Momo is a still
+   picture. Text size, sounds, glyphs, study windows and rest days were never wired to anything, so
+   they are gone; the dimension preset is a judge tool (R6), not a consumer setting. */
 export default function SettingsPage() {
   const theme = useAppStore((s) => s.theme)
   const setTheme = useAppStore((s) => s.setTheme)
@@ -73,67 +79,23 @@ export default function SettingsPage() {
             })}
           </div>
         </li>
-        <SwitchRow label="Reduce motion" on={reducedMotion} onChange={setReducedMotion} />
-        <SwitchRow label="Mood guess" hint="Momo guesses your mood on this device." on={moodGuess} onChange={setMoodGuess} />
-        <SwitchRow
-          label="Colour-blind friendly colours"
-          hint="Color Clash uses blue, yellow, red and black."
-          on={cvdSafe}
-          onChange={setCvdSafe}
-          last
-        />
+        <li>
+          <Switch label="Reduce motion" checked={reducedMotion} onChange={setReducedMotion} className={ROW} />
+        </li>
+        <li>
+          <Switch label="Mood guess" description={MOOD_NOTICE} checked={moodGuess} onChange={setMoodGuess} className={ROW} />
+          <MoodCorrection />
+        </li>
+        <li>
+          <Switch
+            label="Colour-blind friendly colours"
+            description="Color Clash uses blue, yellow, red and black."
+            checked={cvdSafe}
+            onChange={setCvdSafe}
+            className={`${ROW} rounded-b-2xl`}
+          />
+        </li>
       </ul>
     </div>
-  )
-}
-
-/* One on/off setting. The whole row is the switch, so the tap target is the full row (≥ 44 px).
-   Named by its label only; the hint is its description. */
-function SwitchRow({
-  label,
-  hint,
-  on,
-  onChange,
-  last = false,
-}: {
-  label: string
-  hint?: string
-  on: boolean
-  onChange: (on: boolean) => void
-  last?: boolean
-}) {
-  const labelId = useId()
-  const hintId = useId()
-  return (
-    <li>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={on}
-        aria-labelledby={labelId}
-        aria-describedby={hint ? hintId : undefined}
-        onClick={() => onChange(!on)}
-        className={`focus-ring flex min-h-14 w-full cursor-pointer items-center justify-between gap-4 p-4 text-left hover:bg-surface-raised ${last ? 'rounded-b-2xl' : ''}`}
-      >
-        <span className="flex flex-col">
-          <span id={labelId} className="text-base font-medium text-ink">
-            {label}
-          </span>
-          {hint && (
-            <span id={hintId} className="text-sm text-ink-muted">
-              {hint}
-            </span>
-          )}
-        </span>
-        <span
-          aria-hidden="true"
-          className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-pill border ${
-            on ? 'border-transparent bg-brand' : 'border-border-strong bg-surface-raised'
-          }`}
-        >
-          <span className={`inline-block size-5 rounded-pill transition-transform ${on ? 'translate-x-6 bg-brand-ink' : 'translate-x-1 bg-border-strong'}`} />
-        </span>
-      </button>
-    </li>
   )
 }

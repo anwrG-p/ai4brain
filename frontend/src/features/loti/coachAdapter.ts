@@ -18,17 +18,18 @@ import type { LotiBrain, LotiContext, LotiMessage } from './types'
 
 export type CrisisResult = { crisis: false } | { crisis: true; message: LotiMessage }
 export type CrisisGate = (text: string) => CrisisResult
-/** What the coach may be told: Loti's context without Momo's mood. The mood guess never leaves the
-    device (ADR 0002), so the type has no field for it and `ask` strips it at run time too. */
-export type CoachContext = Omit<LotiContext, 'mood'>
+/** What the coach may be told: an allow-list of Loti's context. The mood guess never leaves the
+    device (ADR 0002), so it is not on the list, and neither is any field added to LotiContext later
+    until someone adds it here on purpose. */
+export type CoachContext = Pick<LotiContext, 'now' | 'weakestPillar' | 'hasGoalsThisYear' | 'sessionsThisWeek'>
 /** The future LLM call. ponytail: sync for now; a real one makes `ask` async with a timeout. */
 export type CoachTransport = (text: string, ctx: CoachContext) => LotiMessage | null
 
-/** Loti's context as the coach may see it: everything but the mood. */
+/** Loti's context as the coach may see it: the allow-listed fields only. */
 export function coachContext(ctx: LotiContext): CoachContext {
-  const rest: LotiContext = { ...ctx }
-  delete rest.mood
-  return rest
+  const out: CoachContext = { now: ctx.now, hasGoalsThisYear: ctx.hasGoalsThisYear, sessionsThisWeek: ctx.sessionsThisWeek }
+  if (ctx.weakestPillar) out.weakestPillar = ctx.weakestPillar
+  return out
 }
 
 /** One calm, plain line: emergency help and a crisis line, named as such. No choices. */
