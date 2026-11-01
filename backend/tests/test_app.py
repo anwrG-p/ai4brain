@@ -56,7 +56,11 @@ def test_module_routes_win_over_the_interop_router(module):
 
 # (path, method) -> module of a route that intentionally answers instead of its v1_interop stand-in.
 # BE-04/06/11 add their entry here when their module route lands, then delete the stand-in.
-INTENTIONAL_OVERRIDES: dict[tuple[str, str], str] = {}
+INTENTIONAL_OVERRIDES: dict[tuple[str, str], str] = {
+    ("/v1/tasks/next", "GET"): "dynamic_cache.api",  # BE-04; the stand-in is deleted
+    ("/v1/coach/chat", "POST"): "ai_coach.api",  # BE-06; the stand-in is deleted
+    ("/v1/coach/collaboration-score", "GET"): "ai_coach.api",  # BE-06; the stand-in is deleted
+}
 
 
 def flat_routes(routes, prefix=""):
@@ -75,10 +79,18 @@ def test_no_route_shadows_a_v1_interop_stand_in_by_accident():
     ordered = list(flat_routes(reload_main().app.routes))
     stand_ins = [(r.path, m) for r in v1_interop.router.routes for m in r.methods]
     assert stand_ins
-    for path, method in stand_ins:
+    # A route whose stand-in was deleted is still checked: its module must answer it.
+    for path, method in [*stand_ins, *INTENTIONAL_OVERRIDES]:
         first = next(mod for p, methods, mod in ordered if p == path and method in methods)
         expected = INTENTIONAL_OVERRIDES.get((path, method), "app.api.routes.v1_interop")
         assert first == expected, f"{method} {path} is answered by {first}, not {expected}"
+
+
+def test_intentional_overrides_are_answered_by_their_module():
+    ordered = list(flat_routes(reload_main().app.routes))
+    for (path, method), module in INTENTIONAL_OVERRIDES.items():
+        first = next(mod for p, methods, mod in ordered if p == path and method in methods)
+        assert first == module, f"{method} {path} is answered by {first}, not {module}"
 
 
 def test_custom_422_handler_kept(client):

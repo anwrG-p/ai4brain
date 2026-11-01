@@ -8,6 +8,10 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
+    # GEMINI_API_KEY and the rest, if backend/.env exists (copy backend/.env.example). Optional.
+    env_file:
+      - path: backend/.env
+        required: false
     environment:
       - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS:-http://localhost:5173}
     volumes:
@@ -17,6 +21,12 @@ services:
       # GET /v1/user/export or `docker compose cp backend:/data/telemetry ./out`. Retention:
       # docker compose exec backend python -m backend.app.privacy.retention --days 30
       - telemetry:/data/telemetry
+      # GET /v1/tasks/next's per-user registry (seen filter, session answers); same reasoning.
+      - task_registry:/data/task_registry
+      # The coach chat history, same arrangement (COACH_DIR). Delete, export and retention cover it.
+      - coach:/data/coach
 
 volumes:
   telemetry:
+  task_registry:
+  coach:

@@ -1,5 +1,7 @@
 import { create } from 'zustand'
+import { sessionsThisWeek } from './dashboard'
 import { isPillarId, type PillarId } from './pillars'
+import type { SessionRecord } from './sessionStore'
 
 /* Yearly goals: the slice Loti's setGoal writes to (ticket 03). A target is the number of points
    (on the 0-100 pillar scale) the user wants to gain on that pillar this year. Each goal also keeps
@@ -100,6 +102,39 @@ export const useGoalsStore = create<GoalsState>((set, get) => ({
     }
   },
 }))
+
+/* The weekly goal (research #10): 3 sessions a week (more than 3 a week showed no added benefit in a
+   meta-analysis of older adults), with one built-in skip, so 2 of 3 still keeps the week. No streak
+   is counted across weeks: every Monday starts again at 0, quietly, and nothing mentions a missed
+   week. Computed from the sessions on this device; nothing extra is stored. */
+export const WEEKLY_GOAL = 3
+export const WEEKLY_SKIPS = 1
+
+export type WeeklyGoal = {
+  /** Sessions finished since Monday 00:00 (local time). */
+  done: number
+  target: number
+  /** done >= target - WEEKLY_SKIPS: the week is kept, one skip allowed. */
+  kept: boolean
+}
+
+/** The week is kept from WEEKLY_GOAL - WEEKLY_SKIPS sessions. Home's line and Loti's weekend nudge
+    both decide with this. */
+export const weekKept = (done: number): boolean => done >= WEEKLY_GOAL - WEEKLY_SKIPS
+
+/** This week's count, the same one Loti reads (sessionsThisWeek: Monday 00:00 local time to now). */
+export function weeklyGoal(sessions: readonly SessionRecord[], now: Date): WeeklyGoal {
+  const done = sessionsThisWeek(sessions, now)
+  return { done, target: WEEKLY_GOAL, kept: weekKept(done) }
+}
+
+/** The one plain line: "1 of 3 this week", and once the week is kept (one skip allowed) "2 of 3
+    this week · week kept". Past the goal it counts on ("4 this week · week kept"). No guilt, no
+    streak words, nothing about last week. */
+export function weeklyGoalText({ done, target, kept }: WeeklyGoal): string {
+  const count = done > target ? `${done} this week` : `${done} of ${target} this week`
+  return kept ? `${count} · week kept` : count
+}
 
 export function hasGoalsForYear(state: { year: number | null; goals: Goals }, year: number): boolean {
   return state.year === year && Object.keys(state.goals).length > 0

@@ -53,6 +53,8 @@
     { "pattern": "\\bneuroplastic\\w*|\\brewir\\w*|\\bbrain age\\b|\\bneurogenesis\\b", "flags": "gi", "termLabel": "neuroplasticity claim", "category": "neuroplastic_claim", "replacementSuggestion": "" },
     { "pattern": "\\bsmarter\\b|\\bsharper mind\\b|\\babove average\\b|\\bpercentile\\b|\\bbetter than \\d+ ?% of\\b", "flags": "gi", "termLabel": "transfer or comparison claim", "category": "unsupported_claim", "replacementSuggestion": "" },
     { "pattern": "\\breduces? stress\\b|\\bcalms? your nervous system\\b|\\breal improvement\\b|\\bverified progress\\b", "flags": "gi", "termLabel": "unearned health or progress claim", "category": "unsupported_claim", "replacementSuggestion": "" },
-    { "pattern": "\\blose your progress\\b", "flags": "gi", "termLabel": "lose your progress", "category": "punitive_guilt", "replacementSuggestion": "" }
+    { "pattern": "\\blose your progress\\b", "flags": "gi", "termLabel": "lose your progress", "category": "punitive_guilt", "replacementSuggestion": "" },
+    { "pattern": "\\bi(?:\\s+am|['’]?m)\\s+(?:a\\s+|an\\s+|your\\s+)?(?:real\\s+)?(?:human|person|doctor|therapist|psycholog\\w*|psychiatrist|nurse|counsell?or)\\b", "flags": "gi", "termLabel": "claims to be a person or clinician", "category": "persona_drift", "replacementSuggestion": "" },
+    { "pattern": "\\bas\\s+(?:a|an|your)\\s+(?:doctor|therapist|psycholog\\w*|psychiatrist|nurse|counsell?or)\\b", "flags": "gi", "termLabel": "speaks as a clinician", "category": "persona_drift", "replacementSuggestion": "" }
   ]
 }

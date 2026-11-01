@@ -97,7 +97,7 @@ export const EMILY_EMOTION_CONFIGS: Record<EmilyEmotion, EmilyEmotionConfig> = {
     accentNight: '#A3BBD0',
     glowNight: 'rgba(163, 187, 208, 0.14)',
     brianPose: 'sleepy',
-    brianAdvice: 'Pacing is slowing down — scheduled rest protects your streak.',
+    brianAdvice: 'Pacing is slowing down. A short rest is fine.',
     actionPrompt: 'Scheduled rest mode active',
   },
 }

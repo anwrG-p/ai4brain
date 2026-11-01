@@ -14,7 +14,7 @@ import {
   weakestPillar,
   type GoalLine,
 } from '../features/insights/dashboard'
-import { hasGoalsForYear, useGoalsStore } from '../features/insights/goals'
+import { hasGoalsForYear, useGoalsStore, weeklyGoal, weeklyGoalText, type WeeklyGoal } from '../features/insights/goals'
 import { PastResults } from '../features/insights/PastResults'
 import { PillarRadar, REAL_IMPROVEMENT } from '../features/insights/PillarRadar'
 import { PILLAR_LABELS, type PillarId, type PillarScore } from '../features/insights/pillars'
@@ -22,6 +22,7 @@ import { ProgressCurve } from '../features/insights/ProgressCurve'
 import { useSessionStore } from '../features/insights/sessionStore'
 import { LotiBubbles, scriptedBrain, useLotiActions, type LotiAction, type LotiBrain } from '../features/loti'
 import { useAppStore } from '../state/useAppStore'
+import { moodGuessActive, useDevicePrefs } from '../state/devicePrefs'
 import { useEmilyStore } from '../state/useEmilyStore'
 
 /* Home (/dashboard; Dashboard doc). Need-to-know only (rules 13, 14): above the fold exactly three
@@ -50,7 +51,10 @@ export default function DashboardPage() {
   const goals = useGoalsStore((s) => s.goals)
   const bases = useGoalsStore((s) => s.bases)
   const setBase = useGoalsStore((s) => s.setBase)
-  const mood = EMOTION_TO_MOOD[useEmilyStore((s) => s.currentEmotion)]
+  const emotion = useEmilyStore((s) => s.currentEmotion)
+  // Nothing reads the mood unless the guess is active (opted in, notice seen: ADR 0002).
+  const guessActive = useDevicePrefs(moodGuessActive)
+  const mood = guessActive ? EMOTION_TO_MOOD[emotion] : 'calm'
   const name = useAppStore((s) => s.userProfile?.preferredName)
   // ponytail: "now" is read once per visit; the page does not tick over midnight.
   const [now] = useState(() => new Date())
@@ -76,7 +80,7 @@ export default function DashboardPage() {
   const context = {
     now,
     weakestPillar: weakest,
-    mood,
+    ...(guessActive ? { mood } : {}),
     hasGoalsThisYear: hasGoalsForYear({ year: goalYear, goals }, now.getFullYear()),
     sessionsThisWeek: sessionsThisWeek(sessions, now),
   }
@@ -92,6 +96,7 @@ export default function DashboardPage() {
             <h1 id="home-hello" className="font-display text-3xl font-bold text-ink">
               Hi, {name || 'there'}
             </h1>
+            {/* A picture, not a control (rule 14): the mood guess is opted into and corrected in Settings. */}
             <MomoFromStore size="md" className="shrink-0" />
           </div>
           {sessions.length ? (
@@ -129,7 +134,7 @@ export default function DashboardPage() {
 
       <Explore>
         <Why weakest={weakest} pillars={pillars} improved={improved.length > 0} />
-        <Goals lines={goalList} context={context} onAction={onLoti} />
+        <Goals week={weeklyGoal(sessions, now)} lines={goalList} context={context} onAction={onLoti} />
         <ExploreBlock title="Past results" className="md:col-span-2">
           <PastResults sessions={sessions} />
         </ExploreBlock>
@@ -210,10 +215,12 @@ function goalText(g: GoalLine): string {
 }
 
 function Goals({
+  week,
   lines,
   context,
   onAction,
 }: {
+  week: WeeklyGoal
   lines: GoalLine[]
   context: Parameters<typeof LotiBubbles>[0]['context']
   onAction: (action: LotiAction) => void
@@ -221,6 +228,10 @@ function Goals({
   const [talk, setTalk] = useState(false)
   return (
     <ExploreBlock title="Goals">
+      {/* The weekly goal (research #10): one plain line, no streak, a new week starts quietly at 0. */}
+      <p data-testid="weekly-goal" className="mb-2 text-base text-ink tabular-nums">
+        {weeklyGoalText(week)}
+      </p>
       {lines.length ? (
         <ul aria-label="Your goals this year" className="m-0 list-none space-y-1 p-0 text-base text-ink">
           {lines.map((g) => (

@@ -1,2 +1,4 @@
 # ai_coach runtime dependencies. The root requirements.txt includes this file.
 pydantic>=2.6
+# Gemini REST client (ai_coach/llm_gemini.py); plain httpx, no SDK.
+httpx==0.28.1

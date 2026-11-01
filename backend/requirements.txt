@@ -3,6 +3,8 @@ fastapi==0.161.1
 pydantic==2.14.1
 uvicorn==0.54.0
 numpy==2.5.4
+# Reads the optional backend/.env (app/settings.py)
+python-dotenv==1.2.4
 scipy==1.18.1
 # Tests (FastAPI's TestClient runs on httpx2)
 httpx2==2.16.0

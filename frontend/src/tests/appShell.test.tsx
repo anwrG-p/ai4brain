@@ -9,6 +9,7 @@ import { useSessionStore } from '../features/insights/sessionStore'
 import TaskRunnerPage from '../pages/TaskRunnerPage'
 import { useAppStore } from '../state/useAppStore'
 import { useEmilyStore } from '../state/useEmilyStore'
+import { DEFAULT_PREFS, PREFS_KEY, useDevicePrefs } from '../state/devicePrefs'
 import { begin } from './exerciseFrame'
 
 // Same flags as App.tsx, so the router prints no v7 warnings.
@@ -116,9 +117,35 @@ describe('App shell (ticket 09a)', () => {
 })
 
 describe('Emotion engine without the mood pill (gap FE-03)', () => {
-  it('the shell keeps the mood store updating from interaction, with no pill rendered', () => {
+  it('with default prefs (guess off, opt-in), rage-clicking on /dashboard starts no listener and leaves the emotion unchanged', () => {
+    vi.useFakeTimers()
+    const added = vi.spyOn(window, 'addEventListener')
+    try {
+      act(() => useDevicePrefs.setState(DEFAULT_PREFS))
+      useEmilyStore.getState().reset()
+      const before = useEmilyStore.getState().metrics
+      shellAt('/dashboard')
+      expect(added.mock.calls.map((c) => c[0])).not.toEqual(expect.arrayContaining(['pointermove']))
+      for (let round = 0; round < 3; round++) {
+        for (let i = 0; i < 4; i++) {
+          fireEvent.mouseDown(document.body, { clientX: 100, clientY: 100 })
+          fireEvent.mouseUp(document.body, { clientX: 100, clientY: 100 })
+          fireEvent.click(document.body, { clientX: 100 + i, clientY: 100 })
+        }
+        act(() => void vi.advanceTimersByTime(3100))
+      }
+      expect(useEmilyStore.getState()).toMatchObject({ currentEmotion: 'calm_flow', proposedEmotion: null })
+      expect(useEmilyStore.getState().metrics).toBe(before)
+    } finally {
+      added.mockRestore()
+      vi.useRealTimers()
+    }
+  })
+
+  it('opted in, the shell keeps the mood store updating from interaction, with no pill rendered', () => {
     vi.useFakeTimers()
     try {
+      useDevicePrefs.getState().setMoodGuess(true)
       useEmilyStore.getState().reset()
       const before = useEmilyStore.getState().metrics
       shellAt('/dashboard')
@@ -128,6 +155,31 @@ describe('Emotion engine without the mood pill (gap FE-03)', () => {
       expect(useEmilyStore.getState().metrics).not.toBe(before)
       expect(document.documentElement.getAttribute('data-emotion')).toBe(useEmilyStore.getState().currentEmotion)
     } finally {
+      act(() => useDevicePrefs.setState(DEFAULT_PREFS))
+      localStorage.removeItem(PREFS_KEY)
+      vi.useRealTimers()
+    }
+  })
+
+  it('switched off, the listener stops and the mood goes back to calm; on again, it listens (ADR 0002)', () => {
+    vi.useFakeTimers()
+    try {
+      useEmilyStore.setState({ currentEmotion: 'energized' })
+      useDevicePrefs.setState({ moodGuess: false, moodNoticeSeen: true })
+      shellAt('/dashboard')
+      expect(useEmilyStore.getState().currentEmotion).toBe('calm_flow')
+      const before = useEmilyStore.getState().metrics
+      for (let i = 0; i < 6; i++) fireEvent.click(document.body, { clientX: 10 * i, clientY: 5 * i })
+      act(() => void vi.advanceTimersByTime(3100))
+      expect(useEmilyStore.getState().metrics).toBe(before)
+      // Opted in again: it listens again.
+      act(() => useDevicePrefs.getState().setMoodGuess(true))
+      for (let i = 0; i < 6; i++) fireEvent.click(document.body, { clientX: 10 * i, clientY: 5 * i })
+      act(() => void vi.advanceTimersByTime(3100))
+      expect(useEmilyStore.getState().metrics).not.toBe(before)
+    } finally {
+      act(() => useDevicePrefs.setState(DEFAULT_PREFS))
+      localStorage.removeItem(PREFS_KEY)
       vi.useRealTimers()
     }
   })

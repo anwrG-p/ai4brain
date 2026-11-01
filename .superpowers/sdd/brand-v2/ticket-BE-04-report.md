@@ -1,0 +1,324 @@
+# Ticket BE-04 (+ BE-12) report: `GET /v1/tasks/next`, dispatcher, Bloom/TTL, parameter projector
+
+- **Branch:** `worktree-agent-a483458eabf534f4e`, reset to the BE-PORT tip `ae67522` before any work.
+- **Commits** (no AI attribution):
+  - `c580939 feat(dynamic_cache): GET /v1/tasks/next dispatcher, Bloom/TTL registry, parameter projector (BE-04, BE-12)`
+  - `f0169f6 docs(sdd): BE-04 (+BE-12) report: ...` (first version of this report)
+  - `0471e25 fix(dynamic_cache): BE-04 review: staircase windup, test isolation, bounded memory, worker lifecycle`
+  - `bb3ba28 docs(sdd): BE-04 report: review round ...`
+  - `e820e54 fix(dynamic_cache): BE-04 re-review: resilient startup, real lifespan test, retention setting, flush race`
+  - `98f1381 fix(dynamic_cache): BE-04 hot pools: demand-sized pools, prioritised refills, baseline-wave test`
+  - the hot-pool review commit after it (this report's last update is in it; see "Hot-pool review round" below).
+- **Tests:** one `pytest -q` from the repo root: **1052 passed, 1 xfailed, 0 warnings**. It also passes with `-W error`.
+  - The base had 858 passed + 1 xfailed.
+  - 6 tests were removed (the `/tasks/next` 501 stand-in tests) and 200 added.
+- **Venv:** `.venv` inside the worktree (git-ignored), built from the root `requirements.txt` on CPython 3.13.14. No new dependencies.
+
+## Files
+
+| Path | What |
+|---|---|
+| `dynamic_cache/cache_dispatcher.py` | `Dispatcher`: pools, schema choice, idempotency, staircase, LRU user registry and its persistence, `forget`/`export`, `start`/`close`. Also `TelemetryTrials`, `trials_by_schema`, `trials_since`, `purge_idle`, `worker_pool` |
+| `dynamic_cache/bloom.py` | `TimedBloom`: a day-sliced Bloom filter with a 14-day TTL; the false-positive table is in its docstring |
+| `dynamic_cache/parameter_projector.py` | BE-12 `project(pillars, schema_type) -> theta | None`, `BOUNDS`, `START_THETA` |
+| `dynamic_cache/api.py` | The route, the per-id `RateLimiter`, the server wiring (`make_dispatcher`/`get_dispatcher`/`set_dispatcher`/`shutdown`), the privacy hooks, and the lifecycle hooks |
+| `backend/app/lifecycle.py` (new) | `on_startup(name, fn)`, `on_shutdown(name, fn)` and the FastAPI `lifespan` that runs them |
+| `backend/app/main.py` | **One edit:** `FastAPI(..., lifespan=lifespan)` (allowed by the review) |
+| `backend/app/privacy/telemetry_store.py` | `register_user_store(name, delete, export)` with `(key, directory)` hooks, best-effort runs, and `StoreUnavailable` |
+| `backend/app/api/routes/v1_privacy.py` | `StoreUnavailable` → 503 with `Retry-After` on delete and export |
+| `backend/app/privacy/retention.py` | The CLI also runs `purge_idle` over the task registry and reports `registries_removed` |
+| `backend/app/api/routes/v1_interop.py` | `/tasks/next` stand-in deleted |
+| `backend/tests/test_app.py` | `INTENTIONAL_OVERRIDES[("/v1/tasks/next", "GET")] = "dynamic_cache.api"`, plus a test that each override is answered by its module |
+| `backend/tests/test_v1_interop.py`, `test_honest_endpoints.py` | The `/tasks/next` 501 tests are removed. Its 422 user-id checks are kept |
+| `backend/tests/test_retention.py` | The CLI's output now has `registries_removed` |
+| `backend/tests/test_lifecycle.py` (new) | The lifespan runs the hooks; a failing shutdown hook does not stop the others |
+| `conftest.py` (new, repo root) | Autouse fixture: every test gets a temporary task registry, a dispatcher with `background=False`, and an empty rate limiter |
+| `backend/Dockerfile`, `docker-compose.yml`, `backend/.env.example` | Writable `/data/task_registry` (uid 10001, named volume) and `TASK_REGISTRY_DIR` |
+| `dynamic_cache/pyproject.toml` | Comment only: `api.py` needs the server's `app` package. The dispatcher, Bloom filter and projector need neither |
+| `dynamic_cache/tests/test_{dispatcher,bloom,parameter_projector,tasks_api}.py` | Tests |
+
+## Frontend contract (wave-integration `8b8c859`, `taskSource.ts` + `types.ts`)
+
+**Request.** It sends `GET /v1/tasks/next?user_id=<uuid>` and nothing else. Every other parameter is optional.
+
+**Response.** The route returns exactly the BE-03 `TaskPayload` envelope `{task_id, dimension, schema_type, params, surface_seed}`, as `application/json`, which is what `validTask` checks.
+
+**Errors.** Any non-2xx makes it throw; that covers 422, 429 and 503.
+
+**Drift guard.** `test_the_port_matches_task_source_ts` reads `taskSource.ts` and checks the schema list, the dimension list, the task-id regex and the URL template.
+
+## Route
+
+`GET /v1/tasks/next?user_id&schema_type?&dimension?&session_id?&seq?` is a plain `def`, so it runs in FastAPI's thread pool, never on the event loop.
+
+- **Ids:** `user_id` goes through `telemetry_store.user_key()` (R13).
+- **422:** a `schema_type` + `dimension` pair that matches no schema, an unknown value, or a bad id.
+- **429:** `Retry-After` is the seconds until the window ends. The limits are per user id, in fixed windows: **120 an hour and 400 a day**.
+  - A session is about 8 tasks, so real users never hit them.
+  - The daily cap is what keeps a leaked id from saturating its Bloom filter (see the table below). 120/hour alone would allow 2880 a day.
+- **503** (`Retry-After: 1`): no unseen task could be built, or a generator failed.
+- **No filter:** the schema served longest ago is chosen, so a new user cycles through the 8.
+
+## How it works
+
+**Pools**
+- Keyed by `(archetype, schema, theta level)`, levels on a 0.1 grid, holding payloads already serialised to JSON.
+- Each pool is sized to its demand: 2 s of its recent pop rate, up to `POOL_MAX = 128`.
+  - Its floor is `POOL_SIZE = 16` while in use, and 0 once idle for 10 min; stock above the target is trimmed.
+  - All pools together are under a hard 96 MiB cap, of which at most 32 MiB may sit above the floors.
+- A pool at half its target is topped up by the **spawn worker processes** (2, or 1 on a 2-vCPU host), in small jobs. The latest pool goes first: its time to run dry minus the time to rebuild its whole deficit.
+- Jobs are submitted outside the dispatcher lock. Failures back off, and hung jobs time out. Details in "Hot-pool round" and "Hot-pool review round" below.
+- An empty pool builds one task inline, in the request thread.
+- The worker is started by the lifespan startup hook, which runs off the event loop and does not wait for the spawn. It is stopped by the shutdown hook (`close()`).
+- If the worker cannot start, the server logs it and serves every task inline; boot never fails on it.
+- Its initializer starts a thread that `os._exit`s when the parent's sentinel fires, so a hard-killed server leaves no orphan.
+
+**Stroop:** always `inks="classic"`, validated with `allow_unserved=False`. `cvd_safe` is never served.
+
+**No repeats.** One 4096-bit, 7-hash Bloom slice per UTC day, 14-day TTL, so a task is blocked 14 to 15 days. False-positive rates (from the `bloom.py` docstring):
+
+| tasks/day | one slice | 15 such days |
+|---|---|---|
+| 8 | 9e-14 | 1e-12 |
+| 100 | 2.4e-6 | 3.5e-5 |
+| 400 (the daily cap) | 7.3e-3 | 0.10 |
+| 2880 (no daily cap) | 0.95 | 1.0 |
+
+A false positive only skips a fresh task; it never lets a repeat through.
+
+**Idempotency and "one task_id, one run"** (BE-07 dedupe, Option B)
+- The key is `(user, session_id, seq, schema_type, dimension)`; repeating it returns identical bytes, including after a restart.
+- Apart from that replay of the same run, a user never gets a `task_id` again within 14 days, retakes included.
+- The client must send a new `seq` (or `session_id`) per run.
+
+**Difficulty (BE-12 + the 85% rule)**
+- **A per-user, per-schema staircase.** It starts at `project(pillars)`, or at `START_THETA` (the middle of the bounds) with no pillars, which is always the case until BE-11.
+- **It steps only on trials it has not counted yet**, and only once **at least 10 new trials** have arrived.
+  - At most the newest 60 of them count in one step.
+  - The step is Hamza's `apply_85_percent_rule` on b = 5θ − 2.5, with `RULE_STEP = 1.0` (A), then clamped.
+- **How trials are tracked.** Each trial carries a marker (`received_at|session|task|trial_index`), and the staircase stores the last one it stepped on.
+  - If that trial has left the telemetry window (retention, the 1 MiB tail), only trials received after its `received_at` count.
+- **Effect.** Single-trial tasks (matrix, tower) no longer wind it up. Tasks fetched and never played do not move it.
+- **Trials source.** The tail of the user's telemetry JSONL, cached by size and mtime, holding up to 5000 users. Deduplicated by item_id/stream like BE-07; fixture ids and torn lines are ignored.
+
+**Projector:** unchanged from the first round.
+- Weights come from `pillars.ts`.
+- Missing pillars renormalise.
+- It returns None when no relevant score exists.
+- [0, 1] bounds; MST pinned at 0.5.
+- mental_rotation always returns None.
+
+**Registry**
+- **Storage.** One `{key}.json` per user (Bloom slices as base64, session recipes, staircases, `last` served time) under `TASK_REGISTRY_DIR` (default `data/processed/task_registry`).
+- **Writes.** A writer thread writes behind the request, as tmp + `os.replace`. Each user is serialised under its own lock, so a concurrent serve cannot change it mid-dump. Failed writes are logged with no user id and retried.
+- **Memory is a bounded cache; the file is the source of truth.**
+  - At most `MAX_USERS = 5000` users are kept, least recently used first out.
+  - Only users whose latest generation is on disk, with no call in flight, are evicted.
+  - A change made during a write keeps the user dirty.
+  - Per-user locks exist only while a call is in flight.
+- **Reads** of a registry no longer wait on the writer's file lock. That wait put the writer's disk time on requests.
+- **Retention.** One setting, env `RETENTION_DAYS` (default 30):
+  - A registry idle that long starts afresh when its user returns; the server passes the setting to the dispatcher.
+  - `purge_idle(dir, days)` removes files whose mtime is older than that. The retention CLI (`python -m backend.app.privacy.retention`) runs it, with the setting as its `--days` default.
+
+**Privacy (delete/export)**
+- **Hooks.** `register_user_store(name, delete(key, directory), export(key, directory))`.
+  - `directory` is None for the server's own locations.
+  - When a caller passes an explicit telemetry directory (a tool, a test), the store keeps to `directory/<name>/` and touches nothing else.
+- **Failures.** Hooks are best effort: every store is tried, and failures are logged by store name and exception class only. Any failure raises `StoreUnavailable`, which the routes turn into **503 + Retry-After**; the delete is safe to repeat. There is no partial-delete 500.
+- **Export content.** The registry is appended as `{"store": "task_registry", "user_id", "data"}` after the events. A corrupt registry file is exported as `{"unreadable": "<raw text>"}`, so the telemetry export still goes out.
+- **Test isolation.** The root autouse fixture means no test can reach the real `data/processed/task_registry`. `test_a_pre_existing_registry_file_outside_tmp_is_never_touched` plants a file there and checks its bytes and mtime after serve, export and delete.
+
+## Review round (`0471e25`): each item
+
+| # | Item | Fix | Evidence |
+|---|---|---|---|
+| 1 | Staircase windup on single-trial schemas | Steps only on trials not yet counted, after ≥ 10 new ones, at most the newest 60 | `test_single_trial_tasks_do_not_wind_the_staircase_up[0.7, 1.0]`: 600 single-trial matrix tasks, simulated learner P = logistic(8(ability − level)); asserts late SD < 0.1 and mean within 0.1 of the 85% point. Over 10 learners through the real dispatcher: **ability 0.7: mean 0.459 (target 0.48), SD 0.054; ability 1.0: mean 0.758 (target 0.78), SD 0.052** (reviewer's fixed sim: 0.06). Also `test_the_rule_steps_only_on_trials_it_has_not_counted` (9 new trials: no step; the 10th: one step on exactly those 10), `test_trials_since_a_marker`, `test_one_step_counts_at_most_the_newest_window` |
+| 2 | Privacy tests touched the real registry | Root autouse fixture; hooks honour an explicit directory | `test_a_pre_existing_registry_file_outside_tmp_is_never_touched`, `test_store_hooks_keep_to_an_explicit_directory`, `test_forget_and_export_with_a_directory_touch_only_that_directory`; the retention CLI subprocess tests inherit the temporary `TASK_REGISTRY_DIR` |
+| 3 | Unbounded per-user memory | LRU of 5000; only clean users with nothing in flight are evicted; locks only while in flight; the trials cache is bounded too | `test_memory_keeps_at_most_max_users_evicting_clean_ones` (dirty users stay; after flush the LRU goes; an evicted user reloads with its seen filter), `test_a_user_with_a_call_in_flight_is_not_evicted`, `test_a_change_made_during_a_write_keeps_the_user_dirty`, `test_telemetry_trials_cache_is_bounded` |
+| 4 | Orphan worker on a hard kill | Initializer thread waits on `parent_process().sentinel`, then `os._exit`; lifespan hooks via `app/lifecycle.py` | `test_the_worker_exits_when_its_parent_is_killed` (subprocess parent, `kill()`, worker pid gone), `test_lifespan_starts_and_stops_the_dispatcher`, `test_lifecycle.py` (3 tests). Live: uvicorn hard-killed with `Stop-Process -Force`; its worker 26676 was gone 3 s later |
+| 5 | First submit under the lock | `_refill_job` under the lock, `_submit` after; `start()` spawns the worker at startup | `test_the_first_submit_runs_outside_the_dispatcher_lock` (another thread takes the lock from inside `submit`) |
+| 6 | Delete/export robustness | Best-effort hooks, logged without ids; `StoreUnavailable` → 503; corrupt registry exported raw | `test_a_failing_store_makes_delete_503_and_still_runs_the_others` (other stores ran, the registry file is gone, the log names the store and `ZeroDivisionError` but not the id, a retry gives 200), `test_a_failing_store_makes_export_503`, `test_a_corrupt_registry_does_not_block_the_telemetry_export`, `test_a_corrupt_registry_is_exported_raw` |
+| 7 | Registry retention | 30-day idle reset in memory; `purge_idle`; wired into the retention CLI | `test_a_registry_idle_past_retention_starts_afresh`, `test_purge_idle_removes_registry_files_untouched_for_30_days`, `test_the_retention_cli_purges_idle_registries`. Live CLI: `{"files": 0, ..., "registries_removed": 2}` (two files set 40 days old out of 93) |
+| 8 | Bloom docstring | Correct per-slice and 15-slice false-positive table | `bloom.py` docstring; `test_false_positive_rate_is_small` |
+| 9 | Rate limit | 120/hour and 400/day per id, fixed windows, 429 + Retry-After, at most 50k ids tracked | `test_too_many_calls_for_one_id_are_429` (case-insensitive id, per id, next window), `test_rate_limiter_windows_and_bound`, `test_default_limits`. Live: 125 calls → 120 × 200, 5 × 429, `retry-after: 3456` |
+| 10 | p99 at production POOL_SIZE, paced | New paced test at 16 deep, 100 calls/s; the unpaced burst is stated in its docstring | `test_p99_under_10_ms_at_production_pool_size_paced` (see the re-review correction below). The warm 48-deep test: p50 0.02 ms, p99 0.16–0.24 ms |
+
+Found and fixed while testing round 2 (not in the review):
+- Registry reads waited on the writer's file lock. Fixed as above.
+- The real-registry probe test left an empty `data/processed/`. It now removes every directory it created.
+
+## Re-review round: each item
+
+| # | Item | Fix | Evidence |
+|---|---|---|---|
+| 1 | Isolation probe could collide with a real id | The test skips if a real `never-touch-probe.json` already exists, so it never writes over one; it still plants and removes its own file otherwise | `test_a_pre_existing_registry_file_outside_tmp_is_never_touched` |
+| 2 | Startup hooks could block or break boot | `lifecycle.lifespan` runs each startup hook through `run_in_threadpool` (off the event loop), one at a time. A failing hook is logged by name and exception class; its own shutdown hook runs at once to undo what it half started; boot goes on; it is not shut down twice. `Dispatcher.start()` no longer waits for the worker: it queues the spawn and returns a future. If the spawn fails (at submit or when the future resolves), the dispatcher logs `task worker process unavailable (<Error>); building tasks inline` and serves inline. A runtime refill that cannot spawn a worker does the same; a worker that died (`BrokenProcessPool`) gets a replacement | `test_a_failing_startup_hook_does_not_block_boot` (server answers, the hook was undone, the next hook ran), `test_startup_hooks_run_off_the_event_loop` (no running event loop inside the hook), `test_start_does_not_wait_for_the_worker` (< 0.5 s), `test_a_worker_that_dies_at_spawn_falls_back_to_inline`, `test_a_worker_that_cannot_start_leaves_the_server_serving_inline` (the full app boots and serves with a spawn that raises) |
+| 3 | Lifespan test with a real worker | Added | `test_lifespan_runs_a_real_worker_process_and_stops_it`: a `background=True` dispatcher, `with TestClient(app)`. The worker pid is spawned at startup and differs from ours; 12 requests drain the pool so a refill runs in the worker; after shutdown the dispatcher is closed, the worker process has exited, and the pending registry is on disk |
+| 4 | `trials_since` froze without a `received_at` | If the stored marker is gone and there is no `received_at` to compare (on the marker, or on any trial), it returns the newest `ACCURACY_WINDOW` trials. The staircase steps once if at least 10, then re-anchors on a marker it can find | `test_trials_since_without_a_received_at_takes_the_newest_window[2]`, `test_a_staircase_whose_marker_vanished_steps_then_reanchors` (steps, re-anchors on the newest trial, then holds with no new trials) |
+| 5 | Two retention settings | One setting, env `RETENTION_DAYS` (whole days ≥ 1, default 30), read by `app.privacy.retention.configured_days()`. The CLI uses it as its `--days` default (`--days` still overrides one run); `dynamic_cache.api.make_dispatcher` passes it to `Dispatcher(retention_days=...)` for the in-memory idle reset. A bad value is refused (CLI exit 2) | `test_the_idle_reset_uses_the_configured_retention_days`, `test_the_retention_cli_default_is_the_same_setting` (the same 10-day-idle file is kept under 30 and removed under 7), `test_a_bad_retention_setting_is_refused[4]`, `test_server_retention_days_come_from_the_one_setting`; documented in `backend/.env.example` |
+| 6 | `flush()` serialised under `self._lock` while `next_task` mutated under the user lock | `flush` snapshots the dirty keys, then serialises each user under that user's lock (the one `next_task` mutates under), reading the generation in the same hold; the disk write happens after releasing it, with the identity check as before | `test_serving_and_flushing_at_once_never_breaks_a_dump`: 3 threads × 300 serves (a new session answer each, so the dict keeps changing) against a thread flushing in a loop; no exception, and the last state lands on disk |
+
+**Correction to round 2's p99 number.**
+- The round-2 paced test (`paced{k % 40}`) passed at 0.47 ms once. That was luck at the margin.
+- Its users walk the schemas in step, so calls arrive in blocks of 40 for one schema; at the end that is 40 MST calls in 0.4 s. That drains the 16-deep MST pool, and each empty-pool call builds MST inline.
+- Re-runs gave p99 20–25 ms. The cause is the workload, not this round's code: the slow calls are all MST with an empty pool.
+- The test now staggers the users across the battery (user u has played u % 8 tasks), so consecutive calls ask for different schemas, as real traffic does.
+- Three runs: **p99 0.71, 0.64 and 0.71 ms** (p50 about 0.25 ms).
+- The concentrated case (everyone on one pool at once, p99 about 20–25 ms) and the unpaced HTTP burst (p99 about 8 ms) were stated in the test's docstring as not covered. The hot-pool round below fixes the concentrated case.
+
+## Hot-pool round: demand-sized pools, prioritised refills
+
+**Why.** Every new user plays the baseline in the same fixed order (relational, n_back, stroop, tower, ufov, mst), so a wave of sign-ups hits one pool at a time. With fixed 16-deep pools and one worker refilling in arrival order, a hot MST pool drained and each call built MST inline (p99 20–25 ms).
+
+**What changed** (`dynamic_cache/cache_dispatcher.py`, all inside the dispatcher):
+
+| Change | How |
+|---|---|
+| Pools sized to demand | Each pool has a decaying pop-rate estimate: +1/τ per pop and e^(−Δt/τ) decay, τ = `DEMAND_TAU_S` = 2 s. Its target is the pops expected in `POOL_HORIZON_S` = 2 s, clamped to [`POOL_SIZE` = 16, `POOL_MAX` = 128]. A burst grows the pool within about a second; when the wave passes, the target decays back to 16 |
+| Memory bounded | Growth above 16 stops while the pools together hold `POOL_BYTES_MAX` = 64 MiB (bytes tracked on every add and pop). One pool never exceeds `POOL_MAX` |
+| Low-water refill | A pool at or under half its target is topped back up to its target. The top-up is cut into jobs of about `BATCH_S` = 30 ms of build time (4 MST, 10 relational, 100 tower), so results come back fast and priorities are re-weighed after every job |
+| Priority | The free worker takes the pool with the least slack: (stock + in flight) / pop rate − the batch's build time. A slow schema (MST, mental rotation) therefore starts before a cheap one with the same stock and demand, and an empty pool before a stocked one. Build costs start from a measured table (`BUILD_COST_S`) and are learned per schema from the workers' timings (moving average) |
+| Two workers | `WORKERS` = 2 spawn processes. Both can work on one hot pool at once. They are started at boot and watched by the same exit-with-parent thread |
+| Plumbing | Refill results are handled on a small pumper thread, not the process pool's own thread. A worker that dies gets a new pool, and late results from the old one don't skew the counts (epoch). A worker that cannot spawn still falls back to inline building |
+
+**Tests**
+
+- **`test_p99_under_10_ms_for_a_baseline_wave`** (production defaults):
+  - 150 new users arrive at 50 a second, each walking the 6-task baseline in order, 0.3–0.8 s apart (compressed play time).
+  - That is 900 calls in about 7 s, each pool taking a burst of up to ~50 calls/s.
+  - Three runs: **p99 0.72, 1.20 and 1.24 ms**, with pools grown to 64–72.
+- **`test_p99_under_10_ms_with_users_in_step`:** round 2's failing workload (40 users in step at 100 calls/s, ending with 40 MST calls in 0.4 s). Three runs: **p99 0.99, 1.96 and 1.43 ms** (was 20–25 ms).
+- **Mixed traffic** (`..._at_production_pool_size_paced`): p99 0.75–1.08 ms.
+- **Warm 48-deep pools:** p99 0.16–0.26 ms.
+- **Mechanism tests:**
+  - `test_a_hot_pool_grows_with_demand_and_shrinks_back`: the target grows within 1 s, tracks the rate at 3τ, and is back to 16 after the wave; other pools are unaffected.
+  - `test_pool_growth_is_capped_per_pool_and_in_bytes`
+  - `test_refill_starts_at_the_low_water_mark`: no job at 9 of 16; at 8, one job for 8.
+  - `test_a_slow_schema_is_refilled_before_a_cheap_one`: same stock and demand, MST goes first, in a small batch.
+  - `test_the_pool_that_runs_dry_first_is_refilled_first`
+  - `test_both_workers_can_serve_one_hot_pool`
+  - `test_background_refill_keeps_the_pool_warm`: back to target, cost learned.
+
+**Still not covered.** An unpaced HTTP burst far above any real arrival rate (200 back-to-back calls) can still outrun two workers on a cold pool. A pool also needs about a second of demand before it grows. Raise `WORKERS` or `POOL_SIZE` for a launch-day spike.
+
+## Hot-pool review round: each item
+
+Every review repro (`rr-be04-hot/`) was run before and after the fix.
+
+| # | Finding | Fix | Repro after / tests |
+|---|---|---|---|
+| 1 | **Spawn-death deadlock.** `start()`'s callback ran on the process pool's manager thread, which holds the pool's shutdown lock, and called `shutdown` | Every process-pool callback (`start()`'s and the refill jobs') only hands over to the pumper thread (`_hand_over`). Worker failures go through `_worker_failed` there | `deadlock_repro.py`: was a hang (killed by `timeout`, exit 124). Now `start future done: True`, `shutdown_lock held: False`, served inline, **exit 0**. Test `test_a_worker_that_dies_at_spawn_does_not_deadlock` runs the same thing (a real spawn pool whose initializer is `os._exit(3)`) in a subprocess with a 90 s timeout: falls back, serves, `close()` returns, exit 0 |
+| 2 | **Refill error hot loop** (936 MST submits/s) | A refill that raises puts its pool on an exponential back-off (0.5 s doubling to 30 s), off the top-up list. So does a refill that stocks nothing (no payloads back, or no room under the caps): the repro's tower half also looped, at 430 submits in 0.5 s. A broken worker pool is replaced after the same kind of back-off (`_pool_failures`). Warnings are rate-limited to one per kind per 30 s, with a count of those held back | `errloop_repro.py`: **mst 2** (one per worker, then back-off) and **tower 1** in 1.5 s. Tests: `test_a_failing_refill_backs_off_instead_of_looping` (exactly 1 submit, retries at 0.5, 1 and 2 s, other pools still refilled, 1 log line), `test_a_refill_that_stocks_nothing_backs_off_too`, `test_broken_worker_pools_are_replaced_after_a_growing_back_off` (20 s of traffic against pools that always break: 4–8 replacements, 1 log line, every call served inline) |
+| 3 | **The byte budget was neither a bound nor scaled to 9 archetypes** | **A hard cap:** `POOL_BYTES_MAX` = 96 MiB for all pools, every archetype together. It is checked on every stocking (refills and warm-up), and jobs are sized to the room left. **Growth budget:** only bytes above the pools' floors count, at most `POOL_GROWTH_BYTES` = 32 MiB. **Demand-based floor:** 16 while a pool is in use, 0 once idle for `POOL_IDLE_S` = 10 min. **Trimming:** a sweep (at most every 0.25 s) cuts stock above each pool's demand target, so a wave's growth goes back and idle pools empty out | `sizes.py` shows floors of 100.6 MiB for 9 archetypes. `test_memory_stays_under_the_hard_cap_with_nine_archetypes` uses 702 pools, every one used, with ~18 KB payloads and a 40 MiB cap: the held bytes equal the tally and stay ≤ the cap at every check (the cap binds). A wave stays within the growth budget, and after 10 idle minutes everything is empty. `test_a_wave_s_growth_is_handed_back` trims a grown pool to 16 |
+| 4 | **The slow-schema priority was a rounding artifact**: n·cost ≈ `BATCH_S`, so the term cancelled | **Lateness** = (stock + in flight) / pop rate − deficit × build time, where deficit = target − stock − in flight, so it counts the whole deficit, not the batch | `prio.py`: both empty, MST/mental_rotation/relational go first in either registration order, now by 112/96/48 ms of lateness against tower's 5 ms, not by rounding. "Slow has 1 left, tower 0" gives **tower** there, and that is right at that script's rate (~4 pops/s): the one MST payload lasts ~250 ms, longer than its 105 ms rebuild. Tests: `test_with_equal_stock_and_demand_the_slow_schema_goes_first[both orders]`; `test_a_slow_pool_with_stock_can_still_go_before_an_empty_cheap_one` (at 50 pops/s the MST payload lasts 20 ms against a 105 ms rebuild, so **MST** goes first; at 5 pops/s, tower); `test_the_pool_that_runs_dry_first_is_refilled_first` |
+| 5 | p99 tests on CI | **Benchmarks with a CI threshold** (chosen over reshaping the tests). They are marked `benchmark` (registered in the root `conftest.py`; `-m "not benchmark"` leaves them out). The budget is `P99_BUDGET_MS`: 10 ms locally (the AC), **20 ms when `CI` is set**, which still catches the 20–40 ms regressions seen so far. Also `WORKERS` = min(2, cores − 1), so a 2-vCPU runner or server runs one worker beside the server instead of oversubscribing | Documented in the test module and the marker help |
+| 6 | Bad `RETENTION_DAYS` gave a 500 on every tasks call | The `dynamic_cache` startup hook validates it and raises `lifecycle.FatalStartupError`. The lifespan logs `startup hook dynamic_cache: RETENTION_DAYS must be ...; the server does not start`, undoes what started, and the boot fails | `badret.py`: the boot stops with that log line, no 500s. `test_a_bad_retention_setting_stops_the_boot`, `test_a_fatal_startup_hook_stops_the_boot_and_undoes_what_started` |
+| 7 | Lifespan test too weak | It now waits until a refill came back from a worker process (`_refills_done > 0`), and after shutdown asserts the worker processes exited and the pumper refuses work | `test_lifespan_runs_a_real_worker_process_and_stops_it` |
+| 8 | Hung worker job | Each job records its start. The sweep finds any job older than `JOB_TIMEOUT_S` (10 s), marks that worker pool broken, kills its processes and replaces it after back-off | `test_a_hung_job_marks_the_workers_broken` |
+| 9 | Transient spawn `OSError` made inline permanent; a failure could clear a pool that had replaced a stale one | A failed pool is replaced after back-off; inline is only for the meantime. `_worker_failed(executor, ...)` acts only if `executor` is still the current pool | `test_a_transient_spawn_error_is_retried_not_permanent`, `test_a_stale_failure_report_does_not_drop_the_replacement` |
+| 10 | `CancelledError` / `KeyboardInterrupt` during startup | The startup loop catches `BaseException`. It shuts down (synchronously, since the task may be cancelled) every hook that started, the interrupted one included, then re-raises | `test_a_cancelled_startup_still_shuts_down_what_started[CancelledError, KeyboardInterrupt]` |
+
+**Latency after this round,** three runs each:
+
+| Test | p99 |
+|---|---|
+| Baseline wave | 1.20, 1.35, 0.71 ms (largest pool 59–62) |
+| Users in step | 2.42, 0.36, 0.62 ms |
+| Mixed | 1.02, 1.13, 0.43 ms |
+| Warm 48-deep | 0.21–0.84 ms |
+
+**Scope.** All changes are inside the dispatcher's pool internals, plus `lifecycle.py` (`FatalStartupError`, abort cleanup), the `dynamic_cache.api` startup hook, the root `conftest.py` marker and tests. The constructor gained no parameters in this round (tunables are instance attributes), to keep out of BE-11's and BE-13's hooks.
+
+## Acceptance criteria → evidence
+
+| AC | Evidence |
+|---|---|
+| Per-archetype pools refilled from BE-03 off the event loop | `test_pools_are_per_archetype`, `test_background_refill_keeps_the_pool_warm`; a plain `def` route; the worker process |
+| Archetype defaults to neutral | `NEUTRAL` default |
+| `schema_type` (and `dimension`) filter | `test_schema_filter[8]`, `test_dimension_filter_cycles_its_schemas[6]`, `test_every_schema_is_served_and_valid[8]`, `test_bad_requests_are_422[7]` |
+| Idempotent per (user, session) | `test_same_session_and_seq_returns_the_same_task`, `test_idempotent_across_a_restart`, `test_a_double_get_in_flight_gets_one_task`, `test_idempotent_per_user_and_session` |
+| One task_id per run (BE-07) | `test_a_retake_never_gets_a_task_id_already_served`, `test_a_retake_when_only_the_old_task_is_buildable_is_refused_not_repeated` |
+| No repeat within 14 days, simulated clock | `test_no_repeat_within_14_days_simulated_clock`, `test_blocked_for_at_least_14_days_from_any_time_of_day`, `test_seen_filter_survives_a_restart` |
+| Persisted under `data/processed/`, covered by delete/export | `test_delete_clears_the_registry`, `test_forget_drops_memory_and_file`, `test_a_pending_write_cannot_undo_a_delete`, `test_export_includes_the_registry`, plus review items 2 and 6 |
+| Projector monotone and bounded | `test_monotone_in_every_pillar[8]`, `test_bounded_for_any_input[8]`, `test_no_relevant_score_is_none_not_a_made_up_level`, `test_projection_feeds_the_generators[24]` |
+| 85% rule over recent telemetry accuracy | `test_85_percent_rule_moves_theta_from_recent_accuracy[3]`, `test_the_rule_steps_only_on_trials_it_has_not_counted`, `test_perfect_play_walks_up_to_harder_levels_and_stays_bounded`, `test_single_trial_tasks_do_not_wind_the_staircase_up[2]` |
+| Stroop classic only | `test_stroop_is_served_with_the_classic_inks_only` |
+| p99 < 10 ms | `test_p99_under_10_ms_with_warm_pools`, `test_p99_under_10_ms_at_production_pool_size_paced`, `test_p99_under_10_ms_for_a_baseline_wave`, `test_p99_under_10_ms_with_users_in_step` |
+| Frontend contract shape | `test_the_frontends_exact_request_gets_a_valid_task`, `test_the_port_matches_task_source_ts`, `test_openapi_documents_the_payload` |
+| Stand-in replaced | `test_no_route_shadows_a_v1_interop_stand_in_by_accident`, `test_intentional_overrides_are_answered_by_their_module` |
+
+## Curl and HTTP evidence (round 2)
+
+`uvicorn app.main:app --app-dir backend --port 8769`, with `TASK_REGISTRY_DIR` and `TELEMETRY_DIR` in a scratch directory.
+
+**All 8 schemas**
+
+First call (cold pool, built inline):
+
+```
+n_back           200 6841B 0.042s   (first request of the process)
+stroop           200 4672B 0.003s
+matrix           200 1098B 0.003s
+mental_rotation  200 13984B 0.010s
+relational       200 23588B 0.008s
+tower            200 307B 0.005s
+ufov             200 17989B 0.020s
+mst              200 18185B 0.011s
+```
+
+Second call (refilled pools):
+
+```
+n_back 0.0022s | stroop 0.0020s | matrix 0.0020s | mental_rotation 0.0020s | relational 0.020s | tower 0.0019s | ufov 0.0020s | mst 0.014s
+```
+
+Each curl is a new process and a new TCP connection, and isolated 11–25 ms outliers show up on `GET /` too, which never touches the dispatcher. They are measurement noise from this Windows box. The keep-alive client below is the fair measure.
+
+**Keep-alive client** (`bench_http.py`, 40 users):
+
+```
+paced 100 req/s, 400 calls:  p50 1.39 ms  p99 3.48 ms  max 9.08 ms
+unpaced burst, 200 calls:    p50 1.00 ms  p99 7.91 ms  max 8.32 ms
+```
+
+In round 1 the unpaced burst reached 10–15 ms, before the read-path fix. An unpaced burst can still drain a 16-deep pool, and the empty pool then builds inline: MST takes about 7 ms, mental rotation about 6 ms.
+
+**Rate limit:**
+
+```
+125 calls for one id -> 120 x 200, 5 x 429; then: HTTP/1.1 429 Too Many Requests, retry-after: 3456
+```
+
+**Delete then export:**
+
+```
+DELETE /v1/user/telemetry?user_id=curl-user -> {"deleted_events":0,"deleted_files":1}
+GET /v1/user/export -> 404
+```
+
+**Idempotency and 422s** (round 1, unchanged):
+- the same `session_id`/`seq` twice gives identical bytes; `seq=1` gives a new task;
+- 422 for disagreeing filters, a bad id, an unknown schema, and a bad session id.
+
+**Hard kill:** after `Stop-Process -Force` on the server, its spawn worker had exited 3 s later.
+
+## Decisions to review
+
+1. **The staircase** is seeded by the projector and walked by the 85% rule on new trials only. A seeded staircase is not re-projected when pillars change; BE-11 may want to re-seed, for example on an archetype change.
+2. **`RULE_STEP = 1.0`** (A), with `MIN_TRIALS = 10` new trials per step. With Hamza's default step of 0.25, the sim's late SD is 0.03 but it converges four times slower.
+3. **`START_THETA` = the middle of the bounds** (A). MST is pinned at 0.5; mental_rotation has no projection.
+4. **Rate limits of 120/hour and 400/day** use fixed windows, so up to 2× the limit can pass across a window boundary. The state is in memory and per process.
+5. **Export format:** store records are appended after the events. A corrupt registry goes out as raw text.
+6. **Retention:** registries share the telemetry period (`--days`, 30).
+7. **One `generate()` payload per fetch.** The TOL-F series and matrix blocks are not served.
+
+## Requests
+
+- **F-C (frontend):** send `schema_type` and `session_id` + a per-run `seq`. Never reuse a `(session_id, seq)` for a retake. Handle 429 and 503 by waiting `Retry-After`. (The coordinator is routing this.)
+- **BE-06 / any per-user store:** the hook signature is now `delete(key, directory)` / `export(key, directory)`, best effort, with `StoreUnavailable` → 503. With an explicit directory, keep to `directory/<name>/`. Expect a small merge in `telemetry_store.py`.
+- **Any module with background work:** register start/stop with `app.lifecycle.on_startup` / `on_shutdown` instead of editing `main.py`. Startup hooks run in a worker thread, so they must not need the event loop. A hook that raises is undone through its shutdown hook and boot continues, so make the shutdown hook safe to run after a half-done start.
+- **Ops:** `RETENTION_DAYS` is the one retention setting (CLI default and the server's registry idle reset).
+- **BE-11:** pass `pillars=` and `archetype=` to `api.make_dispatcher(...)`.
+- **BE-13:** LLM variants can enter the same pools as `Entry`. Their session recipes need a source field, since an LLM variant cannot be rebuilt from a seed.
+- **Ops:** run the retention CLI daily, as before; it now also prunes idle task registries.

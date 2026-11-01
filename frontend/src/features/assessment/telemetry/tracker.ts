@@ -95,12 +95,20 @@ type TrackerOpts = {
 // R3: pending = not asked yet (events are held on the device), granted = send, denied = keep nothing.
 export type Consent = 'pending' | 'granted' | 'denied'
 
+/* Consent per purpose (research #6), two separate choices of equal weight:
+   - consent: "Save my answers to improve my training", the telemetry this tracker sends. Stored
+     under the v1 key exactly as before, so a stored v1 'granted' still means purpose 1 granted.
+   - coachConsent: "Let Loti use AI to reply", the coach LLM path. Its own key; absent (every v1
+     device) means not chosen. It gates nothing in the tracker; the coach adapter reads it. */
+export type ConsentPurpose = 'telemetry' | 'coach'
+
 export type TrackerStatus = {
   isOnline: boolean
   queuedCount: number
   droppedCount: number
   maxCapacity: number
   consent: Consent
+  coachConsent: Consent
 }
 
 const MAX_PER_REQUEST = 100 // server Batch max_length
@@ -109,8 +117,10 @@ const STORAGE_KEY = 'synapsetwin_telemetry_queue_v2'
 const OLD_STORAGE_KEY = 'synapsetwin_telemetry_queue'
 // Holds 'granted' or 'denied'; absent (or anything else) means pending.
 const CONSENT_KEY = 'synapsetwin_consent_v1'
+// Purpose 2 (the coach LLM): 'granted' or 'denied'; absent means not chosen.
+const COACH_CONSENT_KEY = 'synapsetwin_consent_coach_v1'
 // The privacy page's export and delete read these (features/privacy/myData.ts).
-export { STORAGE_KEY as QUEUE_KEY, CONSENT_KEY }
+export { STORAGE_KEY as QUEUE_KEY, CONSENT_KEY, COACH_CONSENT_KEY }
 const asConsent = (v: string | null | undefined): Consent =>
   v === 'granted' || v === 'denied' ? v : 'pending'
 
@@ -160,6 +170,7 @@ export class Tracker {
   private isOnline = typeof navigator === 'undefined' ? true : navigator.onLine
   private droppedCount = 0
   private consent: Consent = 'pending'
+  private coachConsent: Consent = 'pending'
   private clears = 0 // bumped by clear(), so an in-flight flush knows its batch was purged
   private status: TrackerStatus | null = null
   private listeners = new Set<() => void>()
@@ -194,6 +205,13 @@ export class Tracker {
     const purged = this.store((s) => s.getItem(STORAGE_KEY)) == null
     if ((e.key === STORAGE_KEY || e.key === null) && this.consent === 'pending' && purged && this.buffer.length)
       this.clear()
+    if (e.key === COACH_CONSENT_KEY || e.key === null) {
+      const coach = asConsent(this.store((s) => s.getItem(COACH_CONSENT_KEY)))
+      if (coach !== this.coachConsent) {
+        this.coachConsent = coach
+        this.notify()
+      }
+    }
     if (e.key !== CONSENT_KEY && e.key !== null) return
     const next = asConsent(this.store((s) => s.getItem(CONSENT_KEY)))
     if (next === this.consent) return
@@ -221,6 +239,7 @@ export class Tracker {
     this.maxBackoffMs = opts.maxBackoffMs ?? 60_000
     this.store((s) => s.removeItem(OLD_STORAGE_KEY))
     this.consent = asConsent(this.store((s) => s.getItem(CONSENT_KEY)))
+    this.coachConsent = asConsent(this.store((s) => s.getItem(COACH_CONSENT_KEY)))
     // Read before restoring: a restored full batch flushes at once, and only if granted.
     if (this.consent === 'denied') this.store((s) => s.removeItem(STORAGE_KEY))
     else this.add(this.restore())
@@ -362,8 +381,24 @@ export class Tracker {
       droppedCount: this.droppedCount,
       maxCapacity: this.maxBuffer,
       consent: this.consent,
+      coachConsent: this.coachConsent,
     }
     return this.status
+  }
+
+  /** Both purposes at once, as the consent step and the privacy page choose them: each true grants,
+      each false declines (purpose 1 declined forgets the held answers, as denyConsent). */
+  choose(choice: Record<ConsentPurpose, boolean>): void {
+    this.setCoachConsent(choice.coach)
+    if (choice.telemetry) this.grantConsent()
+    else this.denyConsent()
+  }
+
+  /** Purpose 2 only: "Let Loti use AI to reply". Sends nothing by itself. */
+  setCoachConsent(granted: boolean): void {
+    this.coachConsent = granted ? 'granted' : 'denied'
+    this.store((s) => s.setItem(COACH_CONSENT_KEY, this.coachConsent))
+    this.notify()
   }
 
   grantConsent(): void {
@@ -378,8 +413,11 @@ export class Tracker {
     this.clear()
   }
 
-  // Back to not asked: new events are held again, nothing is sent. Used by the privacy purge.
+  // Back to not asked, for both purposes: new events are held again, nothing is sent. Used by the
+  // privacy purge.
   resetConsent(): void {
+    this.coachConsent = 'pending'
+    this.store((s) => s.removeItem(COACH_CONSENT_KEY))
     this.setConsent('pending')
   }
 

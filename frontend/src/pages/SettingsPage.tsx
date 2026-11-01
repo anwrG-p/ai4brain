@@ -1,4 +1,7 @@
 import { useId, useRef, type KeyboardEvent } from 'react'
+import { MOOD_NOTICE, MoodCorrection } from '../components/features/characters'
+import { Switch } from '../components/ui/Switch'
+import { useDevicePrefs } from '../state/devicePrefs'
 import { useAppStore, type ThemeMode } from '../state/useAppStore'
 
 const THEMES: { id: ThemeMode; label: string }[] = [
@@ -8,15 +11,25 @@ const THEMES: { id: ThemeMode; label: string }[] = [
 
 const NEXT: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }
 
-/* Settings: only what the app really applies. The theme (data-theme) and reduce motion
-   (data-reduced-motion, which turns every anim-* and character idle off). Text size, sounds,
-   glyphs, study windows and rest days were never wired to anything, so they are gone; the
-   dimension preset is a judge tool (R6), not a consumer setting. */
+const ROW = 'p-4'
+
+/* Settings: only what the app really applies. The theme (data-theme), reduce motion
+   (data-reduced-motion, which turns every anim-* and character idle off), the mood guess and the
+   colour-blind friendly Color Clash inks (devicePrefs).
+   Mood guess (ADR 0002, R18): off by default. Its description is the Art 50(3) notice itself, so the
+   user reads it where they opt in, and turning it on records it as seen. While on, the row shows
+   today's guess with a quiet "Change" (MoodCorrection); off, the listener stops and Momo is a still
+   picture. Text size, sounds, glyphs, study windows and rest days were never wired to anything, so
+   they are gone; the dimension preset is a judge tool (R6), not a consumer setting. */
 export default function SettingsPage() {
   const theme = useAppStore((s) => s.theme)
   const setTheme = useAppStore((s) => s.setTheme)
   const reducedMotion = useAppStore((s) => s.reducedMotion)
   const setReducedMotion = useAppStore((s) => s.setReducedMotion)
+  const moodGuess = useDevicePrefs((s) => s.moodGuess)
+  const setMoodGuess = useDevicePrefs((s) => s.setMoodGuess)
+  const cvdSafe = useDevicePrefs((s) => s.cvdSafe)
+  const setCvdSafe = useDevicePrefs((s) => s.setCvdSafe)
   const themeId = useId()
   const radios = useRef<(HTMLButtonElement | null)[]>([])
 
@@ -67,28 +80,20 @@ export default function SettingsPage() {
           </div>
         </li>
         <li>
-          {/* The whole row is the switch, so the tap target is the full row (≥ 44 px). */}
-          <button
-            type="button"
-            role="switch"
-            aria-checked={reducedMotion}
-            onClick={() => setReducedMotion(!reducedMotion)}
-            className="focus-ring flex min-h-14 w-full cursor-pointer items-center justify-between gap-4 rounded-b-2xl p-4 text-left hover:bg-surface-raised"
-          >
-            <span className="text-base font-medium text-ink">Reduce motion</span>
-            <span
-              aria-hidden="true"
-              className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-pill border ${
-                reducedMotion ? 'border-transparent bg-brand' : 'border-border-strong bg-surface-raised'
-              }`}
-            >
-              <span
-                className={`inline-block size-5 rounded-pill transition-transform ${
-                  reducedMotion ? 'translate-x-6 bg-brand-ink' : 'translate-x-1 bg-border-strong'
-                }`}
-              />
-            </span>
-          </button>
+          <Switch label="Reduce motion" checked={reducedMotion} onChange={setReducedMotion} className={ROW} />
+        </li>
+        <li>
+          <Switch label="Mood guess" description={MOOD_NOTICE} checked={moodGuess} onChange={setMoodGuess} className={ROW} />
+          <MoodCorrection />
+        </li>
+        <li>
+          <Switch
+            label="Colour-blind friendly colours"
+            description="Color Clash uses blue, yellow, red and black."
+            checked={cvdSafe}
+            onChange={setCvdSafe}
+            className={`${ROW} rounded-b-2xl`}
+          />
         </li>
       </ul>
     </div>

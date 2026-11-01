@@ -60,7 +60,7 @@ describe('createCoachBrain: the crisis gate runs before any transport', () => {
   it('other text goes to the transport only when enabled; off, Loti has no free-text answer', () => {
     const reply = { id: 'llm', text: 'Hello!', choices: [] }
     const transport = vi.fn(() => reply)
-    expect(createCoachBrain({ enabled: true, crisisGate: keywordCrisisGate, transport }).ask('hi', ctx)).toBe(reply)
+    expect(createCoachBrain({ enabled: true, crisisGate: keywordCrisisGate, transport, consented: () => true }).ask('hi', ctx)).toBe(reply)
     expect(transport).toHaveBeenCalledWith('hi', ctx)
     transport.mockClear()
     expect(createCoachBrain({ enabled: false, crisisGate: keywordCrisisGate, transport }).ask('hi', ctx)).toBeNull()
