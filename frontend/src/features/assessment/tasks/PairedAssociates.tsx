@@ -31,7 +31,7 @@ const PATTERNS: ReactNode[] = [
 
 export function Pattern({ id, size = 40 }: { id: number; size?: number }) {
   return (
-    <svg viewBox="0 0 40 40" width={size} height={size} aria-hidden="true">
+    <svg data-pattern={id} viewBox="0 0 40 40" width={size} height={size} aria-hidden="true">
       {PATTERNS[id % PATTERNS.length]}
     </svg>
   )

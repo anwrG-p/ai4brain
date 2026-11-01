@@ -80,11 +80,8 @@ const MEASURES: Record<InputId, Measure> = {
     note: 'from Color Clash without Arrow Focus',
     how: (
       <>
-        Arrow Focus: time cost = mean time when the side arrows point against the middle one − mean time when they
-        agree, correct answers only. Scale: 0 ms → 100, {FLANKER_COST_MAX_MS} ms → 0. Multiplied by (accuracy − ½) ÷
-        ½. Without Arrow Focus, Color Clash: time cost = mean time on mismatched colours − mean time on matching
-        ones, correct answers only. Scale: 0 ms → 100, {STROOP_COST_MAX_MS} ms → 0. Multiplied by (accuracy − ¼) ÷ ¾,
-        so guessing scores 0.
+        Mean correct time, mismatched − matching. Arrow Focus: 0 ms → 100, {FLANKER_COST_MAX_MS} ms → 0, × (accuracy −
+        ½) ÷ ½. Color Clash: 0 ms → 100, {STROOP_COST_MAX_MS} ms → 0, × (accuracy − ¼) ÷ ¾.
       </>
     ),
   },
@@ -110,10 +107,8 @@ const MEASURES: Record<InputId, Measure> = {
     note: 'estimated from Color Clash without Stop Light',
     how: (
       <>
-        Stop Light: stopping time = your go time at the rank P(press | stop sign), minus the mean stop-sign delay
-        (a missed go counts as your slowest). Scale: {SSRT_BEST_MS} ms → 100, {SSRT_WORST_MS} ms → 0, times (go
-        accuracy − ½) ÷ ½. Not scored when you press on fewer than ¼ or more than ¾ of stop signs. Without Stop
-        Light, accuracy on mismatched Color Clash trials stands in.
+        Stop Light: go time at rank P(press | sign) − mean sign delay; {SSRT_BEST_MS} ms → 100, {SSRT_WORST_MS} ms → 0,
+        × (go accuracy − ½) ÷ ½. Unscored outside ¼–¾ presses.
       </>
     ),
   },
