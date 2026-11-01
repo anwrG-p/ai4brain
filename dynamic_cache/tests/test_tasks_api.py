@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from pathlib import Path
 
 import pytest
@@ -312,8 +313,14 @@ def test_lifespan_runs_a_real_worker_process_and_stops_it(tmp_path):
             assert pid in {p.pid for p in procs} and pid != os.getpid()
             for _ in range(12):  # drains the pool below half: a refill runs in a worker
                 assert c.get(URL, params={"user_id": "u1", "schema_type": "tower"}).status_code == 200
+            deadline = time.monotonic() + 60
+            while d._refills_done == 0 and time.monotonic() < deadline:
+                time.sleep(0.02)
+            assert d._refills_done > 0  # a refill came back from a worker process
         assert d._closed and api._dispatcher is None
-        assert all(p.exitcode is not None for p in procs)  # the worker process has exited
+        assert all(p.exitcode is not None for p in procs)  # the worker processes have exited
+        with pytest.raises(RuntimeError):
+            d._pumper.submit(lambda: None)  # the pumper thread is stopped too
         assert (tmp_path / "live" / "u1.json").exists()  # pending registry written on shutdown
     finally:
         api.set_dispatcher(previous)
