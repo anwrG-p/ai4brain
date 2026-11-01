@@ -1,8 +1,9 @@
 """Session features: a faithful Python port of the frontend's scorers.
 
 Ports `frontend/src/features/insights/taskScores.ts` (telemetry events -> the doc's 0-100 inputs)
-and `pillars.ts` (inputs -> the five pillars and the unified score) as committed in 96ab098 (F-B:
-Stop Light, Pair Finder and Arrow Focus), which carries ruling R16: n-back is scored on the rule's
+and `pillars.ts` (inputs -> the five pillars and the unified score) as committed in 700af3c (F-B:
+Stop Light, Pair Finder and Arrow Focus, with its fix round: PAL is plain FAMS / pal_total and the
+Stroop ANT_Conflict fallback is a proxy), which carries ruling R16: n-back is scored on the rule's
 stream only (`telemetry/types.ts` NBACK_RULE_STREAM, parity answered on `symbol`).
 Every constant, gate and evaluation order matches the TS, so both sides agree to 1e-6 on
 `data/fixtures/golden_sessions.json` (generated from the TS by `scripts/golden/make_golden.mjs`).
@@ -278,23 +279,22 @@ def _stop_signal_input(ss: Sequence[Event]) -> dict[str, Any] | None:
 
 
 def _pal_input(pal: Sequence[Event]) -> dict[str, Any] | None:
-    """PAL_FirstTrialMemory from Pair Finder, per task_id: right on attempt 1 over pal_total (every
-    pattern, so unreached stages count as missed), chance-corrected for one box in `boxes`, pooled
-    weighted by pal_total. A task without pal_total >= 1 and boxes >= 2 is left out."""
+    """PAL_FirstTrialMemory from Pair Finder, per task_id: CANTAB's first-attempt memory score,
+    right on attempt 1 over pal_total (every pattern, so unreached stages count as missed), with no
+    chance correction (a failed stage ends the run, so guessing earns next to nothing); pooled
+    weighted by pal_total. A task without pal_total >= 1 on its first event is left out."""
     by_task: dict[Any, list[Event]] = {}
     for e in pal:
         by_task.setdefault(e.get("task_id"), []).append(e)
     total = weighted = 0
     for es in by_task.values():
         n = _num(es[0], "pal_total")
-        boxes = _num(es[0], "boxes")
-        if n is None or n < 1 or boxes is None or boxes < 2:
+        if n is None or n < 1:
             continue
         # JS `attempt === 1`: a number equal to 1 (1.0 counts), never bool True.
         fams = sum(1 for e in es if _js_strict_eq(_meta(e).get("attempt", _MISSING), 1) and _ok(e))
-        chance = 1 / boxes
         total += n
-        weighted += n * _clamp01((fams / n - chance) / (1 - chance))
+        weighted += n * _clamp01(fams / n)
     return _input(weighted / total, total) if total else None
 
 
@@ -401,8 +401,9 @@ def task_scores(events: Sequence[Event]) -> dict[str, dict[str, Any]]:
             (1 - cost / SWITCH_COST_MAX) * _clamp01(d / D_PRIME_GATE), len(switches) + len(quiet)
         )
 
-    # ANT_Conflict: Arrow Focus's flanker cost when the session played it; else Stroop's RT cost.
-    # Stroop's incongruent accuracy stands in for SSRT only when Stop Light was not played.
+    # ANT_Conflict: Arrow Focus's flanker cost when the session played it; else Stroop's RT cost,
+    # flagged a proxy (both Color Clash fallbacks are proxies). Stroop's incongruent accuracy
+    # stands in for SSRT only when Stop Light was not played.
     st = get("stroop")
     inc = [e for e in st if _meta(e).get("congruent", _MISSING) is False]
     fl = get("flanker")
@@ -422,6 +423,8 @@ def task_scores(events: Sequence[Event]) -> dict[str, dict[str, Any]]:
             STROOP_CHANCE,
             STROOP_COST_MAX_MS,
         )
+        if conflict:
+            conflict = {**conflict, "proxy": True}
     if conflict:
         out["ANT_Conflict"] = conflict
     ss = get("stop_signal")

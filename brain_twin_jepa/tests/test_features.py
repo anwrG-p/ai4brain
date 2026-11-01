@@ -70,6 +70,9 @@ def test_golden_set_covers_every_schema_and_the_edge_cases():
     assert CASES["stop_signal_nonresponder"]["expected"]["inputs"]["SST_SSRT"]["score"] == 0
     assert "proxy" not in CASES["full_session_new_exercises"]["expected"]["inputs"]["SST_SSRT"]
     assert CASES["flanker_at_chance"]["expected"]["inputs"]["ANT_Conflict"]["score"] == 0
+    # F-B's fix round: the Stroop fallback of ANT_Conflict is a proxy, the flanker cost is not.
+    assert CASES["stroop"]["expected"]["inputs"]["ANT_Conflict"]["proxy"] is True
+    assert "proxy" not in CASES["flanker_over_stroop"]["expected"]["inputs"]["ANT_Conflict"]
     assert CASES["stroop_at_chance"]["expected"]["inputs"]["ANT_Conflict"]["score"] == 0
     assert CASES["nback_chance_nonresponder"]["expected"]["inputs"]["OSPAN"]["score"] == 0
     dup = CASES["duplicates"]
@@ -207,14 +210,14 @@ def _pal(i, attempt, ok, task="pa", total=4, boxes=8):
 def test_pal_attempt_one_is_a_number_never_bool_true():
     # JS `attempt === 1`: 1 and 1.0 count, True (== 1 in Python) does not.
     events = [_pal(0, 1, True), _pal(1, 1.0, True), _pal(2, True, True), _pal(3, 2, True)]
-    chance = 1 / 8
-    want = 100 * (2 / 4 - chance) / (1 - chance)
-    assert task_scores(events)["PAL_FirstTrialMemory"] == {"score": pytest.approx(want), "trials": 4}
+    # plain FAMS / pal_total, no chance correction (F-B fix round)
+    assert task_scores(events)["PAL_FirstTrialMemory"] == {"score": pytest.approx(100 * 2 / 4), "trials": 4}
 
 
-def test_pal_skips_a_task_without_a_valid_total_or_box_count():
-    bad = [_pal(0, 1, True, task="a", total=0), _pal(0, 1, True, task="b", boxes=1)]
+def test_pal_skips_a_task_without_a_valid_total():
+    bad = [_pal(0, 1, True, task="a", total=0), _pal(0, 1, True, task="b", total=True)]
     assert "PAL_FirstTrialMemory" not in task_scores(bad)
+    assert task_scores([_pal(0, 1, True, boxes=1)])["PAL_FirstTrialMemory"]["trials"] == 4  # boxes unread
     # PAL and Stop Light errors are not the user's to recover from (NO_RECOVERY).
     misses = [_pal(i, 1, i % 2 == 0) for i in range(4)]
     assert "ErrorRecovery" not in task_scores(misses)

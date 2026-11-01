@@ -19,7 +19,8 @@
 // Ticket F-B (2026-11-01) regenerated it: PAL_FirstTrialMemory is sourceable now (Pair Finder), so a
 // session without it widens Deep Memory's uncertainty (pillars.ts UNSOURCED_INPUTS = DDM_Caution
 // only), and it added the stop_signal, pal and flanker cases (taskScores.ts ssrt(), palInput(),
-// conflictInput()).
+// conflictInput()). F-B fix round 1: PAL_FirstTrialMemory is plain FAMS / pal_total (no chance
+// correction), and the Color Clash fallback for ANT_Conflict carries proxy: true, like SST_SSRT's.
 //
 // Dedupe: the server stores events at least once (the client retries a batch), so each case is
 // scored after dropping repeats of (session_id, trial_meta.item_id, trial_meta.stream), first one
