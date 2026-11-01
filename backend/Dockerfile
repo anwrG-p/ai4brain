@@ -20,7 +20,7 @@ COPY backend/app/ backend/app/
 # The BE-08 generator: the bootstrap below fits the served models on its synthetic users.
 COPY data/synthetic/ data/synthetic/
 
-# BE-11: fit the clustering model and train the twin at build time (about a minute, synthetic users
+# BE-11: fit the clustering model and train the twin at build time (about 3 minutes, synthetic users
 # only), into /srv/models, read-only for the app user. The twin ships in shadow mode (validated
 # false). To serve other models, mount them and set CLUSTER_MODEL_PATH / TWIN_CHECKPOINT.
 RUN python -m brain_twin_jepa.bootstrap

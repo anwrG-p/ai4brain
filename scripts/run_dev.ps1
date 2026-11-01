@@ -11,7 +11,7 @@ if (-not (Test-Path (Join-Path $frontendDir "node_modules"))) {
     exit 1
 }
 
-# Fit the clustering model and train the twin if they are missing (about a minute the first time,
+# Fit the clustering model and train the twin if they are missing (about 3 minutes the first time,
 # instant after). Without them the server still runs, with no archetype or forecast.
 Push-Location $repoRoot
 & $python -m brain_twin_jepa.bootstrap

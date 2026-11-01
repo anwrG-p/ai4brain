@@ -49,8 +49,8 @@ def _refresh(key: str):
 @router.get("/v1/dashboard/profile", responses={413: {}, 503: {}})
 def dashboard_profile(user_id: UserId, h: Horizon = 1) -> dict[str, Any]:
     key = user_key(user_id)
-    state, sessions, summaries = _refresh(key)
-    return profile.build(key, sessions, summaries, state, h)
+    r = _refresh(key)
+    return profile.build(key, r.sessions, r.summaries, r.state, h)
 
 
 class EvaluateRequest(BaseModel):
@@ -65,19 +65,18 @@ def clustering_evaluate(req: EvaluateRequest) -> dict[str, Any]:
     if model is None:
         raise HTTPException(status_code=501, detail="no clustering model is installed")
     key = user_key(req.user_id)
-    before = state_bus.load(key)
-    state, _, _ = _refresh(key)
+    r = _refresh(key)
+    state = r.state
     if not state.tasks or state.model_id != model.model_id:
         return {"user_id": key, "status": "not_enough_data"}
-    stepped_now = before is None or before.coach != state.coach
     archetype, _ = profile.archetype_section(state, model, None)
     return {
         "user_id": key,
         "status": "ok",
         "archetype": archetype,
         "frames": len(state.frames),
-        # True only on the call whose new frame confirmed a switch (the coach gets the same flag).
-        "transition_occurred": bool(stepped_now and state.coach and state.coach["transition_occurred"]),
+        # True only when this call's own refresh published the switch (the coach got the same flag).
+        "transition_occurred": any(t == "coach" and e.transition_occurred for t, e in r.published),
     }
 
 

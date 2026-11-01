@@ -25,6 +25,7 @@ Brain-region names never appear (U5); keys are pillar ids.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import threading
@@ -46,6 +47,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CLUSTER_MODEL = REPO_ROOT / "models" / "clustering" / "gmm.json"
 DEFAULT_TWIN_CHECKPOINT = REPO_ROOT / "models" / "checkpoints" / "sat_jepa.pt"
 
+# The clustering model must be fitted on the features the profile computes (BE-07's per-session
+# pillar scores). bootstrap.py tags what it saves; a model without the tag is refused.
+FEATURES_SOURCE = "be07"
 PROFILE_MIN_SESSIONS = 1  # sessions that scored at least one pillar
 FORECAST_H_MAX = 6  # brain_twin_jepa.jepa_model.H_MAX, without importing torch here
 TRAIL_SHOWN = 5
@@ -149,7 +153,8 @@ def _version(path: Path) -> tuple | None:
 
 def cluster_model():
     """(ClusterModel, None) or (None, reason): "no_model" when the file is missing, "invalid_model"
-    when it fails BE-09's validated load or is not a 5-pillar model."""
+    when it fails BE-09's validated load, is not a 5-pillar model, or is not tagged as fitted on
+    BE-07 features (`"features_source": "be07"`, written by bootstrap.save_cluster_model)."""
     path = cluster_model_path()
     version = _version(path)
     if version is None:
@@ -161,9 +166,12 @@ def cluster_model():
 
         model, reason = None, None
         try:
+            doc = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(doc, dict) or doc.get("features_source") != FEATURES_SOURCE:
+                raise ValueError("the clustering model is not tagged as fitted on BE-07 features")
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter("always")
-                model = ClusterModel.load(path)
+                model = ClusterModel.from_dict(doc)
             for w in caught:
                 log.warning("clustering model: %s", w.message)
             if list(model.features) != list(PILLARS):
@@ -211,7 +219,9 @@ def forecast_section(sessions: list[Session], h: int) -> tuple[dict | None, str 
     from brain_twin_jepa.jepa_model import forecast, session_record
 
     out = forecast([session_record(s) for s in sessions], h, twin=model)  # ValueError on a bad h
-    out["mode"] = "shadow"  # validated stays false until validate.py promotes the checkpoint
+    # R17: "shadow" while the twin is not validated (always, until validate.py promotes the
+    # checkpoint on real users); "live" only after that.
+    out["mode"] = "live" if out.get("validated") is True else "shadow"
     if out.get("status") == "ok":
         out["source"] = out["calibration"]["source"]
     return out, None

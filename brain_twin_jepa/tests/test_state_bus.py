@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 
 from brain_twin_jepa import profile, state_bus
+from brain_twin_jepa.bootstrap import save_cluster_model
 from brain_twin_jepa.profile import PILLARS, SessionSummary
 from clustering_engine.clustering_gmm import fit_gmm
 
@@ -27,7 +28,7 @@ def planted(path, seed=0, low=25.0, k=2):
     centres = [low, 75.0, 50.0][:k]
     X = np.vstack([rng.normal(c, 4, (60, 5)) for c in centres])
     model = fit_gmm(X, k=k, seed=seed, features=list(PILLARS))
-    model.save(path)
+    save_cluster_model(model, path)
     return model
 
 
@@ -212,16 +213,43 @@ def test_a_failing_subscriber_does_not_stop_the_others(model, events, caplog):
     assert "RuntimeError" in caplog.text and "u1" not in caplog.text
 
 
-def test_task_view_uses_the_archetype_pool_key(model):
-    assert state_bus.pool_key("u1") == state_bus.NEUTRAL  # nothing known yet
+def test_every_cluster_is_served_from_the_neutral_pool_until_styles_have_options(model):
+    # Per-style pools would hold the same tasks (ARCHETYPE_OPTIONS has NEUTRAL only) and split the
+    # hit rate; the cluster is still known and retained.
+    assert state_bus.pool_key("u1") == state_bus.NEUTRAL
     state_bus.refresh("u1", history(HIGH), now=NOW)
-    k = component_near(model, HIGH)
-    aid = model.archetype_ids[k]
-    expected = f"archetype-{aid}" if aid is not None else f"cluster-{model.model_id}-{k}"
-    assert state_bus.pool_key("u1") == expected
+    st = state_bus.load("u1")
+    assert st.tasks["active_cluster_id"] == component_near(model, HIGH)
+    assert st.tasks["pool"] == state_bus.pool_key("u1") == state_bus.NEUTRAL
+    from dynamic_cache.cache_dispatcher import ARCHETYPE_OPTIONS
+
+    assert set(ARCHETYPE_OPTIONS) == {state_bus.NEUTRAL}  # when this grows, pool_name must too
+
+
+def test_a_stale_refresh_never_moves_the_gate_back(model, events):
+    """refresh(new) -> refresh(stale) -> refresh(new): no frame is stepped twice and no extra
+    event is published (the seen frames are merged, never replaced by an older list)."""
+    frames = [LOW, LOW, HIGH]
+    for n in (1, 2, 3):
+        state_bus.refresh("u1", history(*frames[:n]), now=NOW)
+    gate = state_bus.load("u1").gate
+    published = len(events["coach"])
+    state_bus.refresh("u1", history(*frames[:1]), now=NOW)  # a slower reader's older view
+    state_bus.refresh("u1", history(*frames), now=NOW)
+    assert state_bus.load("u1").gate == gate
+    assert len(events["coach"]) == published
+    assert state_bus.load("u1").frames == ["s0", "s1", "s2"]
+
+
+def test_an_untagged_clustering_model_is_refused(tmp_path, monkeypatch):
+    path = tmp_path / "plain.json"
+    fit_gmm(np.random.default_rng(0).normal(50, 10, (40, 5)), k=2, features=list(PILLARS)).save(path)
+    monkeypatch.setenv("CLUSTER_MODEL_PATH", str(path))
+    assert profile.cluster_model() == (None, "invalid_model")  # features of unknown origin
 
 
 def test_staircase_steps_join_the_trail_as_plain_reasons(model):
+    append("play1")  # a step means trials were stored; with no telemetry nothing is kept
     state_bus.record_step("u1", "n_back", 0.5, 0.6)
     state_bus.record_step("u1", "stroop", 0.5, 0.4)
     state_bus.refresh("u1", history(HIGH), now=NOW)
@@ -237,10 +265,12 @@ def test_staircase_steps_join_the_trail_as_plain_reasons(model):
 def append(session_id, n=3):
     from app.privacy.telemetry_store import append_events
 
+    append.counter = getattr(append, "counter", 0) + n
     base = {"user_id": "u1", "task_id": "t1", "dimension": "working_memory", "score_norm": 1.0,
             "response_time_ms": 500.0, "error_flag": False, "error_burst": 0, "hesitation_jitter": 0.0,
             "client_ts": T0.isoformat()}
-    append_events([{**base, "session_id": session_id, "trial_index": i} for i in range(n)])
+    start = append.counter - n  # unique trial indexes, so every line differs
+    append_events([{**base, "session_id": session_id, "trial_index": start + i} for i in range(n)])
 
 
 @pytest.fixture
@@ -285,12 +315,95 @@ def test_light_refresh_reads_in_full_after_a_model_change_or_a_rewrite(model, re
     assert reads["n"] == 3
 
 
+def test_light_refresh_reads_in_full_after_a_rewrite_that_grew_again(model, reads):
+    """Retention drops the oldest lines, then new appends make the file longer than the saved
+    offset: the tail would start mid-history, so the changed first line forces a full read."""
+    from app.privacy.telemetry_store import telemetry_dir
+
+    append("old", n=2)
+    append("play1")
+    state_bus.refresh_light("u1")
+    path = telemetry_dir() / "u1.jsonl"
+    lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+    path.write_text("".join(lines[2:]), encoding="utf-8")  # the two "old" lines expired
+    append("play1", n=6)  # longer than before, all in the open session
+    state_bus.refresh_light("u1")
+    assert reads["n"] == 2
+
+
 def test_light_refresh_closes_an_idle_session(model, reads):
     append("play1")
     state_bus.refresh_light("u1")
     state_bus.refresh_light("u1", now=datetime.now(timezone.utc) + timedelta(minutes=31))
     assert reads["n"] == 2  # idle for 30 minutes: a full refresh makes it a frame
     assert state_bus.load("u1").open_session is None
+
+
+def test_a_delete_lands_after_a_refresh_in_flight(model, monkeypatch):
+    import threading
+
+    from app.privacy.telemetry_store import delete_user
+
+    append("play1")
+    append("play2")
+    real, read_done, go = state_bus.read_sessions, threading.Event(), threading.Event()
+
+    def slow_read(*a, **k):
+        sessions = real(*a, **k)
+        read_done.set()
+        go.wait(5)  # the refresh holds the user's lock here, with the old data in hand
+        return sessions
+
+    monkeypatch.setattr(state_bus, "read_sessions", slow_read)
+    refresher = threading.Thread(target=lambda: state_bus.refresh_full("u1"))  # the profile route's path
+    refresher.start()
+    assert read_done.wait(5)
+    deleter = threading.Thread(target=lambda: delete_user("u1"))
+    deleter.start()
+    deleter.join(0.3)
+    assert deleter.is_alive()  # the bus delete waits for the refresh in flight
+    go.set()
+    refresher.join(5)
+    deleter.join(5)
+    assert not (state_bus.state_dir() / "u1.json").exists()
+
+
+def test_after_a_delete_new_telemetry_starts_from_nothing(model):
+    from app.privacy.telemetry_store import delete_user
+
+    append("play1")
+    state_bus.refresh("u1")
+    state_bus.record_step("u1", "n_back", 0.5, 0.6)
+    assert state_bus.load("u1").trail
+    delete_user("u1")
+    state_bus.record_step("u1", "stroop", 0.5, 0.6)  # a serve racing the delete keeps nothing
+    assert state_bus.load("u1") is None
+    append("play9")
+    st = state_bus.refresh("u1")
+    assert st.trail == [] and st.frames == [] and st.open_session["id"] == "play9"
+
+
+def test_a_refresh_with_no_telemetry_drops_the_whole_state(model):
+    append("play1")
+    state_bus.refresh("u1")
+    state_bus.record_step("u1", "n_back", 0.5, 0.6)
+    from app.privacy.telemetry_store import telemetry_dir
+
+    (telemetry_dir() / "u1.jsonl").unlink()  # every line expired (retention)
+    state_bus.refresh("u1")
+    assert not (state_bus.state_dir() / "u1.json").exists()  # the trail too
+
+
+def test_trail_entries_older_than_retention_are_pruned(model, monkeypatch):
+    monkeypatch.setenv("RETENTION_DAYS", "7")
+    append("play1")
+    state_bus.refresh("u1")
+    old = datetime.now(timezone.utc) - timedelta(days=8)
+    st = state_bus.load("u1")
+    st.trail = [{"at": old.isoformat(), "kind": "harder", "schema": "mst"}]
+    state_bus._save("u1", st)
+    state_bus.record_step("u1", "n_back", 0.5, 0.6)
+    assert [t["schema"] for t in state_bus.load("u1").trail] == ["n_back"]
 
 
 def test_delete_and_export_cover_the_bus_state(model):

@@ -13,7 +13,7 @@ The types live in code, not here:
 | `POST /v1/telemetry/event` | Live | One event or a batch of up to 100. Fields: `user_id`, `session_id`, `task_id`, `trial_index`, `dimension`, `score_norm` (0..1), `response_time_ms`, `error_flag`, `error_burst`, `hesitation_jitter`, `keystroke_latency_ms`, `trial_meta`, `client_ts`, plus optional voice fields that require `voice_opt_in`. Returns `202 {"accepted": n}`. Sent only after "Save my answers". |
 | `DELETE /v1/user/telemetry?user_id=` | Live | Deletes everything stored for the id. Returns the counts actually removed: `{"deleted_events", "deleted_chat_turns", "deleted_files"}`. Covers every per-user store (telemetry, chat history, task registry, state bus). No certificate. |
 | `GET /v1/user/export?user_id=` | Live | The stored events as JSONL, then one tagged line per other store (`"record": "coach_turn"`, `"task_registry"`, `"state_bus"`); 404 when nothing is stored. |
-| `GET /v1/tasks/next` | Live (BE-04) | `{ task_id, dimension, schema_type, params, surface_seed }`. Served from the user's practice-style pool once the state bus knows it (BE-11). The full contract is the `dynamic_cache/api.py` docstring. |
+| `GET /v1/tasks/next` | Live (BE-04) | `{ task_id, dimension, schema_type, params, surface_seed }`. New difficulty staircases start from the user's latest skill scores (BE-11 state bus). The full contract is the `dynamic_cache/api.py` docstring. |
 | `GET /v1/dashboard/profile` | Live (BE-11) | The 5 skills (latest and average, with uncertainty), the practice style, the forecast in shadow mode, the collaboration score and the "why this" trail. See [Profile](#get-v1dashboardprofile) below. |
 | `POST /v1/coach/chat` | Live (BE-06) | Loti's AI mode. Only with the keyword crisis gate, then the backup classifier, a configured key and `VITE_LOTI_COACH=on` (R14). Never carries Momo's mood ([ADR 0002](../adr/0002-no-server-side-emotion-inference.md)). The contract is the `ai_coach/api.py` docstring. |
 | `GET /v1/coach/collaboration-score` | Live (BE-06) | Computed from real chat history only. |
@@ -77,7 +77,7 @@ R12 still applies: the UI shows ranges only in "View as table".
 - `not_enough_data`: no finished session has scored all 5 skills yet.
 
 **`forecast`** (R17, shadow mode). This is BE-10's twin forecast for the session `h` sessions ahead:
-- It always says `validated: false` and `mode: "shadow"`, plus the `source` its calibration came from.
+- It says `validated: false` and `mode: "shadow"` until `python -m brain_twin_jepa.validate` promotes the twin on real users (then `validated: true`, `mode: "live"`), plus the `source` its calibration came from.
 - **The UI shows measured values only.** It must not draw this forecast until `validated` is true.
 - Below 3 sessions it is `{"status": "not_enough_data", "validated": false, "mode": "shadow", ...}`.
 - `null` with a `forecast_reason`: `no_model` (no checkpoint), `outdated_model` (a checkpoint from before the calibrated-range format: retrain), `not_installed` (no torch) or `invalid_model`.

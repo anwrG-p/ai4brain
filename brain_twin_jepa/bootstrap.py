@@ -3,7 +3,7 @@
     python -m brain_twin_jepa.bootstrap [--force] [--cluster-users 200] [--cluster-sessions 6]
 
 Run from the repo root, once, before the server (scripts/run_dev.ps1 and the Docker build do).
-Both models are fitted on BE-08 synthetic users only (about a minute on a laptop CPU), because no
+Both models are fitted on BE-08 synthetic users only (about three minutes on a laptop CPU, almost all of it the twin), because no
 real users exist yet:
 - clustering: BE-09's GMM (K = 9) on BE-07's per-session pillar scores, the same features the
   profile and the state bus compute, so a user's posteriors are computed in the units the model
@@ -21,6 +21,7 @@ refitted. Without this step the server still runs: the profile says `archetype: 
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 from pathlib import Path
@@ -58,6 +59,15 @@ def fit_cluster_model(users: int = CLUSTER_USERS, sessions: int = CLUSTER_SESSIO
     return fit_gmm(synthetic_pillar_rows(users, sessions, data_seed), features=list(profile.PILLARS))
 
 
+def save_cluster_model(model, path: Path) -> Path:
+    """model.save, plus the tag profile.cluster_model requires: the features it was fitted on."""
+    doc = model.to_dict() | {"features_source": profile.FEATURES_SOURCE}
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(doc, indent=1) + "\n", encoding="utf-8", newline="\n")
+    return path
+
+
 def ensure_cluster_model(force: bool = False, users: int = CLUSTER_USERS, sessions: int = CLUSTER_SESSIONS) -> str:
     path = profile.cluster_model_path()
     if not force:
@@ -65,10 +75,10 @@ def ensure_cluster_model(force: bool = False, users: int = CLUSTER_USERS, sessio
         if model is not None:
             return f"clustering model kept: {path} ({model.model_id})"
         if reason == "invalid_model":
-            print(f"clustering model at {path} does not load; refitting")
+            print(f"clustering model at {path} does not load or is not tagged as fitted on BE-07 features; refitting")
     t = time.perf_counter()
     model = fit_cluster_model(users, sessions)
-    model.save(path)
+    save_cluster_model(model, path)
     names = ", ".join(model.name(i) for i in range(model.k))
     return f"clustering model fitted in {time.perf_counter() - t:.0f} s -> {path} ({model.model_id}): {names}"
 

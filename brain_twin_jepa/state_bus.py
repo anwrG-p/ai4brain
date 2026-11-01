@@ -2,15 +2,18 @@
 
 README "Inter-Subsystem Communication Interfaces":
 - to the task service (Member 5): {user_id, active_cluster_id, centroid_vector, confidence}
-  (`ClusterState`, topic "tasks"). GET /v1/tasks/next serves from that cluster's pool
-  (`task_archetype`) and seeds new staircases from the latest pillar scores (`task_pillars`).
+  (`ClusterState`, topic "tasks"). GET /v1/tasks/next asks for the user's pool (`task_archetype`;
+  NEUTRAL for every cluster until per-style generator options exist, see `pool_name`) and seeds
+  new staircases from the latest pillar scores (`task_pillars`).
 - to the coach (Member 2): {user_id, transition_occurred, delta_vector, uncertainty}
   (`CoachSignal`, topic "coach"). The coach turns Δc into words (`coach_context`); numbers never
   reach the user.
 
 In-process pub/sub: `bus.subscribe(topic, fn)`, delivered synchronously; a failing subscriber is
 logged (no user id) and never stops the others. The last event of each topic is also kept per
-user (retained), so a consumer that was not listening can read it.
+user (retained), so a consumer that was not listening can read it. No production code subscribes
+yet: the topics are for future subscribers, and today's consumers (the dispatcher, the coach, the
+profile) read the retained state.
 
 When it runs: lazily. A profile or evaluate request refreshes in full. GET /v1/tasks/next and the
 coach chat call `refresh_light`, which only stats the user's JSONL and reads the bytes appended
@@ -28,12 +31,17 @@ vector is adopted. Component indices mean nothing across models, so a model swap
 "transition"; a transition is a change of the active cluster under one model.
 
 Storage: `{STATE_BUS_DIR}/{user_key}.json` (default data/processed/state_bus, gitignored), written
-as tmp + replace under a per-user lock. It is per-user data: the privacy delete and export cover it
-(`register_user_store`), and the retention CLI drops files idle past RETENTION_DAYS.
+as tmp + replace under a per-user lock. Every read of the telemetry, every step and every save of
+one user happen under that lock, and so does the privacy delete: a refresh in flight finishes
+before the delete removes the file, and a refresh that finds no telemetry keeps nothing (the
+"why this" trail included). It is per-user data: the privacy delete and export cover it
+(`register_user_store`), trail entries older than RETENTION_DAYS are pruned, and the retention CLI
+drops files idle past RETENTION_DAYS.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -44,10 +52,11 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import numpy as np
 
+from app.privacy.retention import configured_days
 from app.privacy.telemetry_store import (
     register_user_store,
     state_bus_dir,
@@ -138,7 +147,7 @@ class UserState:
     gamma: list[float] | None = None  # posteriors of the last frame stepped
     frames: list[str] = field(default_factory=list)  # session ids stepped (or skipped), newest last
     open_session: dict | None = None  # {"id", "last_received"}: the newest session, not yet a frame
-    telemetry: list[int] | None = None  # [size, mtime_ns] of the JSONL at the last refresh
+    telemetry: list | None = None  # [size, mtime_ns, identity] of the JSONL at the last refresh
     pillars: dict[str, float | None] | None = None  # latest score per pillar
     tasks: dict | None = None  # retained ClusterState
     coach: dict | None = None  # retained CoachSignal
@@ -168,11 +177,14 @@ def _path(key: str, directory: Path | None = None) -> Path:
 
 
 def load(user_id: str) -> UserState | None:
+    """The user's state, read under their lock: a reader never meets a half-done os.replace
+    (a PermissionError on Windows)."""
     key = user_key(user_id)
-    try:
-        text = _path(key).read_text(encoding="utf-8")
-    except FileNotFoundError:
-        return None
+    with _lock(key):
+        try:
+            text = _path(key).read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return None
     try:
         return UserState.from_json(json.loads(text))
     except (ValueError, TypeError):
@@ -231,12 +243,17 @@ def _now(now: datetime | None) -> datetime:
     return now or datetime.now(timezone.utc)
 
 
-def _stat(key: str) -> list[int] | None:
+def _stat(key: str) -> list | None:
+    """[size, mtime_ns, identity] of the user's JSONL, or None. The identity is a hash of its first
+    line: a retention rewrite changes it, an append does not."""
+    path = telemetry_dir() / f"{key}.jsonl"
     try:
-        st = (telemetry_dir() / f"{key}.jsonl").stat()
+        st = path.stat()
+        with open(path, "rb") as f:
+            first = f.readline(4096)
     except OSError:
         return None
-    return [st.st_size, st.st_mtime_ns]
+    return [st.st_size, st.st_mtime_ns, hashlib.sha256(first).hexdigest()[:16]]
 
 
 def _closed(summaries: list[SessionSummary], now: datetime) -> list[SessionSummary]:
@@ -261,11 +278,24 @@ def _vectors(summaries: list[SessionSummary], closed_ids: set[str]) -> list[tupl
     return out
 
 
+def _merge_frames(seen: list[str], closed: list[str]) -> list[str]:
+    """The seen ids plus the newly closed ones, oldest first. Ids are only ever added (then the
+    oldest trimmed), so a refresh from fewer sessions can never move "newest seen" backwards."""
+    known = set(seen)
+    last = max((i for i, sid in enumerate(closed) if sid in known), default=-1)
+    # Only ids after the newest known one are new; the ones before it are history (trimmed off
+    # earlier, or a late session that sorts before it) and are never stepped, so not re-added.
+    return (seen + [sid for sid in closed[last + 1 :] if sid not in known])[-FRAMES_KEPT:]
+
+
 def pool_name(model, k: int) -> str:
     """The task pool of component k: one per named archetype (stable across refits), one per
     unnamed component of this model."""
-    aid = None if model.archetype_ids is None else model.archetype_ids[k]
-    return f"archetype-{aid}" if aid is not None else f"cluster-{model.model_id}-{k}"
+    # ponytail: every cluster maps to the NEUTRAL pool. dynamic_cache's ARCHETYPE_OPTIONS defines
+    # generator options for NEUTRAL only, so per-style pools would hold the same tasks and split the
+    # hit rate nine ways. Upgrade path: add options per archetype id to ARCHETYPE_OPTIONS, then
+    # return f"archetype-{aid}" for a named component and f"cluster-{model.model_id}-{k}" otherwise.
+    return NEUTRAL
 
 
 def _events(key: str, model, active: int, gamma: np.ndarray, transition: bool) -> tuple[ClusterState, CoachSignal]:
@@ -295,9 +325,15 @@ def _events(key: str, model, active: int, gamma: np.ndarray, transition: bool) -
     return task, coach
 
 
+def _prune_trail(st: UserState, now: datetime) -> None:
+    """Drop decisions older than the retention period (RETENTION_DAYS), like the telemetry behind them."""
+    cutoff = now - timedelta(days=configured_days())
+    st.trail = [t for t in st.trail if datetime.fromisoformat(t["at"]) >= cutoff][-TRAIL_KEPT:]
+
+
 def _add_trail(st: UserState, entry: dict, now: datetime) -> None:
     st.trail.append({"at": now.isoformat(), **entry})
-    del st.trail[:-TRAIL_KEPT]
+    _prune_trail(st, now)
 
 
 def _step(key: str, st: UserState, summaries: list[SessionSummary], now: datetime) -> list[tuple[str, Any]]:
@@ -315,7 +351,7 @@ def _step(key: str, st: UserState, summaries: list[SessionSummary], now: datetim
     )
     if model is None:  # no model: no cluster, and nothing retained from an earlier one
         st.model_id = st.gate = st.gamma = st.tasks = st.coach = None
-        st.frames = [s.session_id for s in closed][-FRAMES_KEPT:]
+        st.frames = _merge_frames(st.frames, [s.session_id for s in closed])
         return []
 
     frames = _vectors(summaries, {s.session_id for s in closed})
@@ -325,6 +361,7 @@ def _step(key: str, st: UserState, summaries: list[SessionSummary], now: datetim
         if st.tasks and st.tasks.get("model_id") != model.model_id:
             st.tasks = st.coach = None  # another model's indices
         pending = [f for f in frames if f[1] is not None][-1:]
+        st.frames = []
     else:
         gate = HysteresisGate(**st.gate)
         seen = set(st.frames)
@@ -332,7 +369,7 @@ def _step(key: str, st: UserState, summaries: list[SessionSummary], now: datetim
         # session that sorts before it (an offline device syncing) is history: seen, not stepped.
         last = max((i for i, (sid, _) in enumerate(frames) if sid in seen), default=-1)
         pending = [f for f in frames[last + 1 :] if f[1] is not None]
-    st.frames = [sid for sid, _ in frames][-FRAMES_KEPT:]  # every closed session is now seen
+    st.frames = _merge_frames(st.frames, [sid for sid, _ in frames])  # every closed session is now seen
 
     gamma = None
     for _, vec in pending:
@@ -353,43 +390,50 @@ def _step(key: str, st: UserState, summaries: list[SessionSummary], now: datetim
     return [("tasks", task), ("coach", coach)]
 
 
-def _refresh(key: str, summaries: list[SessionSummary] | None, now: datetime, stat: list[int] | None) -> UserState:
+class Refreshed(NamedTuple):
+    state: UserState
+    sessions: list[Session]  # what this refresh read ([] when summaries were given)
+    summaries: list[SessionSummary]
+    published: list[tuple[str, Any]]  # the events this refresh published, in order
+
+
+def _refresh(key: str, summaries: list[SessionSummary] | None, now: datetime) -> Refreshed:
+    """One full refresh. The stat, the read, the step and the save all happen under the user's
+    lock, so a slower refresh can never save older data over a newer one, and a privacy delete
+    (which takes the same lock) always lands after a refresh in flight, never before its save."""
+    sessions: list[Session] = []
     with _lock(key):
         st = load(key) or UserState()
+        stat = None
         if summaries is None:
             stat = _stat(key)  # before the read: a later append makes the next refresh look again
-            summaries = [profile.summarize(s) for s in read_sessions(key)]
+            sessions = read_sessions(key)
+            summaries = [profile.summarize(s) for s in sessions]
         if not summaries:
-            # Nothing measured (never, or deleted/expired): keep only the decisions already shown.
-            st = UserState(trail=st.trail)
-            if st.trail:
-                _save(key, st)
-            else:
-                _remove(key)
-            return st
+            # Nothing measured (never, deleted or expired): nothing derived from it is kept, the
+            # "why this" trail included.
+            _remove(key)
+            return Refreshed(UserState(), sessions, summaries, [])
         published = _step(key, st, summaries, now)
+        _prune_trail(st, now)
         st.telemetry = stat
         _save(key, st)
     for topic, event in published:  # outside the lock: subscribers may call back into the bus
         bus.publish(topic, event)
-    return st
+    return Refreshed(st, sessions, summaries, published)
 
 
 def refresh(user_id: str, summaries: list[SessionSummary] | None = None, *, now: datetime | None = None) -> UserState:
     """Full refresh: reads the user's sessions (unless given), steps the gate on every closed
     session not stepped yet, saves, and publishes a ClusterState and a CoachSignal when a frame
     was stepped. Raises telemetry_io.EventsTooLarge and telemetry_store.LockTimeout."""
-    return _refresh(user_key(user_id), summaries, _now(now), None)
+    return _refresh(user_key(user_id), summaries, _now(now)).state
 
 
-def refresh_full(user_id: str, *, now: datetime | None = None) -> tuple[UserState, list[Session], list[SessionSummary]]:
-    """refresh(), also returning the sessions read and their summaries (the profile route needs
-    both, and reads the file once). Same errors as refresh()."""
-    key = user_key(user_id)
-    stat = _stat(key)  # before the read: a later append makes the next refresh look again
-    sessions = read_sessions(key)
-    summaries = [profile.summarize(s) for s in sessions]
-    return _refresh(key, summaries, _now(now), stat), sessions, summaries
+def refresh_full(user_id: str, *, now: datetime | None = None) -> Refreshed:
+    """refresh(), also returning the sessions it read, their summaries and the events it published
+    (the profile and evaluate routes read the file once). Same errors as refresh()."""
+    return _refresh(user_key(user_id), None, _now(now))
 
 
 def _tail_session_ids(key: str, start: int, end: int) -> tuple[set[str], datetime | None] | None:
@@ -426,7 +470,8 @@ def _tail_session_ids(key: str, start: int, end: int) -> tuple[set[str], datetim
 
 def refresh_light(user_id: str, *, now: datetime | None = None) -> UserState | None:
     """The cheap refresh for hot paths (tasks/next, coach chat): a full refresh only when a new
-    session started, the open one went idle, the model changed or the file was rewritten."""
+    session started, the open one went idle, the model changed or the file was rewritten. The
+    full refresh runs after this lock is released, so its events are published outside any lock."""
     key, now = user_key(user_id), _now(now)
     with _lock(key):
         st = load(key)
@@ -435,7 +480,10 @@ def refresh_light(user_id: str, *, now: datetime | None = None) -> UserState | N
             return st  # nothing measured, nothing derived from it
         model, _ = profile.cluster_model()
         same_model = st is not None and st.model_id == (model.model_id if model else None)
-        if same_model and st.telemetry is not None and stat is not None:
+        # The same file: the first line is unchanged. A retention rewrite drops old lines from the
+        # top, so after one the byte offsets saved with the state mean nothing.
+        same_file = st is not None and st.telemetry is not None and stat is not None and st.telemetry[2:] == stat[2:]
+        if same_model and same_file:
             idle = st.open_session is not None and now - datetime.fromisoformat(st.open_session["last_received"]) >= SESSION_IDLE
             if stat == st.telemetry and not idle:
                 return st
@@ -448,7 +496,7 @@ def refresh_light(user_id: str, *, now: datetime | None = None) -> UserState | N
                         st.telemetry = stat
                         _save(key, st)
                         return st
-        return _refresh(key, None, now, None)
+    return _refresh(key, None, now).state
 
 
 # --- what the consumers read -----------------------------------------------------------------------
@@ -487,6 +535,8 @@ def record_step(key: str, schema_type: str, old_level: float, new_level: float) 
     try:
         key = user_key(key)
         with _lock(key):
+            if _stat(key) is None:
+                return  # no telemetry (deleted meanwhile): keep nothing about this user
             st = load(key) or UserState()
             _add_trail(st, {"kind": "harder" if new_level > old_level else "easier", "schema": schema_type}, _now(None))
             _save(key, st)

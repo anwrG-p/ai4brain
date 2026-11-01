@@ -2,8 +2,51 @@
 
 ## Branch and commits
 - Branch `worktree-agent-a70375fb12eb5a691`, reset to `e36227e` (main tip with BE-04, BE-06, BE-07, BE-09 and BE-10 merged), as instructed. Not `ae67522`.
-- One commit, "feat(brain_twin): BE-11 state bus, profile service, clustering evaluate". It holds the code, the tests and this report. The sha is in the reply.
-- No AI attribution in the commit (user rule).
+- `35bc5c6` feat(brain_twin): BE-11 state bus, profile service, clustering evaluate.
+- `782a9b0` merge of main `bca71d8` (BE-04 final and F-D). The one conflict was the `cache_dispatcher.py` module docstring: main's pool text was kept, with my "Archetype:" line.
+- The fix-round-1 commit (sha in the reply). See "Fix round 1" below; it wins over the earlier sections where they disagree.
+- No AI attribution in any commit (user rule).
+
+## Fix round 1
+
+### Important
+1. **A stale full read could overwrite newer state.**
+   - Before: `refresh_full` read the sessions outside the user's lock, so a slower reader could save older frames. The gate could then step a frame twice.
+   - Now the stat, the read, the step and the save all happen inside `_lock(key)`. `_refresh` returns a `Refreshed(state, sessions, summaries, published)`, which the routes use.
+   - The seen-frame list is merged, never replaced. Only ids after the newest known one are added, so "newest seen" never moves backwards.
+   - Test `test_a_stale_refresh_never_moves_the_gate_back` runs refresh(new) → refresh(stale) → refresh(new): the gate is unchanged, there are no extra coach events, and the frames are `[s0, s1, s2]`.
+2. **A refresh in flight could bring the file back after a delete.**
+   - **Correction:** my report said "a delete holds the same lock as a refresh, so a refresh in flight cannot resurrect the file". That was false in round 1, because the read happened before the lock was taken. It is true now that the read is under the lock.
+   - A refresh that finds no telemetry now drops the whole state, the trail included.
+   - `record_step` writes nothing when the user has no telemetry.
+   - Trail entries older than `RETENTION_DAYS` are pruned on every save.
+   - Tests:
+     - `test_a_delete_lands_after_a_refresh_in_flight`: the refresh is held after its read. The bus delete waits for it, then the file is gone.
+     - `test_after_a_delete_new_telemetry_starts_from_nothing`: no old trail or frames survive, and a step that races the delete keeps nothing.
+     - `test_a_refresh_with_no_telemetry_drops_the_whole_state`.
+     - `test_trail_entries_older_than_retention_are_pruned`.
+
+### Minors
+- **Pools.**
+  - Every cluster is served from the `neutral` pool. `state_bus.pool_name` carries a `ponytail:` note with the upgrade path: add per-archetype options to `ARCHETYPE_OPTIONS`, then return `archetype-<id>` / `cluster-<model_id>-<k>`.
+  - The cluster is still known and retained. The pillars still seed new staircases (`test_new_staircases_are_seeded_from_the_users_pillars`).
+  - A test pins `ARCHETYPE_OPTIONS == {neutral}`, so the day it grows, someone revisits `pool_name`.
+- **Feature-source tag.**
+  - The bootstrap saves the clustering model with `"features_source": "be07"` (`bootstrap.save_cluster_model`).
+  - `profile.cluster_model` refuses a model without it (`invalid_model`), and the bootstrap then refits (`test_an_untagged_clustering_model_is_refused`).
+  - The tag is outside BE-09's hashed parameters, so `model_id` is unchanged.
+- **Time.** The Dockerfile, `scripts/README.md`, `run_dev.ps1` and the bootstrap docstring now say about 3 minutes.
+- **`mode`** follows `validated`: `"shadow"` while false, `"live"` once true (`test_mode_follows_validated`).
+- **Light-path offsets.**
+  - The stat now carries an identity, a hash of the file's first line, next to size and mtime_ns. A retention rewrite changes it, an append does not.
+  - A changed identity forces a full read (`test_light_refresh_reads_in_full_after_a_rewrite_that_grew_again`: the file is rewritten, then grows past the old offset).
+- **Publishing.** `refresh_light` now releases its lock before it calls the full refresh, so events are always published outside any lock.
+- **Unlocked loads.**
+  - `load()` itself takes the user's lock, so `pool_key` and every other reader never meet a half-done `os.replace` on Windows.
+  - Evaluate no longer compares a before/after load. `transition_occurred` comes from the events this call's own refresh published.
+- **Subscribers.** The `state_bus` docstring says no production code subscribes yet: the topics are for future subscribers, and today's consumers read the retained state.
+- **AGENTS.md.** The Backend "Config" line names `STATE_BUS_DIR`, `CLUSTER_MODEL_PATH` and `TWIN_CHECKPOINT`.
+- **Ruling kept:** an unknown user gets 200 `not_enough_data`, not 404.
 
 ## What was built
 
@@ -48,15 +91,12 @@
   - Retained events from the old model are dropped, so a model swap is never a "transition".
 - **`transition_occurred`** is true only when the active cluster changes under one model. The first adoption is not a transition.
 - **Δc** is `μ_target − μ_active` per pillar, in points, with BE-09's suggested target: the runner-up posterior. `uncertainty` is 1 − the active posterior.
-- **Pools.**
-  - A named archetype id maps to `archetype-<id>`, stable across refits.
-  - An unnamed component maps to `cluster-<model_id>-<k>`.
-  - No cluster maps to `neutral`.
+- **Pools.** Every cluster maps to `neutral` (fix round 1; see the `ponytail:` note in `pool_name`).
 - **Storage.**
   - One file per user, `{STATE_BUS_DIR}/{key}.json`, written as tmp + replace under a striped per-user lock.
   - It is registered with `register_user_store("state_bus", ...)`, so delete and export cover it.
   - The retention CLI drops idle files.
-  - A delete holds the same lock as a refresh, so a refresh in flight cannot resurrect the file.
+  - (Corrected in fix round 1.) A delete holds the same lock as a refresh, and every refresh now reads, steps and saves under that lock, so a refresh in flight cannot resurrect the file.
 - **Hot-path safety.** `task_archetype`, `task_pillars`, `record_step` and `coach_context` never raise. On any failure the task is served from `neutral` and the chat goes on without context (tested with a broken bus).
 
 ### Profile service (`profile.py`)
@@ -88,7 +128,7 @@
 - **`not_enough_data`** below 1 session that scored any skill. That includes an unknown user (200, not 404: the ids are anonymous).
 
 ### Member 5: the task service
-- `tasks/next` serves from `state_bus.pool_key(user)` once a cluster exists. The registry's session record stores that archetype; this is tested, and seen live: `archetype-6`.
+- `tasks/next` asks the bus for `state_bus.pool_key(user)`; since fix round 1 that is `neutral` for every cluster. (The round-1 live run served `archetype-6`.)
 - New staircases are seeded by BE-12's projector from the latest pillar scores.
 - **Honest limit:** the per-archetype pools hold the same content. `ARCHETYPE_OPTIONS` defines generator options for `neutral` only, and no evidence says how a practice style should change the generators, so I did not invent any. The difficulty personalisation is the projector seed plus the 85% staircase.
 - I did not re-seed a staircase on a style change (BE-04 decision 1). The 85% rule already walks it from the user's own accuracy.
@@ -109,14 +149,15 @@
   - Run here: 3 s, `model_id 99c43f78be091f33`.
   - Names: Keen recaller, All-rounder, Fresh starter, Balanced builder, Methodical solver, and 4 × Mixed profile.
 - **Twin.** BE-10's `TrainConfig()` defaults, saved with `validated: false`.
-  - Run here: 153 s, so **about 2.7 min in total on this laptop, not ~1 min**. Most of the time is generating 1000 × 14 synthetic users. I kept BE-10's evidence configuration rather than shrink it.
+  - Run here: 153 s, so **about 2.7 min in total on this laptop** (the docs say about 3 minutes). Most of the time is generating 1000 × 14 synthetic users. I kept BE-10's evidence configuration rather than shrink it.
 - The bootstrap keeps models that load and refits missing or broken ones. A second run took 2 s.
 - It runs at `docker build` (a `RUN` step, models baked into `/srv/models`) and in `scripts/run_dev.ps1`. It is documented in `scripts/README.md`.
 - Without models, the profile answers with `null` sections and reasons, and evaluate answers 501. Nothing is faked.
 
 ## Tests (written first)
 - **Before:** `pytest -q` from the repo root at the `e36227e` baseline gave 1370 passed, 1 xfailed.
-- **After:** `pytest -q -W error` from the repo root gives **1423 passed, 1 xfailed, 0 warnings** (279 s). The xfail is BE-05's pre-existing strict xfail.
+- **After (round 1, before the merge):** `pytest -q -W error` gave 1423 passed, 1 xfailed, 0 warnings.
+- **After fix round 1, on the merged tree (main `bca71d8`):** `pytest -q -W error` gives **1457 passed, 1 failed, 1 xfailed, 0 warnings** (265 s). The one failure is `test_tasks_api.py::test_the_port_matches_task_source_ts`, which already fails on main (F-D added `&inks=cvd_safe`; SRV-1 owns the fix). The xfail is BE-05's pre-existing strict xfail.
 - **New files:**
   - `brain_twin_jepa/tests/test_state_bus.py`: 21 tests.
   - `brain_twin_jepa/tests/test_profile_api.py`: 39 tests, including parametrised cases.

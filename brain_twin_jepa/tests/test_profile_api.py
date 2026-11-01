@@ -28,7 +28,7 @@ def gmm_file(tmp_path_factory):
     """A clustering model fitted the way the bootstrap fits the served one (BE-07 features of
     BE-08 users), small enough for the suite."""
     path = tmp_path_factory.mktemp("models") / "gmm.json"
-    bootstrap.fit_cluster_model(users=60, sessions=3, data_seed=0).save(path)
+    bootstrap.save_cluster_model(bootstrap.fit_cluster_model(users=60, sessions=3, data_seed=0), path)
     return path
 
 
@@ -175,6 +175,14 @@ def test_archetype_waits_for_a_finished_session(client, with_model):
 # --- the forecast (R17 shadow mode) -----------------------------------------------------------
 
 
+def test_mode_follows_validated(client, monkeypatch, tmp_path, with_twin):
+    add_user("u1", 4)
+    with_twin.meta = {"validation": {"validated": True}}  # as validate.promote writes it
+    monkeypatch.setenv("TWIN_CHECKPOINT", str(with_twin.save(tmp_path / "promoted.pt")))
+    fc = client.get(PROFILE, params={"user_id": "u1"}).json()["forecast"]
+    assert fc["validated"] is True and fc["mode"] == "live"
+
+
 def test_the_forecast_is_in_shadow_mode(client, with_model, with_twin):
     add_user("u1", 4)
     fc = client.get(PROFILE, params={"user_id": "u1", "h": 2}).json()["forecast"]
@@ -284,7 +292,7 @@ def test_evaluate_takes_only_a_user_id(client, with_model, payload):
     assert client.post(EVALUATE, json=payload).status_code == 422
 
 
-# --- Member 5: GET /v1/tasks/next serves from the user's archetype pool -------------------------
+# --- Member 5: GET /v1/tasks/next asks the bus for the user's pool ------------------------------
 
 
 def served_pool(client, uid, seq):
@@ -296,13 +304,28 @@ def served_pool(client, uid, seq):
     return next(rec["archetype"] for rec in data["sessions"].values() if rec["task_id"] == r.json()["task_id"])
 
 
-def test_tasks_next_uses_the_users_archetype_pool_once_a_cluster_exists(client, monkeypatch, tmp_path, gmm_file):
+def test_tasks_next_asks_the_bus_for_the_users_pool_once_a_cluster_exists(client, monkeypatch, tmp_path, gmm_file):
     add_user("u1", 3)
     monkeypatch.setenv("CLUSTER_MODEL_PATH", str(tmp_path / "none.json"))
     assert served_pool(client, "u1", 0) == state_bus.NEUTRAL
+    assert state_bus.load("u1").tasks is None
     monkeypatch.setenv("CLUSTER_MODEL_PATH", str(gmm_file))
     pool = served_pool(client, "u1", 1)
-    assert pool != state_bus.NEUTRAL and pool == state_bus.pool_key("u1")
+    # The task request clustered the user through the bus; the pool is the retained one, NEUTRAL
+    # for every cluster until per-style generator options exist (state_bus.pool_name).
+    st = state_bus.load("u1")
+    assert st.tasks is not None and pool == st.tasks["pool"] == state_bus.NEUTRAL
+
+
+def test_new_staircases_are_seeded_from_the_users_pillars(client, with_model):
+    from dynamic_cache import api
+    from dynamic_cache.parameter_projector import project
+
+    add_user("u1", 3)
+    served_pool(client, "u1", 0)
+    rec = api.get_dispatcher().export("u1")["schemas"]
+    (schema, staircase), = rec.items()
+    assert staircase["theta"] == pytest.approx(project(state_bus.load("u1").pillars, schema), abs=0.11)
 
 
 def test_tasks_next_still_serves_when_the_bus_fails(client, with_model, monkeypatch):
