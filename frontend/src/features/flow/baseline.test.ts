@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import fixtures from '../assessment/tasks/fixtures.json'
 import { trialCount } from '../assessment/exercises'
 import type { TaskPayload } from '../assessment/telemetry/types'
-import { BASELINE_SCHEMAS, fastTask, isFastRun } from './baseline'
+import { BASELINE_SCHEMAS, fastTask, isFastRun, shortenBaselineTask } from './baseline'
 
 const fixture = (s: string) => (fixtures as TaskPayload[]).find((t) => t.schema_type === s)!
 
@@ -46,5 +46,49 @@ describe('the ?fast=1 test hook', () => {
   it('leaves other exercises alone', () => {
     const matrix = fixture('matrix')
     expect(fastTask(matrix)).toBe(matrix)
+  })
+})
+
+describe('shortenBaselineTask', () => {
+  it('shortens every baseline exercise to ~1.5-2 minutes total while measuring all pillars', () => {
+    for (const s of BASELINE_SCHEMAS) {
+      const full = fixture(s)
+      const shortened = shortenBaselineTask(full)
+      expect(shortened.task_id).toBe(full.task_id)
+      expect(trialCount(shortened)).toBeGreaterThan(0)
+      expect(trialCount(shortened)).toBeLessThanOrEqual(trialCount(full))
+    }
+  })
+
+  it('applies calibrated limits and trial counts to each baseline task', () => {
+    expect(shortenBaselineTask(fixture('relational')).params).toMatchObject({
+      n_trials: 2,
+      time_limit_ms: 10000,
+    })
+    expect(shortenBaselineTask(fixture('n_back')).params).toMatchObject({
+      interval_ms: 1200,
+    })
+    expect(trialCount(shortenBaselineTask(fixture('n_back')))).toBe(5)
+
+    expect(shortenBaselineTask(fixture('tower')).params).toMatchObject({
+      time_limit_ms: 30000,
+    })
+
+    expect(shortenBaselineTask(fixture('stroop')).params).toMatchObject({
+      time_limit_ms: 2500,
+    })
+    expect(trialCount(shortenBaselineTask(fixture('stroop')))).toBe(3)
+
+    expect(trialCount(shortenBaselineTask(fixture('ufov')))).toBe(2)
+
+    expect(shortenBaselineTask(fixture('mst')).params).toMatchObject({
+      encode_ms: 1500,
+    })
+    expect(trialCount(shortenBaselineTask(fixture('mst')))).toBe(3)
+  })
+
+  it('leaves other exercises alone', () => {
+    const matrix = fixture('matrix')
+    expect(shortenBaselineTask(matrix)).toBe(matrix)
   })
 })

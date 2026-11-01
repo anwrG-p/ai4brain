@@ -22,19 +22,17 @@ const loadBaseline = () =>
     throw e
   }))
 
-/* How long the full baseline takes (the six default tasks in tasks/fixtures.json, at full length,
-   no ?fast). Timed parts use each exercise's fixed timing or its time limit, so this is a ceiling:
-     Logic Web            6 trials x 15 s limit                          =  90 s
-     Memory Gauntlet      10 trials x (500 ms stimulus + 2000 ms gap)    =  25 s
-     Color Clash          4 trials x 3 s limit                           =  12 s
-     Strategic Blueprint  60 s limit + ~10 s for the move prediction     =  70 s
-     Perceptual Radar     4 trials x (500 ms fixation + ~0.5 s flash
-                          and mask + ~5 s for the two answers)           =  24 s
-     Precision Archive    3 x 2 s study + 5 tests x 5 s limit            =  31 s
-   plus each exercise's own screens, ~13 s x 6 (reading the instruction, the 500 ms fixation, the
-   end card)                                                             =  78 s
-   Total 330 s = 5.5 min, rounded up: about 6 minutes. Recount when the baseline or its tasks change. */
-const MINUTES = 6
+/* How long the shortened baseline takes (the six default tasks in tasks/fixtures.json,
+   shortened via shortenBaselineTask):
+     Logic Web            2 trials x 10 s limit                          =  20 s
+     Memory Gauntlet      5 trials x (500 ms stimulus + 1200 ms gap)     =   9 s
+     Color Clash          3 trials x 2.5 s limit                         =   8 s
+     Strategic Blueprint  30 s limit + ~5-10 s for the move prediction   =  35 s
+     Perceptual Radar     2 trials x (~0.5 s flash + answer)             =  10 s
+     Precision Archive    2 x 1.5 s study + 3 tests                      =  15 s
+   plus each exercise's own screens (reading the instruction, fixation, end card) = ~23 s
+   Total ~120 s = 2 minutes. Recount when the baseline or its tasks change. */
+const MINUTES = 2
 
 /* Welcome: Loti says hello, Start begins the baseline assessment, and Log in skips the assessment
    directly to the dashboard. Motion (spec R8, "Loti welcomes you into the app"): an entrance, a

@@ -25,7 +25,7 @@ describe('Welcome (/): Loti, Start button, Log in button', () => {
   it('shows Loti with one bubble', async () => {
     const main = await renderWelcome()
     expect(within(main).getByRole('img', { name: /Loti/ })).toBeInTheDocument()
-    expect(within(main).getByText('Want to see how your mind works today? It takes about 6 minutes.')).toBeInTheDocument()
+    expect(within(main).getByText('Want to see how your mind works today? It takes about 2 minutes.')).toBeInTheDocument()
   })
 
   const controlsIn = (main: HTMLElement) => Array.from(main.querySelectorAll('a, button'))
@@ -75,7 +75,7 @@ describe('Welcome (/): Loti, Start button, Log in button', () => {
   // Motion pass (ticket 07b, spec R8).
   it('reveals the bubble word by word on screen, with the full text in the DOM for screen readers from the start', async () => {
     const main = await renderWelcome()
-    const line = 'Want to see how your mind works today? It takes about 6 minutes.'
+    const line = 'Want to see how your mind works today? It takes about 2 minutes.'
     expect(screen.getByRole('heading', { level: 1, name: "Hi, I'm Loti." })).toBeInTheDocument()
     expect(within(main).getByText(line)).toHaveClass('sr-only')
     const shown = main.querySelectorAll('[aria-hidden="true"] .anim-word')

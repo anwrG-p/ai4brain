@@ -1,6 +1,15 @@
 import { usingMocks } from '../assessment/tasks/taskSource'
 import { isValidTrial } from '../assessment/tasks/Ufov'
-import type { MstParams, NBackParams, SchemaType, StroopParams, TaskPayload, UfovParams } from '../assessment/telemetry/types'
+import type {
+  MstParams,
+  NBackParams,
+  RelationalParams,
+  SchemaType,
+  StroopParams,
+  TaskPayload,
+  TowerParams,
+  UfovParams,
+} from '../assessment/telemetry/types'
 
 /** The six baseline exercises, in order: Logic Web, Memory Gauntlet, Color Clash, Strategic
     Blueprint, Perceptual Radar, Precision Archive. Color Clash gives Impulse Control a first score
@@ -43,6 +52,41 @@ export function fastTask(task: TaskPayload): TaskPayload {
     case 'mst': {
       const q = p as unknown as MstParams
       return { ...task, params: { ...q, encode_ms: 200, test: q.test.slice(0, 2) } }
+    }
+    default:
+      return task
+  }
+}
+
+/** Shortened version of baseline tasks for first-time assessment:
+    Keeps all 6 exercises (measuring all 5 cognitive pillars) while shortening
+    trial counts and timeouts so the entire assessment completes in ~1.5 - 2 minutes total. */
+export function shortenBaselineTask(task: TaskPayload): TaskPayload {
+  const p = task.params as Record<string, unknown>
+  switch (task.schema_type) {
+    case 'relational': {
+      const q = p as unknown as RelationalParams
+      return { ...task, params: { ...q, n_trials: 2, time_limit_ms: 10000 } }
+    }
+    case 'n_back': {
+      const q = p as unknown as NBackParams
+      return { ...task, params: { ...q, interval_ms: 1200, trials: q.trials.slice(0, 5) } }
+    }
+    case 'tower': {
+      const q = p as unknown as TowerParams
+      return { ...task, params: { ...q, time_limit_ms: 30000 } }
+    }
+    case 'stroop': {
+      const q = p as unknown as StroopParams
+      return { ...task, params: { ...q, time_limit_ms: 2500, trials: q.trials.slice(0, 3) } }
+    }
+    case 'ufov': {
+      const q = p as unknown as UfovParams
+      return { ...task, params: { ...q, trials: q.trials.filter(isValidTrial).slice(0, 2) } }
+    }
+    case 'mst': {
+      const q = p as unknown as MstParams
+      return { ...task, params: { ...q, encode_ms: 1500, encode: q.encode.slice(0, 2), test: q.test.slice(0, 3) } }
     }
     default:
       return task

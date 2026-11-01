@@ -5,7 +5,7 @@ import { Button } from '../components/ui/Button'
 import { ExerciseHost } from '../features/assessment/ExerciseHost'
 import { tracker } from '../features/assessment/telemetry/tracker'
 import type { TelemetryEvent } from '../features/assessment/telemetry/types'
-import { BASELINE_SCHEMAS, fastTask, isFastRun } from '../features/flow/baseline'
+import { BASELINE_SCHEMAS, fastTask, isFastRun, shortenBaselineTask } from '../features/flow/baseline'
 import { saveRun } from '../features/insights/sessionStore'
 
 const TOTAL = BASELINE_SCHEMAS.length
@@ -120,7 +120,7 @@ export default function BaselinePage() {
           key={`${step}.${attempt}`}
           schemaType={BASELINE_SCHEMAS[step]!}
           attempt={attempt}
-          prepare={fast ? fastTask : undefined}
+          prepare={fast ? fastTask : shortenBaselineTask}
           onTask={onTask}
           onDone={onDone}
           onError={onError}

@@ -7,7 +7,7 @@ Brand v2 screens. Routes and files: `docs/design/BRAND-V2.md`. Add `?judge=1` to
 | **Relevance** (12%) | `/` → `/baseline` (6 exercises) → `/results` → `/dashboard` (5-skill chart, progress curve); `/coach` (Loti); `/privacy` | `features/flow/`, `features/insights/`, `features/loti/` |
 | **Quality** (12%) | Every screen, light and dark, at 375, 768 and 1440 px | `npm run qa:checks`; Playwright e2e with axe (`frontend/e2e/`) |
 | **Innovation** (12%) | Loti's bubbles and answer chips; Momo's mood guess you can correct; the classroom board | `components/features/characters/`, `features/loti/` |
-| **UX** (9%) | First insight in about 6 minutes (the baseline); one primary button per screen; returning devices go straight to Home | `pages/WelcomePage.tsx`, `pages/BaselinePage.tsx`, e2e `returning.spec.ts` |
+| **UX** (9%) | First insight in about 2 minutes (the baseline); one primary button per screen; returning devices go straight to Home | `pages/WelcomePage.tsx`, `pages/BaselinePage.tsx`, e2e `returning.spec.ts` |
 | **Explainability** (9%) | "Why Loti picked this" on Home; "How we calculate this" (`/methodology`) with the real formulas, imported from code | `pages/MethodologyPage.tsx`, `features/insights/pillars.ts` |
 | **Safety** (6%) | Equal-weight consent on Results; Export / Delete my data; no clinical words; crisis check before any AI reply | `npm run lint:copy`; `ai_coach/safety_guardrails.py`; [ADR 0002](../adr/0002-no-server-side-emotion-inference.md) |
 | **Generalisation** (10%) | Exercises map to dimensions in a registry; the exercise runner's dimension preset switch shows under `?judge=1` | `config/dimensions.ts`, `pages/TaskRunnerPage.tsx`, `features/insights/pillars.ts` |
