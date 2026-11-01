@@ -916,7 +916,7 @@ class Dispatcher:
         # put its disk time (antivirus scans of the new file included) on the request path.
         try:
             return UserState.from_json(json.loads(path.read_text(encoding="utf-8")))
-        except FileNotFoundError:
+        except (FileNotFoundError, NotADirectoryError):  # NotADirectoryError: a file where the folder should be (POSIX)
             return None
         except (ValueError, TypeError, AttributeError):
             return UserState()  # an unreadable registry only forgets what was served
