@@ -1,5 +1,6 @@
 """BE-09: GMM practice profiles (clustering_engine/clustering_gmm.py)."""
 
+import json
 import re
 from pathlib import Path
 
@@ -128,16 +129,22 @@ def test_duplicate_rows_count_once():
     assert (m.name(low), m.name(1 - low)) == ("Fresh starter", "All-rounder")
 
 
-def test_session_pillars_adapter_scores_and_skips_incomplete_sessions():
-    def ev(sid, schema, score):
-        return {"user_id": "u", "session_id": sid, "task_id": f"syn-{schema}-000-0", "score_norm": score}
+def test_session_pillars_are_be07_scores_and_skip_incomplete_sessions():
+    """The rows are BE-07's pillar scores (held to the TS by the golden vectors), duplicates once."""
+    golden = json.loads((Path(__file__).resolve().parents[2] / "data" / "fixtures" / "golden_sessions.json").read_text(encoding="utf-8"))
+    cases = {c["name"]: c for c in golden["cases"]}
+    full = cases["full_session_new_exercises"]
+    dup = cases["duplicates"]  # 191 rows, 159 unique: scored once each
+    partial = cases["stroop"]  # agility and impulse only: skipped, not imputed
 
-    full = [ev("s1", s, 1.0) for s in ("nback", "stroop", "mst", "ufov")] + [ev("s1", "rotation", 0.0)]
-    full += [ev("s1", "ufov", 0.0)]  # visual: mean of 1 and 0
-    partial = [ev("s2", "nback", 1.0)]  # no memory, impulse or visual: skipped, not imputed
-    keys, X = session_pillars(full + partial)
-    assert keys == [("u", "s1")]
-    assert X.tolist() == [[100.0, 100.0, 100.0, 100.0, 50.0]]
+    def as_user(case, user, session):
+        return [{**e, "user_id": user, "session_id": session} for e in case["events"]]
+
+    events = as_user(partial, "u1", "s0") + as_user(full, "u1", "s1") + as_user(dup, "u2", "s1")
+    keys, X = session_pillars(events)
+    assert keys == [("u1", "s1"), ("u2", "s1")]
+    for row, case in zip(X, (full, dup)):
+        assert row.tolist() == pytest.approx([case["expected"]["pillars"][p]["score"] for p in PILLARS], abs=1e-6)
     assert session_pillars([])[1].shape == (0, 5)
 
 
@@ -316,18 +323,19 @@ def test_archetype_names_are_nine_distinct_names():
 
 # --- golden fit on fixed synthetic data -----------------------------------------------------------
 
-GOLDEN_IDS = [0, 3, 5, 6, 7, 8, None, None, None]
-GOLDEN_WEIGHTS = [0.2144, 0.1102, 0.1236, 0.0833, 0.1346, 0.1512, 0.1001, 0.0493, 0.0333]
+# Refit by SRV-1 on BE-07's pillar scores of BE-08's data with all 11 exercises and R16 n-back.
+GOLDEN_IDS = [1, 5, 6, 8, None, None, None, None, None]
+GOLDEN_WEIGHTS = [0.1803, 0.2069, 0.0833, 0.197, 0.1158, 0.0838, 0.0496, 0.0417, 0.0417]
 GOLDEN_MEANS = [
-    [81.04, 89.27, 80.74, 91.35, 76.04],
-    [55.36, 86.86, 68.69, 88.67, 75.91],
-    [89.84, 95.68, 94.71, 100.0, 76.17],
-    [27.47, 37.1, 11.17, 30.0, 3.75],
-    [69.58, 88.83, 75.4, 73.82, 72.57],
-    [84.56, 90.16, 98.56, 89.9, 77.83],
-    [49.12, 76.15, 60.82, 63.22, 70.82],
-    [69.73, 89.82, 68.62, 47.05, 66.64],
-    [44.84, 73.02, 41.15, 39.58, 68.75],
+    [37.76, 74.54, 67.93, 62.6, 74.38],
+    [64.07, 82.08, 80.51, 75.97, 78.39],
+    [7.34, 5.13, 0.4, 9.63, 5.62],
+    [68.8, 43.36, 82.68, 74.03, 81.93],
+    [56.49, 53.06, 74.19, 19.69, 72.55],
+    [21.19, 48.76, 51.84, 21.25, 77.48],
+    [12.2, 26.31, 40.07, 20.42, 64.69],
+    [39.76, 44.05, 39.95, 39.25, 64.2],
+    [25.99, 27.36, 58.31, 75.6, 76.25],
 ]
 
 
@@ -344,8 +352,8 @@ def test_golden_fit_on_fixed_synthetic_data():
     m = fit_synthetic(users=40, sessions=3, data_seed=7, k=9, seed=0)
     assert m.archetype_ids == GOLDEN_IDS
     assert [m.name(i) for i in range(9)] == [
-        "Steady planner", "Keen recaller", "All-rounder", "Fresh starter", "Balanced builder",
-        "Methodical solver", FALLBACK_NAME, FALLBACK_NAME, FALLBACK_NAME,
+        "Nimble switcher", "All-rounder", "Fresh starter", "Methodical solver",
+        FALLBACK_NAME, FALLBACK_NAME, FALLBACK_NAME, FALLBACK_NAME, FALLBACK_NAME,
     ]
     assert m.weights == pytest.approx(GOLDEN_WEIGHTS, abs=1e-3)
     assert m.means == pytest.approx(np.array(GOLDEN_MEANS), abs=0.05)
