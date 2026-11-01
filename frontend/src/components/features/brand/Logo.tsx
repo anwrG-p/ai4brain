@@ -1,6 +1,7 @@
 import { useId } from 'react'
+import { BRAND_CONFIG } from '../../../config/brand'
 
-/* The SynapseTwin mark (docs/design/references/logo-mark.jpg): Loti's bust, head and shoulders with
+/* The Loti mark (docs/design/references/logo-mark.jpg): Loti's bust, head and shoulders with
    coral-outlined gills, inside an open circle arc. Flat line art in the character tokens; the same
    drawing, with its colours written out, is public/favicon.svg. */
 
@@ -17,7 +18,7 @@ export function LogoMark({ size = 40, className = '', ...rest }: { size?: number
   // A unique clip id per mark: the header renders two, one of them display:none.
   const clip = `logo-bust-${useId().replace(/[^a-zA-Z0-9]/g, '')}`
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" className={`shrink-0 ${className}`} role={rest['aria-hidden'] ? undefined : 'img'} aria-label={rest['aria-hidden'] ? undefined : 'SynapseTwin'} {...rest}>
+    <svg width={size} height={size} viewBox="0 0 64 64" className={`shrink-0 ${className}`} role={rest['aria-hidden'] ? undefined : 'img'} aria-label={rest['aria-hidden'] ? undefined : BRAND_CONFIG.productName} {...rest}>
       <defs>
         <clipPath id={clip}>
           <circle cx={32} cy={35} r={26} />
@@ -52,7 +53,7 @@ export function LogoLockup({ className = '' }: { className?: string }) {
   return (
     <span aria-hidden="true" className={`inline-flex items-center gap-2 ${className}`}>
       <LogoMark size={36} aria-hidden="true" />
-      <span className="font-display text-xl font-bold text-ink">SynapseTwin</span>
+      <span className="font-display text-xl font-bold text-ink">{BRAND_CONFIG.productName}</span>
     </span>
   )
 }

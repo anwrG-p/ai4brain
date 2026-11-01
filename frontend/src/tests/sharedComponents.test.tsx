@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { AppShell } from '../components/layout/AppShell'
 import { Badge, type BadgeTone } from '../components/ui/Badge'
 import { Button, type ButtonSize, type ButtonVariant } from '../components/ui/Button'
+import { BRAND_CONFIG } from '../config/brand'
 
 // Same flags as App.tsx, so the router prints no v7 warnings.
 const future = { v7_startTransition: true, v7_relativeSplatPath: true }
@@ -78,6 +79,6 @@ describe('AppShell (Calm & Clean)', () => {
       </MemoryRouter>,
     )
     expect(screen.getByRole('banner').className).toMatch(/\bh-16\b/)
-    expect(screen.getByRole('link', { name: 'SynapseTwin Home' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: `${BRAND_CONFIG.productName} Home` })).toBeInTheDocument()
   })
 })
