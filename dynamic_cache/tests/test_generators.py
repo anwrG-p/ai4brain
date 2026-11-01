@@ -218,7 +218,7 @@ GOLDEN = {
     ("mst", 0.5, 1234): "1e345dc5e1c56015d0168aa36948a22049426731c13fc2a7665706dac67612dc",
     ("stop_signal", 0.5, 1234): "718171a287aa01cae54a2eeb136cf491fb1c80c7b70f03db91a8fb115d3abbca",
     ("pal", 0.5, 1234): "11cfaba8d2fcbc7ee0e71e83a1ca1be33b502803affc0b2b8ee2631a865060af",
-    ("flanker", 0.5, 1234): "bfb63f47e9b0eb8829b41a247ae8917e583ec060fe4f21ac8b96132823c00399",
+    ("flanker", 0.5, 1234): "a9e0a3890ed9f5951e5da63f33ad461cdc233b1cef060fc6b3e9e17ee14e5b5c",
 }
 GOLDEN_CVD_SAFE = "3970c51d832796b427498fd54b2669d48adc5025daeb22fcf8421112e4353143"  # stroop 0.2 1234
 GOLDEN_BLOCKS = {

@@ -1103,6 +1103,12 @@
               },
               "congruent": {
                 "type": "boolean"
+              },
+              "cue": {
+                "enum": [
+                  "center",
+                  "spatial"
+                ]
               }
             }
           }

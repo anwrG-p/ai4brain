@@ -8,9 +8,9 @@
     "trial_meta.stream"
   ],
   "source": {
-    "insights/taskScores.ts": "d01e2c44ae251b7079196f244447f4ef5384fba3494eb38aa20e7baae7680090",
-    "insights/pillars.ts": "ec530a8c3e2a6fa15ab335ab72017a33f567107f2a64edb777088f777aca87a1",
-    "assessment/telemetry/types.ts": "26d2d753e1b76cc14fbc6f07a0c11b0b0c0d133fdba875e9c8fd803bf5610447"
+    "insights/taskScores.ts": "e3ebe0080028ae5986a6e10de4e879264999bb332d46d256e1e7ac3fa2a001d5",
+    "insights/pillars.ts": "ccc9adef880473850843365c06321f921e993b5da77b601b5fdd60e0e49170e6",
+    "assessment/telemetry/types.ts": "c031790e49c2d2fdd6f125c5915106796d50fa13f9552acdaec0d02884622871"
   },
   "cases": [
     {
@@ -687,6 +687,10 @@
             "trials": 4,
             "proxy": true
           },
+          "DDM_Caution": {
+            "score": 9.371411438675608,
+            "trials": 8
+          },
           "ErrorRecovery": {
             "score": 66.66666666666666,
             "trials": 3
@@ -708,9 +712,9 @@
             ]
           },
           "impulse": {
-            "score": 50,
+            "score": 38.3918318396216,
             "uncertainty": 50,
-            "coverage": 0.5,
+            "coverage": 0.7,
             "proxies": [
               "SST_SSRT"
             ]
@@ -728,7 +732,7 @@
             "proxies": []
           }
         },
-        "unified": 26.729402104452465
+        "unified": 22.860012717659668
       },
       "events": [
         {"user_id":"golden_user","session_id":"s_erc","task_id":"stx","trial_index":0,"dimension":"executive_function","score_norm":0,"response_time_ms":700,"error_flag":true,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"stx:0","congruent":true},"client_ts":"2026-10-30T09:00:01.500Z"},
@@ -771,6 +775,10 @@
             "trials": 24,
             "proxy": true
           },
+          "DDM_Caution": {
+            "score": 25.955699191326133,
+            "trials": 36
+          },
           "ErrorRecovery": {
             "score": 100,
             "trials": 2
@@ -792,9 +800,9 @@
             ]
           },
           "impulse": {
-            "score": 95.83333333333334,
-            "uncertainty": 32.00666597236686,
-            "coverage": 0.5,
+            "score": 75.86829500704557,
+            "uncertainty": 21.47349787787521,
+            "coverage": 0.7,
             "proxies": [
               "SST_SSRT"
             ]
@@ -812,7 +820,7 @@
             "proxies": []
           }
         },
-        "unified": 88.42765415833048
+        "unified": 78.4451349951866
       },
       "events": [
         {"user_id":"golden_user","session_id":"s_stroop","task_id":"st1","trial_index":0,"dimension":"executive_function","score_norm":1,"response_time_ms":614,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"st1:0","congruent":true,"word":"green","ink":"green"},"client_ts":"2026-10-30T09:00:01.500Z"},
@@ -868,6 +876,10 @@
             "score": 12.5,
             "trials": 8,
             "proxy": true
+          },
+          "DDM_Caution": {
+            "score": 41.91022604399552,
+            "trials": 16
           }
         },
         "pillars": {
@@ -886,9 +898,9 @@
             ]
           },
           "impulse": {
-            "score": 12.5,
-            "uncertainty": 50,
-            "coverage": 0.5,
+            "score": 20.902921726855865,
+            "uncertainty": 36.742346141747674,
+            "coverage": 0.7,
             "proxies": [
               "SST_SSRT"
             ]
@@ -906,7 +918,7 @@
             "proxies": []
           }
         },
-        "unified": 6.25
+        "unified": 10.451460863427933
       },
       "events": [
         {"user_id":"golden_user","session_id":"s_st_ch","task_id":"stc","trial_index":0,"dimension":"executive_function","score_norm":1,"response_time_ms":500,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"stc:0","congruent":true},"client_ts":"2026-10-30T09:00:01.500Z"},
@@ -942,6 +954,10 @@
             "score": 0,
             "trials": 4,
             "proxy": true
+          },
+          "DDM_Caution": {
+            "score": 11.620358463695695,
+            "trials": 8
           }
         },
         "pillars": {
@@ -960,9 +976,9 @@
             ]
           },
           "impulse": {
-            "score": 0,
+            "score": 3.32010241819877,
             "uncertainty": 50,
-            "coverage": 0.5,
+            "coverage": 0.7,
             "proxies": [
               "SST_SSRT"
             ]
@@ -980,7 +996,7 @@
             "proxies": []
           }
         },
-        "unified": 0
+        "unified": 1.660051209099385
       },
       "events": [
         {"user_id":"golden_user","session_id":"s_st_w","task_id":"stw","trial_index":0,"dimension":"executive_function","score_norm":0,"response_time_ms":800,"error_flag":true,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"stw:0","congruent":true},"client_ts":"2026-10-30T09:00:01.500Z"},
@@ -1476,6 +1492,10 @@
             "score": 66.66666666666666,
             "trials": 12
           },
+          "DDM_Caution": {
+            "score": 26.221421598911437,
+            "trials": 24
+          },
           "ErrorRecovery": {
             "score": 57.14285714285714,
             "trials": 35
@@ -1497,9 +1517,9 @@
             ]
           },
           "impulse": {
-            "score": 81.875,
-            "uncertainty": 26.166011470034938,
-            "coverage": 0.8,
+            "score": 70.74428431978228,
+            "uncertainty": 21.311714306143152,
+            "coverage": 1,
             "proxies": [
               "SST_SSRT"
             ]
@@ -1517,7 +1537,7 @@
             "proxies": []
           }
         },
-        "unified": 60.74609487087234
+        "unified": 58.51995173482881
       },
       "events": [
         {"user_id":"golden_user","session_id":"s_full","task_id":"s_full_nb","trial_index":0,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"s_full_nb:0","trial_type":"lure_minus","rule":"position","stream":"position"},"client_ts":"2026-10-30T09:00:01.500Z"},
@@ -1729,6 +1749,10 @@
             "score": 91.66666666666666,
             "trials": 12
           },
+          "DDM_Caution": {
+            "score": 26.795757842074742,
+            "trials": 24
+          },
           "ErrorRecovery": {
             "score": 80.76923076923077,
             "trials": 26
@@ -1750,9 +1774,9 @@
             ]
           },
           "impulse": {
-            "score": 89.6875,
-            "uncertainty": 26.166011470034938,
-            "coverage": 0.8,
+            "score": 77.10915156841494,
+            "uncertainty": 21.311714306143152,
+            "coverage": 1,
             "proxies": [
               "SST_SSRT"
             ]
@@ -1770,7 +1794,7 @@
             "proxies": []
           }
         },
-        "unified": 75.0943884876464
+        "unified": 72.57871880132939
       },
       "events": [
         {"user_id":"golden_user","session_id":"s_dup","task_id":"s_dup_nb","trial_index":0,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"s_dup_nb:0","trial_type":"standard","rule":"position","stream":"position"},"client_ts":"2026-10-30T09:00:01.500Z"},
@@ -1998,6 +2022,10 @@
             "score": 50,
             "trials": 12
           },
+          "DDM_Caution": {
+            "score": 31.89411914178385,
+            "trials": 14
+          },
           "ErrorRecovery": {
             "score": 90,
             "trials": 10
@@ -2019,9 +2047,9 @@
             ]
           },
           "impulse": {
-            "score": 100,
-            "uncertainty": 50,
-            "coverage": 0.5,
+            "score": 80.54117689765253,
+            "uncertainty": 35.00566847521735,
+            "coverage": 0.7,
             "proxies": [
               "SST_SSRT"
             ]
@@ -2039,7 +2067,7 @@
             "proxies": []
           }
         },
-        "unified": 66.47629305967345
+        "unified": 61.61158728408658
       },
       "events": [
         {"user_id":"golden_user","session_id":"s_fz81","task_id":"s_fz81_nb","trial_index":0,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"s_fz81_nb:0","trial_type":"standard","rule":"position","stream":"position"},"client_ts":"2026-10-30T09:00:01.500Z"},
@@ -2174,6 +2202,10 @@
             "score": 100,
             "trials": 10
           },
+          "DDM_Caution": {
+            "score": 27.483629304918384,
+            "trials": 20
+          },
           "ErrorRecovery": {
             "score": 92.3076923076923,
             "trials": 13
@@ -2195,9 +2227,9 @@
             ]
           },
           "impulse": {
-            "score": 69.23076923076923,
-            "uncertainty": 43.48849538405796,
-            "coverage": 0.5,
+            "score": 57.30301496624041,
+            "uncertainty": 29.141564289357728,
+            "coverage": 0.7,
             "proxies": [
               "SST_SSRT"
             ]
@@ -2215,7 +2247,7 @@
             "proxies": []
           }
         },
-        "unified": 62.0939296665622
+        "unified": 59.11199110042999
       },
       "events": [
         {"user_id":"golden_user","session_id":"s_fz82","task_id":"s_fz82_nb","trial_index":0,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"s_fz82_nb:0","trial_type":"lure_minus","rule":"position","stream":"position"},"client_ts":"2026-10-30T09:00:01.500Z"},
@@ -2378,6 +2410,10 @@
             "score": 100,
             "trials": 10
           },
+          "DDM_Caution": {
+            "score": 35.02810631697194,
+            "trials": 29
+          },
           "ErrorRecovery": {
             "score": 80,
             "trials": 15
@@ -2399,9 +2435,9 @@
             ]
           },
           "impulse": {
-            "score": 73.68421052631578,
-            "uncertainty": 39.34479835880134,
-            "coverage": 0.8,
+            "score": 65.95298968444702,
+            "uncertainty": 31.685569548366267,
+            "coverage": 1,
             "proxies": [
               "SST_SSRT"
             ]
@@ -2419,7 +2455,7 @@
             "proxies": []
           }
         },
-        "unified": 54.040784298300785
+        "unified": 52.494540129927046
       },
       "events": [
         {"user_id":"golden_user","session_id":"s_fz83","task_id":"s_fz83_nb","trial_index":0,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"s_fz83_nb:0","trial_type":"standard","rule":"position","stream":"position"},"client_ts":"2026-10-30T09:00:01.500Z"},
@@ -2551,6 +2587,10 @@
           "SST_SSRT": {
             "score": 57.93726256376858,
             "trials": 37
+          },
+          "DDM_Caution": {
+            "score": 41.086074177770826,
+            "trials": 83
           }
         },
         "pillars": {
@@ -2567,9 +2607,9 @@
             "proxies": []
           },
           "impulse": {
-            "score": 57.93726256376858,
-            "uncertainty": 25.77776120948002,
-            "coverage": 0.5,
+            "score": 53.12263731062636,
+            "uncertainty": 17.0160917576277,
+            "coverage": 0.7,
             "proxies": []
           },
           "memory": {
@@ -2585,7 +2625,7 @@
             "proxies": []
           }
         },
-        "unified": 57.93726256376858
+        "unified": 53.12263731062636
       },
       "events": [
         {"user_id":"golden_user","session_id":"s_sst","task_id":"ss1","trial_index":0,"dimension":"executive_function","score_norm":1,"response_time_ms":361,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"ss1:0","stop_trial":false,"dir":"right","response":"right"},"client_ts":"2026-10-30T09:00:01.500Z"},
@@ -2720,6 +2760,10 @@
             "score": 71.66666666666667,
             "trials": 12,
             "proxy": true
+          },
+          "DDM_Caution": {
+            "score": 44.02618238504882,
+            "trials": 55
           }
         },
         "pillars": {
@@ -2740,7 +2784,7 @@
           "impulse": {
             "score": null,
             "uncertainty": 50,
-            "coverage": 0,
+            "coverage": 0.2,
             "proxies": []
           },
           "memory": {
@@ -2838,7 +2882,12 @@
       "description": "Stop Light whose signal-respond RTs are not faster than go RTs: the race check excludes it.",
       "expected": {
         "unique_events": 10,
-        "inputs": {},
+        "inputs": {
+          "DDM_Caution": {
+            "score": 21.44843830200799,
+            "trials": 6
+          }
+        },
         "pillars": {
           "focus": {
             "score": null,
@@ -2855,7 +2904,7 @@
           "impulse": {
             "score": null,
             "uncertainty": 50,
-            "coverage": 0,
+            "coverage": 0.2,
             "proxies": []
           },
           "memory": {
@@ -2895,6 +2944,10 @@
           "SST_SSRT": {
             "score": 0,
             "trials": 3
+          },
+          "DDM_Caution": {
+            "score": 11.844704849245034,
+            "trials": 9
           }
         },
         "pillars": {
@@ -2911,9 +2964,9 @@
             "proxies": []
           },
           "impulse": {
-            "score": 0,
+            "score": 3.384201385498581,
             "uncertainty": 50,
-            "coverage": 0.5,
+            "coverage": 0.7,
             "proxies": []
           },
           "memory": {
@@ -2929,7 +2982,7 @@
             "proxies": []
           }
         },
-        "unified": 0
+        "unified": 3.384201385498581
       },
       "events": [
         {"user_id":"golden_user","session_id":"s_sst_n","task_id":"ss4","trial_index":0,"dimension":"executive_function","score_norm":0,"response_time_ms":1250,"error_flag":true,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"ss4:0","stop_trial":false,"dir":"left","response":"none"},"client_ts":"2026-10-30T09:00:01.500Z"},
@@ -3110,6 +3163,10 @@
             "score": 56.036231884057976,
             "trials": 92
           },
+          "DDM_Caution": {
+            "score": 28.497274846652438,
+            "trials": 96
+          },
           "ErrorRecovery": {
             "score": 75,
             "trials": 4
@@ -3131,7 +3188,7 @@
           "impulse": {
             "score": null,
             "uncertainty": 50,
-            "coverage": 0,
+            "coverage": 0.2,
             "proxies": []
           },
           "memory": {
@@ -3263,6 +3320,10 @@
             "trials": 16,
             "proxy": true
           },
+          "DDM_Caution": {
+            "score": 32.38206450823331,
+            "trials": 72
+          },
           "ErrorRecovery": {
             "score": 85.71428571428571,
             "trials": 7
@@ -3282,9 +3343,9 @@
             "proxies": []
           },
           "impulse": {
-            "score": 100,
-            "uncertainty": 39.2,
-            "coverage": 0.5,
+            "score": 80.68058985949524,
+            "uncertainty": 25.44056253745625,
+            "coverage": 0.7,
             "proxies": [
               "SST_SSRT"
             ]
@@ -3302,7 +3363,7 @@
             "proxies": []
           }
         },
-        "unified": 73.35772156084656
+        "unified": 63.69801649059417
       },
       "events": [
         {"user_id":"golden_user","session_id":"s_fl_st","task_id":"fl2","trial_index":0,"dimension":"executive_function","score_norm":1,"response_time_ms":519,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"fl2:0","flanker":"congruent","dir":"left","response":"left"},"client_ts":"2026-10-30T09:00:01.500Z"},
@@ -3388,6 +3449,10 @@
           "ANT_Conflict": {
             "score": 0,
             "trials": 20
+          },
+          "DDM_Caution": {
+            "score": 0.5059644323730219,
+            "trials": 40
           }
         },
         "pillars": {
@@ -3406,7 +3471,7 @@
           "impulse": {
             "score": null,
             "uncertainty": 50,
-            "coverage": 0,
+            "coverage": 0.2,
             "proxies": []
           },
           "memory": {
@@ -3517,6 +3582,10 @@
             "score": 75,
             "trials": 12
           },
+          "DDM_Caution": {
+            "score": 38.001046608426364,
+            "trials": 137
+          },
           "ErrorRecovery": {
             "score": 69.23076923076923,
             "trials": 39
@@ -3536,9 +3605,9 @@
             "proxies": []
           },
           "impulse": {
-            "score": 89.70448717948717,
-            "uncertainty": 26.46302451849876,
-            "coverage": 0.8,
+            "score": 79.36379906527502,
+            "uncertainty": 21.23654289798383,
+            "coverage": 1,
             "proxies": []
           },
           "memory": {
@@ -3554,7 +3623,7 @@
             "proxies": []
           }
         },
-        "unified": 65.07319324921855
+        "unified": 63.00505562637611
       },
       "events": [
         {"user_id":"golden_user","session_id":"s_all","task_id":"s_all_nb","trial_index":0,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"s_all_nb:0","trial_type":"standard","rule":"position","stream":"position"},"client_ts":"2026-10-30T09:00:01.500Z"},

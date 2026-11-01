@@ -1,3 +1,4 @@
+import { tracker } from '../features/assessment/telemetry/tracker'
 import { useEffect, useId, useRef, useState } from 'react'
 import { RotateCcw } from 'lucide-react'
 import { Loti } from '../components/features/characters'
@@ -22,6 +23,11 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
   const motion = useCharacterMotion()
   const { turns, current, begin, record, clear } = useLotiSession()
   const [talking, setTalking] = useState(true)
+  const [coachConsent, setCoachConsent] = useState(() => tracker.getStatus().coachConsent === 'granted')
+  const grantConsent = () => {
+    tracker.setCoachConsent(true)
+    setCoachConsent(true)
+  }
   const focusNext = useRef<'chips' | 'log' | null>(null)
   const chipsRef = useRef<HTMLDivElement>(null)
   const logRef = useRef<HTMLDivElement>(null)
@@ -75,6 +81,14 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
           {brain.enabled && <p className="mt-1 text-sm text-ink-muted">Loti is an AI guide, not a doctor.</p>}
         </div>
       </div>
+      {brain.enabled && !coachConsent && (
+        <div data-testid="coach-consent-banner" className="flex items-center justify-between gap-4 rounded-xl border border-border bg-surface px-4 py-3">
+          <p className="text-sm text-ink">Let Loti use AI to reply to your questions.</p>
+          <Button size="sm" variant="secondary" onClick={grantConsent}>
+            Enable AI replies
+          </Button>
+        </div>
+      )}
 
       <div
         ref={logRef}

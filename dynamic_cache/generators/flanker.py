@@ -48,5 +48,5 @@ def build(rng: random.Random, theta: float, trials: int = DEFAULT_TRIALS) -> dic
     return {
         "time_limit_ms": TIME_LIMIT_MS,
         "fixation_ms": FIXATION_MS,
-        "trials": [{"dir": d, "congruent": c} for d, c in cells],
+        "trials": [{"dir": d, "congruent": c, "cue": ("center" if k % 2 == 0 else "spatial")} for k, (d, c) in enumerate(cells)],
     }

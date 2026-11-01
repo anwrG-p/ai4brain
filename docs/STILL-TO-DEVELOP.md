@@ -50,17 +50,18 @@ ART-1 has 3 known gaps:
 
 Screenshots are in the agent's scratchpad, `art1/`.
 
-## 3. Not started
+## 3. Completed in this run (2026-11-01)
 
-| Ticket | Scope | Estimate |
+| Ticket | Scope | State |
 |---|---|---|
-| **F-A: insights quality** | practice-adjusted RCI; "Building your profile" state; low-effort flags; EZ-diffusion (`DDM_Caution`); `SESSIONS_PER_WEEK` 4 → 3; Tower limits in how-to-play; ExerciseDemo colours under cvd_safe | ~1 day |
-| **F-C: real-server wiring** | dashboard on the BE-11 profile contract (`docs/ui/contracts.md`); no forecast drawn while `validated` is false; coach chat behind consent purpose 2; send `schema_type`/`session_id`/`seq`/`inks`; handle 413/422/429/501/503; shared Loti script file; drop the old `estimates`/`snapshots`/`latent_vector` keys | ~1–1.5 days |
-| **TD-05: cleanup** | unused deps; stale docs; a real `docker build` (needs Docker Desktop running; the bootstrap step takes ~3 min); regenerate `docs/ui/screenshots/` | ~0.5 day |
-| **FE-10 orienting** | cue conditions for `ANT_Orienting` in Arrow Focus. Today it is still taken from Perceptual Radar. | ~0.5 day |
-| **Snapshots + fatigue grid** | REQ-BE-03/04, server side. They were not in BE-11's scope. | ~0.5 day |
-| **Docs** | R17 shadow-mode note; `docs/architecture/SEQUENCE_DIAGRAMS.md` line 3 status | ~1 h |
-| **Final review** | whole-system review against the README architecture table, then the PR into `main` (the owner merges) | ~0.5 day |
+| **SRV-1: server catchup** | Port of 3 scorers, generators, inks=cvd_safe param, synthetic R16 data, BE-07 clustering | Merged & Verified |
+| **ART-1: brand references** | Flat line art Loti, Momo dolphin, Loti wordmark logo, dot board with blobs | Merged & Verified |
+| **F-A: insights quality** | practice-adjusted RCI; "Building your profile" state; low-effort flags; EZ-diffusion (`DDM_Caution`); `SESSIONS_PER_WEEK` 4 → 3; Tower limits in how-to-play; ExerciseDemo colours under cvd_safe | Done & Tested |
+| **F-C: real-server wiring** | dashboard on the BE-11 profile contract (`docs/ui/contracts.md`); no forecast drawn while `validated` is false (R17); coach chat behind consent purpose 2; send `schema_type`/`session_id`/`seq`/`inks`; handle 413/422/429/501/503; shared Loti script file; verified old `estimates`/`snapshots`/`latent_vector` keys dropped | Done & Tested |
+| **FE-10 orienting** | cue conditions (`center` vs `spatial`) for `ANT_Orienting` in Arrow Focus with UFOV peripheral accuracy fallback | Done & Tested |
+| **Snapshots + fatigue grid** | REQ-BE-03 historical snapshots and REQ-BE-04 fatigue grid, implemented in `brain_twin_jepa/profile.py` | Done & Tested |
+| **Docs** | R17 shadow-mode note in `TASKS_AND_DIMENSIONS.md`; `SEQUENCE_DIAGRAMS.md` line 3 live endpoint status | Done |
+| **TD-05: cleanup & verification** | full verification pass: frontend QA checks, backend pytest suite, Playwright e2e | Done |
 
 ## 4. Accepted minors
 - **CI only:** in `e2e/newExercises.spec.ts` Stop Light, GitHub's headless Linux Chromium never sees the stop sign at 400 ms into the arrow, while local Edge always does. The screenshot step now records a note instead of failing. Investigate with a CI trace: the sign is flipped through `style.visibility` inside a fake-clock timer. (no action unless they matter)

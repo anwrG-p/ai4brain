@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { TelemetryEvent } from '../assessment/telemetry/types'
 import { newId } from '../assessment/tasks/taskSource'
 import { isInputId, type InputScore, type TaskScores } from './pillars'
-import { taskScores } from './taskScores'
+import { isLowEffort, taskScores } from './taskScores'
 
 /* Completed sessions on this device (R5): each one's per-input scores from taskScores(). Versioned
    like the goals slice and cleared by the privacy purge. Member 3's server profile can replace it. */
@@ -17,6 +17,7 @@ export type SessionRecord = {
   /** ISO 8601, when the session finished. */
   at: string
   inputs: TaskScores
+  low_effort?: boolean
 }
 
 export interface SessionState {
@@ -45,7 +46,8 @@ function cleanRecord(x: unknown): SessionRecord | null {
     const v = cleanInput(value)
     if (isInputId(key) && v) clean[key] = v
   }
-  return { id, at, inputs: clean }
+  const low_effort = (x as Record<string, unknown>).low_effort === true ? true : undefined
+  return { id, at, inputs: clean, ...(low_effort ? { low_effort: true } : {}) }
 }
 
 /** Reads the stored sessions; corrupt, foreign or other-version data reads as empty, and a bad
@@ -97,6 +99,7 @@ export function saveRun(events: readonly TelemetryEvent[], taskIds?: Iterable<st
   const own = ids ? events.filter((e) => ids.has(e.task_id)) : events
   const inputs = taskScores(own)
   if (Object.keys(inputs).length === 0) return false
-  useSessionStore.getState().addSession({ id: newId(), at: new Date().toISOString(), inputs })
+  const low_effort = isLowEffort(own)
+  useSessionStore.getState().addSession({ id: newId(), at: new Date().toISOString(), inputs, ...(low_effort ? { low_effort: true } : {}) })
   return true
 }

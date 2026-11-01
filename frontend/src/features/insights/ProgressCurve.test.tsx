@@ -78,4 +78,12 @@ describe('ProgressCurve', () => {
     rerender(<ProgressCurve history={hist(41)} now={NOW} />)
     expect(screen.getByText('Your score: 41 after 1 session.')).toHaveClass('sr-only')
   })
+  it('displays "Building your profile" note before 3 sessions', () => {
+    const { rerender } = render(<ProgressCurve history={hist(40)} now={NOW} />)
+    expect(screen.getByTestId('building-profile-note')).toHaveTextContent('Building your profile (1 of 3 sessions completed to unlock projections and practice style)')
+    rerender(<ProgressCurve history={hist(40, 44)} now={NOW} />)
+    expect(screen.getByTestId('building-profile-note')).toHaveTextContent('Building your profile (2 of 3 sessions completed to unlock projections and practice style)')
+    rerender(<ProgressCurve history={hist(40, 44, 48)} now={NOW} />)
+    expect(screen.queryByTestId('building-profile-note')).toBeNull()
+  })
 })

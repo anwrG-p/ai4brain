@@ -288,5 +288,5 @@ export type PalParams = {
 export type FlankerParams = {
   time_limit_ms: number
   fixation_ms: number
-  trials: { dir: 'left' | 'right'; congruent: boolean }[]
+  trials: { dir: 'left' | 'right'; congruent: boolean; cue?: 'center' | 'spatial' }[]
 }

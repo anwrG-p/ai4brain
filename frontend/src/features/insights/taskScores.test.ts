@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Dimension, TelemetryEvent, TrialMeta } from '../assessment/telemetry/types'
 import { pillarScores } from './pillars'
-import { dPrime, ldi, probit, schemaOf, taskScores } from './taskScores'
+import { dPrime, ezDiffusionBoundary, isLowEffort, ldi, probit, schemaOf, taskScores } from './taskScores'
 
 let seq = 0
 function ev(
@@ -309,5 +309,59 @@ describe('Mental Agility does not reward doing nothing', () => {
     })
     expect(agility.score).toBeGreaterThan(40)
     expect(agility.score).toBeLessThan(85)
+  })
+})
+
+describe('isLowEffort', () => {
+  it('does not flag normal engaged runs', () => {
+    const normal = Array.from({ length: 10 }, (_, k) =>
+      ev({ congruent: k % 2 === 0, response: k % 2 === 0 ? 'left' : 'right' }, { ok: true, rt: 450 + k * 10, dim: 'executive_function' })
+    )
+    expect(isLowEffort(normal)).toBe(false)
+  })
+
+  it('flags runs with implausibly fast reaction times (<150ms)', () => {
+    const tooFast = Array.from({ length: 10 }, () =>
+      ev({ congruent: true, response: 'red' }, { ok: true, rt: 90, dim: 'executive_function' })
+    )
+    expect(isLowEffort(tooFast)).toBe(true)
+  })
+
+  it('flags runs with high timeout rates (>50%)', () => {
+    const timeouts = Array.from({ length: 10 }, (_, k) =>
+      ev({ congruent: true, response: k < 6 ? 'none' : 'blue' }, { ok: k >= 6, rt: k < 6 ? 5000 : 600, dim: 'executive_function' })
+    )
+    expect(isLowEffort(timeouts)).toBe(true)
+  })
+
+  it('flags runs with repetitive button mashing (>90% same response)', () => {
+    const repetitive = Array.from({ length: 10 }, () =>
+      ev({ flanker: 'congruent', response: 'left' }, { ok: true, rt: 400, dim: 'executive_function' })
+    )
+    expect(isLowEffort(repetitive)).toBe(true)
+  })
+})
+
+describe('ezDiffusionBoundary', () => {
+  it('returns boundary separation a for 2AFC speeded trials', () => {
+    const trials = Array.from({ length: 20 }, (_, k) =>
+      ev({ flanker: 'congruent', response: 'left' }, { ok: k < 18, rt: 500 + (k % 4) * 40, dim: 'executive_function' })
+    )
+    const a = ezDiffusionBoundary(trials)
+    expect(a).not.toBeNull()
+    expect(a!).toBeGreaterThan(0.05)
+    expect(a!).toBeLessThan(0.35)
+  })
+
+  it('returns higher caution boundary for slower and more accurate responding', () => {
+    const cautious = Array.from({ length: 20 }, (_, k) =>
+      ev({ flanker: 'congruent', response: 'left' }, { ok: true, rt: 800 + (k % 5) * 60, dim: 'executive_function' })
+    )
+    const hurried = Array.from({ length: 20 }, (_, k) =>
+      ev({ flanker: 'congruent', response: 'left' }, { ok: k < 14, rt: 350 + (k % 3) * 20, dim: 'executive_function' })
+    )
+    const aCautious = ezDiffusionBoundary(cautious)!
+    const aHurried = ezDiffusionBoundary(hurried)!
+    expect(aCautious).toBeGreaterThan(aHurried)
   })
 })

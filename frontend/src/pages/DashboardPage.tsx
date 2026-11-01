@@ -14,6 +14,8 @@ import {
   weakestPillar,
   type GoalLine,
 } from '../features/insights/dashboard'
+import { fetchProfile, profileToPillars, type ProfileResponse } from '../features/insights/profileApi'
+import { usingMocks } from '../features/assessment/tasks/taskSource'
 import { hasGoalsForYear, useGoalsStore, weeklyGoal, weeklyGoalText, type WeeklyGoal } from '../features/insights/goals'
 import { PastResults } from '../features/insights/PastResults'
 import { PillarRadar, REAL_IMPROVEMENT } from '../features/insights/PillarRadar'
@@ -58,8 +60,20 @@ export default function DashboardPage() {
   const name = useAppStore((s) => s.userProfile?.preferredName)
   // ponytail: "now" is read once per visit; the page does not tick over midnight.
   const [now] = useState(() => new Date())
+  const [profile, setProfile] = useState<ProfileResponse | null>(null)
 
-  const pillars = useMemo(() => currentPillars(sessions), [sessions])
+  useEffect(() => {
+    if (usingMocks()) return
+    let live = true
+    fetchProfile().then((data) => {
+      if (live && data) setProfile(data)
+    })
+    return () => { live = false }
+  }, [])
+
+  const localPillars = useMemo(() => currentPillars(sessions), [sessions])
+  const serverPillars = useMemo(() => (profile ? profileToPillars(profile) : null), [profile])
+  const pillars = serverPillars ?? localPillars
   const improved = useMemo(() => improvedPillars(sessions), [sessions])
   const history = useMemo(() => unifiedHistory(sessions), [sessions])
   const weakest = weakestPillar(pillars) ?? undefined
@@ -133,7 +147,13 @@ export default function DashboardPage() {
       </section>
 
       <Explore>
-        <Why weakest={weakest} pillars={pillars} improved={improved.length > 0} />
+        <Why
+          weakest={weakest}
+          pillars={pillars}
+          improved={improved.length > 0}
+          whyThis={profile?.why_this}
+          archetype={profile?.archetype?.name}
+        />
         <Goals week={weeklyGoal(sessions, now)} lines={goalList} context={context} onAction={onLoti} />
         <ExploreBlock title="Past results" className="md:col-span-2">
           <PastResults sessions={sessions} />
@@ -186,7 +206,19 @@ function ExploreBlock({ title, children, className }: { title: string; children:
   )
 }
 
-function Why({ weakest, pillars, improved }: { weakest: PillarId | undefined; pillars: Record<PillarId, PillarScore>; improved: boolean }) {
+function Why({
+  weakest,
+  pillars,
+  improved,
+  whyThis,
+  archetype,
+}: {
+  weakest: PillarId | undefined
+  pillars: Record<PillarId, PillarScore>
+  improved: boolean
+  whyThis?: { kind: string; reason: string }[]
+  archetype?: string
+}) {
   return (
     <ExploreBlock title="Why Loti picked this">
       <div className="space-y-2 text-base text-ink">
@@ -199,6 +231,16 @@ function Why({ weakest, pillars, improved }: { weakest: PillarId | undefined; pi
           <p>Loti picks a skill once your first session is done.</p>
         )}
         {improved && <p>&ldquo;{REAL_IMPROVEMENT}&rdquo; means the change is bigger than everyday ups and downs.</p>}
+        {archetype && (
+          <p className="text-sm text-ink-muted">Practice style: {archetype}.</p>
+        )}
+        {whyThis && whyThis.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {whyThis.slice(0, 3).map((w, idx) => (
+              <p key={idx} className="text-sm text-ink-muted">{w.reason}</p>
+            ))}
+          </div>
+        )}
       </div>
     </ExploreBlock>
   )

@@ -111,6 +111,21 @@ SNAPSHOT = {
     "forecast_reason": "null",
     "collaboration": {"status": "str"},
     "why_this": [{"kind": "str", "reason": "str", "at": "str"}],
+    "snapshots": [{
+        "snapshot_id": "str",
+        "timestamp_iso": "str",
+        "trigger_event": "str",
+        "profile_pct": {p: "number" for p in profile.PILLARS},
+        "uncertainty_sigma": {p: "number" for p in profile.PILLARS},
+        "cluster_id": "str",
+    }],
+    "fatigue_grid": [{
+        "day_of_week": "number",
+        "time_of_day_bucket": "str",
+        "mean_rt_ms": "number",
+        "error_rate": "number",
+        "session_count": "number",
+    }],
 }
 
 
@@ -407,3 +422,14 @@ def test_every_coach_line_fits_lotis_shape(pillar, sign):
     for line in lines:
         assert fit_bubbles(line) == line, line  # one bubble of at most 12 words
         assert numbers_in(line) == set() and lint_text(line) == []
+
+def test_req_be_03_historical_snapshots_and_req_be_04_fatigue_grid(client, with_model, with_twin):
+    add_user("u_time_travel", 3)
+    body = client.get(PROFILE, params={"user_id": "u_time_travel"}).json()
+    assert body["status"] == "ok"
+    assert "snapshots" in body and len(body["snapshots"]) == 3
+    s0 = body["snapshots"][0]
+    assert "snapshot_id" in s0 and "profile_pct" in s0 and "uncertainty_sigma" in s0
+    assert "fatigue_grid" in body and len(body["fatigue_grid"]) > 0
+    fg0 = body["fatigue_grid"][0]
+    assert "day_of_week" in fg0 and "mean_rt_ms" in fg0 and "error_rate" in fg0

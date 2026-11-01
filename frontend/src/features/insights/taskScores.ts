@@ -71,6 +71,7 @@ export const UFOV_MAX_MS = 500 // the top of the UFOV duration grid
 export const SSRT_BEST_MS = 150 // SSRT 150 ms -> 100, 450 ms -> 0
 export const SSRT_WORST_MS = 450
 const SST_CHANCE = 0.5 // two arrows on the go task
+export const DDM_CAUTION_MAX = 0.25 // EZ-diffusion boundary a: 0 -> 0, 0.25 -> 100
 export const FLANKER_COST_MAX_MS = 200 // flanker cost 0 ms -> 100, 200 ms -> 0
 const FLANKER_CHANCE = 0.5 // two arrows
 // Exclusion rules of the consensus guide (Verbruggen et al. 2019), evidence, not tuning: outside
@@ -173,7 +174,31 @@ export function taskScores(events: readonly TelemetryEvent[]): TaskScores {
   const uf = get('ufov')
   const thresholds = uf.map((e) => num(e, 'quest_threshold_ms')).filter((t): t is number => t !== null)
   if (thresholds.length) out.UFOV_SOA = input((UFOV_MAX_MS - mean(thresholds)) / (UFOV_MAX_MS - UFOV_MIN_MS), uf.length)
-  if (uf.length) out.ANT_Orienting = input(share(uf, (e) => e.trial_meta?.peripheral_ok === true), uf.length)
+  // ANT_Orienting: Arrow Focus's orienting effect (center cue RT - spatial cue RT on correct trials)
+  // when cue conditions are present (FE-10); otherwise falls back to UFOV's peripheral accuracy.
+  const flCues = fl.filter((e) => e.trial_meta?.cue === 'center' || e.trial_meta?.cue === 'spatial')
+  if (flCues.length >= 8) {
+    const center = flCues.filter((e) => e.trial_meta?.cue === 'center' && ok(e))
+    const spatial = flCues.filter((e) => e.trial_meta?.cue === 'spatial' && ok(e))
+    if (center.length && spatial.length) {
+      const orientingBenefitMs = mean(center.map((e) => e.response_time_ms)) - mean(spatial.map((e) => e.response_time_ms))
+      const gate = Math.max(0, (share(flCues, ok) - 0.5) / 0.5)
+      const fraction = clamp01(orientingBenefitMs / 100) * gate
+      out.ANT_Orienting = input(fraction, flCues.length)
+    }
+  } else if (uf.length) {
+    out.ANT_Orienting = input(share(uf, (e) => e.trial_meta?.peripheral_ok === true), uf.length)
+  }
+
+  // DDM_Caution: EZ-diffusion boundary separation on speeded 2AFC decisions (Stop Light go trials,
+  // Flanker, Stroop), Wagenmakers et al. 2007.
+  const speeded = [...ss.filter(isGoTrial), ...fl, ...st].filter((e) => e.response_time_ms > 0)
+  if (speeded.length >= 6) {
+    const a = ezDiffusionBoundary(speeded)
+    if (a !== null) {
+      out.DDM_Caution = input(a / DDM_CAUTION_MAX, speeded.length)
+    }
+  }
 
   const recovery = errorRecovery(events)
   if (recovery) out.ErrorRecovery = recovery
@@ -192,6 +217,87 @@ export function onRuleStream(e: TelemetryEvent): boolean {
 /** The events that count toward a block's accuracy: all of them, except n-back's off-rule events
     (the rule-stream event already holds the trial's verdict, R16). */
 export const countsToward = (e: TelemetryEvent) => schemaOf(e) !== 'n_back' || onRuleStream(e)
+
+/** Detects whether a block of telemetry events indicates disengaged or low-effort responding:
+    - Fewer than 4 events: false (not flagged)
+    - Implausibly fast RT: mean or median RT < 150 ms, or > 50% of RTs < 150 ms
+    - Accuracy at or below chance (<= 0.25) across speeded/choice tasks
+    - Excessive timeouts: > 50% timeout / 'none' responses
+    - Repetitive presses: > 90% identical response buttons on choice tasks */
+export function isLowEffort(events: readonly TelemetryEvent[]): boolean {
+  if (events.length < 4) return false
+  const rts = events.map((e) => e.response_time_ms).filter((t) => t > 0)
+  if (rts.length >= 4) {
+    const sorted = [...rts].sort((a, b) => a - b)
+    const median = sorted[Math.floor(sorted.length / 2)]!
+    const meanRt = rts.reduce((a, b) => a + b, 0) / rts.length
+    const fastCount = rts.filter((t) => t < 150).length
+    if (meanRt < 150 || median < 150 || fastCount / rts.length > 0.5) return true
+  }
+  const timeouts = events.filter((e) => e.trial_meta?.response === 'none' || e.response_time_ms >= 5000).length
+  if (timeouts / events.length > 0.5) return true
+
+  const choiceTasks = events.filter((e) => {
+    const s = schemaOf(e)
+    return s === 'stroop' || s === 'flanker' || s === 'n_back' || s === 'matrix' || s === 'stop_signal'
+  })
+  if (choiceTasks.length >= 6) {
+    const acc = choiceTasks.filter(ok).length / choiceTasks.length
+    if (acc <= 0.25) return true
+  }
+
+  const responses = events
+    .map((e) => e.trial_meta?.response)
+    .filter((r): r is string => typeof r === 'string' && r !== 'none')
+  if (responses.length >= 6) {
+    const counts = new Map<string, number>()
+    for (const r of responses) counts.set(r, (counts.get(r) ?? 0) + 1)
+    const maxFreq = Math.max(...counts.values())
+    if (maxFreq / responses.length >= 0.9) return true
+  }
+
+  return false
+}
+
+/** EZ-diffusion model boundary separation a (Wagenmakers, van der Maas, & Grasman 2007)
+    for speeded 2AFC decision trials. Returns boundary separation a in diffusion units. */
+export function ezDiffusionBoundary(trials: readonly TelemetryEvent[], s = 0.1): number | null {
+  const n = trials.length
+  if (n < 6) return null
+  const correct = trials.filter(ok)
+  const nCorrect = correct.length
+  let pc: number
+  if (nCorrect === n) {
+    pc = 1 - 1 / (2 * n)
+  } else if (nCorrect === 0) {
+    pc = 1 / (2 * n)
+  } else {
+    pc = nCorrect / n
+  }
+  if (Math.abs(pc - 0.5) < 1e-5) pc = pc >= 0.5 ? 0.5001 : 0.4999
+
+  const rtsSec = correct.map((e) => e.response_time_ms / 1000)
+  let vRt: number
+  if (rtsSec.length > 1) {
+    const m = rtsSec.reduce((a, b) => a + b, 0) / rtsSec.length
+    vRt = rtsSec.reduce((a, b) => a + (b - m) ** 2, 0) / (rtsSec.length - 1)
+  } else if (rtsSec.length === 1) {
+    vRt = 0.04
+  } else {
+    const allRts = trials.map((e) => e.response_time_ms / 1000)
+    const m = allRts.reduce((a, b) => a + b, 0) / allRts.length
+    vRt = allRts.length > 1 ? allRts.reduce((a, b) => a + (b - m) ** 2, 0) / (allRts.length - 1) : 0.04
+  }
+  vRt = Math.max(vRt, 1e-4)
+
+  const logitP = Math.log(pc / (1 - pc))
+  const sign = pc > 0.5 ? 1 : -1
+  const numVal = logitP * (pc * pc * logitP - pc * logitP + pc - 0.5)
+  const inner = Math.max(numVal / vRt, 1e-6)
+  let v = sign * s * Math.pow(inner, 0.25)
+  if (Math.abs(v) < 1e-6) v = 1e-6 * sign
+  return Math.abs((s * s * logitP) / v)
+}
 
 const ruleStream = (nb: TelemetryEvent[]) => nb.filter(onRuleStream)
 const isSwitch = (e: TelemetryEvent) => e.trial_meta?.trial_type === 'switch'

@@ -111,6 +111,11 @@ export function ProgressCurve({ history, now }: ProgressCurveProps) {
           </li>
         ))}
       </ul>
+      {history.length < PROJECT_FROM && (
+        <p className="mt-2 text-sm text-ink-muted" data-testid="building-profile-note">
+          Building your profile ({history.length} of {PROJECT_FROM} sessions completed to unlock projections and practice style)
+        </p>
+      )}
     </figure>
   )
 }

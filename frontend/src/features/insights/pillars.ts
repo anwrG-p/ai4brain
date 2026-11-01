@@ -109,7 +109,7 @@ export type PillarScore = {
 export const MIN_COVERAGE = 0.3
 const MAX_UNCERTAINTY = 50
 /** Inputs with no source by design: they lower `coverage` but do not widen the band forever. */
-export const UNSOURCED_INPUTS: readonly InputId[] = ['DDM_Caution']
+export const UNSOURCED_INPUTS: readonly InputId[] = []
 
 /** Scores every pillar from the inputs that are there, renormalising the weights over them.
     Uncertainty: each input's standard error is taken as the worst-case binomial one, 50 / sqrt(trials)
