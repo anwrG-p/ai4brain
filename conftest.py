@@ -18,6 +18,10 @@ def _isolated_task_registry(tmp_path_factory, monkeypatch):
     The served dispatcher has no worker process or writer thread, and the rate limit starts empty."""
     registry = tmp_path_factory.mktemp("task_registry")
     monkeypatch.setenv("TASK_REGISTRY_DIR", str(registry))
+    # The LLM pool worker (BE-13) stays off in every test, even with a developer's key in
+    # backend/.env; its tests build one with a mocked transport. Its archive is temporary too.
+    monkeypatch.setenv("LLM_POOL_RPM", "0")
+    monkeypatch.setenv("LLM_VARIANT_DIR", str(tmp_path_factory.mktemp("llm_variants")))
     try:
         from dynamic_cache import api
     except ImportError:  # a checkout without the server: nothing to isolate

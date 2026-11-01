@@ -25,8 +25,11 @@ services:
       - task_registry:/data/task_registry
       # The coach chat history, same arrangement (COACH_DIR). Delete, export and retention cover it.
       - coach:/data/coach
+      # LLM task variants (BE-13) and the pool's daily call count: task content, no user data.
+      - llm_variants:/data/llm_variants
 
 volumes:
   telemetry:
   task_registry:
   coach:
+  llm_variants:

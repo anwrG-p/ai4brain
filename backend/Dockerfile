@@ -18,15 +18,16 @@ COPY clustering_engine/ clustering_engine/
 COPY dynamic_cache/ dynamic_cache/
 COPY backend/app/ backend/app/
 
-# Run as an unprivileged user; it owns only the telemetry, task registry and coach folders.
+# Run as an unprivileged user; it owns only the telemetry, task registry, coach and LLM variant folders.
 RUN useradd --system --no-create-home --uid 10001 app \
-    && mkdir -p /data/telemetry /data/task_registry /data/coach \
-    && chown app /data/telemetry /data/task_registry /data/coach
+    && mkdir -p /data/telemetry /data/task_registry /data/coach /data/llm_variants \
+    && chown app /data/telemetry /data/task_registry /data/coach /data/llm_variants
 USER app
 
 ENV TELEMETRY_DIR=/data/telemetry
 ENV TASK_REGISTRY_DIR=/data/task_registry
 ENV COACH_DIR=/data/coach
+ENV LLM_VARIANT_DIR=/data/llm_variants
 EXPOSE 8000
 
 CMD ["uvicorn", "app.main:app", "--app-dir", "backend", "--host", "0.0.0.0", "--port", "8000"]

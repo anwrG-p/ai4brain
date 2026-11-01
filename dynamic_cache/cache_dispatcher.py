@@ -49,6 +49,11 @@
   which the retention CLI runs). Both read one setting, env RETENTION_DAYS (default 30): the
   server passes it in through dynamic_cache.api, the CLI uses it as its --days default.
   forget() and export() back the privacy delete and export.
+- LLM variants (BE-13, llm_worker.py): offer() puts already-validated entries with a non-procedural
+  `source` into pools in use, at the front (served first, never trimmed first), within the pool's
+  demand target and the byte caps, replacing procedural stock when the pool is full. Their
+  session recipe records that source, and a replay looks the body up through `variants` (they
+  cannot be rebuilt from a seed).
 
 Thread safety: a per-user lock serialises one user's calls (so a double GET in the same session
 cannot hand out two tasks); one dispatcher lock guards the pools and the user table.
@@ -140,7 +145,11 @@ class NoFreshTask(RuntimeError):
 class Entry(NamedTuple):
     task_id: str
     body: bytes  # the TaskPayload as JSON
-    seed: int
+    seed: int  # meaningless unless source == PROCEDURAL
+    source: str = "procedural"  # or "llm" (BE-13): not rebuildable from the seed
+
+
+PROCEDURAL = "procedural"
 
 
 class Served(NamedTuple):
@@ -392,6 +401,7 @@ class Dispatcher:
         trials: Callable[[str, str], Sequence[Trial]] = lambda key, schema: [],
         pillars: Callable[[str], Mapping[str, float | None] | None] = lambda key: None,
         archetype: Callable[[str], str] = lambda key: NEUTRAL,
+        variants: Callable[[str], bytes | None] = lambda task_id: None,
         difficulty_rule: Callable[..., float] | None = None,
         clock: Callable[[], float] = time.time,
         seed_source: Callable[[], int] = lambda: random.SystemRandom().randrange(2**32),
@@ -407,6 +417,7 @@ class Dispatcher:
         self.trials = trials
         self.pillars = pillars
         self.archetype = archetype
+        self.variants = variants  # task_id -> body of a non-procedural entry (session replays)
         self.difficulty_rule = difficulty_rule
         self.clock = clock
         self.seed_source = seed_source
@@ -1027,6 +1038,8 @@ class Dispatcher:
             if body is not None:
                 self._replays.move_to_end(rec["task_id"])
                 return body
+        if rec.get("source", PROCEDURAL) != PROCEDURAL:
+            return self.variants(rec["task_id"])  # None: the session gets a new task
         try:
             entry = build_entry(rec.get("archetype", NEUTRAL), rec["schema"], rec["theta"], rec["seed"])
         except (KeyError, TypeError, ValueError, RuntimeError):
@@ -1109,6 +1122,7 @@ class Dispatcher:
                     "schema": chosen,
                     "theta": level,
                     "seed": entry.seed,
+                    "source": entry.source,
                     "archetype": archetype,
                     "task_id": entry.task_id,
                     "at": now,
@@ -1117,6 +1131,73 @@ class Dispatcher:
             st.prune(now)
             self._mark_dirty(key)
             return Served(entry.body, entry.task_id, chosen, level, False)
+
+    # --- LLM variants (BE-13) ----------------------------------------------------------------------
+
+    def offer(self, archetype: str, schema_type: str, level: float, entries: Sequence[Entry]) -> int:
+        """Stock validated non-procedural entries (BE-13 LLM variants) in a pool in use; returns how
+        many went in. The caller (llm_worker) has already run the served schema, the solvers and
+        the content checks.
+
+        - Only a pool that exists and is in use (floor > 0) takes offers.
+        - The pool never passes its demand target (_want): when it is full, an LLM entry takes the
+          place of a procedural one (the rightmost), and stops when only paid entries are left.
+        - Every entry goes through _add, so the byte tallies and POOL_BYTES_MAX hold; the first
+          refusal stops the offer. As in _refilled, an entry above the floor counts into the growth
+          share and one within it into the floors' share (floor_bytes_max).
+        - LLM entries go to the left: served first, and never the ones _sweep trims (it pops from
+          the right).
+        Demand, activity and in-flight counts are not touched: an offer is not a pop.
+        """
+        pool_key = (archetype, schema_type, theta_level(schema_type, level))
+        with self._lock:
+            now = self._mono()
+            pool = self._pools.get(pool_key)
+            if self._closed or pool is None or self._floor(pool_key, now) == 0:
+                return 0
+            floor, want = self._floor(pool_key, now), self._want(pool_key, now)
+            taken = 0
+            for entry in entries:
+                if entry.source == PROCEDURAL:
+                    continue
+                evict = len(pool) >= want
+                if evict and (not pool or pool[-1].source != PROCEDURAL):
+                    break  # full of paid entries already
+                # Every check before the eviction, so a refused offer never costs a procedural entry.
+                size, out = len(entry.body), len(pool[-1].body) if evict else 0
+                above = len(pool) - evict >= floor
+                freed = out if evict and len(pool) > floor else 0  # the evicted entry sat above the floor
+                out_within = out if evict and len(pool) <= floor else 0  # ... or within it
+                if above and self._growth_bytes - freed + size > self.pool_growth_bytes:
+                    break  # the growth share
+                if not above and self._floor_bytes - out_within + size > self.floor_bytes_max:
+                    break  # the floors' share
+                if self._pool_bytes - out + size > self.pool_bytes_max:
+                    break  # the hard cap
+                if evict:
+                    self._take(pool_key, pool.pop())
+                    self._growth_bytes -= freed
+                    self._floor_bytes -= out_within
+                if not self._add(pool_key, entry):
+                    break  # the hard cap (not reached: checked above)
+                pool.appendleft(pool.pop())  # _add appended it on the right
+                if above:
+                    self._growth_bytes += size
+                else:
+                    self._floor_bytes += size
+                taken += 1
+            return taken
+
+    def pool_stock(self) -> dict[tuple[str, str, float], tuple[int, int]]:
+        """The pools in use (floor > 0) as (entries, non-procedural entries), so the LLM worker
+        fills only pools that serve someone."""
+        with self._lock:
+            now = self._mono()
+            return {
+                k: (len(p), sum(e.source != PROCEDURAL for e in p))
+                for k, p in self._pools.items()
+                if self._floor(k, now) > 0
+            }
 
     def close(self) -> None:
         """Stop the worker processes, the pumper and the writer, and write what is pending.
