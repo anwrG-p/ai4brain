@@ -2,7 +2,7 @@ import { PREFS_KEY, useDevicePrefs } from '../../state/devicePrefs'
 import { useAppStore } from '../../state/useAppStore'
 import { useEmilyStore } from '../../state/useEmilyStore'
 import { COACH_CONSENT_KEY, CONSENT_KEY, QUEUE_KEY, tracker } from '../assessment/telemetry/tracker'
-import { forgetUserId, UID_KEY } from '../assessment/tasks/taskSource'
+import { forgetUserId, getUserId, UID_KEY, usingMocks } from '../assessment/tasks/taskSource'
 import { GOALS_KEY, useGoalsStore } from '../insights/goals'
 import { SESSIONS_KEY, useSessionStore } from '../insights/sessionStore'
 import { useLotiSession, type LotiTalk } from '../loti/lotiSession'
@@ -78,14 +78,41 @@ export function downloadMyData(now = new Date()): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-/* The privacy purge, on this device only (server-side deletion is Member 4's route): the queued
-   answers, both consent choices (back to not chosen, so nothing is sent until the user chooses
-   again), the anonymous id, sessions, goals, Loti's talk, the mood prefs (guess off, notice
-   unseen) with any mood correction, and the profile
-   (sign-out). The mood guess goes back OFF (its opt-in default, ADR 0002): a purge never turns it
-   on. The theme, reduce motion and colour-blind friendly inks are preferences, not data, so they
-   survive. */
-export function deleteMyData(): void {
+/** Downloads server-side telemetry and coach turns as JSONL if available. */
+export async function downloadServerData(userId = getUserId()): Promise<boolean> {
+  if (usingMocks()) return false
+  try {
+    const res = await fetch(`/v1/user/export?user_id=${encodeURIComponent(userId)}`)
+    if (!res.ok) return false
+    const blob = await res.blob()
+    if (typeof URL !== 'undefined' && URL.createObjectURL && typeof document !== 'undefined') {
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${userId.toLowerCase()}-server-data.jsonl`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
+/* The privacy purge: deletes user telemetry and task registries on the server (when connected),
+   then purges local queued answers, both consent choices, the anonymous id, sessions, goals,
+   Loti's talk, the mood prefs with any mood correction, and the profile (sign-out). */
+export async function deleteMyData(): Promise<void> {
+  const userId = getUserId()
+  if (!usingMocks()) {
+    try {
+      await fetch(`/v1/user/telemetry?user_id=${encodeURIComponent(userId)}`, { method: 'DELETE' })
+    } catch {
+      // server unreachable or mock: continue with local deletion
+    }
+  }
   const { theme, reducedMotion, resetDemoState, setTheme, setReducedMotion } = useAppStore.getState()
   resetDemoState()
   setTheme(theme)

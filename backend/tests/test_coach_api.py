@@ -507,6 +507,15 @@ def test_missing_env_file_is_fine(tmp_path):
     assert load_env_file(tmp_path / "nope.env", environ) == [] and environ == {}
 
 
+def test_env_file_strips_quotes_from_values(tmp_path):
+    env_file = tmp_path / ".env"
+    env_file.write_text('OPENROUTER_API_KEY="sk-quoted-key"\nLLM_PROVIDER=\'openrouter\'\n', encoding="utf-8")
+    environ = {}
+    assert set(load_env_file(env_file, environ)) == {"OPENROUTER_API_KEY", "LLM_PROVIDER"}
+    assert environ["OPENROUTER_API_KEY"] == "sk-quoted-key"
+    assert environ["LLM_PROVIDER"] == "openrouter"
+
+
 def test_env_file_is_gitignored():
     # The backend's .env is the one place the key may live; it must never be committed.
     root = Path(__file__).resolve().parents[2]

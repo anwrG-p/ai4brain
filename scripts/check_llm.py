@@ -55,14 +55,16 @@ def main():
             print("    Tips:")
             print("    1. Wait 1-2 minutes and retry.")
             print("    2. Or try another model in backend/.env (e.g. google/gemini-2.0-flash-exp:free or standard paid models).")
+        elif "402" in err:
+            print("\n[!] Diagnosis: HTTP 402 (Payment Required / Insufficient Credits).")
+            print("    The account balance is insufficient for this model or maximum token reservation.")
+            print("    Tips: Check your OpenRouter credit balance or select a free model.")
         elif "401" in err:
             print("\n[!] Diagnosis: HTTP 401 (Unauthorized).")
             print("    Your API key was rejected by OpenRouter. Please check the key in backend/.env.")
-        elif "404" in err:
-            print(f"\n[!] Diagnosis: Model '{model}' not found on OpenRouter.")
-    except Exception as e:
-        print(f"\n[-] Unexpected connection error: {type(e).__name__}: {e}")
+        elif "ConnectError" in err or "SSL" in err:
+            print("\n[!] Diagnosis: Network / SSL Error.")
+            print("    Could not establish TLS connection to OpenRouter API.")
 
 if __name__ == "__main__":
     main()
-

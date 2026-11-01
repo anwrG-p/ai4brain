@@ -3,7 +3,7 @@ import { Button } from '../components/ui/Button'
 import { tracker, type Consent } from '../features/assessment/telemetry/tracker'
 import { ConsentChoices, type ConsentChoice } from '../features/flow/ConsentChoices'
 import { COACH_ENABLED } from '../features/loti/coachAdapter'
-import { deleteMyData, downloadMyData } from '../features/privacy/myData'
+import { deleteMyData, downloadMyData, downloadServerData } from '../features/privacy/myData'
 
 const CONSENT_LINE: Record<Consent, string> = {
   pending: 'Not chosen yet. Your answers stay on this device.',
@@ -25,8 +25,8 @@ const QUIET = 'focus-ring inline-flex min-h-11 cursor-pointer items-center round
 
 /* Privacy: each purpose's status in one line (research #6: saving answers, AI replies from Loti)
    with one control that opens both switches to change them (R3, equal weight), one sentence on what
-   is recorded, then two quiet links: "Export my data" (one JSON file) and "Delete my data" behind a
-   confirmation (rules 13, 14: the only primary button is inside the open choice). */
+   is recorded, then two quiet links: "Export my data" (local JSON + server telemetry) and "Delete my data"
+   behind a confirmation (rules 13, 14: the only primary button is inside the open choice). */
 export default function PrivacyPage() {
   const { consent, coachConsent } = useSyncExternalStore(subscribeTracker, currentStatus)
   const [choosing, setChoosing] = useState(false)
@@ -69,7 +69,14 @@ export default function PrivacyPage() {
 
       <div>
         <div className="flex flex-wrap gap-x-6">
-          <button type="button" onClick={() => downloadMyData()} className={`${QUIET} text-brand`}>
+          <button
+            type="button"
+            onClick={() => {
+              downloadMyData()
+              void downloadServerData()
+            }}
+            className={`${QUIET} text-brand`}
+          >
             Export my data
           </button>
           <button type="button" onClick={() => setConfirming(true)} className={`${QUIET} text-danger`}>
@@ -85,7 +92,7 @@ export default function PrivacyPage() {
         <ConfirmDelete
           onCancel={() => setConfirming(false)}
           onConfirm={() => {
-            deleteMyData()
+            void deleteMyData()
             setConfirming(false)
             setChoosing(false)
             setDeleted(true)

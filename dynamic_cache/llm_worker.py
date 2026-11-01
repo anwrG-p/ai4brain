@@ -89,7 +89,7 @@ LLM_SOURCE = "llm"
 SCHEMAS: tuple[str, ...] = ("relational", "stroop", "matrix")
 VARIANTS_PER_CALL = {"relational": 1, "stroop": 2, "matrix": 6}
 # A relational block (90-120 items) is about 8k tokens of JSON.
-MAX_OUTPUT_TOKENS = {"relational": 16384, "stroop": 8192, "matrix": 4096}
+MAX_OUTPUT_TOKENS = {"relational": 4096, "stroop": 2048, "matrix": 2048}
 LLM_PER_POOL = 8  # LLM variants kept per pool at most; the procedural ones fill the rest
 CALL_TIMEOUT_S = 90.0  # one generateContent call, whole task blocks: far above Loti's 3 s
 TEMPERATURE = 0.9  # variety: these are content variants
@@ -404,8 +404,22 @@ def _no_constant(token: str) -> Any:
     raise VariantParseError("NaN or Infinity")
 
 
+def strip_markdown_fences(text: str) -> str:
+    """Strip markdown code block fences (```json ... ``` or ``` ... ```) and surrounding whitespace."""
+    s = text.strip()
+    if s.startswith("```"):
+        lines = s.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        s = "\n".join(lines).strip()
+    return s
+
+
 def parse_variants(text: str, count: int) -> list:
     """The variants of a strict-JSON reply. Raises VariantParseError on anything else."""
+    text = strip_markdown_fences(text)
     try:
         doc = json.loads(text, object_pairs_hook=_no_duplicate_keys, parse_constant=_no_constant)
     except VariantParseError:
@@ -659,10 +673,13 @@ class LlmPoolWorker:
         except Exception as e:  # noqa: BLE001 - anything else fails safe too
             failure = type(e).__name__
         if failure is not None:
-            limited = failure == "HTTP 429"
+            limited = failure in ("HTTP 429", "HTTP 402")
             self.stats["rate_limited" if limited else "errors"] += 1
             self._backoff(now, RATE_LIMIT_BACKOFF_S if limited else ERROR_BACKOFF_S)
-            log.warning("LLM pool call failed (%s); procedural pools keep serving", failure)
+            if failure == "HTTP 402":
+                log.warning("LLM pool call failed (HTTP 402 Payment Required: account credits low or model quota exceeded); backing off 300s. Procedural pools keep serving.")
+            else:
+                log.warning("LLM pool call failed (%s); procedural pools keep serving", failure)
             return "error"
         self._failures = 0
 

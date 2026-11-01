@@ -63,13 +63,23 @@ class GeminiBlocked(GeminiError):
     """Gemini's own safety filter blocked the prompt or the reply."""
 
 
+def clean_env_val(val: Optional[str]) -> str:
+    """Strip whitespace and surrounding single or double quotes."""
+    if not val:
+        return ""
+    s = val.strip()
+    if len(s) >= 2 and ((s[0] == '"' and s[-1] == '"') or (s[0] == "'" and s[-1] == "'")):
+        s = s[1:-1].strip()
+    return s
+
+
 def config_from_env(environ: Optional[Mapping[str, str]] = None) -> Optional[Tuple[str, str]]:
     """(api key, model id) from GEMINI_API_KEY / GEMINI_MODEL, or None when no key is set."""
     env = os.environ if environ is None else environ
-    key = (env.get("GEMINI_API_KEY") or "").strip()
+    key = clean_env_val(env.get("GEMINI_API_KEY"))
     if not key:
         return None
-    return key, (env.get("GEMINI_MODEL") or "").strip() or DEFAULT_MODEL
+    return key, clean_env_val(env.get("GEMINI_MODEL")) or DEFAULT_MODEL
 
 
 class GeminiRunner:
@@ -82,10 +92,11 @@ class GeminiRunner:
         timeout_s: float = TIMEOUT_S,
         transport: Optional[httpx.BaseTransport] = None,
     ):
-        if not api_key or not api_key.strip():
+        clean_key = clean_env_val(api_key)
+        if not clean_key:
             raise ValueError("api_key is empty")
-        self._api_key = api_key.strip()
-        self.model = model
+        self._api_key = clean_key
+        self.model = clean_env_val(model) or DEFAULT_MODEL
         self.timeout_s = timeout_s
         self._client = httpx.Client(timeout=httpx.Timeout(timeout_s), transport=transport)
 

@@ -32,6 +32,15 @@ def test_with_a_key_config_reads_the_default_model():
     assert config_from_env({"OPENROUTER_API_KEY": f" {KEY} "}) == (KEY, DEFAULT_MODEL)
 
 
+def test_config_from_env_strips_surrounding_quotes():
+    assert config_from_env({"OPENROUTER_API_KEY": f'"{KEY}"'}) == (KEY, DEFAULT_MODEL)
+    assert config_from_env({"OPENROUTER_API_KEY": f"'{KEY}'"}) == (KEY, DEFAULT_MODEL)
+    assert config_from_env({
+        "OPENROUTER_API_KEY": f'"{KEY}"',
+        "OPENROUTER_MODEL": '"openai/gpt-4o"',
+    }) == (KEY, "openai/gpt-4o")
+
+
 def test_custom_model_from_env():
     r = OpenRouterRunner.from_env({"OPENROUTER_API_KEY": KEY, "OPENROUTER_MODEL": "anthropic/claude-3.5-sonnet"})
     assert r is not None
@@ -111,6 +120,31 @@ def test_json_schema_triggers_json_object_response_format():
     assert out == '{"reason": "ok", "risk": "none"}'
 
 
+def test_generate_strips_markdown_fences_when_json_schema_provided():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": '```json\n{"reason": "focus", "risk": "none"}\n```'
+                        },
+                        "finish_reason": "stop",
+                    }
+                ]
+            },
+        )
+
+    runner = fake_runner(handler)
+    out = runner.generate(
+        "Classifier prompt",
+        [{"role": "user", "parts": [{"text": "Hello"}]}],
+        json_schema={"type": "object"},
+    )
+    assert out == '{"reason": "focus", "risk": "none"}'
+
+
 # -- error handling --------------------------------------------------------------------------------
 
 
@@ -153,4 +187,3 @@ def test_empty_reply_raises_openrouter_error():
     runner = fake_runner(handler)
     with pytest.raises(OpenRouterError, match="empty reply"):
         runner([{"role": "user", "content": "hi"}])
-

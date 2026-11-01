@@ -52,13 +52,36 @@ class OpenRouterBlocked(GeminiBlocked, OpenRouterError):
     """OpenRouter or upstream provider content filter blocked the prompt or reply."""
 
 
+def clean_env_val(val: Optional[str]) -> str:
+    """Strip whitespace and surrounding single or double quotes."""
+    if not val:
+        return ""
+    s = val.strip()
+    if len(s) >= 2 and ((s[0] == '"' and s[-1] == '"') or (s[0] == "'" and s[-1] == "'")):
+        s = s[1:-1].strip()
+    return s
+
+
+def strip_markdown_fences(text: str) -> str:
+    """Strip markdown code block fences (```json ... ``` or ``` ... ```) and surrounding whitespace."""
+    s = text.strip()
+    if s.startswith("```"):
+        lines = s.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        s = "\n".join(lines).strip()
+    return s
+
+
 def config_from_env(environ: Optional[Mapping[str, str]] = None) -> Optional[Tuple[str, str]]:
     """(api key, model id) from OPENROUTER_API_KEY / OPENROUTER_MODEL, or None when no key is set."""
     env = os.environ if environ is None else environ
-    key = (env.get("OPENROUTER_API_KEY") or "").strip()
+    key = clean_env_val(env.get("OPENROUTER_API_KEY"))
     if not key:
         return None
-    model = (env.get("OPENROUTER_MODEL") or "").strip() or DEFAULT_MODEL
+    model = clean_env_val(env.get("OPENROUTER_MODEL")) or DEFAULT_MODEL
     return key, model
 
 
@@ -75,12 +98,13 @@ class OpenRouterRunner:
         site_url: str = DEFAULT_SITE_URL,
         site_name: str = DEFAULT_SITE_NAME,
     ):
-        if not api_key or not api_key.strip():
+        clean_key = clean_env_val(api_key)
+        if not clean_key:
             raise ValueError("api_key is empty")
-        self._api_key = api_key.strip()
-        self.model = model
+        self._api_key = clean_key
+        self.model = clean_env_val(model) or DEFAULT_MODEL
         self.timeout_s = timeout_s
-        self.api_url = api_url
+        self.api_url = clean_env_val(api_url) or DEFAULT_API_URL
         self.site_url = site_url
         self.site_name = site_name
         self._client = httpx.Client(timeout=httpx.Timeout(timeout_s), transport=transport)
@@ -91,7 +115,7 @@ class OpenRouterRunner:
         if config is None:
             return None
         env = os.environ if environ is None else environ
-        api_url = (env.get("OPENROUTER_BASE_URL") or "").strip() or DEFAULT_API_URL
+        api_url = clean_env_val(env.get("OPENROUTER_BASE_URL")) or DEFAULT_API_URL
         return cls(*config, api_url=api_url)
 
     def __repr__(self) -> str:
@@ -192,7 +216,10 @@ class OpenRouterRunner:
         if failure is not None:
             raise OpenRouterError(failure)
 
-        return reply_text(data)
+        text = reply_text(data)
+        if json_schema is not None:
+            text = strip_markdown_fences(text)
+        return text
 
     def _post(self, body: Dict[str, Any], end: float) -> httpx.Response:
         left = end - time.monotonic()
@@ -234,4 +261,3 @@ def reply_text(data: Any) -> str:
     if not text:
         raise OpenRouterError("empty reply")
     return text
-

@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from typing import Optional, Tuple
 
 from ai_coach.llm_gemini import config_from_env as gemini_config_from_env
-from ai_coach.llm_openrouter import config_from_env as openrouter_config_from_env
+from ai_coach.llm_openrouter import clean_env_val, config_from_env as openrouter_config_from_env
 
 
 def active_llm_config(
@@ -27,7 +27,7 @@ def active_llm_config(
          - If neither is present -> None
     """
     env = os.environ if environ is None else environ
-    pref = (env.get("LLM_PROVIDER") or "").strip().lower()
+    pref = clean_env_val(env.get("LLM_PROVIDER")).lower()
 
     openrouter_cfg = openrouter_config_from_env(env)
     gemini_cfg = gemini_config_from_env(env)
@@ -45,4 +45,3 @@ def active_llm_config(
     if openrouter_cfg:
         return ("openrouter", *openrouter_cfg)
     return None
-

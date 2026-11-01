@@ -38,8 +38,14 @@ def _isolated_task_registry(tmp_path_factory, monkeypatch):
 @pytest.fixture(autouse=True)
 def _isolated_coach_store(tmp_path_factory, monkeypatch):
     """Every suite (not only backend/tests) deletes and exports against a temporary coach chat
-    history, never the real data/processed/coach: the privacy delete and export cover that store."""
+    history, never the real data/processed/coach: the privacy delete and export cover that store.
+    Also isolate LLM keys so no test makes unexpected external API calls."""
     monkeypatch.setenv("COACH_DIR", str(tmp_path_factory.mktemp("coach")))
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_MODEL", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_MODEL", raising=False)
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
 
 
 @pytest.fixture(autouse=True)

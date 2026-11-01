@@ -14,6 +14,14 @@ from dotenv import dotenv_values
 ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
 
 
+def clean_env_val(val: str) -> str:
+    """Strip whitespace and surrounding single or double quotes."""
+    s = val.strip()
+    if len(s) >= 2 and ((s[0] == '"' and s[-1] == '"') or (s[0] == "'" and s[-1] == "'")):
+        s = s[1:-1].strip()
+    return s
+
+
 def load_env_file(
     path: Path = ENV_FILE, environ: MutableMapping[str, str] | None = None
 ) -> list[str]:
@@ -27,6 +35,6 @@ def load_env_file(
     added = []
     for name, value in dotenv_values(path).items():
         if value is not None and name not in env:
-            env[name] = value
+            env[name] = clean_env_val(value)
             added.append(name)
     return added

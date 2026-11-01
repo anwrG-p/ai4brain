@@ -238,6 +238,12 @@ def test_garbage_replies_are_rejected_not_served(setup):
     assert worker.stats["offered"] == 1 and worker.stats["rejected_duplicate"] == 1
 
 
+def test_parse_variants_accepts_markdown_code_fences():
+    from dynamic_cache.llm_worker import parse_variants
+    raw = '```json\n{"variants": [{"a": 1}]}\n```'
+    assert parse_variants(raw, 1) == [{"a": 1}]
+
+
 # --- content safety ---------------------------------------------------------------------------------
 
 
@@ -382,6 +388,7 @@ def test_no_key_means_no_call_from_the_server(monkeypatch):
     calls = []
     monkeypatch.setattr(GeminiRunner, "generate", lambda *a, **k: calls.append(1))
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("LLM_POOL_RPM", raising=False)
     api.start_llm_pool()
     try:
