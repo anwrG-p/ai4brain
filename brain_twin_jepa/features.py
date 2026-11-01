@@ -1,9 +1,9 @@
 """Session features: a faithful Python port of the frontend's scorers.
 
 Ports `frontend/src/features/insights/taskScores.ts` (telemetry events -> the doc's 0-100 inputs)
-and `pillars.ts` (inputs -> the five pillars and the unified score) as committed in cad4ad1
-(feat/ui-calm-clean), which carries ruling R16: n-back is scored on the rule's stream only
-(`telemetry/types.ts` NBACK_RULE_STREAM, parity answered on `symbol`).
+and `pillars.ts` (inputs -> the five pillars and the unified score) as committed in 96ab098 (F-B:
+Stop Light, Pair Finder and Arrow Focus), which carries ruling R16: n-back is scored on the rule's
+stream only (`telemetry/types.ts` NBACK_RULE_STREAM, parity answered on `symbol`).
 Every constant, gate and evaluation order matches the TS, so both sides agree to 1e-6 on
 `data/fixtures/golden_sessions.json` (generated from the TS by `scripts/golden/make_golden.mjs`).
 Neither file rounds: the UI rounds only for display.
@@ -36,6 +36,15 @@ PLAN_SHARE = 0.8  # OTS_Planning = 0.8 x solved in minimum moves + 0.2 x plannin
 PLAN_TIME_MAX_MS = 30_000  # half of the TOL-F 60 s limit
 UFOV_MIN_MS = 17  # one 60 Hz frame
 UFOV_MAX_MS = 500  # the top of the UFOV duration grid
+SSRT_BEST_MS = 150  # SSRT 150 ms -> 100, 450 ms -> 0
+SSRT_WORST_MS = 450
+SST_CHANCE = 0.5  # two arrows on the go task
+FLANKER_COST_MAX_MS = 200  # flanker cost 0 ms -> 100, 200 ms -> 0
+FLANKER_CHANCE = 0.5  # two arrows
+# Exclusion rules of the consensus guide (Verbruggen et al. 2019), evidence, not tuning: outside
+# this P(respond | signal) range the integration estimate is unreliable.
+SST_P_RESPOND_MIN = 0.25
+SST_P_RESPOND_MAX = 0.75
 
 # R16: the stream whose key the rule's hint names (frontend `telemetry/types.ts` NBACK_RULE_STREAM);
 # parity is answered with L (symbol).
@@ -55,8 +64,16 @@ def _is_number(v: Any) -> bool:
 
 def schema_of(e: Event) -> str | None:
     """The exercise an event came from, read from its trial_meta signature (unique per exercise).
-    Matrix logs no extra keys, so it is the pattern_induction event without relational's `hops`."""
+    Matrix logs no extra keys, so it is the pattern_induction event without relational's `hops`.
+    The newer exercises are read first: their keys are their own (Arrow Focus logs `flanker`, never
+    Stroop's `congruent`)."""
     m = _meta(e)
+    if "stop_trial" in m:
+        return "stop_signal"
+    if "pal_level" in m:
+        return "pal"
+    if "flanker" in m:
+        return "flanker"
     if "stream" in m:
         return "n_back"
     if "congruent" in m:
@@ -194,9 +211,123 @@ def _nback_d_prime(nb: Sequence[Event]) -> float | None:
     return max(0, d_prime(hits, len(signal), fas, len(noise)))
 
 
+def quantile6(sorted_xs: Sequence[float], p: float) -> float:
+    """Hyndman & Fan (1996) type-6 sample quantile of ascending `sorted_xs` (R's quantile(type = 6)):
+    h = (n + 1) p, interpolated between the order statistics around h, clamped to the ends."""
+    n = len(sorted_xs)
+    h = (n + 1) * p
+    if h <= 1:
+        return sorted_xs[0]
+    if h >= n:
+        return sorted_xs[n - 1]
+    lo = math.floor(h)
+    return sorted_xs[lo - 1] + (h - lo) * (sorted_xs[lo] - sorted_xs[lo - 1])
+
+
+def _responded(e: Event) -> bool:
+    r = _meta(e).get("response", _MISSING)
+    return isinstance(r, str) and r != "none"
+
+
+def _is_stop_trial(e: Event) -> bool:
+    return _meta(e).get("stop_trial", _MISSING) is True
+
+
+def _is_go_trial(e: Event) -> bool:
+    return _meta(e).get("stop_trial", _MISSING) is False
+
+
+def ssrt(events: Sequence[Event]) -> float | None:
+    """Stop-signal reaction time by the integration method with go omissions replaced by the
+    slowest go RT (Verbruggen et al. 2019): the type-6 quantile of the go RTs (choice errors
+    included) at p = P(respond | signal), minus the mean SSD. None under the guide's exclusion
+    rules: no stop trial or go response, a stop trial without a numeric SSD, P(respond | signal)
+    outside [0.25, 0.75], or a mean signal-respond RT not below the mean go RT."""
+    go = [e for e in events if _is_go_trial(e)]
+    stop = [e for e in events if _is_stop_trial(e)]
+    go_rts = [e["response_time_ms"] for e in go if _responded(e)]
+    ssds = [v for v in (_num(e, "ssd_ms") for e in stop) if v is not None]
+    if not stop or not go_rts or len(ssds) != len(stop):
+        return None
+    p_respond = _share(stop, _responded)
+    if p_respond < SST_P_RESPOND_MIN or p_respond > SST_P_RESPOND_MAX:
+        return None
+    # Race-model check (p_respond >= 0.25 guarantees a signal-respond trial).
+    if _mean([e["response_time_ms"] for e in stop if _responded(e)]) >= _mean(go_rts):
+        return None
+    slowest = max(go_rts)
+    dist = sorted(e["response_time_ms"] if _responded(e) else slowest for e in go)
+    return quantile6(dist, p_respond) - _mean(ssds)
+
+
+def _stop_signal_input(ss: Sequence[Event]) -> dict[str, Any] | None:
+    """SST_SSRT from Stop Light: SSRT 150 ms -> 100, 450 ms -> 0, times the go gate
+    (go accuracy - 1/2) / (1/2). A gate of 0 scores 0; an excluded SSRT gives no input.
+    `trials` = stop trials."""
+    go = [e for e in ss if _is_go_trial(e)]
+    stops = sum(1 for e in ss if _is_stop_trial(e))
+    if not stops:
+        return None
+    gate = _accuracy_gate(go, SST_CHANCE) if go else 0
+    if gate == 0:
+        return _input(0, stops)
+    value = ssrt(ss)
+    if value is None:
+        return None
+    return _input(_clamp01((SSRT_WORST_MS - value) / (SSRT_WORST_MS - SSRT_BEST_MS)) * gate, stops)
+
+
+def _pal_input(pal: Sequence[Event]) -> dict[str, Any] | None:
+    """PAL_FirstTrialMemory from Pair Finder, per task_id: right on attempt 1 over pal_total (every
+    pattern, so unreached stages count as missed), chance-corrected for one box in `boxes`, pooled
+    weighted by pal_total. A task without pal_total >= 1 and boxes >= 2 is left out."""
+    by_task: dict[Any, list[Event]] = {}
+    for e in pal:
+        by_task.setdefault(e.get("task_id"), []).append(e)
+    total = weighted = 0
+    for es in by_task.values():
+        n = _num(es[0], "pal_total")
+        boxes = _num(es[0], "boxes")
+        if n is None or n < 1 or boxes is None or boxes < 2:
+            continue
+        # JS `attempt === 1`: a number equal to 1 (1.0 counts), never bool True.
+        fams = sum(1 for e in es if _js_strict_eq(_meta(e).get("attempt", _MISSING), 1) and _ok(e))
+        chance = 1 / boxes
+        total += n
+        weighted += n * _clamp01((fams / n - chance) / (1 - chance))
+    return _input(weighted / total, total) if total else None
+
+
+def _accuracy_gate(es: Sequence[Event], chance: float) -> float:
+    """0 at accuracy `chance` or below, 1 at perfect accuracy."""
+    return _clamp01((_share(es, _ok) - chance) / (1 - chance))
+
+
+def _conflict_input(
+    es: Sequence[Event],
+    is_inc: Callable[[Event], bool],
+    is_con: Callable[[Event], bool],
+    chance: float,
+    cost_max: float,
+) -> dict[str, Any] | None:
+    """A conflict cost (Stroop, Arrow Focus): mean correct incongruent RT minus mean correct
+    congruent RT, 0 ms -> 100, `cost_max` -> 0, clamped, times the accuracy gate over all trials.
+    Without a correct trial in either condition: 0 over all trials when the gate is 0, else None."""
+    if not es:
+        return None
+    inc_ok = [e for e in es if is_inc(e) and _ok(e)]
+    con_ok = [e for e in es if is_con(e) and _ok(e)]
+    gate = _accuracy_gate(es, chance)
+    if inc_ok and con_ok:
+        cost = _mean([e["response_time_ms"] for e in inc_ok]) - _mean([e["response_time_ms"] for e in con_ok])
+        # The RT term is clamped before the gate: a negative cost must not lift a guesser.
+        return _input(_clamp01(1 - cost / cost_max) * gate, len(inc_ok) + len(con_ok))
+    return _input(0, len(es)) if gate == 0 else None
+
+
 def _stroop_gate(st: Sequence[Event]) -> float:
     """0 at chance accuracy (1 in 4 inks) or below, 1 at perfect accuracy."""
-    return _clamp01((_share(st, _ok) - STROOP_CHANCE) / (1 - STROOP_CHANCE))
+    return _accuracy_gate(st, STROOP_CHANCE)
 
 
 def _at_chance(task_events: Sequence[Event]) -> bool:
@@ -205,19 +336,27 @@ def _at_chance(task_events: Sequence[Event]) -> bool:
         return _nback_d_prime(task_events) == 0
     if schema == "stroop":
         return _stroop_gate(task_events) == 0
+    if schema == "flanker":
+        return _accuracy_gate(task_events, FLANKER_CHANCE) == 0
     return False
+
+
+# Exercises whose errors are not the user's to recover from: Stop Light's staircase holds stop
+# trials near half wrong by design; in Pair Finder the next pattern is a separate memory.
+NO_RECOVERY = frozenset({"stop_signal", "pal"})
 
 
 def _error_recovery(events: Sequence[Event]) -> dict[str, Any] | None:
     """Accuracy on the trial right after an error, within each task. A trial is wrong when any of
     its events is; for n-back only the rule-stream event (the trial's verdict) is read (R16). Tasks
-    played at chance or below (n-back d' 0, Stroop accuracy <= 1 in 4) are left out."""
+    played at chance or below (n-back d' 0, Stroop accuracy <= 1 in 4, flanker <= 1 in 2) are left
+    out, and so are the NO_RECOVERY exercises (read by the task's first event)."""
     by_task: dict[Any, list[Event]] = {}
     for e in events:
         by_task.setdefault(e.get("task_id"), []).append(e)
     after = recovered = 0
     for task_events in by_task.values():
-        if _at_chance(task_events):
+        if schema_of(task_events[0]) in NO_RECOVERY or _at_chance(task_events):
             continue
         read = _rule_stream(task_events) if schema_of(task_events[0]) == "n_back" else task_events
         trials: dict[Any, bool] = {}
@@ -262,20 +401,35 @@ def task_scores(events: Sequence[Event]) -> dict[str, dict[str, Any]]:
             (1 - cost / SWITCH_COST_MAX) * _clamp01(d / D_PRIME_GATE), len(switches) + len(quiet)
         )
 
-    # Stroop: RT cost on correct trials, gated by accuracy above chance. Incongruent accuracy
-    # stands in for SSRT.
+    # ANT_Conflict: Arrow Focus's flanker cost when the session played it; else Stroop's RT cost.
+    # Stroop's incongruent accuracy stands in for SSRT only when Stop Light was not played.
     st = get("stroop")
     inc = [e for e in st if _meta(e).get("congruent", _MISSING) is False]
-    inc_ok = [e for e in inc if _ok(e)]
-    con_ok = [e for e in st if _meta(e).get("congruent", _MISSING) is True and _ok(e)]
-    gate = _stroop_gate(st) if st else 0
-    if inc_ok and con_ok:
-        cost = _mean([e["response_time_ms"] for e in inc_ok]) - _mean([e["response_time_ms"] for e in con_ok])
-        # The RT term is clamped before the gate: a negative cost must not lift a guesser.
-        out["ANT_Conflict"] = _input(_clamp01(1 - cost / STROOP_COST_MAX_MS) * gate, len(inc_ok) + len(con_ok))
-    elif st and gate == 0:
-        out["ANT_Conflict"] = _input(0, len(st))  # no cost to measure, nothing above chance either
-    if inc:
+    fl = get("flanker")
+    if fl:
+        conflict = _conflict_input(
+            fl,
+            lambda e: _meta(e).get("flanker") == "incongruent",
+            lambda e: _meta(e).get("flanker") == "congruent",
+            FLANKER_CHANCE,
+            FLANKER_COST_MAX_MS,
+        )
+    else:
+        conflict = _conflict_input(
+            st,
+            lambda e: _meta(e).get("congruent", _MISSING) is False,
+            lambda e: _meta(e).get("congruent", _MISSING) is True,
+            STROOP_CHANCE,
+            STROOP_COST_MAX_MS,
+        )
+    if conflict:
+        out["ANT_Conflict"] = conflict
+    ss = get("stop_signal")
+    if ss:
+        sst = _stop_signal_input(ss)
+        if sst:
+            out["SST_SSRT"] = sst
+    elif inc:
         out["SST_SSRT"] = {**_input(_share(inc, _ok), len(inc)), "proxy": True}
 
     # Tower: one event per problem.
@@ -318,6 +472,11 @@ def task_scores(events: Sequence[Event]) -> dict[str, dict[str, Any]]:
         parts.append(won / total)
     if parts:
         out["FluidMatrices"] = _input(_mean(parts), len(mx) + len(rel))
+
+    # Pair Finder: first-attempt memory over every pattern of the task.
+    pal = _pal_input(get("pal"))
+    if pal:
+        out["PAL_FirstTrialMemory"] = pal
 
     # MST: a timeout ('none') counts as not "similar".
     ms = get("mst")
@@ -382,7 +541,7 @@ PILLAR_WEIGHTS: dict[str, dict[str, float]] = {
 MIN_COVERAGE = 0.3
 MAX_UNCERTAINTY = 50
 # Inputs with no source by design: they lower `coverage` but do not widen the band forever.
-UNSOURCED_INPUTS = ("DDM_Caution", "PAL_FirstTrialMemory")
+UNSOURCED_INPUTS = ("DDM_Caution",)
 
 
 def pillar_scores(inputs: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
