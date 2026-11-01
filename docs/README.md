@@ -5,7 +5,7 @@ What the product is and how to run it: the [root README](../README.md).
 ## Current
 | Doc | What it holds |
 |---|---|
-| [GLOSSARY.md](GLOSSARY.md) | Consumer words (Loti, Dolphin, Momo, the 5 skills, exercise names), retired words, banned clinical terms. |
+| [GLOSSARY.md](GLOSSARY.md) | Consumer words (Loti, Momo, the 5 skills, exercise names), retired words, banned clinical terms. |
 | [adr/](adr/) | Decisions. [0001](adr/0001-two-tier-consumer-vs-technical-telemetry.md): plain words in the UI, formulas only on "How we calculate this". [0002](adr/0002-no-server-side-emotion-inference.md): no server-side emotion inference. |
 | [design/DESIGN.md](design/DESIGN.md) | The brand v2 design system in short. Full route and design guide: `docs/design/BRAND-V2.md`. |
 | [architecture/TASKS_AND_DIMENSIONS.md](architecture/TASKS_AND_DIMENSIONS.md) | The exercises, their telemetry dimensions and the skill each one feeds. |

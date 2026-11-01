@@ -4,7 +4,16 @@ This is the current design and route map of the web app (`frontend/`). The bindi
 
 ## 1. Design in one paragraph
 
-A calm, friendly training app on a **classroom board**. The page is a wooden frame, and the app sits on the board inside it: a dotted whiteboard in light mode, a green chalkboard in dark mode. The palette is sky blue with coral accents. Headings are Quicksand (20 px and up only) and text is Inter. Buttons are pills, and there is one soft shadow. Three characters carry the emotion, so the screens don't have to: **Loti** (axolotl coach), **Dolphin** (celebrations) and **Momo** (mood). Every screen shows only what you need right now.
+A calm, friendly training app on a **board with blobs**. The page is an off-white margin, and the app sits on the board inside it: a dotted whiteboard in light mode, a green chalkboard in dark mode, with soft sky blobs in the left corners and coral blobs in the right ones. The palette is sky blue with coral accents. Headings are Quicksand (20 px and up only) in deep navy, and text is Inter. Buttons are pills, cards are rounded white, and there is one soft shadow. Icons are continuous lines with rounded caps. Two characters, drawn as flat line art, carry the emotion so the screens don't have to: **Loti** (axolotl coach) and **Momo** (dolphin: mood and celebrations). Every screen shows only what you need right now.
+
+The look follows four reference images in [`references/`](references/):
+
+| Reference | What it sets |
+|---|---|
+| [loti-moods.jpg](references/loti-moods.jpg) | Loti's three looks: low (wilted gills, sad closed eyes), balanced (wavy gills, calm smile), thriving (leafy gills, blush, sparkles, a wave) |
+| [logo-mark.jpg](references/logo-mark.jpg) | The logo mark: Loti's bust with coral-outlined gills inside an open circle arc |
+| [momo-dolphin.jpg](references/momo-dolphin.jpg) | Momo: a smiling, leaping dolphin with coral fin accents and splash marks |
+| [presentation-style.jpg](references/presentation-style.jpg) | The overall style: off-white page, soft blue and coral corner blobs, rounded white cards, deep-navy rounded headings, continuous-line icons |
 
 ## 2. Rules that shape every screen
 
@@ -21,26 +30,34 @@ A calm, friendly training app on a **classroom board**. The page is a wooden fra
 
 | Piece | File |
 |---|---|
-| Colours, wood frame, board, dot grid, radii, motion | `frontend/src/styles/tokens.css` |
-| Contrast pairs (audited) | `frontend/src/styles/token-metadata.ts` |
-| Characters (SVG, poses) | `frontend/src/components/features/characters/{Loti,Dolphin,Momo}.tsx` |
+| Colours, page margin, board, dot grid, blobs, radii, motion | `frontend/src/styles/tokens.css` |
+| Contrast pairs (audited, including text over the blobs) | `frontend/src/styles/token-metadata.ts` |
+| Characters (SVG, poses) | `frontend/src/components/features/characters/{Loti,Momo}.tsx` |
+| Logo mark and lockup | `frontend/src/components/features/brand/Logo.tsx`, `frontend/public/favicon.svg` |
 | App shell: header, 4 tabs, footer, judge tools | `frontend/src/components/layout/AppShell.tsx` |
 | Mood listener (feeds Momo) | `frontend/src/components/layout/EmotionListener.tsx` |
 
-**Board background.** `body` is the wood (`--color-wood`). `#root` is the board (`--color-canvas` plus the dot grid, rounded and clipped). Don't paint an opaque page background inside `#root`, or it hides the board. In dark mode the cards (`--color-surface`, `-raised`, `--color-border`, `--color-brand-subtle`) are green slate, the chalkboard's own hue; a test keeps them within 30° of it.
+**Characters.** Flat line art, as in the references: flat fills (a sky body, a lighter belly), one darker-blue outline of one width with round caps and joins, and coral accents on the gills, fins and splash marks. No gradients, sheen or shadows; every colour is a `--char-*` token.
+- **Loti** keeps the poses `idle`, `talk`, `think` (balanced: wavy gills), `happy` and `wave` (thriving: leafy gills, blush, sparkle dots), plus `low` (wilted gills, closed sad eyes) on the system pages and the error screen.
+- **Momo** is the dolphin. Its moods (calm, happy, tired, frustrated, focused) show by face, fin pose and posture, so colour is never the only signal; frustrated takes warm amber accents, never red. `celebrate` is the leap with splash marks, used on Results.
+- Motion follows R8: entrances, celebrations and state changes only, all of it off under reduced motion.
+
+**Logo.** The mark is Loti's bust inside an open circle arc. The header shows the mark on phones and the mark plus the "SynapseTwin" wordmark (Quicksand) from `sm` up. The favicon is the same mark.
+
+**Board background.** `body` is the off-white page margin (`--color-page`). `#root` is the board (`--color-canvas` plus the dot grid, rounded and clipped). Its `::before` and `::after` draw the blobs: flat `--color-blob-sky` and `--color-blob-coral` shapes masked into the corners, behind all content (`z-index: -1` inside the board's isolated stacking context), no pointer events and no motion. They are pale enough that every text colour keeps AA contrast on them (audited). Don't paint an opaque page background inside `#root`, or it hides the board and the blobs. In dark mode the cards (`--color-surface`, `-raised`, `--color-border`, `--color-brand-subtle`) are green slate, the chalkboard's own hue; a test keeps them within 30° of it.
 
 **Theme on load.** An inline script in `index.html` applies the stored theme (`synapsetwin_theme_v1`) before the first paint, so a reload never flashes light. There is no CSP today; if one is added, allow that script by its hash.
 
 ## 4. Routing
 
 ### Navigation
-Four tabs: **Home · Train · Loti · You**. On desktop they sit in the header; below `lg` they become bottom tabs inside the wood frame. **You** stays active on `/privacy`, `/settings` and `/methodology`.
+Four tabs: **Home · Train · Loti · You**. On desktop they sit in the header; below `lg` they become bottom tabs on the board. **You** stays active on `/privacy`, `/settings` and `/methodology`.
 
 ### First visit flow
 ```mermaid
 flowchart LR
   W["/ Welcome<br/>Loti says hi · Start"] --> B["/baseline<br/>6 short exercises"]
-  B --> R["/results<br/>blurred → Dolphin → data choice → reveal"]
+  B --> R["/results<br/>blurred → Momo → data choice → reveal"]
   R --> H["/dashboard Home"]
 ```
 Returning devices (at least one saved session) go straight to Home: `/` and `/baseline` redirect to `/dashboard` (`/baseline?again=1` is the retake).
@@ -51,7 +68,7 @@ Returning devices (at least one saved session) go straight to Home: `/` and `/ba
 |---|---|---|---|
 | `/` | Welcome | Loti greeting, one line, **Start** | `pages/WelcomePage.tsx` |
 | `/baseline` | Baseline | 6 exercises in a row with a "1 of 6" bar: Logic Web, Memory Gauntlet, Color Clash, Strategic Blueprint, Perceptual Radar, Precision Archive | `pages/BaselinePage.tsx`, `features/flow/baseline.ts` |
-| `/results` | Results | Blurred 5-skill chart → Dolphin → **Save my answers** / **Keep them on this device only** (equal weight) → reveal → **Go to my space** | `pages/ResultsPage.tsx`, `features/flow/LoginSheet.tsx` |
+| `/results` | Results | Blurred 5-skill chart → Momo's leap → **Save my answers** / **Keep them on this device only** (equal weight) → reveal → **Go to my space** | `pages/ResultsPage.tsx`, `features/flow/LoginSheet.tsx` |
 | `/dashboard` | Home | Greeting + Momo + one Loti line, **Start today's session**, 5-skill chart (+ "View as table"). Below: progress curve, then "Further explore my training" (heatmap, goals, why Loti picked this) | `pages/DashboardPage.tsx`, `features/insights/*` |
 | `/train` | Train | Loti line; 5 skills, each listing its exercises; one primary Start on the weakest skill (the same weakest as Home and Loti: `weakestPillar` in `features/insights/dashboard.ts`). `?pillar=<id>` focuses a skill | `pages/TrainPage.tsx`, `features/train/catalog.ts` |
 | `/task/:dimId?schema=<type>` | Exercise | One exercise in the exercise frame: Exit and Begin on the instruction screen, Pause from Begin on; the end card returns to Train | `pages/TaskRunnerPage.tsx`, `features/assessment/*` |
@@ -60,7 +77,7 @@ Returning devices (at least one saved session) go straight to Home: `/` and `/ba
 | `/privacy` | Privacy | Consent status + change, what we record (one sentence), Export my data, Delete my data | `pages/PrivacyPage.tsx`, `features/privacy/myData.ts` |
 | `/settings` | Settings | Theme, Reduce motion | `pages/SettingsPage.tsx` |
 | `/methodology` | How we calculate this | Plain intro; 5 closed topics with the real formulas and constants, imported from code | `pages/MethodologyPage.tsx` |
-| `/offline`, `/system-error`, `*` | System | Loti, one line, one way home | `pages/SystemPage.tsx` |
+| `/offline`, `/system-error`, `*` | System | Loti (low), one line, one way home | `pages/SystemPage.tsx` |
 
 The Welcome, Baseline and Results pages use minimal chrome: logo and theme toggle only, no tabs.
 
@@ -112,7 +129,8 @@ Hiding the tab during the fixation or the trials pauses the run. A paused attemp
 - **R14:** no AI-generated Loti replies for users until a second, AI-based crisis check exists.
 - **R15:** (server) unbuilt endpoints answer "not available yet" instead of inventing data.
 - **R16:** Memory Gauntlet scoring follows its hint: only the current rule's stream expects an answer.
-- **Background:** the classroom board.
+- **Background:** the classroom board; since ART-1 (2026-11-01), the board with blobs on an off-white page.
+- **Characters (ART-1, 2026-11-01):** flat line art from the references; Momo is the dolphin (the separate Dolphin character is gone); the BRIAN logo is replaced by the Loti mark.
 
 The decision record is **DEC-011** in `docs/ui/DECISIONS.md` (supersedes DEC-010, and DEC-007 for these pages).
 

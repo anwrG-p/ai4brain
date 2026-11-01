@@ -247,7 +247,7 @@ sequenceDiagram
         Baseline->>Device: Queues one telemetry event per trial (nothing sent yet)
     end
     Baseline->>Device: Scores the run and saves a session
-    Baseline->>Results: Blurred 5-skill chart, then the Dolphin
+    Baseline->>Results: Blurred 5-skill chart, then Momo's leap
     Results->>User: Save my answers / Keep them on this device only (equal weight)
     alt Save my answers
         Results->>API: POST /v1/telemetry/event (the queued events)

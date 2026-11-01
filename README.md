@@ -1,6 +1,6 @@
 # SynapseTwin
 
-A calm cognitive-training web app for the CISTAC 1.0 (AI4Brain) challenge. You play short exercises, see how you did on 5 skills, and practise with **Loti**, an axolotl coach. **Dolphin** celebrates, and **Momo** shows a mood guess you can correct. For training and self-reflection. Not a medical tool.
+A calm cognitive-training web app for the CISTAC 1.0 (AI4Brain) challenge. You play short exercises, see how you did on 5 skills, and practise with **Loti**, an axolotl coach. **Momo**, a dolphin, celebrates with you and shows a mood guess you can correct. For training and self-reflection. Not a medical tool.
 
 Users are anonymous. Scores are computed on the device, and nothing is sent until you choose "Save my answers".
 
