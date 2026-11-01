@@ -190,12 +190,13 @@ def test_tower_series_does_not_depend_on_theta():
 
 # sha256 of the canonical JSON (sorted keys, no spaces) of each payload, recorded on CPython 3.13.
 # A deliberate generator change updates these; an accidental one (or a Python upgrade) fails here.
+# relational re-recorded by BE-13 (and its review round 1): rude words and slurs added to BLOCKED.
 GOLDEN = {
     ("n_back", 0.7, 1234): "34a3a50704119d8c5db669306d71d0416672be33fa27db9febdbac5338e4c57e",
     ("stroop", 0.2, 1234): "7677a711e33a13f579f8109adf59a971ee4023bb4f9a6341a57023bd7aa38955",
     ("matrix", 0.9, 1234): "e99e4214c0cde962d03777630f95eb99728e112dcdac7ef7a9024847a2b966b5",
     ("mental_rotation", 0.5, 1234): "6e62a67140812fd466395cd8222a1c272ce4669121ab08d3be0517a83e677ed4",
-    ("relational", 0.6, 1234): "cf2313e5b176202a01af941b949e797a0ad924f75a4fb730c16cb4b158fb8785",
+    ("relational", 0.6, 1234): "04fe4f0eb0ccc542a6bf0567b161400599b183f2b2cd331dfc1a5eb6a17d3e53",
     ("tower", 0.8, 1234): "2543b49a61d34ee545922a48ae2148edd3ee701b9bcdb81f83e302ed8382073c",
     ("ufov", 0.3, 1234): "8ca4404deca466190f006a5b266d179093937b2925d42fbe2bf0239407a04714",
     ("mst", 0.5, 1234): "1e345dc5e1c56015d0168aa36948a22049426731c13fc2a7665706dac67612dc",

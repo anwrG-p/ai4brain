@@ -25,6 +25,8 @@ services:
       - task_registry:/data/task_registry
       # The coach chat history, same arrangement (COACH_DIR). Delete, export and retention cover it.
       - coach:/data/coach
+      # LLM task variants (BE-13) and the pool's daily call count: task content, no user data.
+      - llm_variants:/data/llm_variants
       # The state bus's per-user cluster state (STATE_BUS_DIR, BE-11). Delete, export and retention
       # cover it. The models themselves are baked into the image at build time
       # (python -m brain_twin_jepa.bootstrap in backend/Dockerfile).
@@ -34,4 +36,5 @@ volumes:
   telemetry:
   task_registry:
   coach:
+  llm_variants:
   state_bus:

@@ -25,15 +25,16 @@ COPY data/synthetic/ data/synthetic/
 # false). To serve other models, mount them and set CLUSTER_MODEL_PATH / TWIN_CHECKPOINT.
 RUN python -m brain_twin_jepa.bootstrap
 
-# Run as an unprivileged user; it owns only the per-user data folders.
+# Run as an unprivileged user; it owns only the per-user data folders and the LLM variant folder.
 RUN useradd --system --no-create-home --uid 10001 app \
-    && mkdir -p /data/telemetry /data/task_registry /data/coach /data/state_bus \
-    && chown app /data/telemetry /data/task_registry /data/coach /data/state_bus
+    && mkdir -p /data/telemetry /data/task_registry /data/coach /data/llm_variants /data/state_bus \
+    && chown app /data/telemetry /data/task_registry /data/coach /data/llm_variants /data/state_bus
 USER app
 
 ENV TELEMETRY_DIR=/data/telemetry
 ENV TASK_REGISTRY_DIR=/data/task_registry
 ENV COACH_DIR=/data/coach
+ENV LLM_VARIANT_DIR=/data/llm_variants
 ENV STATE_BUS_DIR=/data/state_bus
 EXPOSE 8000
 
