@@ -85,6 +85,13 @@ describe('fetchNextTask', () => {
       expect(fetchFn).toHaveBeenCalledWith('/v1/tasks/next?user_id=a%20b%26c')
     })
 
+    test.each(['stop_signal', 'pal', 'flanker'] as const)('a server payload of the newer exercise %s is accepted', async (schema) => {
+      real()
+      const payload = tasks.find((t) => t.schema_type === schema)!
+      const fetchFn = vi.fn(async (_url: string) => okResponse(payload))
+      expect((await fetchNextTask('u1', 0, { fetchFn })).schema_type).toBe(schema)
+    })
+
     test('a 500 rejects', async () => {
       real()
       const fetchFn = async () => new Response('boom', { status: 500 })

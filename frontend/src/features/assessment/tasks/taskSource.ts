@@ -6,7 +6,20 @@ import { toCvdSafe } from './Stroop'
 type FetchFn = (url: string) => Promise<Response>
 
 const FIXTURES = fixtures as TaskPayload[]
-const SCHEMA_TYPES: readonly SchemaType[] = ['n_back', 'stroop', 'matrix', 'mental_rotation', 'relational', 'tower', 'ufov', 'mst']
+// Every schema the UI can play; `satisfies` makes a schema added to the union fail to compile here.
+const SCHEMA_TYPES = Object.keys({
+  n_back: true,
+  stroop: true,
+  matrix: true,
+  mental_rotation: true,
+  relational: true,
+  tower: true,
+  ufov: true,
+  mst: true,
+  stop_signal: true,
+  pal: true,
+  flanker: true,
+} satisfies Record<SchemaType, true>) as readonly SchemaType[]
 const DIMENSIONS: readonly Dimension[] = [
   'working_memory',
   'pattern_induction',
