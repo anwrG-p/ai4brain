@@ -346,26 +346,26 @@ class Dispatcher:
         trials: Callable[[str, str], Sequence[Trial]] = lambda key, schema: [],
         pillars: Callable[[str], Mapping[str, float | None] | None] = lambda key: None,
         archetype: Callable[[str], str] = lambda key: NEUTRAL,
+        variants: Callable[[str], bytes | None] = lambda task_id: None,
         difficulty_rule: Callable[..., float] | None = None,
         clock: Callable[[], float] = time.time,
         seed_source: Callable[[], int] = lambda: random.SystemRandom().randrange(2**32),
         pool_size: int = POOL_SIZE,
         max_users: int = MAX_USERS,
         retention_days: int = RETENTION_DAYS,
-        variants: Callable[[str], bytes | None] = lambda task_id: None,
         background: bool = True,
     ) -> None:
         self.registry_dir = registry_dir
         self.trials = trials
         self.pillars = pillars
         self.archetype = archetype
+        self.variants = variants  # task_id -> body of a non-procedural entry (session replays)
         self.difficulty_rule = difficulty_rule
         self.clock = clock
         self.seed_source = seed_source
         self.pool_size = pool_size
         self.max_users = max_users
         self.retention_days = retention_days  # the server passes RETENTION_DAYS from the env
-        self.variants = variants  # task_id -> body of a non-procedural entry (session replays)
 
         # Pools, the user table, pins, the dirty set. Re-entrant: a refill future that is already
         # done runs its callback (which takes the lock) in the submitting thread.
