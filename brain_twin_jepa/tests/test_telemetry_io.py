@@ -46,7 +46,7 @@ def test_missing_user_reads_empty(tmp_path):
 
 
 def test_bad_id_is_rejected(tmp_path):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="user_id must match"):
         read_events("../etc", tmp_path)
 
 
