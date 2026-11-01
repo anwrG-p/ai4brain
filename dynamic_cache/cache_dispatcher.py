@@ -1,10 +1,19 @@
 """Task dispatcher behind GET /v1/tasks/next (BE-04).
 
 - Pools: per (archetype, schema_type, theta level), in memory, holding pre-built payloads already
-  serialised to JSON. A pop that leaves a pool half empty queues a refill in a worker process, so
-  the BE-03 generators (sync, CPU-bound) never run on the event loop, rarely on a request, and
-  never hold the GIL against request threads. An empty pool builds one task inline, in the
-  request's worker thread. The worker exits with its parent, even on a hard kill.
+  serialised to JSON, refilled by WORKERS worker processes, so the BE-03 generators (sync,
+  CPU-bound) never run on the event loop, rarely on a request, and never hold the GIL against
+  request threads. An empty pool builds one task inline, in the request's worker thread. The
+  workers exit with their parent, even on a hard kill.
+  - Each pool is sized to its demand: a decaying per-pool pop rate sets its target to cover
+    POOL_HORIZON_S of demand, between POOL_SIZE and POOL_MAX, and growth above POOL_SIZE stops
+    while all pools together hold POOL_BYTES_MAX. A wave of new users all starting the same
+    baseline task grows that one pool; when the wave passes, the target decays back.
+  - Low-water refill: a pool at or under half its target is topped back up to it, in small jobs
+    (about BATCH_S of build time each), so results come back and priorities are re-weighed often.
+  - Priority: the free worker takes the pool that will run dry soonest, its build time counted
+    (slack = stock / pop rate - build time of the batch), so a hot pool of a slow schema (MST,
+    mental rotation) is not stuck behind cheap refills. Build times are learned per schema.
 - Archetype: until clustering (BE-09/BE-11) assigns one, every user is NEUTRAL.
 - No repeats: a per-user TimedBloom (bloom.py) of served task ids; nothing seen in the last 14 days
   is served again.
@@ -36,6 +45,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import multiprocessing
 import multiprocessing.connection
 import os
@@ -64,7 +74,24 @@ NEUTRAL = "neutral"
 ARCHETYPE_OPTIONS: dict[str, dict[str, dict[str, Any]]] = {NEUTRAL: {"stroop": {"inks": "classic"}}}
 
 LEVEL_STEP = 0.1  # pools are keyed by theta snapped to this grid
-POOL_SIZE = 16  # payloads kept per pool
+POOL_SIZE = 16  # the smallest target of every pool
+POOL_MAX = 128  # the largest target one hot pool grows to
+POOL_HORIZON_S = 2.0  # a pool's target covers this many seconds of its recent pop rate
+DEMAND_TAU_S = 2.0  # time constant of the per-pool pop-rate estimate
+POOL_BYTES_MAX = 64 << 20  # pools stop growing above POOL_SIZE once together they hold this much
+WORKERS = 2  # refill processes
+BATCH_S = 0.03  # build time per refill job: short, so priorities are re-weighed often
+# Seconds to build and validate one payload (CPython 3.13, dev laptop); learned at run time.
+BUILD_COST_S: dict[str, float] = {
+    "mst": 0.007,
+    "mental_rotation": 0.006,
+    "relational": 0.003,
+    "ufov": 0.002,
+    "n_back": 0.0012,
+    "stroop": 0.0007,
+    "matrix": 0.0003,
+    "tower": 0.0003,
+}
 SESSIONS_KEPT = 64  # idempotency answers kept per user (and none older than the TTL)
 REPLAY_CACHE = 256  # serialised payloads kept for session replays
 FRESH_TRIES = 8  # inline builds tried when every pooled task was already seen
@@ -144,8 +171,11 @@ def build_entry(archetype: str, schema_type: str, level: float, seed: int) -> En
     return Entry(payload["task_id"], body, seed)
 
 
-def build_entries(archetype: str, schema_type: str, level: float, seeds: list[int]) -> list[Entry]:
-    return [build_entry(archetype, schema_type, level, seed) for seed in seeds]
+def build_entries(archetype: str, schema_type: str, level: float, seeds: list[int]) -> tuple[list[Entry], float]:
+    """The payloads for `seeds`, and the seconds it took (the dispatcher learns build costs)."""
+    t = time.perf_counter()
+    entries = [build_entry(archetype, schema_type, level, seed) for seed in seeds]
+    return entries, time.perf_counter() - t
 
 
 def worker_pid() -> int:
@@ -166,11 +196,11 @@ def _exit_with_parent() -> None:
     threading.Thread(target=watch, name="exit-with-parent", daemon=True).start()
 
 
-def worker_pool() -> ProcessPoolExecutor:
+def worker_pool(workers: int = WORKERS) -> ProcessPoolExecutor:
     # spawn everywhere: fork from a threaded server (uvicorn's pool) can deadlock the child, and
     # Python 3.12+ warns about it on Linux.
     return ProcessPoolExecutor(
-        max_workers=1, mp_context=multiprocessing.get_context("spawn"), initializer=_exit_with_parent
+        max_workers=workers, mp_context=multiprocessing.get_context("spawn"), initializer=_exit_with_parent
     )
 
 
@@ -345,6 +375,9 @@ class Dispatcher:
         pool_size: int = POOL_SIZE,
         max_users: int = MAX_USERS,
         retention_days: int = RETENTION_DAYS,
+        pool_max: int = POOL_MAX,
+        pool_bytes_max: int = POOL_BYTES_MAX,
+        workers: int = WORKERS,
         background: bool = True,
     ) -> None:
         self.registry_dir = registry_dir
@@ -357,13 +390,22 @@ class Dispatcher:
         self.pool_size = pool_size
         self.max_users = max_users
         self.retention_days = retention_days  # the server passes RETENTION_DAYS from the env
+        self.pool_max = max(pool_size, pool_max)
+        self.pool_bytes_max = pool_bytes_max
+        self.workers = workers
 
         # Pools, the user table, pins, the dirty set. Re-entrant: a refill future that is already
         # done runs its callback (which takes the lock) in the submitting thread.
         self._lock = threading.RLock()
         self._io_lock = threading.Lock()  # registry files
         self._pools: dict[tuple[str, str, float], deque[Entry]] = {}
-        self._refilling: set[tuple[str, str, float]] = set()
+        self._topping: set[tuple[str, str, float]] = set()  # pools being topped up to their target
+        self._inflight: dict[tuple[str, str, float], int] = {}  # payloads being built, per pool
+        self._demand: dict[tuple[str, str, float], tuple[float, float]] = {}  # pool -> (pops/s, at)
+        self._cost: dict[str, float] = dict(BUILD_COST_S)  # seconds per payload, learned
+        self._pool_bytes = 0
+        self._busy = 0  # refill jobs in flight
+        self._epoch = 0  # bumped when the worker pool is replaced: late results of the old one are dropped
         self._users: OrderedDict[str, UserState] = OrderedDict()  # least recently used first
         self._user_locks: dict[str, threading.Lock] = {}  # only for users with a call in flight
         self._pins: dict[str, int] = {}  # calls in flight per user
@@ -373,37 +415,64 @@ class Dispatcher:
         self._replays: OrderedDict[str, bytes] = OrderedDict()
         # Refills run in a worker process: building is CPU-bound Python, and in a thread it would
         # hold the GIL against the request threads (measured: 20-40 ms requests under uvicorn).
-        self._workers = worker_pool() if background else None
+        self._workers = worker_pool(workers) if background else None
+        # Refill results are handled here, not in the process pool's own thread.
+        self._pumper = ThreadPoolExecutor(max_workers=1, thread_name_prefix="task-pool") if background else None
         self._writer = ThreadPoolExecutor(max_workers=1, thread_name_prefix="task-registry") if background else None
 
     # --- building payloads -----------------------------------------------------------------------
 
     def start(self) -> Future | None:
-        """Spawn the worker process now (server startup), so no request pays for it. Does not
-        wait: the returned future resolves to the worker's pid. If the worker cannot start, the
+        """Spawn the worker processes now (server startup), so no request pays for it. Does not
+        wait: the returned future resolves to the workers' pids. If they cannot start, the
         dispatcher logs it and builds every task inline from then on, rather than failing."""
         with self._lock:
             workers = self._workers
         if workers is None:
             return None
         try:
-            future = workers.submit(worker_pid)
+            # One call per process: the pool spawns a new process while none is idle.
+            futures = [workers.submit(worker_pid) for _ in range(self.workers)]
         except Exception as e:  # spawn refused outright (shut down, no processes allowed, ...)
             self._no_workers(e)
             return None
-        future.add_done_callback(lambda f: f.cancelled() or f.exception() is None or self._no_workers(f.exception()))
-        return future
+        done: Future = Future()
+        left = [len(futures)]
+        guard = threading.Lock()
+
+        def one_done(f: Future) -> None:
+            if not f.cancelled() and f.exception() is not None:
+                self._no_workers(f.exception())
+            with guard:
+                left[0] -= 1
+                last = left[0] == 0
+            if last and not done.done():
+                errors = [g.exception() for g in futures if not g.cancelled() and g.exception()]
+                if errors:
+                    done.set_exception(errors[0])
+                else:
+                    done.set_result([g.result() for g in futures if not g.cancelled()])
+
+        for f in futures:
+            f.add_done_callback(one_done)
+        return done
 
     def _no_workers(self, error: BaseException) -> None:
-        log.warning("task worker process unavailable (%s); building tasks inline", type(error).__name__)
         with self._lock:
             workers, self._workers = self._workers, None
-            self._refilling.clear()
+            self._reset_jobs()
         if workers is not None:
+            log.warning("task worker process unavailable (%s); building tasks inline", type(error).__name__)
             workers.shutdown(wait=False, cancel_futures=True)
 
+    def _reset_jobs(self) -> None:
+        """Called with self._lock held, when the worker pool goes away: forget its jobs."""
+        self._epoch += 1
+        self._busy = 0
+        self._inflight.clear()
+
     def _fill(self, pool_key: tuple[str, str, float]) -> None:
-        """Top the pool up in the caller's thread (warm-up)."""
+        """Top the pool up to POOL_SIZE in the caller's thread (warm-up)."""
         archetype, schema_type, level = pool_key
         while True:
             with self._lock:
@@ -412,52 +481,121 @@ class Dispatcher:
             entry = build_entry(archetype, schema_type, level, self.seed_source())  # outside the lock
             with self._lock:
                 self._pools[pool_key].append(entry)
+                self._pool_bytes += len(entry.body)
 
-    def _refill_job(self, pool_key: tuple[str, str, float]) -> tuple | None:
-        """Called with self._lock held: the refill to submit (after releasing it) when the pool is
-        half empty and none is in flight."""
-        have = len(self._pools.get(pool_key, ()))
-        if self._workers is None or self._closed or pool_key in self._refilling or have * 2 > self.pool_size:
-            return None
-        self._refilling.add(pool_key)
-        return pool_key, [self.seed_source() for _ in range(self.pool_size - have)]
+    # Demand: an exponentially decaying event-rate estimate per pool. Each pop adds 1/tau; between
+    # pops it decays by e^(-dt/tau), so at a steady rate it settles on that rate (pops per second).
 
-    def _submit(self, job: tuple | None) -> None:
-        """Outside self._lock: the first submit spawns the worker process, which takes a while."""
-        if job is None:
-            return
-        pool_key, seeds = job
+    def _rate(self, pool_key: tuple[str, str, float], now: float) -> float:
+        rate, at = self._demand.get(pool_key, (0.0, now))
+        return rate * math.exp(-(now - at) / DEMAND_TAU_S)
+
+    def _note_pop(self, pool_key: tuple[str, str, float], now: float) -> None:
+        """Called with self._lock held."""
+        self._demand[pool_key] = (self._rate(pool_key, now) + 1.0 / DEMAND_TAU_S, now)
+
+    def _target(self, pool_key: tuple[str, str, float], now: float) -> int:
+        """Called with self._lock held: POOL_HORIZON_S of demand, within [pool_size, pool_max];
+        no growth above pool_size while the pools hold pool_bytes_max."""
+        if self._pool_bytes >= self.pool_bytes_max:
+            return self.pool_size
+        want = math.ceil(self._rate(pool_key, now) * POOL_HORIZON_S)
+        return max(self.pool_size, min(self.pool_max, want))
+
+    def _check_low_water(self, pool_key: tuple[str, str, float], now: float) -> None:
+        """Called with self._lock held: at or under half its target, the pool is topped up."""
+        if len(self._pools.get(pool_key, ())) * 2 <= self._target(pool_key, now):
+            self._topping.add(pool_key)
+
+    def _jobs(self) -> list[tuple]:
+        """Called with self._lock held: the refill jobs to start now, most urgent first, as long
+        as a worker is free. Urgency is the slack before the pool runs dry, minus the batch's
+        build time, so an expensive schema starts earlier than a cheap one with the same stock."""
+        if self._workers is None or self._closed:
+            return []
+        now = time.monotonic()
+        jobs = []
+        while self._busy < self.workers:
+            best = None
+            for pool_key in list(self._topping):
+                have = len(self._pools.get(pool_key, ()))
+                inflight = self._inflight.get(pool_key, 0)
+                deficit = self._target(pool_key, now) - have - inflight
+                if deficit <= 0:
+                    if not inflight:
+                        self._topping.discard(pool_key)  # topped up
+                    continue
+                cost = self._cost.get(pool_key[1], 0.005)
+                n = max(1, min(deficit, math.ceil(BATCH_S / cost)))
+                slack = (have + inflight) / max(self._rate(pool_key, now), 1e-3) - n * cost
+                if best is None or slack < best[0]:
+                    best = (slack, pool_key, n)
+            if best is None:
+                break
+            _, pool_key, n = best
+            self._inflight[pool_key] = self._inflight.get(pool_key, 0) + n
+            self._busy += 1
+            jobs.append((self._epoch, pool_key, [self.seed_source() for _ in range(n)]))
+        return jobs
+
+    def _pump(self) -> None:
+        """Start the refill jobs that are due. Outside self._lock: the first submit spawns a
+        worker process, which takes a while."""
         with self._lock:
+            jobs = self._jobs()
             workers = self._workers
-        if workers is None:  # gone inline meanwhile
-            with self._lock:
-                self._refilling.discard(pool_key)
-            return
-        try:
-            future = workers.submit(build_entries, *pool_key, seeds)
-        except BrokenProcessPool:  # the worker died: the next refill uses a new one
-            with self._lock:
-                self._refilling.discard(pool_key)
-                if not self._closed and self._workers is workers:
-                    self._workers = worker_pool()
-            return
-        except Exception as e:  # shut down, or a new worker cannot be spawned: serve inline
-            with self._lock:
-                self._refilling.discard(pool_key)
-                closed = self._closed
-            if not closed:
-                self._no_workers(e)
-            return
-        future.add_done_callback(lambda f: self._refilled(pool_key, f))
+        for epoch, pool_key, seeds in jobs:
+            try:
+                future = workers.submit(build_entries, *pool_key, seeds)
+            except BrokenProcessPool:  # a worker died: the next refills use a new pool
+                with self._lock:
+                    if not self._closed and self._workers is workers:
+                        self._workers = worker_pool(self.workers)
+                        self._reset_jobs()
+                return
+            except Exception as e:  # shut down, or no worker can be spawned: serve inline
+                with self._lock:
+                    closed = self._closed
+                if not closed:
+                    self._no_workers(e)
+                return
+            future.add_done_callback(lambda f, e=epoch, k=pool_key, n=len(seeds): self._job_done(e, k, n, f))
 
-    def _refilled(self, pool_key: tuple[str, str, float], future: Future) -> None:
+    def _job_done(self, epoch: int, pool_key: tuple[str, str, float], n: int, future: Future) -> None:
+        # Runs in the process pool's thread: hand over to the pumper thread.
+        try:
+            self._pumper.submit(self._refilled, epoch, pool_key, n, future)
+        except RuntimeError:
+            pass  # closing
+
+    def _refilled(self, epoch: int, pool_key: tuple[str, str, float], n: int, future: Future) -> None:
+        error = None if future.cancelled() else future.exception()
         with self._lock:
-            self._refilling.discard(pool_key)
-            if not future.cancelled() and future.exception() is None:
+            if epoch == self._epoch:
+                self._busy -= 1
+                left = self._inflight.get(pool_key, 0) - n
+                if left > 0:
+                    self._inflight[pool_key] = left
+                else:
+                    self._inflight.pop(pool_key, None)
+            if not future.cancelled() and error is None:
+                entries, seconds = future.result()
                 pool = self._pools.setdefault(pool_key, deque())
-                pool.extend(future.result()[: max(0, self.pool_size - len(pool))])
-        # A failed refill leaves the pool short; the next pop queues another, and an empty pool
-        # builds inline, so a generator bug surfaces there as a 503 instead of passing silently.
+                for entry in entries[: max(0, self.pool_max - len(pool))]:
+                    pool.append(entry)
+                    self._pool_bytes += len(entry.body)
+                if entries:
+                    old = self._cost.get(pool_key[1], seconds / len(entries))
+                    self._cost[pool_key[1]] = 0.8 * old + 0.2 * seconds / len(entries)
+            broken = isinstance(error, BrokenProcessPool) and epoch == self._epoch and not self._closed
+            if broken:
+                self._workers = worker_pool(self.workers)
+                self._reset_jobs()
+        if error is not None and not isinstance(error, BrokenProcessPool):
+            # A generator bug: the pool stays short, an empty pool builds inline, and the bug
+            # surfaces there as a 503 instead of passing silently.
+            log.warning("task refill failed (%s)", type(error).__name__)
+        self._pump()
 
     def warm(
         self,
@@ -465,8 +603,8 @@ class Dispatcher:
         schema_types: tuple[str, ...] = SCHEMA_TYPES,
         at: float | None = None,
     ) -> int:
-        """Fill the pools now, in the caller's thread: every level, or only the one theta `at` falls
-        on. Returns how many payloads the pools hold."""
+        """Fill the pools to POOL_SIZE now, in the caller's thread: every level, or only the one
+        theta `at` falls on. Returns how many payloads the pools hold."""
         for archetype in archetypes:
             for schema_type in schema_types:
                 for level in levels(schema_type) if at is None else [theta_level(schema_type, at)]:
@@ -724,10 +862,13 @@ class Dispatcher:
                         skipped.append(e)  # someone else may still use it
                     else:
                         entry = e
+                        self._pool_bytes -= len(e.body)
                         break
                 pool.extendleft(reversed(skipped))
-                job = self._refill_job(pool_key)
-            self._submit(job)
+                mono = time.monotonic()
+                self._note_pop(pool_key, mono)  # demand counts inline builds too
+                self._check_low_water(pool_key, mono)
+            self._pump()
             tries = 0
             while entry is None:
                 if tries == FRESH_TRIES:
@@ -758,7 +899,7 @@ class Dispatcher:
         """Stop the worker process and the writer, and write what is pending. Idempotent."""
         with self._lock:
             self._closed = True
-        for ex in (self._workers, self._writer):
+        for ex in (self._workers, self._pumper, self._writer):
             if ex is not None:
                 ex.shutdown(wait=True, cancel_futures=True)
         self.flush()

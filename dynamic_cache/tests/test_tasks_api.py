@@ -306,10 +306,11 @@ def test_lifespan_runs_a_real_worker_process_and_stops_it(tmp_path):
     previous = api.set_dispatcher(d)
     try:
         with TestClient(app) as c:
-            pid = d._workers.submit(cache_dispatcher.worker_pid).result(timeout=60)  # spawned at startup
-            procs = list(d._workers._processes.values())
-            assert [p.pid for p in procs] == [pid] and pid != os.getpid()
-            for _ in range(12):  # drains the pool below half: a refill runs in the worker
+            procs = list(d._workers._processes.values())  # spawned by the startup hook
+            assert len(procs) == cache_dispatcher.WORKERS
+            pid = d._workers.submit(cache_dispatcher.worker_pid).result(timeout=60)
+            assert pid in {p.pid for p in procs} and pid != os.getpid()
+            for _ in range(12):  # drains the pool below half: a refill runs in a worker
                 assert c.get(URL, params={"user_id": "u1", "schema_type": "tower"}).status_code == 200
         assert d._closed and api._dispatcher is None
         assert all(p.exitcode is not None for p in procs)  # the worker process has exited

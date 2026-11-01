@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import heapq
 import itertools
 import json
 import math
@@ -12,6 +13,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections import deque
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 
@@ -378,14 +380,130 @@ def test_pools_are_per_archetype(make):
     assert {k[0] for k in d._pools} == {"a", "b"}
 
 
+def wait_for(check, timeout=60.0):
+    deadline = time.monotonic() + timeout
+    while not check():
+        assert time.monotonic() < deadline, "timed out"
+        time.sleep(0.01)
+
+
 def test_background_refill_keeps_the_pool_warm(make):
     d = make(background=True, pool_size=4)
     d.warm(schema_types=("matrix",), at=0.5)
     for _ in range(3):
         d.next_task("u1", schema_type="matrix")
-    d._workers.shutdown(wait=True)  # the refill ran in the worker process
-    # One left after 3 pops; the refill queued at half full added what was missing then (2).
-    assert len(d._pools[("neutral", "matrix", 0.5)]) == 3
+    # At half its target (2 of 4) the pool was queued for a top-up, run in a worker process.
+    wait_for(lambda: len(d._pools[("neutral", "matrix", 0.5)]) >= 4 and d._busy == 0)
+    assert d._cost["matrix"] > 0  # build cost learned from the worker's timing
+
+
+# --- pool sizing and refill priority ----------------------------------------------------------------
+
+
+class Recorder:
+    """A stand-in process pool that records refill jobs and never runs them."""
+
+    def __init__(self):
+        self.jobs = []
+
+    def submit(self, fn, *args):
+        from concurrent.futures import Future
+
+        self.jobs.append(args)
+        return Future()
+
+    def shutdown(self, *a, **k):
+        pass
+
+
+def recording(make, **kw):
+    d = make(background=True, **kw)
+    real, d._workers = d._workers, Recorder()
+    real.shutdown()
+    return d
+
+
+def test_a_hot_pool_grows_with_demand_and_shrinks_back(make):
+    d = recording(make)
+    key = ("neutral", "mst", 0.5)
+    with d._lock:
+        assert d._target(key, 0.0) == cd.POOL_SIZE  # no demand: the floor
+        for k in range(100):  # 100 pops/s: after one time constant (2 s) the estimate is at ~63%
+            d._note_pop(key, k * 0.01)
+        assert d._rate(key, 1.0) > 30 and d._target(key, 1.0) > cd.POOL_SIZE  # grows within 1 s
+        for k in range(100, 600):  # 6 s = 3 time constants: ~95%
+            d._note_pop(key, k * 0.01)
+        rate = d._rate(key, 6.0)
+        assert 90 < rate < 105  # the estimate tracks the pop rate
+        assert d._target(key, 6.0) == min(cd.POOL_MAX, math.ceil(rate * cd.POOL_HORIZON_S))
+        assert d._target(key, 40.0) == cd.POOL_SIZE  # the wave passed: back to the floor
+        assert d._target(("neutral", "tower", 0.5), 6.0) == cd.POOL_SIZE  # other pools unaffected
+
+
+def test_pool_growth_is_capped_per_pool_and_in_bytes(make):
+    d = recording(make, pool_max=40, pool_bytes_max=1000)
+    key = ("neutral", "mst", 0.5)
+    with d._lock:
+        for k in range(1000):
+            d._note_pop(key, k * 0.001)  # 1000 pops/s
+        assert d._target(key, 1.0) == 40  # the per-pool cap
+        d._pool_bytes = 1000
+        assert d._target(key, 1.0) == d.pool_size  # the byte budget: no growth above the floor
+
+
+def test_refill_starts_at_the_low_water_mark(make):
+    d = recording(make, pool_size=16, workers=1)
+    d.warm(schema_types=("tower",), at=0.5)
+    for _ in range(7):  # 16 -> 9: above half the target
+        d.next_task(f"u{_}", schema_type="tower")
+    assert d._workers.jobs == []
+    d.next_task("u7", schema_type="tower")  # 8 = half: topped up
+    (job,) = d._workers.jobs
+    assert job[:3] == ("neutral", "tower", 0.5) and len(job[3]) == 16 - 8  # up to the target
+
+
+def test_a_slow_schema_is_refilled_before_a_cheap_one(make):
+    """Same stock, same demand: the free worker takes MST first (it takes longer to build)."""
+    d = recording(make, workers=1)
+    mst, tower = ("neutral", "mst", 0.5), ("neutral", "tower", 0.5)
+    with d._lock:
+        now = time.monotonic()
+        for key in (tower, mst):
+            d._pools[key] = deque()
+            for k in range(20):
+                d._note_pop(key, now - 1 + k * 0.05)
+            d._topping.add(key)
+    d._pump()
+    assert [job[1] for job in d._workers.jobs] == ["mst"]
+    assert len(d._workers.jobs[0][3]) == math.ceil(cd.BATCH_S / cd.BUILD_COST_S["mst"])  # a small batch
+
+
+def test_the_pool_that_runs_dry_first_is_refilled_first(make):
+    d = recording(make, workers=1)
+    full, starving = ("neutral", "mst", 0.5), ("neutral", "tower", 0.5)
+    with d._lock:
+        now = time.monotonic()
+        d._pools[full] = deque([cd.Entry(f"x{k}", b"{}", k) for k in range(7)])
+        d._pools[starving] = deque()
+        for key in (full, starving):
+            for k in range(40):
+                d._note_pop(key, now - 2 + k * 0.05)
+            d._topping.add(key)
+    d._pump()
+    assert [job[1] for job in d._workers.jobs] == ["tower"]  # empty beats 7 left, cheap or not
+
+
+def test_both_workers_can_serve_one_hot_pool(make):
+    d = recording(make, workers=2)
+    key = ("neutral", "mst", 0.5)
+    with d._lock:
+        now = time.monotonic()
+        d._pools[key] = deque()
+        for k in range(200):
+            d._note_pop(key, now - 2 + k * 0.01)
+        d._topping.add(key)
+    d._pump()
+    assert [job[1] for job in d._workers.jobs] == ["mst", "mst"] and d._busy == 2
 
 
 # --- registry: persistence, delete, export ------------------------------------------------------------
@@ -737,7 +855,7 @@ def test_close_stops_the_worker_and_is_idempotent(make):
     d.close()
     d.close()
     d.next_task("u1")  # still serves inline after close, without starting a new worker
-    assert d._refilling == set()
+    assert d._busy == 0 and d._inflight == {}
 
 
 # --- latency -----------------------------------------------------------------------------------------
@@ -766,16 +884,10 @@ def test_p99_under_10_ms_with_warm_pools(make):
 
 
 def test_p99_under_10_ms_at_production_pool_size_paced(make):
-    """The production POOL_SIZE (16) at 100 calls/s, the schemas mixed as real traffic is: 40
-    users at different points of their battery (user u has already played u % 8 tasks), so
-    consecutive calls ask for different schemas, about 12 calls/s per pool, which the one worker
-    refills in time.
-
-    Not covered, and slower: load concentrated on one pool. 40 users all in step (every one asking
-    for MST within 0.4 s) drain the MST pool, and each empty-pool call builds inline: p99 about
-    20-25 ms here. Likewise an unpaced burst of 200 back-to-back calls over HTTP: p99 about 8 ms
-    after the round-2 read-path fix (10-15 ms before). Deeper pools or more workers would cover
-    those; at ~8 tasks per session, real traffic is far below."""
+    """Mixed traffic at the production defaults: 100 calls/s, 40 users at different points of
+    their battery (user u has already played u % 8 tasks), so consecutive calls ask for different
+    schemas, about 12 calls/s per pool. Concentrated traffic is covered by the two tests below
+    (a baseline wave, users in step)."""
     d = make(background=True)
     assert d.pool_size == cd.POOL_SIZE == 16
     for s in SCHEMA_TYPES:
@@ -794,4 +906,72 @@ def test_p99_under_10_ms_at_production_pool_size_paced(make):
         time.sleep(0.01)
     p99 = percentile(timings, 0.99)
     print(f"\n16-deep pools, 100 calls/s: next_task p50 {percentile(timings, 0.5) * 1e3:.3f} ms, p99 {p99 * 1e3:.3f} ms")
+    assert p99 < 0.010
+
+
+# The baseline every new user plays first, in this order (frontend baseline runner).
+BASELINE = ("relational", "n_back", "stroop", "tower", "ufov", "mst")
+
+
+def run_wave(d, users: int, arrivals_per_s: float, play_s: tuple[float, float], seed: int = 0) -> list[float]:
+    """A wave of sign-ups: `users` new users arrive at `arrivals_per_s`, each walks BASELINE,
+    fetching the next task `play_s` (uniform) after the previous one. Time is compressed (real
+    tasks take minutes), which makes the load on each pool far denser than real. One thread
+    replays the schedule in real time and times every call."""
+    rng = random.Random(seed)
+    start = time.monotonic()
+    events = [(u / arrivals_per_s, u, 0) for u in range(users)]  # (due, user, baseline step)
+    heapq.heapify(events)
+    timings = []
+    while events:
+        due, u, step = heapq.heappop(events)
+        wait = start + due - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+        t = time.perf_counter()
+        d.next_task(f"wave{u}", schema_type=BASELINE[step], session_id="baseline", seq=step)
+        timings.append(time.perf_counter() - t)
+        if step + 1 < len(BASELINE):
+            heapq.heappush(events, (max(due, time.monotonic() - start) + rng.uniform(*play_s), u, step + 1))
+    return timings
+
+
+def production_dispatcher(make):
+    d = make(background=True)  # production POOL_SIZE, POOL_MAX, WORKERS
+    assert (d.pool_size, d.pool_max, d.workers) == (cd.POOL_SIZE, cd.POOL_MAX, cd.WORKERS)
+    for s in SCHEMA_TYPES:
+        d.warm(schema_types=(s,), at=START_THETA[s])  # what a running server holds when idle
+    d.start().result(timeout=60)
+    return d
+
+
+def test_p99_under_10_ms_for_a_baseline_wave(make):
+    """AC p99 < 10 ms for the case real traffic concentrates on: a wave of sign-ups. 150 new
+    users arrive at 50 a second, all on the same baseline task first, then each moves on 0.3 to
+    0.8 s later (compressed play time), so each baseline pool takes a burst of up to ~50 calls/s
+    while the next pool's burst builds. Covered by: pools sized to their demand (POOL_HORIZON_S),
+    refills started at the low-water mark, the slowest-to-build and soonest-dry pool refilled
+    first, two workers."""
+    d = production_dispatcher(make)
+    timings = run_wave(d, users=150, arrivals_per_s=50, play_s=(0.3, 0.8))
+    p99 = percentile(timings, 0.99)
+    grown = max(len(p) for p in d._pools.values())
+    print(f"\nbaseline wave, {len(timings)} calls: p50 {percentile(timings, 0.5) * 1e3:.3f} ms, "
+          f"p99 {p99 * 1e3:.3f} ms, largest pool {grown}")
+    assert p99 < 0.010
+
+
+def test_p99_under_10_ms_with_users_in_step(make):
+    """The harsher case round 2 failed (p99 20-25 ms with one fixed-size pool and one worker):
+    40 users in step at 100 calls/s, so calls come in blocks of 40 for one schema, the last block
+    being 40 MST calls in 0.4 s."""
+    d = production_dispatcher(make)
+    timings = []
+    for k in range(320):
+        t = time.perf_counter()
+        d.next_task(f"step{k % 40}")
+        timings.append(time.perf_counter() - t)
+        time.sleep(0.01)
+    p99 = percentile(timings, 0.99)
+    print(f"\nusers in step, 100 calls/s: p50 {percentile(timings, 0.5) * 1e3:.3f} ms, p99 {p99 * 1e3:.3f} ms")
     assert p99 < 0.010
