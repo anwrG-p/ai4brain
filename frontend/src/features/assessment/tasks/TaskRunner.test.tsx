@@ -46,6 +46,7 @@ const PORTED: Record<string, string> = {
   ufov: 'Perceptual Radar',
   mst: 'Precision Archive',
   stop_signal: 'Stop Light',
+  pal: 'Pair Finder',
 }
 
 test('the fixture schemas and the ported components are the same set', () => {

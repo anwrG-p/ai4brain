@@ -123,7 +123,16 @@ const MEASURES: Record<InputId, Measure> = {
     from: ['mst'],
     how: <>LDI = P(“similar” | lure) − P(“similar” | new), kept between 0 and 1.</>,
   },
-  PAL_FirstTrialMemory: { name: 'Remembering pairs', from: null, how: null },
+  PAL_FirstTrialMemory: {
+    name: 'Remembering pairs',
+    from: ['pal'],
+    how: (
+      <>
+        Pair Finder: shapes placed in the right box on the first try, out of every shape in all rounds (rounds
+        not reached count as missed). Corrected for guessing: (share − 1 ÷ boxes) ÷ (1 − 1 ÷ boxes).
+      </>
+    ),
+  },
   UFOV_SOA: {
     name: 'Seeing speed',
     from: ['ufov'],
@@ -286,13 +295,14 @@ export default function MethodologyPage() {
               ))}
           </dl>
           <p className="text-sm">
-            {UNSOURCED_INPUTS.map((id) => MEASURES[id].name).join(' and ')} have no exercise yet. The scale
-            ends are working values we will tune as data comes in.
+            {UNSOURCED_INPUTS.map((id) => MEASURES[id].name).join(' and ')} {UNSOURCED_INPUTS.length === 1 ? 'has' : 'have'}{' '}
+            no exercise yet. The scale ends are working values we will tune as data comes in.
           </p>
           <Sources>
             <li>d′ correction: Hautus 1995, Behavior Research Methods, Instruments, &amp; Computers.</li>
             <li>LDI: Stark et al. 2023, Frontiers in Behavioral Neuroscience.</li>
             <li>Stopping time (integration method): Verbruggen et al. 2019, eLife.</li>
+            <li>Remembering pairs: Sahakian et al. 1988, Brain (CANTAB Paired Associates Learning).</li>
             <li>
               Time-cost scores are unreliable from one test to the next: Hedge, Powell &amp; Sumner 2018, Behavior
               Research Methods.

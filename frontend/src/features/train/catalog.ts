@@ -9,12 +9,13 @@ import { dimensionFor, PILLAR_IDS, type PillarId } from '../insights/pillars'
    - Logic Web and Pattern Puzzle: FluidMatrices, Focus.
    - Shape Turn feeds no pillar input except error recovery, which is Agility's.
    - Stop Light: SST_SSRT, Impulse (the stop-signal measure; Color Clash only stands in without it).
+   - Pair Finder: PAL_FirstTrialMemory, Memory.
    None of the newer exercises is in the six-exercise baseline (R10). */
 export const TRAIN_EXERCISES: Record<PillarId, readonly TaskSchemaType[]> = {
   focus: ['tower', 'relational', 'matrix'],
   agility: ['n_back', 'mental_rotation'],
   impulse: ['stroop', 'stop_signal'],
-  memory: ['mst'],
+  memory: ['mst', 'pal'],
   visual: ['ufov'],
 }
 

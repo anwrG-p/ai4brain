@@ -1,6 +1,7 @@
 import type {
   MstParams,
   NBackParams,
+  PalParams,
   RelationalParams,
   RotationParams,
   SchemaType,
@@ -27,6 +28,7 @@ const LINE: Record<SchemaType, string> = {
   matrix: 'Pick the piece that completes the pattern.',
   mental_rotation: 'Say if the right shape is the left one turned or mirrored.',
   stop_signal: 'Press the way the arrow points. Stop for the sign.',
+  pal: 'Remember which box holds each shape. Then find it.',
 }
 
 // The instruction screen: the name, one sentence on what to do (under 12 words, anti-slop rule 4)
@@ -61,6 +63,10 @@ export function trialCount(task: TaskPayload): number {
       return (p as MstParams).test.length
     case 'stop_signal':
       return (p as StopSignalParams).trials.length
+    case 'pal':
+      // One dot per pattern on its first attempt. ponytail: a repeated stage adds trials, so the
+      // dots can fill early (they cap at the total), and a failed last attempt ends with dots open.
+      return (p as PalParams).stages.reduce((n, s) => n + s.recall.length, 0)
     default:
       return 1 // matrix and tower: one trial
   }

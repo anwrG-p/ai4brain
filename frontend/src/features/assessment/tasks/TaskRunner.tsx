@@ -4,6 +4,7 @@ import type {
   MatrixParams,
   MstParams,
   NBackParams,
+  PalParams,
   RelationalParams,
   RotationParams,
   StopSignalParams,
@@ -16,6 +17,7 @@ import { Matrix } from './Matrix'
 import { MentalRotation } from './MentalRotation'
 import { Mst } from './Mst'
 import { NBack } from './NBack'
+import { PairedAssociates } from './PairedAssociates'
 import { Relational } from './Relational'
 import { StopSignal } from './StopSignal'
 import { Stroop } from './Stroop'
@@ -49,6 +51,8 @@ export function TaskRunner(props: Props) {
       return <Mst params={task.params as MstParams} recorder={recorder} onDone={onDone} />
     case 'stop_signal':
       return <StopSignal params={task.params as StopSignalParams} recorder={recorder} onDone={onDone} />
+    case 'pal':
+      return <PairedAssociates params={task.params as PalParams} recorder={recorder} onDone={onDone} />
     default:
       return <Unsupported schemaType={task.schema_type} onDone={onDone} />
   }

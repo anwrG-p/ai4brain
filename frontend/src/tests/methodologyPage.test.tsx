@@ -96,9 +96,11 @@ describe('How we calculate this (/methodology)', () => {
     expect(feedsFocus([ev({ kind: 'lure', delta: 0.1, response: 'similar' }, { dim: 'episodic_memory' })])).toBe(false)
     expect(feedsFocus([ev({ shown_ms: 50, peripheral_ok: true, quest_threshold_ms: 100 }, { dim: 'processing_speed' })])).toBe(false)
 
-    expect(exercisesOf(PILLAR_LABELS.memory)).toBe('Precision Archive')
+    expect(exercisesOf(PILLAR_LABELS.memory)).toBe('Precision Archive, Pair Finder')
     const mst = [ev({ kind: 'lure', response: 'similar' }, { dim: 'episodic_memory' }), ev({ kind: 'new', response: 'new' }, { dim: 'episodic_memory' })]
     expect(Object.keys(taskScores(mst))).toContain('MST_LDI')
+    const pal = [ev({ pal_level: 2, attempt: 1, pattern: 0, box: 3, chosen: 3, pal_total: 20, boxes: 8 }, { dim: 'episodic_memory' })]
+    expect(Object.keys(taskScores(pal))).toContain('PAL_FirstTrialMemory')
   })
 
   it('marks the measures that only approximate the doc’s', () => {

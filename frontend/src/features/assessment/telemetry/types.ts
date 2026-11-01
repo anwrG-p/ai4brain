@@ -260,3 +260,21 @@ export type StopSignalParams = {
   ssd_step_ms: number
   trials: { dir: 'left' | 'right'; stop: boolean }[]
 }
+
+/* Pair Finder (tasks/PairedAssociates.tsx): paired-associates learning, simplified from CANTAB PAL.
+   Each stage shows its patterns one by one in their boxes (`study_ms` each), then shows each pattern
+   in `recall` order and asks for its box. A stage with any wrong box is studied and recalled again,
+   up to `max_attempts`; failing the last attempt ends the task (later stages are not reached). One
+   event per recall choice, trial_meta { pal_level (patterns in the stage), attempt (1-based),
+   pattern, box, chosen (-1 on a timeout), pal_total (patterns over all stages), boxes };
+   `pal_level` is the signature schemaOf reads. Stage sizes: PAL_DESIGN in PairedAssociates.tsx. */
+export type PalParams = {
+  boxes: number
+  study_ms: number
+  time_limit_ms: number // per recall choice
+  max_attempts: number
+  stages: {
+    items: { pattern: number; box: number }[] // in study order; pattern 0..7, box 0..boxes-1
+    recall: number[] // indices into items, the recall order
+  }[]
+}

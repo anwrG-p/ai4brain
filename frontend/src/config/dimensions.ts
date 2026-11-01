@@ -111,7 +111,7 @@ export const FULL_DIMENSION_POOL: readonly DimensionConfig[] = [
     uncertaintyNote: 'High false-alarm rate on low-delta lures widens epistemic uncertainty.',
     knownBiases: ['Visual fatigue over long sessions', 'Response bias toward "Old"'],
     backendDimensionKey: 'episodic_memory',
-    schemaTypes: ['mst'],
+    schemaTypes: ['mst', 'pal'],
     colorCssVar: 'var(--dim-6)',
     markerShape: 'hexagon',
     markerGlyph: '⬢',

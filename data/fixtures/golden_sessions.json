@@ -8,9 +8,9 @@
     "trial_meta.stream"
   ],
   "source": {
-    "insights/taskScores.ts": "de5d88d03ef30ba3518c37c5466e6cbd90bf1f35488369840fab8947756f33b5",
-    "insights/pillars.ts": "e3de51c4a57f5dd3dc2d71a9b58926d25369bf7b12a6e2caee7f69db56d77b66",
-    "assessment/telemetry/types.ts": "b4e4627dfad6df8dd23e867bfc492391d020cb69ea0716f59e1d86a3cf553567"
+    "insights/taskScores.ts": "16a601784a19b4c7a57ad8fdd79daec79c6299283366756eb674b68fa4d003a8",
+    "insights/pillars.ts": "614ac9534f92316873ba9a98900059c11b4bb85c9a1ca6710fac3e60cc5e3699",
+    "assessment/telemetry/types.ts": "c3921edb53e8b4426879c8f1e49e40441e453ca32cc839c138c19c2b3c6551e9"
   },
   "cases": [
     {
@@ -1212,7 +1212,7 @@
           },
           "memory": {
             "score": 20,
-            "uncertainty": 19.6,
+            "uncertainty": 35.63636363636363,
             "coverage": 0.55,
             "proxies": []
           },
@@ -1491,7 +1491,7 @@
           },
           "memory": {
             "score": 35.16483516483516,
-            "uncertainty": 21.913466179497938,
+            "uncertainty": 39.842665780905335,
             "coverage": 0.55,
             "proxies": []
           },
@@ -1741,7 +1741,7 @@
           },
           "memory": {
             "score": 80,
-            "uncertainty": 25.30349119522179,
+            "uncertainty": 46.00634762767597,
             "coverage": 0.55,
             "proxies": []
           },
@@ -2007,7 +2007,7 @@
           },
           "memory": {
             "score": 50,
-            "uncertainty": 28.29016319029166,
+            "uncertainty": 50,
             "coverage": 0.55,
             "proxies": []
           },
@@ -2381,7 +2381,7 @@
           },
           "memory": {
             "score": 83.33333333333334,
-            "uncertainty": 30.990321069650115,
+            "uncertainty": 50,
             "coverage": 0.55,
             "proxies": []
           },

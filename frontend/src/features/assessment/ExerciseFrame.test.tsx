@@ -308,6 +308,7 @@ test('the consumer names are the spec table', () => {
     matrix: 'Pattern Puzzle',
     mental_rotation: 'Shape Turn',
     stop_signal: 'Stop Light',
+    pal: 'Pair Finder',
   })
 })
 

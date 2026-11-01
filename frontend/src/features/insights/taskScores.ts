@@ -9,11 +9,12 @@ import type { InputScore, TaskScores } from './pillars'
     (only mock ids carry a prefix), so it is read from the trial_meta signature, which is unique per
     exercise (assessment_engine/README.md, "trial_meta by schema_type"). Matrix logs no extra keys,
     so it is the pattern_induction event without relational's `hops`. The newer exercises are read
-    first: their keys are their own (stop_trial; Arrow Focus logs `flanker`, never Stroop's
-    `congruent`). */
+    first: their keys are their own (stop_trial, pal_level; Arrow Focus logs `flanker`, never
+    Stroop's `congruent`). */
 export function schemaOf(e: TelemetryEvent): SchemaType | null {
   const m = e.trial_meta ?? {}
   if ('stop_trial' in m) return 'stop_signal'
+  if ('pal_level' in m) return 'pal'
   if ('stream' in m) return 'n_back'
   if ('congruent' in m) return 'stroop'
   if ('angle_deg' in m) return 'mental_rotation'
@@ -151,6 +152,11 @@ export function taskScores(events: readonly TelemetryEvent[]): TaskScores {
   if (rel.length) parts.push(rel.reduce((a, e) => a + (ok(e) ? hops(e) : 0), 0) / rel.reduce((a, e) => a + hops(e), 0))
   if (parts.length) out.FluidMatrices = input(mean(parts), mx.length + rel.length)
 
+  // Pair Finder: first-attempt memory over every pattern of the task, unreached stages counted as
+  // not recalled.
+  const pal = palInput(get('pal'))
+  if (pal) out.PAL_FirstTrialMemory = pal
+
   // MST: a timeout ('none') counts as not "similar".
   const ms = get('mst')
   const lures = ms.filter((e) => e.trial_meta?.kind === 'lure')
@@ -263,12 +269,39 @@ function stopSignalInput(ss: TelemetryEvent[]): InputScore | null {
   return input(clamp01((SSRT_WORST_MS - value) / (SSRT_WORST_MS - SSRT_BEST_MS)) * gate, stops)
 }
 
+/** PAL_FirstTrialMemory from Pair Finder events, per task (task_id):
+    - FAMS = recall events on attempt 1 that were right (CANTAB's first-attempt memory score);
+    - out of pal_total, every pattern of every stage, so the stages a failed run never reached count
+      as not recalled (CANTAB's "adjusted" convention for unreached stages);
+    - chance-corrected: (FAMS / pal_total - 1/boxes) / (1 - 1/boxes), clamped to 0..1 (A: one random
+      tap finds a pattern's box 1 time in `boxes`), so tapping at random scores 0.
+    Tasks are pooled weighted by pal_total; `trials` = the summed pal_total. A task without a valid
+    pal_total (>= 1) or boxes (>= 2) on its events is left out. */
+function palInput(pal: TelemetryEvent[]): InputScore | null {
+  const byTask = new Map<string, TelemetryEvent[]>()
+  for (const e of pal) byTask.set(e.task_id, [...(byTask.get(e.task_id) ?? []), e])
+  let total = 0
+  let weighted = 0
+  for (const es of byTask.values()) {
+    const first = es[0]!
+    const n = num(first, 'pal_total')
+    const boxes = num(first, 'boxes')
+    if (n === null || n < 1 || boxes === null || boxes < 2) continue
+    const fams = es.filter((e) => e.trial_meta?.attempt === 1 && ok(e)).length
+    const chance = 1 / boxes
+    total += n
+    weighted += n * clamp01((fams / n - chance) / (1 - chance))
+  }
+  return total ? input(weighted / total, total) : null
+}
+
 /** 0 at chance accuracy (1 in 4 inks) or below, 1 at perfect accuracy. */
 const stroopGate = (st: TelemetryEvent[]) => clamp01((share(st, ok) - STROOP_CHANCE) / (1 - STROOP_CHANCE))
 
 /** Exercises whose errors are not the user's to recover from: Stop Light's staircase holds stop
-    trials near half wrong by design. A task is read by its first event's schema. */
-const NO_RECOVERY: ReadonlySet<SchemaType> = new Set<SchemaType>(['stop_signal'])
+    trials near half wrong by design; in Pair Finder a wrong box is a memory miss, and the next
+    pattern is a separate memory, not a second try. A task is read by its first event's schema. */
+const NO_RECOVERY: ReadonlySet<SchemaType> = new Set<SchemaType>(['stop_signal', 'pal'])
 
 /** Accuracy on the trial right after an error, within each task. A trial is wrong when any of its
     events is; n-back logs one event per stream, and only its rule-stream event (which carries the

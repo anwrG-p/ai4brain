@@ -55,10 +55,16 @@ describe('pillarScores', () => {
     expect(s.visual).toMatchObject({ score: null, coverage: 0 })
   })
 
-  it('scores Deep Memory from LDI alone, since PAL has no source', () => {
+  it('scores Deep Memory from LDI alone when Pair Finder was not played', () => {
     const memory = pillarScores({ MST_LDI: { score: 70, trials: 20 } }).memory
     expect(memory.score).toBeCloseTo(70, 10)
     expect(memory.coverage).toBeCloseTo(0.55, 12)
+  })
+
+  it('scores Deep Memory from LDI and Pair Finder together at full coverage (FE-09)', () => {
+    const memory = pillarScores({ MST_LDI: { score: 70, trials: 64 }, PAL_FirstTrialMemory: { score: 50, trials: 20 } }).memory
+    expect(memory.coverage).toBeCloseTo(1, 12)
+    expect(memory.score).toBeCloseTo(0.55 * 70 + 0.45 * 50, 10)
   })
 
   it('lists the proxies it used', () => {
@@ -75,12 +81,20 @@ describe('pillarScores', () => {
     expect(one).toBeGreaterThan(two)
   })
 
-  it('keeps the band narrow for Deep Memory on a full block: unsourced inputs do not widen it', () => {
-    // oMST: 44 lures + 20 foils. PAL has no source by design, so coverage stays 0.55 but the band
-    // is only the LDI's own: 1.96 * 50 / 8.
+  it('widens the Deep Memory band when Pair Finder, now sourceable, is missing', () => {
+    // oMST: 44 lures + 20 foils. The LDI's own band is 1.96 * 50 / 8 = 12.25; PAL has a source now
+    // (Pair Finder), so its absence divides the band by the coverage 0.55.
     const memory = pillarScores({ MST_LDI: { score: 70, trials: 64 } }).memory
     expect(memory.coverage).toBeCloseTo(0.55, 12)
-    expect(memory.uncertainty).toBeCloseTo(12.25, 6)
+    expect(memory.uncertainty).toBeCloseTo(12.25 / 0.55, 6)
+  })
+
+  it('keeps the band narrow for Impulse Control: the unsourced DDM_Caution does not widen it', () => {
+    // sourceable = SST 0.5 + OTS 0.3 = 0.8 = coverage, so no widening. Weights renormalised over 0.8:
+    // variance = (0.5/0.8)^2 * 2500/64 + (0.3/0.8)^2 * 2500/16 = 15.2588 + 21.9727 = 37.2314.
+    const impulse = pillarScores({ SST_SSRT: { score: 60, trials: 64 }, OTS_Execution: { score: 60, trials: 16 } }).impulse
+    expect(impulse.coverage).toBeCloseTo(0.8, 12)
+    expect(impulse.uncertainty).toBeCloseTo(1.96 * Math.sqrt(37.2314453125), 6)
   })
 
   it('widens the uncertainty as trials drop, and caps it at 50', () => {

@@ -18,6 +18,7 @@ export type TaskSchemaType =
   | 'ufov'
   | 'mst'
   | 'stop_signal'
+  | 'pal'
 
 export type MarkerShape =
   | 'circle'

@@ -188,6 +188,24 @@ function StopSignal() {
   )
 }
 
+// Pair Finder: a shape shows in one of four boxes, then that box is picked (a ring closes on it).
+function Pal() {
+  const xs = [26, 60, 94, 128]
+  return (
+    <>
+      {xs.map((x) => (
+        <rect key={x} x={x - 13} y={27} width={26} height={26} rx={5} fill="none" stroke={LINE} strokeWidth={1.5} />
+      ))}
+      <g className="anim-demo-seq" style={at(0)}>
+        <path d="M94 31 L103 49 H85 Z" fill={SHAPE} />
+      </g>
+      <g className="anim-demo-seq" style={at(4)}>
+        <rect x={78} y={23} width={32} height={34} rx={7} fill="none" stroke={MARK} strokeWidth={3} />
+      </g>
+    </>
+  )
+}
+
 const DEMOS: Record<SchemaType, (p: { n?: number }) => ReactNode> = {
   stroop: Stroop,
   n_back: NBack,
@@ -198,6 +216,7 @@ const DEMOS: Record<SchemaType, (p: { n?: number }) => ReactNode> = {
   mst: Mst,
   matrix: Matrix,
   stop_signal: StopSignal,
+  pal: Pal,
 }
 
 /** `n`: the n-back distance the Memory Gauntlet demo draws (its caption names it). */
