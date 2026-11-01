@@ -18,6 +18,7 @@ export interface SpeechListenerCallbacks {
 
 export interface SpeechListenerController {
   stop: () => void
+  abort: () => void
   instance: unknown
 }
 
@@ -39,17 +40,60 @@ export function isSynthesisSupported(): boolean {
   )
 }
 
+/**
+ * Detects if the current browser is Opera or Opera GX.
+ * Opera is based on Chromium and exposes window.webkitSpeechRecognition,
+ * but lacks backend cloud credentials for speech recognition.
+ */
+export function isOperaBrowser(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  const w = (typeof window !== 'undefined' ? window : {}) as Record<string, unknown>
+  return Boolean(/OPR\//i.test(ua) || /Opera/i.test(ua) || w.opr !== undefined)
+}
+
 /** Check if Web Speech Recognition is supported by the client browser. */
 export function isRecognitionSupported(): boolean {
   if (typeof window === 'undefined') return false
+  // Opera and Opera GX expose webkitSpeechRecognition on window, but have no backend speech service
+  if (isOperaBrowser()) return false
   const w = window as unknown as Record<string, unknown>
   return Boolean(w.SpeechRecognition || w.webkitSpeechRecognition)
 }
 
 /**
- * Prompts the browser for microphone access via getUserMedia.
- * This guarantees the browser displays its native permission prompt dialog to the user.
- * Releasing tracks immediately once granted.
+ * Returns a human-friendly explanation if speech recognition is not supported in the current browser.
+ */
+export function getRecognitionSupportReason(): string | null {
+  if (typeof window === 'undefined') return 'Speech recognition is not supported in this environment.'
+  if (isOperaBrowser()) {
+    return 'Speech recognition is not supported in Opera GX. Please open this page in Google Chrome or Microsoft Edge, or press Win + H for Windows Voice Typing.'
+  }
+  const w = window as unknown as Record<string, unknown>
+  if (!w.SpeechRecognition && !w.webkitSpeechRecognition) {
+    return 'Speech recognition is supported in Chrome, Edge, and Safari. Or press Win + H for Windows Voice Typing.'
+  }
+  return null
+}
+
+/**
+ * Checks the current microphone permission state using Permissions API when available.
+ */
+export async function getMicPermissionState(): Promise<'granted' | 'prompt' | 'denied' | 'unknown'> {
+  if (typeof navigator === 'undefined' || !navigator.permissions?.query) {
+    return 'unknown'
+  }
+  try {
+    const status = await navigator.permissions.query({ name: 'microphone' as PermissionName })
+    return status.state
+  } catch {
+    return 'unknown'
+  }
+}
+
+/**
+ * Prompts the browser for microphone access via getUserMedia if needed.
+ * Releasing tracks immediately once verified.
  */
 export async function requestMicPermission(): Promise<{ ok: boolean; error?: string }> {
   if (
@@ -61,13 +105,17 @@ export async function requestMicPermission(): Promise<{ ok: boolean; error?: str
     return { ok: false, error: 'Microphone requires a secure connection (HTTPS or localhost).' }
   }
 
+  const state = await getMicPermissionState()
+  if (state === 'granted') {
+    return { ok: true }
+  }
+
   if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
     return { ok: true }
   }
 
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    // Stop all audio tracks immediately to release the microphone hardware
     stream.getTracks().forEach((t) => t.stop())
     return { ok: true }
   } catch (err: unknown) {
@@ -160,12 +208,14 @@ export function stopLotiSpeech(): void {
 }
 
 /**
- * Starts speech recognition for user dictation.
- * Returns a controller with stop() method, or null if unsupported.
+ * Starts speech recognition for continuous user dictation.
+ * Streams interim and final transcripts in real-time.
+ * Automatically keeps session alive across Chrome's silence timeouts until explicitly stopped.
  */
 export function startListening(callbacks: SpeechListenerCallbacks): SpeechListenerController | null {
-  if (!isRecognitionSupported()) {
-    callbacks.onError?.('Speech recognition is supported in Chrome, Edge, and Safari.')
+  const unsupportedReason = getRecognitionSupportReason()
+  if (unsupportedReason) {
+    callbacks.onError?.(unsupportedReason)
     callbacks.onEnd?.()
     return null
   }
@@ -179,69 +229,135 @@ export function startListening(callbacks: SpeechListenerCallbacks): SpeechListen
       onresult: ((e: any) => void) | null
       onerror: ((e: any) => void) | null
       onend: (() => void) | null
+      onspeechstart?: (() => void) | null
       start: () => void
       stop: () => void
       abort: () => void
     }
   }
 
-  try {
-    const recognition = new SpeechRecognitionConstructor()
-    recognition.continuous = false
-    recognition.interimResults = true
-    recognition.lang = 'en-US'
+  let recognition: InstanceType<typeof SpeechRecognitionConstructor> | null = null
+  let isListeningActive = true
+  let committedTranscript = ''
+  let latestPassTranscript = ''
+  let restartTimeout: ReturnType<typeof setTimeout> | null = null
 
-    recognition.onresult = (event: any) => {
-      let finalTranscript = ''
-      let interimTranscript = ''
+  // Determine speech recognition language
+  const navLang = typeof navigator !== 'undefined' && navigator.language ? navigator.language : 'en-US'
+  const recognitionLang = navLang.toLowerCase().startsWith('en') ? 'en-US' : navLang
 
-      for (let i = 0; i < event.results.length; ++i) {
-        const item = event.results[i]
-        const text = item[0]?.transcript ?? ''
-        if (item.isFinal) {
-          finalTranscript += text
-        } else {
-          interimTranscript += text
+  const createAndStart = () => {
+    try {
+      recognition = new SpeechRecognitionConstructor()
+      recognition.continuous = true
+      recognition.interimResults = true
+      recognition.lang = recognitionLang
+
+      recognition.onresult = (event: any) => {
+        let currentPassText = ''
+        let isFinal = false
+
+        for (let i = 0; i < event.results.length; ++i) {
+          const item = event.results[i]
+          const text = item[0]?.transcript ?? ''
+          currentPassText = (currentPassText + ' ' + text).trim()
+          if (item.isFinal) {
+            isFinal = true
+          }
+        }
+
+        latestPassTranscript = currentPassText
+        const fullTranscript = (committedTranscript ? committedTranscript + ' ' + currentPassText : currentPassText).trim()
+
+        if (fullTranscript) {
+          const lastResult = event.results[event.results.length - 1]
+          callbacks.onResult(fullTranscript, Boolean(lastResult?.isFinal || isFinal))
         }
       }
 
-      const result = finalTranscript || interimTranscript
-      if (result) {
-        callbacks.onResult(result, Boolean(finalTranscript))
-      }
-    }
+      recognition.onerror = (event: any) => {
+        const err = event?.error
+        if (err === 'no-speech' || err === 'aborted') {
+          // Benign silence event: onend will auto-restart if still listening
+          return
+        }
 
-    recognition.onerror = (event: any) => {
-      const err = event?.error
-      let message = 'Speech recognition error.'
-      if (err === 'not-allowed') {
-        message = 'Microphone access was denied. Click the lock icon in your browser address bar to allow microphone access.'
-      } else if (err === 'no-speech') {
-        message = 'No speech was detected.'
-      }
-      callbacks.onError?.(message)
-    }
+        // Fatal errors terminate listening
+        isListeningActive = false
+        if (restartTimeout) clearTimeout(restartTimeout)
 
-    recognition.onend = () => {
+        let message = 'Speech recognition error.'
+        if (err === 'not-allowed') {
+          message = 'Microphone access was denied. Click the lock icon in your browser address bar to allow microphone access.'
+        } else if (err === 'audio-capture') {
+          message = 'No microphone was detected. Please check your audio settings.'
+        } else if (err === 'network') {
+          message = 'Speech service network error. Speech recognition requires an active internet connection.'
+        } else if (err === 'service-not-allowed') {
+          message = 'Speech service is not allowed in this browser. Please use Google Chrome or Microsoft Edge.'
+        }
+        callbacks.onError?.(message)
+      }
+
+      recognition.onend = () => {
+        if (!isListeningActive) {
+          callbacks.onEnd?.()
+          return
+        }
+
+        // Commit current pass transcript across silence restarts so words are not lost
+        if (latestPassTranscript) {
+          committedTranscript = (committedTranscript ? committedTranscript + ' ' + latestPassTranscript : latestPassTranscript).trim()
+          latestPassTranscript = ''
+        }
+
+        // Auto-restart with slight backoff
+        restartTimeout = setTimeout(() => {
+          if (isListeningActive) {
+            try {
+              createAndStart()
+            } catch {
+              isListeningActive = false
+              callbacks.onEnd?.()
+            }
+          }
+        }, 150)
+      }
+
+      recognition.start()
+    } catch {
+      isListeningActive = false
+      callbacks.onError?.('Could not start speech recognition.')
       callbacks.onEnd?.()
     }
+  }
 
-    recognition.start()
+  createAndStart()
 
-    return {
-      stop: () => {
-        try {
-          recognition.stop()
-        } catch {
-          // Ignore if already stopped
-        }
-      },
-      instance: recognition,
+  const stop = () => {
+    isListeningActive = false
+    if (restartTimeout) clearTimeout(restartTimeout)
+    try {
+      recognition?.stop()
+    } catch {
+      // Ignore
     }
-  } catch {
-    callbacks.onError?.('Could not start speech recognition.')
-    callbacks.onEnd?.()
-    return null
+  }
+
+  const abort = () => {
+    isListeningActive = false
+    if (restartTimeout) clearTimeout(restartTimeout)
+    try {
+      recognition?.abort()
+    } catch {
+      // Ignore
+    }
+  }
+
+  return {
+    stop,
+    abort,
+    instance: recognition,
   }
 }
 
@@ -258,7 +374,7 @@ export interface VoiceCoachHookState {
   toggleVoice: () => void
   setVoicePace: (pace: number) => void
   speak: (text: string) => void
-  listen: (onFinalTranscript?: (text: string) => void) => void
+  listen: (onTranscript?: (text: string, isFinal: boolean) => void) => void
   stop: () => void
 }
 
@@ -315,8 +431,8 @@ export function useVoiceCoach(): VoiceCoachHookState {
   )
 
   const listen = useCallback(
-    async (onFinalTranscript?: (text: string) => void) => {
-      if (isListening || isPromptingMic) {
+    async (onTranscript?: (text: string, isFinal: boolean) => void) => {
+      if (isListening) {
         stop()
         return
       }
@@ -324,19 +440,22 @@ export function useVoiceCoach(): VoiceCoachHookState {
       setMicError(null)
       setTranscript('')
 
-      if (!recognitionSupported) {
-        setMicError('Speech recognition is supported in Chrome, Edge, and Safari.')
+      const unsupportedReason = getRecognitionSupportReason()
+      if (unsupportedReason) {
+        setMicError(unsupportedReason)
         return
       }
 
-      // Explicitly trigger browser microphone permission prompt
-      setIsPromptingMic(true)
-      const perm = await requestMicPermission()
-      setIsPromptingMic(false)
-
-      if (!perm.ok) {
-        setMicError(perm.error ?? 'Microphone access was denied.')
-        return
+      // Check mic permission first
+      const permState = await getMicPermissionState()
+      if (permState === 'prompt') {
+        setIsPromptingMic(true)
+        const perm = await requestMicPermission()
+        setIsPromptingMic(false)
+        if (!perm.ok) {
+          setMicError(perm.error ?? 'Microphone permission denied.')
+          return
+        }
       }
 
       setIsListening(true)
@@ -344,13 +463,23 @@ export function useVoiceCoach(): VoiceCoachHookState {
       const ctrl = startListening({
         onResult: (text, isFinal) => {
           setTranscript(text)
-          if (isFinal && onFinalTranscript) {
-            onFinalTranscript(text)
+          if (onTranscript) {
+            onTranscript(text, isFinal)
           }
         },
-        onError: (err) => {
-          setMicError(err)
+        onError: async (err) => {
           setIsListening(false)
+          // If error is not-allowed, prompt with getUserMedia so browser surfaces the permission bar
+          if (err.includes('denied') || err.includes('not-allowed')) {
+            const perm = await requestMicPermission()
+            if (!perm.ok) {
+              setMicError(perm.error ?? err)
+            } else {
+              setMicError('Microphone enabled. Click Speak to begin talking.')
+            }
+          } else {
+            setMicError(err)
+          }
         },
         onEnd: () => {
           setIsListening(false)
@@ -363,7 +492,7 @@ export function useVoiceCoach(): VoiceCoachHookState {
         listenerRef.current = ctrl
       }
     },
-    [isListening, isPromptingMic, recognitionSupported, stop],
+    [isListening, stop],
   )
 
   const toggleVoice = useCallback(() => {

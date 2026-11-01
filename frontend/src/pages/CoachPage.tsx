@@ -16,7 +16,7 @@ import { WaveformVisualizer } from '../features/loti/WaveformVisualizer'
 /* /coach: the whole talk with Loti in one column. Loti's bubbles on the left, the user's picks on the
    right, the open question's chips at the bottom, and a chat input to ask Loti anything.
    Includes multimodal voice coaching: spoken responses from Loti with speech synthesis,
-   speech recognition for user voice input, audio speed tuning, and accessible waveform visuals.
+   live continuous speech recognition for user voice input, audio speed tuning, and accessible waveform visuals.
    The talk lives in the session (lotiSession), so a talk started on another page's Loti bubble
    continues here, and leaving and coming back resumes it.
    Escape does nothing here: the only control that clears anything is "Start over". */
@@ -29,6 +29,7 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
   const [coachConsent, setCoachConsent] = useState(() => tracker.getStatus().coachConsent === 'granted')
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const baseInputRef = useRef('')
 
   const {
     voiceEnabled,
@@ -92,6 +93,17 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
     record(current, choice, next)
     focusNext.current = next && next.choices.length > 0 ? 'chips' : 'log'
     if (choice.action && choice.action.kind !== 'reply') run(choice.action)
+  }
+
+  const handleMicClick = () => {
+    if (isListening || isPromptingMic) {
+      stopVoice()
+      return
+    }
+    baseInputRef.current = input ? `${input.trim()} ` : ''
+    listen((liveTranscript) => {
+      setInput(`${baseInputRef.current}${liveTranscript}`)
+    })
   }
 
   const handleSend = async (e: React.FormEvent) => {
@@ -277,20 +289,22 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
         </div>
       )}
 
-      {/* Free-text chat input form with speech dictation */}
+      {/* Free-text chat input form with live speech dictation */}
       <form onSubmit={handleSend} className="flex flex-col gap-1.5 pt-2">
         <div className="flex items-center gap-2">
           <Button
             type="button"
             variant={isListening ? 'primary' : 'secondary'}
             size="sm"
-            onClick={() =>
-              listen((finalTranscript) => {
-                setInput((prev) => (prev ? `${prev} ${finalTranscript}` : finalTranscript))
-              })
-            }
+            onClick={handleMicClick}
             aria-label={isListening ? 'Stop listening' : isPromptingMic ? 'Allow microphone' : 'Speak to Loti'}
-            title={isListening ? 'Stop listening' : isPromptingMic ? 'Allow microphone' : 'Speak to Loti'}
+            title={
+              isListening
+                ? 'Stop listening'
+                : isPromptingMic
+                  ? 'Allow microphone'
+                  : 'Speak to Loti (or press Win + H)'
+            }
             className={isListening ? 'animate-pulse' : ''}
             leftIcon={
               isListening ? (
@@ -315,7 +329,7 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
                 ? 'Waiting for microphone permission in browser...'
                 : isListening
                   ? 'Listening to you speak...'
-                  : 'Ask Loti a question...'
+                  : 'Ask Loti a question (or press Win + H)...'
             }
             className="focus-ring flex-1 rounded-xl border border-border bg-surface px-4 py-2 text-base text-ink placeholder:text-ink-muted"
             aria-label="Message to Loti"
@@ -326,16 +340,19 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
           </Button>
         </div>
 
+        {isListening && (
+          <div className="flex items-center gap-2 px-1 text-xs text-ink-muted">
+            <WaveformVisualizer active={true} mode="listening" barCount={8} />
+            <span>Listening... speak clearly into your mic</span>
+          </div>
+        )}
+
         {micError && (
           <div role="alert" className="flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink-muted">
             <p>{micError}</p>
             <button
               type="button"
-              onClick={() =>
-                listen((finalTranscript) => {
-                  setInput((prev) => (prev ? `${prev} ${finalTranscript}` : finalTranscript))
-                })
-              }
+              onClick={handleMicClick}
               className="ml-2 font-medium underline hover:text-ink"
             >
               Retry

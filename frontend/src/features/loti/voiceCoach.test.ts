@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import {
   cleanSpokenText,
+  getRecognitionSupportReason,
+  isOperaBrowser,
   isRecognitionSupported,
   isSynthesisSupported,
   requestMicPermission,
@@ -118,6 +120,23 @@ describe('voiceCoach module (seam: Web Speech API)', () => {
 
       expect(isSynthesisSupported()).toBe(false)
       expect(isRecognitionSupported()).toBe(false)
+    })
+
+    it('identifies Opera/Opera GX and marks recognition as unsupported with actionable reason', () => {
+      const originalUA = navigator.userAgent
+      Object.defineProperty(navigator, 'userAgent', {
+        value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 OPR/106.0.0.0',
+        configurable: true,
+      })
+
+      expect(isOperaBrowser()).toBe(true)
+      expect(isRecognitionSupported()).toBe(false)
+      expect(getRecognitionSupportReason()).toMatch(/Opera GX/i)
+
+      Object.defineProperty(navigator, 'userAgent', {
+        value: originalUA,
+        configurable: true,
+      })
     })
   })
 

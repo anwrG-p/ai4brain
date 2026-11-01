@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { act, cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -329,6 +329,38 @@ describe('CoachPage (/coach)', () => {
 
       await user.click(playBtn)
       expect(mockSpeak).toHaveBeenCalled()
+    })
+
+    it('writes spoken text into chat input in real time when speech recognition emits results', async () => {
+      const user = userEvent.setup()
+      let recognitionInstance: any = null
+
+      ;(window as unknown as Record<string, unknown>).SpeechRecognition = class {
+        start = vi.fn()
+        stop = vi.fn()
+        onresult = null
+        constructor() {
+          recognitionInstance = this
+        }
+      }
+
+      renderAt()
+      const micBtn = screen.getByRole('button', { name: /speak to loti/i })
+      await user.click(micBtn)
+
+      expect(recognitionInstance).not.toBeNull()
+
+      act(() => {
+        recognitionInstance!.onresult?.({
+          resultIndex: 0,
+          results: [
+            [{ transcript: 'I want to focus on mental rotation' }],
+          ],
+        })
+      })
+
+      const input = screen.getByRole('textbox', { name: /message to loti/i })
+      expect((input as HTMLInputElement).value).toBe('I want to focus on mental rotation')
     })
   })
 })
