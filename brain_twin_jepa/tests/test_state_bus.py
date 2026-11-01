@@ -315,6 +315,25 @@ def test_light_refresh_reads_in_full_after_a_model_change_or_a_rewrite(model, re
     assert reads["n"] == 3
 
 
+def test_the_stat_reads_the_first_line_only_under_the_telemetry_lock(model, reads, monkeypatch):
+    """An unlocked open handle would make a concurrent delete or retention unlink fail on Windows.
+    With the lock busy the identity is unknown, and the light refresh reads in full instead."""
+    from app.privacy.telemetry_store import telemetry_dir, telemetry_lock
+
+    append("play1")
+    assert state_bus._stat("u1")[2] is not None
+    with telemetry_lock(telemetry_dir()):
+        size, mtime, identity = state_bus._stat("u1")
+    assert identity is None and size > 0
+
+    state_bus.refresh_light("u1")
+    assert reads["n"] == 1
+    real = state_bus._stat
+    monkeypatch.setattr(state_bus, "_stat", lambda key: real(key)[:2] + [None])  # the lock stays busy
+    state_bus.refresh_light("u1")
+    assert reads["n"] == 2  # unknown identity: the saved offsets are not trusted
+
+
 def test_light_refresh_reads_in_full_after_a_rewrite_that_grew_again(model, reads):
     """Retention drops the oldest lines, then new appends make the file longer than the saved
     offset: the tail would start mid-history, so the changed first line forces a full read."""

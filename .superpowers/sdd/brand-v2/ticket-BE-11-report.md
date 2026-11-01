@@ -7,6 +7,20 @@
 - The fix-round-1 commit (sha in the reply). See "Fix round 1" below; it wins over the earlier sections where they disagree.
 - No AI attribution in any commit (user rule).
 
+## Final round (after approval)
+- **`dccd196`:** merge of main `218fa58` (BE-13). Four conflicts, each kept both sides:
+  - Dockerfile: the bootstrap RUN, plus one `mkdir`/`chown` covering `/data/llm_variants` and `/data/state_bus`, plus both ENV lines.
+  - Compose: both volumes.
+  - `make_dispatcher`: passes `variants` as well as `pillars`/`archetype`/`on_step`. Main's stale "pillars: no server profile" comment is dropped.
+  - `Dispatcher.__init__`: both the `variants` and `on_step` parameters and attributes.
+- **`state_bus._stat`:**
+  - It now reads the first line under `telemetry_lock(telemetry_dir(), timeout=STAT_LOCK_S=0.05)`. An unlocked open handle could make a concurrent privacy delete or retention unlink fail on Windows (WinError 32).
+  - When the lock is busy, the identity is `None`, which `refresh_light` treats as unknown, so it reads in full.
+  - Test: `test_the_stat_reads_the_first_line_only_under_the_telemetry_lock`.
+- **Tests on the merged tree:** `pytest -q -W error -m "not benchmark"` gives 1512 passed, 2 failed, 4 deselected, 1 xfailed (187 s). The 2 failures:
+  - `test_tasks_api.py::test_the_port_matches_task_source_ts`: known red on main (SRV-1).
+  - `test_dispatcher.py::test_a_worker_that_dies_at_spawn_falls_back_to_inline`: a flake. Run alone 3 times it passed twice and failed once. Not touched.
+
 ## Fix round 1
 
 ### Important
