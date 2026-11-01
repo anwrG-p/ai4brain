@@ -1,6 +1,6 @@
 # UI Sprint State (`docs/ui/STATE.md`)
 
-> **History.** A record of the UI before brand v2 (BRIAN, the Doodle design, 19 pages, 7 dimensions). Entries are kept as written; later work supersedes them. Current: the [root README](../../README.md), the [glossary](../../docs/GLOSSARY.md) and `docs/design/BRAND-V2.md`.
+> **History.** A record of the UI before brand v2 (BRIAN, the Doodle design, 19 pages, 7 dimensions; replaced on 2026-10-31, DEC-011). Entries are kept as written; later work supersedes them. Current: the [root README](../../README.md), the [glossary](../../docs/GLOSSARY.md) and `docs/design/BRAND-V2.md`. Its screenshots were replaced by brand v2 ones in `docs/ui/screenshots/`; the old ones are in the repository history at commit `8b8c859`.
 
 **2026-10-25 11:15 (UTC+1)** | **Branch:** `ui/main` | **Milestone Release Tag:** [`ui-v1.0-phase1`](https://github.com/anwrG-p/ai4brain/releases/tag/ui-v1.0-phase1) | **Status:** 100% COMPLETE (19/19 Pages Shipped)
 

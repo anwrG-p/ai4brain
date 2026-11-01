@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { act, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { DEFAULT_PREFS, useDevicePrefs } from '../../../state/devicePrefs'
 import { useAppStore } from '../../../state/useAppStore'
 import { useEmilyStore } from '../../../state/useEmilyStore'
 import { Dolphin, type DolphinPose } from './Dolphin'
@@ -143,12 +144,25 @@ describe('Momo', () => {
     })
   })
 
-  it('MomoFromStore follows useEmilyStore', () => {
+  it('MomoFromStore follows useEmilyStore once the mood guess is active (opted in, notice seen)', () => {
+    useDevicePrefs.setState({ moodGuess: true, moodNoticeSeen: true })
     act(() => useEmilyStore.getState().setManualEmotion('fatigued'))
     render(<MomoFromStore size="md" />)
     expect(screen.getByRole('img', { name: /momo.*tired/i })).toBeInTheDocument()
     act(() => useEmilyStore.getState().setManualEmotion('energized'))
     expect(screen.getByRole('img', { name: /momo.*happy/i })).toBeInTheDocument()
+    // Switched off: a still, neutral picture that reads nothing from the store.
+    act(() => useDevicePrefs.setState({ moodGuess: false }))
+    expect(screen.getByRole('img', { name: 'Momo' })).toBeInTheDocument()
+    act(() => useEmilyStore.getState().reset())
+    useDevicePrefs.setState(DEFAULT_PREFS)
+  })
+
+  it('MomoFromStore with default prefs (opt-in, off) is neutral whatever the store holds', () => {
+    useDevicePrefs.setState(DEFAULT_PREFS)
+    act(() => useEmilyStore.getState().setManualEmotion('frustrated'))
+    render(<MomoFromStore size="md" />)
+    expect(screen.getByRole('img', { name: 'Momo' })).toBeInTheDocument()
     act(() => useEmilyStore.getState().reset())
   })
 })
@@ -195,13 +209,18 @@ describe('reduced motion', () => {
 
 // Spec R8: the one idle a character may have, opt-in; and a gaze the page can steer.
 describe('Loti idle and gaze (ticket 07b)', () => {
-  it('is still by default; `alive` adds the breath and the blink', () => {
+  it('is still by default; `alive` adds the blink only (the breath lives on an HTML wrapper, LotiSays)', () => {
     const still = render(<Loti pose="idle" />)
-    expect(still.container.querySelector('.char-anim-breathe, .char-anim-blink')).toBeNull()
+    expect(still.container.querySelector('.char-anim-blink')).toBeNull()
     still.unmount()
     const { container } = render(<Loti pose="idle" alive />)
-    expect(container.querySelector('.char-anim-breathe')).not.toBeNull()
+    expect(container.querySelector('[class*="breathe"]')).toBeNull()
     expect(container.querySelector('.char-anim-blink')).not.toBeNull()
+  })
+
+  it('tokens.css keeps no SVG breath and no override for it', () => {
+    const css = readFileSync(path.resolve(__dirname, '../../../styles/tokens.css'), 'utf8')
+    expect(css).not.toMatch(/char-breathe|char-anim-breathe/)
   })
 
   it('drops the idle under reduced motion', () => {

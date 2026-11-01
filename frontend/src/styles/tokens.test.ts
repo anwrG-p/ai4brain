@@ -62,9 +62,26 @@ describe('tokens.css palette', () => {
     expect(light.get('--color-canvas')).toBe('#FFFFFF')
     expect(light.get('--color-ink')).toBe('#0F2233')
     expect(dark.get('--color-canvas')).toBe('#162621')
-    expect(dark.get('--color-surface')).toBe('#122130')
+    expect(dark.get('--color-surface')).toBe('#1A2D28')
     expect(light.get('--color-accent')).toBe('#F2876B')
   })
+
+  // Dark mode: cards sit on the green chalkboard, so the card fills take the board's hue (no navy).
+  it.each(['--color-surface', '--color-surface-raised', '--color-border', '--color-brand-subtle'])(
+    'dark %s is within 30° of the board hue',
+    (name) => {
+      const hue = (hex: string) => {
+        const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as [number, number, number]
+        const max = Math.max(r, g, b)
+        const d = max - Math.min(r, g, b)
+        const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+        return (h * 60 + 360) % 360
+      }
+      const board = hue(dark.get('--color-canvas')!)
+      const diff = Math.abs(hue(dark.get(name)!) - board)
+      expect(Math.min(diff, 360 - diff), name).toBeLessThanOrEqual(30)
+    },
+  )
 
   // Every hex the contrast script audits must be the one the CSS ships.
   const metadataColors = DESIGN_SYSTEM_CONTRAST_PAIRS.flatMap((p) => [
@@ -199,6 +216,13 @@ describe('tokens.css fonts', () => {
     for (const w of [600, 700]) expect(mainSrc).toContain(`@fontsource/quicksand/${w}.css`)
     for (const w of [400, 500, 600]) expect(mainSrc).toContain(`@fontsource/inter/${w}.css`)
     expect(mainSrc).not.toMatch(/@fontsource\/(quicksand\/(400|500)|inter\/700)/)
+  })
+
+  // Only the two brand faces ship. Code text (the judge tool) uses the system monospace.
+  it('ships no other web font', () => {
+    expect([...mainSrc.matchAll(/@fontsource\/([\w-]+)\//g)].map((m) => m[1]).filter((f) => f !== 'quicksand' && f !== 'inter')).toEqual([])
+    expect(Object.keys(pkg.dependencies).filter((d) => d.startsWith('@fontsource/')).sort()).toEqual(['@fontsource/inter', '@fontsource/quicksand'])
+    for (const css of [themeBlock, lightBlock]) expect(css).toMatch(/--font-mono:\s*ui-monospace/)
   })
 
   it('has no Lexend, Delius or Fredoka left', () => {

@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { FULL_PAGE_CSS } from './testUtils'
 
 // SHOTS_DIR sends the screenshots to a scratch folder instead of the docs.
 const SCREENSHOT_DIR = process.env.SHOTS_DIR ?? path.resolve(process.cwd(), '../docs/ui/screenshots')
@@ -28,7 +29,7 @@ async function checkViewports(page: Page, theme: 'light' | 'dark') {
     expect(overflow, `Horizontal overflow at ${vp.width}px (${theme})`).toBe(false)
     const axe = await new AxeBuilder({ page }).analyze()
     expect(axe.violations, `axe at ${vp.width}px (${theme})`).toEqual([])
-    await page.screenshot({ path: path.join(SCREENSHOT_DIR, `13-privacy-${theme}-${vp.width}.png`), fullPage: true })
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, `13-privacy-${theme}-${vp.width}.png`), fullPage: true, style: FULL_PAGE_CSS })
   }
 }
 
@@ -49,32 +50,53 @@ test.describe('Page 13: Privacy (/privacy)', () => {
     await checkViewports(page, 'dark')
   })
 
-  test('Choose shows two equal choices; the line follows the choice', async ({ page }) => {
+  test('Choose shows the two purposes as equal switches; each line follows its choice', async ({ page }) => {
     await page.goto('/privacy', { waitUntil: 'networkidle' })
     await page.getByRole('button', { name: 'Choose' }).click()
-    const save = page.getByRole('button', { name: 'Save my answers' })
-    const keep = page.getByRole('button', { name: 'Keep them on this device only' })
-    expect(await save.getAttribute('class')).toBe(await keep.getAttribute('class'))
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
-    await keep.click()
+    const save = page.getByRole('switch', { name: 'Save my answers to improve my training' })
+    const ai = page.getByRole('switch', { name: "Let Loti use AI to reply when it's available" })
+    expect(await save.getAttribute('class')).toBe(await ai.getAttribute('class'))
+    for (const [w, h] of [[375, 812], [768, 1024], [1440, 900]] as const) {
+      await page.setViewportSize({ width: w, height: h })
+      expect((await new AxeBuilder({ page }).analyze()).violations, `axe at ${w}px`).toEqual([])
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `overflow at ${w}px`).toBe(true)
+    }
+    await ai.click()
+    await page.getByRole('button', { name: 'Done' }).click()
     await expect(page.getByTestId('consent-line')).toHaveText('Your answers are kept on this device only.')
+    await expect(page.getByTestId('coach-line')).toHaveText("Loti may use AI to reply when it's available.")
     await page.getByRole('button', { name: 'Change' }).click()
-    await page.getByRole('button', { name: 'Save my answers' }).click()
+    await page.getByRole('switch', { name: 'Save my answers to improve my training' }).click()
+    await page.getByRole('button', { name: 'Done' }).click()
     await expect(page.getByTestId('consent-line')).toHaveText('Your answers are saved.')
+  })
+
+  test('a device with only the v1 consent stored reads as answers saved, AI replies not chosen', async ({ page }) => {
+    await page.addInitScript(() => window.localStorage.setItem('synapsetwin_consent_v1', 'granted'))
+    await page.goto('/privacy', { waitUntil: 'networkidle' })
+    await expect(page.getByTestId('consent-line')).toHaveText('Your answers are saved.')
+    await expect(page.getByTestId('coach-line')).toHaveText('AI replies from Loti: not chosen yet.')
   })
 
   test('Export my data downloads one JSON file with every device key', async ({ page }) => {
     await page.goto('/privacy', { waitUntil: 'networkidle' })
     await page.getByRole('button', { name: 'Choose' }).click()
-    await page.getByRole('button', { name: 'Keep them on this device only' }).click()
+    await page.getByRole('button', { name: 'Done' }).click()
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export my data' }).click()])
     expect(download.suggestedFilename()).toMatch(/^my-data-\d{4}-\d{2}-\d{2}\.json$/)
     const file = await download.path()
     const data = JSON.parse(await readFile(file, 'utf8'))
-    expect(Object.keys(data.localStorage).sort()).toEqual(
-      ['aura_uid', 'synapsetwin_consent_v1', 'synapsetwin_goals_v1', 'synapsetwin_sessions_v1', 'synapsetwin_telemetry_queue_v2'],
-    )
+    expect(Object.keys(data.localStorage).sort()).toEqual([
+      'aura_uid',
+      'synapsetwin_consent_coach_v1',
+      'synapsetwin_consent_v1',
+      'synapsetwin_goals_v1',
+      'synapsetwin_prefs_v1',
+      'synapsetwin_sessions_v1',
+      'synapsetwin_telemetry_queue_v2',
+    ])
     expect(data.localStorage.synapsetwin_consent_v1).toBe('denied')
+    expect(data.localStorage.synapsetwin_consent_coach_v1).toBe('denied')
     // Loti's talk comes from its store (INT-1), not a raw sessionStorage key.
     expect(data.lotiTalk).toEqual({ turns: [], current: null })
     expect(data.app).toHaveProperty('userProfile')

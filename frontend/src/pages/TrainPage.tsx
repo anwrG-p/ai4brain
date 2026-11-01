@@ -4,9 +4,10 @@ import { ChevronRight } from 'lucide-react'
 import { Loti } from '../components/features/characters'
 import { useCharacterMotion } from '../components/features/characters/shared'
 import { EXERCISE_NAME } from '../features/assessment/names'
-import { isPillarId, PILLAR_IDS, PILLAR_LABELS, pillarScores, type PillarId } from '../features/insights/pillars'
+import { currentPillars, weakestPillar } from '../features/insights/dashboard'
+import { isPillarId, PILLAR_IDS, PILLAR_LABELS, type PillarId } from '../features/insights/pillars'
 import { useSessionStore } from '../features/insights/sessionStore'
-import { PILLAR_LINE, startPath, TRAIN_EXERCISES, trainOrder, weakestPillar } from '../features/train/catalog'
+import { PILLAR_LINE, startPath, TRAIN_EXERCISES, trainOrder } from '../features/train/catalog'
 import { useAppStore } from '../state/useAppStore'
 import type { TaskSchemaType } from '../types'
 
@@ -19,14 +20,15 @@ const ROW = 'focus-ring -mx-2 flex min-h-12 items-center justify-between gap-4 r
    else the weakest scored one, comes first and is highlighted; its first exercise is the page's one
    filled button, "Start <name>". ?pillar= also moves focus to it. A pillar with no exercise in the
    active set of dimensions (judge-mode sets only) is left out, and never leads.
-   Scores are the latest session's, like Results. ponytail: latest session only, no trend. */
+   Scores are each pillar as last measured and the weakest is the dashboard's, so Train, Home and
+   Loti always agree. */
 export default function TrainPage() {
   const [params] = useSearchParams()
   const asked = params.get('pillar')
-  const latest = useSessionStore((s) => s.sessions.at(-1))
+  const sessions = useSessionStore((s) => s.sessions)
   const preset = useAppStore((s) => s.dimensionPreset)
   const motion = useCharacterMotion()
-  const scores = useMemo(() => pillarScores(latest?.inputs ?? {}), [latest])
+  const scores = useMemo(() => currentPillars(sessions), [sessions])
   const rows = useMemo(() => {
     const out = {} as Record<PillarId, Row[]>
     for (const pillar of PILLAR_IDS) {

@@ -1,6 +1,6 @@
 # 08: Dashboard (Momo, radar, progress curve, goals, explore heatmap, Loti bubbles)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 02, 03, 04
 Spec: `../spec.md` (Design intelligence: charts; R5; U5; Anti-slop rules). Source: `docs/Dashboard.docx`.
 

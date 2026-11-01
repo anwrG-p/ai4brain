@@ -1,3 +1,4 @@
+import { weekKept } from '../insights/goals'
 import { PILLAR_IDS, PILLAR_LABELS, isPillarId } from '../insights/pillars'
 import type { LotiAction, LotiBrain, LotiContext, LotiMessage } from './types'
 
@@ -7,9 +8,6 @@ import type { LotiAction, LotiBrain, LotiContext, LotiMessage } from './types'
 export const MAX_MESSAGE_CHARS = 120
 /** Rule 4: about 12 words per line of UI text; the script tests hold every bubble to 14. */
 export const MAX_MESSAGE_WORDS = 14
-
-/** Four sessions a week is the "optimal" plan in the pillar model (ticket 04). */
-export const WEEKLY_TARGET = 4
 
 const GOAL_SIZES = [
   { id: '5', label: 'A little (+5)' },
@@ -126,7 +124,8 @@ function openingId(ctx: LotiContext): string {
   // Emotion aware: a tired or frustrated user is asked about the day, never pushed to train.
   if (ctx.mood === 'tired' || ctx.mood === 'frustrated') return 'day'
   // Friday or Saturday from 18:00, and only while the week's plan still has room.
-  if ((day === 5 || day === 6) && hour >= 18 && ctx.sessionsThisWeek < WEEKLY_TARGET) return 'weekend'
+  // The same rule as Home's weekly line: no nudge once the week is kept (one skip allowed).
+  if ((day === 5 || day === 6) && hour >= 18 && !weekKept(ctx.sessionsThisWeek)) return 'weekend'
   if (ctx.weakestPillar) return 'weakest'
   if (hour >= 5 && hour < 12) return 'sunshine'
   return 'day'

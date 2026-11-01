@@ -41,22 +41,15 @@ def test_module_router_is_mounted(module):
         reload_main()
 
 
-@pytest.mark.parametrize("module", ["dynamic_cache.api", "ai_coach.api", "brain_twin_jepa.api"])
-def test_module_routes_win_over_the_interop_router(module):
-    # BE-04/06/11 add /v1 routes in their module; those must shadow the v1_interop stand-ins.
-    router = importlib.import_module(module).router
-    router.add_api_route("/v1/clustering/evaluate", lambda: {"from": module}, methods=["POST"])
-    try:
-        r = TestClient(reload_main().app).post("/v1/clustering/evaluate", json={})
-        assert r.json() == {"from": module}
-    finally:
-        router.routes.pop()
-        reload_main()
-
-
-# (path, method) -> module of a route that intentionally answers instead of its v1_interop stand-in.
-# BE-04/06/11 add their entry here when their module route lands, then delete the stand-in.
-INTENTIONAL_OVERRIDES: dict[tuple[str, str], str] = {}
+# (path, method) -> the module that answers a route the v1_interop stand-ins once held. Every
+# stand-in is deleted (BE-04, BE-06, BE-11), and with them v1_interop.py.
+INTENTIONAL_OVERRIDES: dict[tuple[str, str], str] = {
+    ("/v1/tasks/next", "GET"): "dynamic_cache.api",  # BE-04; the stand-in is deleted
+    ("/v1/coach/chat", "POST"): "ai_coach.api",  # BE-06; the stand-in is deleted
+    ("/v1/coach/collaboration-score", "GET"): "ai_coach.api",  # BE-06; the stand-in is deleted
+    ("/v1/dashboard/profile", "GET"): "brain_twin_jepa.api",  # BE-11; the stand-in is deleted
+    ("/v1/clustering/evaluate", "POST"): "brain_twin_jepa.api",  # BE-11; the stand-in is deleted
+}
 
 
 def flat_routes(routes, prefix=""):
@@ -69,16 +62,21 @@ def flat_routes(routes, prefix=""):
             yield prefix + r.path, r.methods or set(), r.endpoint.__module__
 
 
-def test_no_route_shadows_a_v1_interop_stand_in_by_accident():
-    from app.api.routes import v1_interop
+def test_the_stand_ins_are_gone_and_each_route_is_declared_once():
+    import importlib.util
 
+    assert importlib.util.find_spec("app.api.routes.v1_interop") is None
     ordered = list(flat_routes(reload_main().app.routes))
-    stand_ins = [(r.path, m) for r in v1_interop.router.routes for m in r.methods]
-    assert stand_ins
-    for path, method in stand_ins:
+    for path, method in INTENTIONAL_OVERRIDES:
+        owners = [mod for p, methods, mod in ordered if p == path and method in methods]
+        assert len(owners) == 1, f"{method} {path} is declared by {owners}"
+
+
+def test_intentional_overrides_are_answered_by_their_module():
+    ordered = list(flat_routes(reload_main().app.routes))
+    for (path, method), module in INTENTIONAL_OVERRIDES.items():
         first = next(mod for p, methods, mod in ordered if p == path and method in methods)
-        expected = INTENTIONAL_OVERRIDES.get((path, method), "app.api.routes.v1_interop")
-        assert first == expected, f"{method} {path} is answered by {first}, not {expected}"
+        assert first == module, f"{method} {path} is answered by {first}, not {module}"
 
 
 def test_custom_422_handler_kept(client):

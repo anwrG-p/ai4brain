@@ -148,10 +148,7 @@ for (const file of walkFiles(SRC_DIR)) {
     const isExemptFromAcademicJargon =
       inDetailsDrawer ||
       ACADEMIC_JARGON_EXEMPT_PAGES.some((page) => rel.endsWith(page)) ||
-      !rel.includes(`pages${path.sep}`) ||
-      rel.endsWith('PrivacyPage.tsx') || // 09d's page; its owner drops this exemption
-      line.includes('Explore How This Is Calculated') ||
-      line.includes('data-technical-drawer')
+      !rel.includes(`pages${path.sep}`)
 
     if (!isExemptFromAcademicJargon) {
       for (const rule of BANNED_ACADEMIC_ML) {

@@ -119,7 +119,7 @@ export function eventProblem(x: unknown): string | null {
 
 export const isTelemetryEvent = (x: unknown): x is TelemetryEvent => eventProblem(x) === null
 
-// One union for the whole app: the UI's registry type has the same 8 literals.
+// One union for the whole app: the UI's registry type has the same literals.
 export type SchemaType = TaskSchemaType
 
 export type TaskPayload = {
@@ -244,4 +244,49 @@ export type MstParams = {
   encode_ms: number
   encode: Poly[]
   test: { item: Poly; kind: 'old' | 'lure' | 'new'; delta: number }[]
+}
+
+/* Stop Light (tasks/StopSignal.tsx): a two-choice go task (left/right arrow) with a stop signal on
+   some trials, shown after a stop-signal delay (SSD). A one-up/one-down staircase moves the SSD by
+   `ssd_step_ms`: later after a stop, earlier after a failed stop (Verbruggen et al. 2019, eLife
+   8:e46323, the consensus guide). The go window is `time_limit_ms`: a go trial with no press is an
+   omission, a stop trial with no press a successful stop. One event per trial, trial_meta
+   { stop_trial, dir, response: 'left' | 'right' | 'none', ssd_ms (stop trials only) }; `stop_trial`
+   is the signature schemaOf reads. Trial count and stop share: SST_DESIGN in StopSignal.tsx. */
+export type StopSignalParams = {
+  time_limit_ms: number
+  fixation_ms: number // the cross before every arrow
+  ssd_start_ms: number
+  ssd_step_ms: number
+  trials: { dir: 'left' | 'right'; stop: boolean }[]
+}
+
+/* Pair Finder (tasks/PairedAssociates.tsx): paired-associates learning, simplified from CANTAB PAL.
+   Each stage shows its patterns one by one in their boxes (`study_ms` each), then shows each pattern
+   in `recall` order and asks for its box. A stage with any wrong box is studied and recalled again,
+   up to `max_attempts`; failing the last attempt ends the task (later stages are not reached). One
+   event per recall choice, trial_meta { pal_level (patterns in the stage), attempt (1-based),
+   pattern, box, chosen (-1 on a timeout), pal_total (patterns over all stages), boxes };
+   `pal_level` is the signature schemaOf reads. Stage sizes: PAL_DESIGN in PairedAssociates.tsx. */
+export type PalParams = {
+  boxes: number
+  study_ms: number
+  time_limit_ms: number // per recall choice
+  max_attempts: number
+  stages: {
+    items: { pattern: number; box: number }[] // in study order; pattern 0..7, box 0..boxes-1
+    recall: number[] // indices into items, the recall order
+  }[]
+}
+
+/* Arrow Focus (tasks/Flanker.tsx): the arrow flanker task (Eriksen & Eriksen 1974), as in the ANT's
+   flanker part (Fan et al. 2002). Five arrows; answer the middle one (left/right). Congruent: the
+   four flankers point the same way; incongruent: the other way. A cross (`fixation_ms`) before each
+   trial; the arrows stay up to `time_limit_ms`. One event per trial, trial_meta { flanker:
+   'congruent' | 'incongruent', dir, response: 'left' | 'right' | 'none' }; `flanker` is the
+   signature schemaOf reads (never Stroop's `congruent`). Trial counts: FLANKER_DESIGN in Flanker.tsx. */
+export type FlankerParams = {
+  time_limit_ms: number
+  fixation_ms: number
+  trials: { dir: 'left' | 'right'; congruent: boolean }[]
 }

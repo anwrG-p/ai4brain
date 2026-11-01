@@ -17,6 +17,9 @@ const EXERCISES = [
   ['mst', 'episodic_pattern_separation', 'Precision Archive'],
   ['matrix', 'visuospatial_planning_gf', 'Pattern Puzzle'],
   ['mental_rotation', 'visuospatial_planning_gf', 'Shape Turn'],
+  ['stop_signal', 'inhibition_control', 'Stop Light'],
+  ['pal', 'episodic_pattern_separation', 'Pair Finder'],
+  ['flanker', 'inhibition_control', 'Arrow Focus'],
 ] as const
 
 test('the baseline opens on Logic Web’s instruction screen, also within one phone screen', async ({ page }) => {

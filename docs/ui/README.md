@@ -1,6 +1,6 @@
 # UI docs index
 
-> Most files here describe the UI **before brand v2** (BRIAN, the Doodle design, 19 pages, 7 dimensions) and are kept as a record. The current design and route map is `docs/design/BRAND-V2.md`; the vocabulary is the [glossary](../GLOSSARY.md).
+> Most files here describe the UI **before brand v2** (BRIAN, the Doodle design, 19 pages, 7 dimensions; replaced on 2026-10-31, DEC-011) and are kept as a record. The current design and route map is `docs/design/BRAND-V2.md`; the vocabulary is the [glossary](../GLOSSARY.md).
 
 ## Current
 | Doc | Purpose |
@@ -22,4 +22,4 @@
 | [`AGENT-EVALUATION-HANDOFF.md`](./AGENT-EVALUATION-HANDOFF.md) | Audit guide for the 19-page UI. |
 | [`direction-sprint.html`](./direction-sprint.html) | The first design-direction comparison. |
 | [`pages/`](./pages/) | The 19 page specs (01 Welcome to 19 Layer D). Each starts with where that route goes now. |
-| `screenshots/` | Screenshots of the 19-page UI. |
+| `screenshots/` | Brand v2 screenshots only. The 19-page UI's screenshots are in the repository history at commit `8b8c859`. |

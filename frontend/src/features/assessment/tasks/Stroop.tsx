@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { Button } from '../../../components/ui/Button'
 import { Card } from '../../../components/ui/Card'
 import { pressProps, useTimedTrials } from '../telemetry/useTimedTrials'
@@ -8,13 +8,54 @@ import { EXERCISE_NAME } from '../names'
 
 // Payload ink names → theme tokens that reach >= 4.5:1 text contrast on --color-surface in light
 // and dark (ratios in brand-v2 tickets 01 and 06). Red is its own pure red: --color-danger reads
-// rose in dark. Not --dim-5 (4.29:1 light).
-// ponytail: only the names the fixtures use; anything else paints in ink.
+// rose in dark. Not --dim-5 (4.29:1 light). Black is for the cvd_safe preset (blue, yellow, red,
+// black), on with Settings' "Colour-blind friendly colours": no dark surface carries black at 4.5:1,
+// so a block with black draws its stimuli on a light plate in both themes (StimulusCard).
+// ponytail: only the names the fixtures and the presets use; anything else paints in ink.
 export const INK: Record<string, string> = {
   red: 'var(--color-stroop-red)',
   green: 'var(--dim-3)',
   blue: 'var(--dim-1)',
   yellow: 'var(--dim-7)',
+  black: 'var(--color-stroop-black)',
+}
+
+/** The server's cvd_safe ink set (dynamic_cache/generators/stroop.py), in its button order: no
+    red/green pair, and the four differ in lightness. */
+export const CVD_SAFE_INKS = ['blue', 'yellow', 'red', 'black'] as const
+const CLASSIC = ['red', 'green', 'blue', 'yellow']
+
+/** The colour-blind friendly version of a classic block, made on the device (mock mode, or a server
+    that ignored inks=cvd_safe): green becomes black in every word, ink and answer, and the buttons
+    take the cvd_safe order. The congruent/incongruent design is unchanged. Any other ink set is
+    returned as it is. */
+export function toCvdSafe(params: StroopParams): StroopParams {
+  // A malformed payload is left for the exercise's own error boundary (SkipOnError).
+  if (!Array.isArray(params.colors) || !Array.isArray(params.trials)) return params
+  const inks = params.colors.map((c) => String(c).toLowerCase())
+  if (inks.length !== CLASSIC.length || !CLASSIC.every((c) => inks.includes(c))) return params
+  const swap = (name: string) => (name.toLowerCase() === 'green' ? (name === 'GREEN' ? 'BLACK' : 'black') : name)
+  return {
+    ...params,
+    colors: [...CVD_SAFE_INKS],
+    trials: params.trials.map((t) => ({ word: swap(t.word), ink: swap(t.ink), answer: swap(t.answer) })),
+  }
+}
+
+/** A block with black ink runs on the light plate. Decided from the block's ink list, never per
+    trial, so the plate gives no answer away. */
+export const usesLightPlate = (colors: readonly string[]) => colors.some((c) => c.toLowerCase() === 'black')
+
+/** The stimulus card. On the plate it carries the light tokens, so every ink (black too) is the
+    audited light pair; in dark mode tokens.css drops its shadow ([data-stroop-plate]). ExerciseFrame
+    draws the block's fixation in the same card, so trial 1 brings no jump from the board to the plate. */
+export function StimulusCard({ plate, children }: { plate: boolean; children: ReactNode }) {
+  const props = plate ? ({ 'data-theme': 'light', 'data-stroop-plate': true } as const) : {}
+  return (
+    <Card {...props} className="flex w-full items-center justify-center" style={{ minHeight: 160 }}>
+      {children}
+    </Card>
+  )
 }
 
 const inkOf = (name: string) => (Object.hasOwn(INK, name.toLowerCase()) ? INK[name.toLowerCase()]! : 'var(--color-ink)')
@@ -45,13 +86,13 @@ export function Stroop({ params, recorder, onDone }: TaskProps<StroopParams>) {
   if (!t) return null
   return (
     <section aria-label={EXERCISE_NAME.stroop} className="flex flex-col items-center gap-4">
-      <Card className="flex w-full items-center justify-center" style={{ minHeight: 160 }}>
+      <StimulusCard plate={usesLightPlate(colors)}>
         {!paused && (
           <p className="text-5xl font-bold" style={{ color: inkOf(t.ink) }}>
             {t.word}
           </p>
         )}
-      </Card>
+      </StimulusCard>
       <div className="flex flex-wrap justify-center gap-3">
         {colors.map((c, k) => (
           <Button key={c} variant="secondary" {...pressProps(() => respond(c === t.answer))}>

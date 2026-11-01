@@ -41,7 +41,20 @@ const isTurn = (x: unknown): x is LotiTurn => {
   return !!t && (t.from === 'loti' || t.from === 'you') && typeof t.text === 'string'
 }
 
-const SCHEMA_TYPES = ['n_back', 'stroop', 'matrix', 'mental_rotation', 'relational', 'tower', 'ufov', 'mst'] as const satisfies readonly TaskSchemaType[]
+// `satisfies Record` makes a schema added to the union fail to compile until listed here.
+const SCHEMA_TYPES = Object.keys({
+  n_back: true,
+  stroop: true,
+  matrix: true,
+  mental_rotation: true,
+  relational: true,
+  tower: true,
+  ufov: true,
+  mst: true,
+  stop_signal: true,
+  pal: true,
+  flanker: true,
+} satisfies Record<TaskSchemaType, true>)
 const isSchemaType = (x: unknown): x is TaskSchemaType => SCHEMA_TYPES.some((t) => t === x)
 /** Where a stored navigate may go: these app routes, or a plain sub-path of one. */
 const APP_ROUTES = ['/dashboard', '/train', '/coach', '/you', '/privacy', '/settings', '/methodology', '/baseline'] as const

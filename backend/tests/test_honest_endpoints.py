@@ -30,33 +30,6 @@ def assert_no_region_names(payload) -> None:
     assert "bottleneck" not in text
 
 
-# --- 501 until the module behind the route exists ------------------------------------------------
-
-NOT_YET = [
-    ("get", "/v1/tasks/next", {"params": {"user_id": "u1"}}, "task service not available yet"),
-    ("post", "/v1/coach/chat", {"json": {"user_id": "u1", "user_prompt": "hi"}}, "coach not available yet"),
-    (
-        "get",
-        "/v1/coach/collaboration-score",
-        {"params": {"user_id": "u1", "cluster_id": 3}},
-        "collaboration score not available yet",
-    ),
-    (
-        "post",
-        "/v1/clustering/evaluate",
-        {"json": {"user_id": "u1", "latent_vector": [0.1]}},
-        "clustering not available yet",
-    ),
-]
-
-
-@pytest.mark.parametrize("method,path,kwargs,detail", NOT_YET)
-def test_unbuilt_routes_are_501(client, method, path, kwargs, detail):
-    r = getattr(client, method)(path, **kwargs)
-    assert r.status_code == 501
-    assert r.json() == {"detail": detail}
-
-
 # --- user_id: required and file-safe on every /v1 route --------------------------------------
 
 USER_ROUTES = [
@@ -67,7 +40,11 @@ USER_ROUTES = [
     (
         "post",
         "/v1/coach/chat",
-        lambda uid: {"json": {"user_prompt": "hi"} | ({} if uid is None else {"user_id": uid})},
+        # A body that is valid apart from the id, so the 422 is about the id.
+        lambda uid: {
+            "json": {"transcript": [], "message": "hi", "kind": "typed"}
+            | ({} if uid is None else {"user_id": uid})
+        },
     ),
     ("post", "/v1/clustering/evaluate", lambda uid: {"json": {} if uid is None else {"user_id": uid}}),
 ]
@@ -93,14 +70,14 @@ def test_delete_removes_the_jsonl_and_counts_events(client, tmp_path):
 
     r = client.delete("/v1/user/telemetry", params={"user_id": "u_del"})
     assert r.status_code == 200
-    assert r.json() == {"deleted_events": 3, "deleted_files": 1}
+    assert r.json() == {"deleted_events": 3, "deleted_chat_turns": 0, "deleted_files": 1}
     assert not (tmp_path / "u_del.jsonl").exists()
 
 
 def test_delete_is_idempotent_and_reports_zero(client):
     r = client.delete("/v1/user/telemetry", params={"user_id": "nobody"})
     assert r.status_code == 200
-    assert r.json() == {"deleted_events": 0, "deleted_files": 0}
+    assert r.json() == {"deleted_events": 0, "deleted_chat_turns": 0, "deleted_files": 0}
 
 
 def test_delete_leaves_other_users_alone(client, tmp_path):
@@ -120,18 +97,19 @@ def test_delete_rejects_ids_that_are_not_file_safe(client, monkeypatch, tmp_path
     assert victim.exists()
 
 
-# --- profile: no numbers until the JSONL -> engine pipeline exists ---------------------------
+# --- profile: numbers only from events an exercise scorer reads (BE-11) ----------------------
 
 
-def test_profile_never_returns_numbers_today(client):
-    # Even with telemetry stored, nothing turns it into estimates yet.
+def test_profile_never_invents_numbers(client):
+    # Stored events that no exercise scorer reads (task "t1" is no exercise) score no skill, so
+    # the profile has nothing to show rather than a prior dressed up as a score (R15).
     setup = client.post(
         "/v1/telemetry/event", json=[{**EVENT, "user_id": "prof", "trial_index": i} for i in range(20)]
     )
     assert setup.status_code == 202
     r = client.get("/v1/dashboard/profile", params={"user_id": "prof"})
     assert r.status_code == 200
-    assert r.json() == {"user_id": "prof", "status": "not_enough_data", "estimates": [], "snapshots": []}
+    assert r.json() == {"user_id": "prof", "status": "not_enough_data", "sessions": 1, "min_sessions": 1}
 
 
 # --- health check -----------------------------------------------------------------------------
@@ -160,8 +138,7 @@ def test_api_routes_are_unmounted(client, method, path):
 
 
 def test_no_route_payload_names_a_region(client):
-    for method, path, kwargs, _ in NOT_YET:
-        assert_no_region_names(getattr(client, method)(path, **kwargs).json())
+    assert_no_region_names(client.post("/v1/clustering/evaluate", json={"user_id": "u1"}).json())
     assert_no_region_names(client.get("/v1/dashboard/profile", params={"user_id": "u1"}).json())
     assert_no_region_names(client.get("/").json())
 

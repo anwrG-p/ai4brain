@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import path from 'node:path'
+import { FULL_PAGE_CSS } from './testUtils'
 
 // SHOTS_DIR sends the screenshots to a scratch folder instead of the docs.
 const SCREENSHOT_DIR = process.env.SHOTS_DIR ?? path.resolve(process.cwd(), '../docs/ui/screenshots')
@@ -37,19 +38,19 @@ async function checkViewports(page: Page, theme: 'light' | 'dark') {
     expect(overflow, `Horizontal overflow at ${vp.width}px (${theme})`).toBe(false)
     const axe = await new AxeBuilder({ page }).analyze()
     expect(axe.violations, `axe at ${vp.width}px (${theme})`).toEqual([])
-    await page.screenshot({ path: path.join(SCREENSHOT_DIR, `you-${theme}-${vp.width}.png`), fullPage: true })
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, `you-${theme}-${vp.width}.png`), fullPage: true, style: FULL_PAGE_CSS })
   }
 }
 
 test.describe('You (/you)', () => {
   test.use({ reducedMotion: 'reduce' })
 
-  test('name line and 4 rows; ≤60 words above the fold; axe light and dark; no overflow at 375/768/1440', async ({ page }) => {
+  test('name line and 3 rows; ≤60 words above the fold; axe light and dark; no overflow at 375/768/1440', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/you', { waitUntil: 'networkidle' })
     await expect(page.getByRole('heading', { level: 1, name: 'Guest' })).toBeVisible()
     const rows = page.getByRole('navigation', { name: 'You' }).getByRole('listitem')
-    await expect(rows).toHaveText(['Privacy', 'Settings', 'How we calculate this', 'Sign in'])
+    await expect(rows).toHaveText(['Privacy', 'Settings', 'How we calculate this'])
     expect(await wordsAboveFold(page)).toBeLessThanOrEqual(60)
     await checkViewports(page, 'light')
     // The store is the theme's source of truth; the header toggle belongs to 09a.

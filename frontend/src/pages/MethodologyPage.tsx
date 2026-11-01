@@ -25,8 +25,11 @@ import {
 } from '../features/insights/projection'
 import {
   D_PRIME_MAX,
+  FLANKER_COST_MAX_MS,
   PLAN_SHARE,
   PLAN_TIME_MAX_MS,
+  SSRT_BEST_MS,
+  SSRT_WORST_MS,
   STROOP_COST_MAX_MS,
   SWITCH_COST_MAX,
   UFOV_MAX_MS,
@@ -73,11 +76,12 @@ const MEASURES: Record<InputId, Measure> = {
   },
   ANT_Conflict: {
     name: 'Handling conflict',
-    from: ['stroop'],
+    from: ['flanker', 'stroop'],
+    note: 'estimated from Color Clash without Arrow Focus',
     how: (
       <>
-        Time cost = mean time on mismatched colours − mean time on matching ones, correct answers only.
-        Scale: 0 ms → 100, {STROOP_COST_MAX_MS} ms → 0. Multiplied by (accuracy − ¼) ÷ ¾, so guessing scores 0.
+        Mean correct time, mismatched − matching. Arrow Focus: 0 ms → 100, {FLANKER_COST_MAX_MS} ms → 0, × (accuracy −
+        ½) ÷ ½. Color Clash: 0 ms → 100, {STROOP_COST_MAX_MS} ms → 0, × (accuracy − ¼) ÷ ¾.
       </>
     ),
   },
@@ -99,9 +103,14 @@ const MEASURES: Record<InputId, Measure> = {
   },
   SST_SSRT: {
     name: 'Stopping a habit',
-    from: ['stroop'],
-    note: 'estimated',
-    how: <>A stand-in for now: accuracy on mismatched Color Clash trials. There is no stop-signal exercise yet.</>,
+    from: ['stop_signal', 'stroop'],
+    note: 'estimated from Color Clash without Stop Light',
+    how: (
+      <>
+        Stop Light: go time at rank P(press | sign) − mean sign delay; {SSRT_BEST_MS} ms → 100, {SSRT_WORST_MS} ms → 0,
+        × (go accuracy − ½) ÷ ½. Unscored outside ¼–¾ presses, or if presses on signs aren’t faster.
+      </>
+    ),
   },
   OTS_Execution: {
     name: 'Moving with care',
@@ -114,7 +123,16 @@ const MEASURES: Record<InputId, Measure> = {
     from: ['mst'],
     how: <>LDI = P(“similar” | lure) − P(“similar” | new), kept between 0 and 1.</>,
   },
-  PAL_FirstTrialMemory: { name: 'Remembering pairs', from: null, how: null },
+  PAL_FirstTrialMemory: {
+    name: 'Remembering pairs',
+    from: ['pal'],
+    how: (
+      <>
+        Pair Finder: shapes placed in the right box on the first try ÷ every shape in all rounds (rounds not
+        reached count as missed). Scale: 0 → 0, all → 100.
+      </>
+    ),
+  },
   UFOV_SOA: {
     name: 'Seeing speed',
     from: ['ufov'],
@@ -277,12 +295,15 @@ export default function MethodologyPage() {
               ))}
           </dl>
           <p className="text-sm">
-            {UNSOURCED_INPUTS.map((id) => MEASURES[id].name).join(' and ')} have no exercise yet. The scale
-            ends are working values we will tune as data comes in.
+            {UNSOURCED_INPUTS.map((id) => MEASURES[id].name).join(' and ')} {UNSOURCED_INPUTS.length === 1 ? 'has' : 'have'}{' '}
+            no exercise yet. The scale ends are working values we will tune as data comes in.
           </p>
           <Sources>
             <li>d′ correction: Hautus 1995, Behavior Research Methods, Instruments, &amp; Computers.</li>
             <li>LDI: Stark et al. 2023, Frontiers in Behavioral Neuroscience.</li>
+            <li>Stopping time (integration method): Verbruggen et al. 2019, eLife.</li>
+            <li>Remembering pairs: Sahakian et al. 1988, Brain (CANTAB Paired Associates Learning).</li>
+            <li>Arrow conflict: Eriksen &amp; Eriksen 1974, Perception &amp; Psychophysics; Fan et al. 2002, J Cogn Neurosci.</li>
             <li>
               Time-cost scores are unreliable from one test to the next: Hedge, Powell &amp; Sumner 2018, Behavior
               Research Methods.

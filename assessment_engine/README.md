@@ -86,6 +86,9 @@ Staircased exercises send `levels: Trial[][]`, easiest first, and the client pic
 | executive_function | `tower` | `{ capacities: number[], start: string[][], goal: string[][], l_min, optimal_moves: [from,to][], counter_intuitive: number[] /* indices into optimal_moves */, time_limit_ms? }`. `time_limit_ms` is per problem, counted from the move-count prediction; the client defaults to 60000 (TOL-F). On expiry the trial ends unsolved. |
 | processing_speed | `ufov` | `{ duration_grid_ms: number[], similarity, mask_noise, trials: { central: "A"\|"B", peripheral_dir: 0..7, distractors: {dir, ring}[] }[] }`. `similarity` and `mask_noise` are fixed per block by Member 5. |
 | episodic_memory | `mst` | `{ encode_ms, encode: Poly[], test: { item: Poly, kind: "old"\|"lure"\|"new", delta: number }[] }`, `Poly = {points: [x,y][], edges: [i,j][]}`, perturbation already applied by the generator |
+| executive_function | `stop_signal` | `{ time_limit_ms, fixation_ms, ssd_start_ms, ssd_step_ms, trials: { dir: "left"\|"right", stop: boolean }[] }`. Stop Light: a cross for `fixation_ms`, then an arrow for up to `time_limit_ms` (the go window). On a `stop` trial a stop sign appears after the stop-signal delay, which a one-up/one-down staircase moves by `ssd_step_ms` (later after a stop, earlier after a failed stop), clamped to `[0, time_limit_ms − ssd_step_ms]`. A stop trial is right when nothing is pressed. Consensus design (Verbruggen et al. 2019): about 25% stop trials, at least 50 of them. |
+| episodic_memory | `pal` | `{ boxes, study_ms, time_limit_ms, max_attempts, stages: { items: { pattern: 0..7, box: 0..boxes−1 }[], recall: number[] /* indices into items */ }[] }`. Pair Finder (CANTAB PAL, simplified): each stage shows its patterns one at a time in their boxes for `study_ms` each, then asks for each pattern's box in `recall` order, with `time_limit_ms` per choice. A stage with any wrong box is studied again, up to `max_attempts`; failing the last attempt ends the task. Boxes and patterns are distinct within a stage. |
+| executive_function | `flanker` | `{ time_limit_ms, fixation_ms, trials: { dir: "left"\|"right", congruent: boolean }[] }`. Arrow Focus: a cross, then five arrows for up to `time_limit_ms`; the answer is the middle arrow's `dir`. Congruent flankers point the same way, incongruent the other way. One ANT block is 96 trials, 48 per condition. |
 
 Payloads are data only: rendered with SVG from numbers and strings, no `dangerouslySetInnerHTML`, `eval` or `new Function`.
 
@@ -130,6 +133,9 @@ Delivery is at-least-once (a retried or beaconed batch may arrive twice); dedupe
 | tower | `l_min`, `l_user`, `predicted_moves`, `planning_time_ms`, `conflict_latency_ms` (mean pause before moves matching a `counter_intuitive` step, 0 if none), `solved` |
 | ufov | `requested_ms`, `shown_ms` (measured), `frames`, `similarity`, `mask_noise`, `central_ok`, `peripheral_ok` |
 | mst | `kind`, `delta`, `response` (`old`/`similar`/`new`, or `none` on timeout) |
+| stop_signal | `stop_trial` (boolean, the signature), `dir`, `response` (`left`/`right`, or `none` with no press), and on stop trials `ssd_ms`: the measured delay from the arrow to the stop sign, or the scheduled delay when a press came first |
+| pal | `pal_level` (patterns in the stage, the signature), `attempt` (1-based), `pattern`, `box`, `chosen` (box index, or `-1` on timeout), `pal_total` (patterns over all stages, reached or not), `boxes`. One event per recall choice; `trial_index` counts across stages and attempts |
+| flanker | `flanker` (`congruent`/`incongruent`, the signature; never Stroop's `congruent` key), `dir`, `response` (`left`/`right`, or `none` on timeout) |
 
 UFOV rounds the requested duration to whole display frames and logs the measured `shown_ms`; QUEST+
 is updated with `shown_ms`, not the requested value. QUEST+ estimates the display-duration threshold

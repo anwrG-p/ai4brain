@@ -15,9 +15,10 @@ import { Button } from '../../components/ui/Button'
 import { PILLAR_LABELS } from '../insights/pillars'
 import { ExerciseDemo } from './ExerciseDemo'
 import { stepParts } from './howToPlay'
-import { introFor, OWN_FIXATION, trialCount, type Intro } from './exercises'
+import { countsAsProgress, introFor, OWN_FIXATION, trialCount, type Intro } from './exercises'
+import { StimulusCard, usesLightPlate } from './tasks/Stroop'
 import { tracker } from './telemetry/tracker'
-import type { NBackParams, SchemaType, TaskPayload } from './telemetry/types'
+import type { NBackParams, SchemaType, StroopParams, TaskPayload } from './telemetry/types'
 
 export const FIXATION_MS = 500
 
@@ -29,6 +30,8 @@ type Props = {
   onDone: () => void
   // The block is over (the end card appears). The host must not pause or replay it from here on.
   onBlockEnd?: () => void
+  // The block has started (Begin, or at once for a bare exercise): a host shows Pause from here on.
+  onBlockStart?: () => void
   // Renders the exercise, which calls `end` once its block is over. `end` keeps its identity, so a
   // frame re-render never restarts the exercise's trial loop (it restarts when onDone changes).
   children: (end: () => void) => ReactNode
@@ -62,7 +65,7 @@ function useTrialsDone(taskId: string) {
   useEffect(() => {
     const seen = new Set<number>()
     return tracker.onEvent((e) => {
-      if (e.task_id !== taskId || seen.has(e.trial_index)) return
+      if (e.task_id !== taskId || seen.has(e.trial_index) || !countsAsProgress(e)) return
       seen.add(e.trial_index)
       setDone(seen.size)
     })
@@ -71,10 +74,25 @@ function useTrialsDone(taskId: string) {
 }
 
 // Small dots, n of N. They change only when a trial ends; a dot pops once as it fills (the only
-// motion near a running trial, spec R8).
-// ponytail: one dot per trial, wrapping; a block of 60+ trials would want a bar instead.
+// motion near a running trial, spec R8). A block longer than MAX_DOTS (Stop Light's 200 trials) shows
+// one thin bar instead, so the dots never push the stimulus down; it steps without motion.
+export const MAX_DOTS = 40
 function ProgressDots({ done, total }: { done: number; total: number }) {
   const n = Math.min(done, total)
+  if (total > MAX_DOTS)
+    return (
+      <div
+        role="progressbar"
+        aria-label="Progress"
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={n}
+        aria-valuetext={`${n} of ${total} done`}
+        className="h-2 w-full max-w-xs overflow-hidden rounded-pill border border-border-strong"
+      >
+        <div data-bar-fill className="h-full bg-brand" style={{ width: `${(100 * n) / total}%` }} />
+      </div>
+    )
   return (
     <div
       role="progressbar"
@@ -251,15 +269,21 @@ function EndCard({ onContinue }: { onContinue: () => void }) {
 // no event is recorded on the instruction or fixation screens; its timing and telemetry are its own.
 // UFOV skips the fixation here (it draws one before every trial). An unknown schema runs bare.
 // The block ends on the end card: onBlockEnd fires then, onDone only on Continue.
-export function ExerciseFrame({ task, onDone, onBlockEnd, children }: Props) {
+export function ExerciseFrame({ task, onDone, onBlockEnd, onBlockStart, children }: Props) {
   const intro = introFor(task)
   const [phase, setPhase] = useState<Phase>('intro')
   const done = useTrialsDone(task.task_id)
   const handed = useRef(false)
   const blockEnd = useRef(onBlockEnd)
+  const blockStart = useRef(onBlockStart)
   useLayoutEffect(() => {
     blockEnd.current = onBlockEnd
+    blockStart.current = onBlockStart
   })
+  const started = !intro || phase !== 'intro'
+  useEffect(() => {
+    if (started) blockStart.current?.()
+  }, [started])
   const ownFixation = OWN_FIXATION.has(task.schema_type)
 
   const begin = useCallback(
@@ -276,8 +300,9 @@ export function ExerciseFrame({ task, onDone, onBlockEnd, children }: Props) {
     onDone()
   }, [onDone])
   // Bare (no intro, so no end card): the block ends and hands over at once, onBlockEnd first, so a
-  // host that saves on block end (TaskRunnerPage) still saves the run.
+  // host that saves on block end (TaskRunnerPage) still saves the run. Once only, like finish.
   const endBare = useCallback(() => {
+    if (handed.current) return
     blockEnd.current?.()
     finish()
   }, [finish])
@@ -307,15 +332,26 @@ export function ExerciseFrame({ task, onDone, onBlockEnd, children }: Props) {
           onBegin={begin}
         />
       )
-    case 'fixation':
+    case 'fixation': {
       // R9: the cross appears at once, at full contrast for all of its 500 ms (jsPsych convention).
+      const cross = (
+        <span role="img" aria-label="Look at the cross" className="select-none text-5xl font-bold text-ink">
+          +
+        </span>
+      )
+      // A Color Clash block on the light plate shows its cross on that plate too (no luminance jump).
+      if (task.schema_type === 'stroop' && usesLightPlate((task.params as StroopParams).colors))
+        return (
+          <div data-block-running="true" className="flex min-h-64 w-full items-center justify-center">
+            <StimulusCard plate>{cross}</StimulusCard>
+          </div>
+        )
       return (
         <div data-block-running="true" className="flex min-h-64 items-center justify-center">
-          <span role="img" aria-label="Look at the cross" className="select-none text-5xl font-bold text-ink">
-            +
-          </span>
+          {cross}
         </div>
       )
+    }
     case 'trials':
       // No character and no decoration here: only the dots and the stimulus.
       return (

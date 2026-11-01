@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import path from 'node:path'
-import { openJudgeMode } from './testUtils'
+import { openJudgeMode, FULL_PAGE_CSS } from './testUtils'
 
 // Screenshots go to SHOTS_DIR when set, else to the test's own output folder (never docs/).
 const shot = (name: string) => path.join(process.env.SHOTS_DIR ?? test.info().outputPath(), name)
@@ -53,7 +53,7 @@ test.describe('Task runner (/task/:dimId), reached from Train', () => {
 
     await page.getByRole('button', { name: /Dark \(Night Lab\)/ }).click()
     await axeClean(page)
-    await page.screenshot({ path: shot('task-summary-dark-1440.png'), fullPage: true })
+    await page.screenshot({ path: shot('task-summary-dark-1440.png'), fullPage: true, style: FULL_PAGE_CSS })
 
     await page.getByRole('button', { name: 'Back to Train' }).click()
     await expect(page).toHaveURL(/\/train$/)

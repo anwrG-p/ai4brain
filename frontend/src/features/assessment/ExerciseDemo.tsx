@@ -169,6 +169,73 @@ function Matrix() {
   )
 }
 
+// Stop Light: an arrow shows, then the stop sign (an octagon and the word) closes round it.
+const OCTAGON = Array.from({ length: 8 }, (_, k) => {
+  const a = ((22.5 + k * 45) * Math.PI) / 180
+  return `${(80 + 34 * Math.cos(a)).toFixed(1)},${(40 + 34 * Math.sin(a)).toFixed(1)}`
+}).join(' ')
+function StopSignal() {
+  return (
+    <>
+      <path d="M62 40 H96 M84 28 L98 40 L84 52" fill="none" stroke={INKC} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />
+      <g className="anim-demo-seq" style={at(3)}>
+        <polygon points={OCTAGON} fill="none" stroke={MARK} strokeWidth={4} strokeLinejoin="round" />
+        <text x={138} y={45} fontSize={13} fill={INKC} {...TEXT}>
+          Stop
+        </text>
+      </g>
+    </>
+  )
+}
+
+// Pair Finder: a shape shows in one of four boxes, then that box is picked (a ring closes on it).
+function Pal() {
+  const xs = [26, 60, 94, 128]
+  return (
+    <>
+      {xs.map((x) => (
+        <rect key={x} x={x - 13} y={27} width={26} height={26} rx={5} fill="none" stroke={LINE} strokeWidth={1.5} />
+      ))}
+      <g className="anim-demo-seq" style={at(0)}>
+        <path d="M94 31 L103 49 H85 Z" fill={SHAPE} />
+      </g>
+      <g className="anim-demo-seq" style={at(4)}>
+        <rect x={78} y={23} width={32} height={34} rx={7} fill="none" stroke={MARK} strokeWidth={3} />
+      </g>
+    </>
+  )
+}
+
+// Arrow Focus: five arrows, the middle one marked; first all one way, then the flankers turn
+// against it while the middle keeps pointing right.
+function FlankerArrow({ cx, left, mark }: { cx: number; left: boolean; mark: boolean }) {
+  const s = left ? -1 : 1
+  return (
+    <path
+      d={`M${cx - 10 * s} 40 H${cx + 10 * s} M${cx + 2 * s} 32 L${cx + 10 * s} 40 L${cx + 2 * s} 48`}
+      fill="none"
+      stroke={mark ? MARK : INKC}
+      strokeWidth={3.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  )
+}
+function Flanker() {
+  const xs = [24, 52, 80, 108, 136] // 28 apart: a clear gap between arrows
+  return (
+    <>
+      {[false, true].map((against, i) => (
+        <g key={i} className={`anim-demo-cycle ${i ? 'demo-later' : ''}`} style={at(i * 1.5)}>
+          {xs.map((x, k) => (
+            <FlankerArrow key={x} cx={x} left={against && k !== 2} mark={k === 2} />
+          ))}
+        </g>
+      ))}
+    </>
+  )
+}
+
 const DEMOS: Record<SchemaType, (p: { n?: number }) => ReactNode> = {
   stroop: Stroop,
   n_back: NBack,
@@ -178,6 +245,9 @@ const DEMOS: Record<SchemaType, (p: { n?: number }) => ReactNode> = {
   tower: Tower,
   mst: Mst,
   matrix: Matrix,
+  stop_signal: StopSignal,
+  pal: Pal,
+  flanker: Flanker,
 }
 
 /** `n`: the n-back distance the Memory Gauntlet demo draws (its caption names it). */

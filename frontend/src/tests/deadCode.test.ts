@@ -77,6 +77,22 @@ describe('dead code (INT-1)', () => {
     expect(hits).toEqual([])
   })
 
+  it('every runtime dependency is imported by the app', () => {
+    const pkg = JSON.parse(readFileSync(path.resolve(SRC, '../package.json'), 'utf8')) as { dependencies: Record<string, string> }
+    const code = files(SRC)
+      .filter((f) => /\.tsx?$/.test(f) && !isTest(rel(f)))
+      .map((f) => readFileSync(f, 'utf8'))
+      .join('\n')
+    // The package itself ('d') or a path inside it ('d/...'), never a longer name that starts with it.
+    const unused = Object.keys(pkg.dependencies).filter((d) => !code.includes(`'${d}'`) && !code.includes(`'${d}/`))
+    expect(unused).toEqual([])
+  })
+
+  it('CI step names carry no test counts (they go stale with every new test)', () => {
+    const ci = readFileSync(path.resolve(SRC, '../../.github/workflows/ui-ci.yml'), 'utf8')
+    expect(ci).not.toMatch(/name:.*\(\d+\/\d+\)/)
+  })
+
   it('the app store holds no unused settings or demo switches', () => {
     const keys = Object.keys(useAppStore.getState())
     for (const gone of ['simulateLlmDown', 'textScale', 'soundEffects', 'enhancedGlyphs', 'blurAutoPause', 'studyWindow', 'restDays'])

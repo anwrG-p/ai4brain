@@ -3,7 +3,10 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { useAppStore } from '../state/useAppStore'
-import { CONSENT_KEY, QUEUE_KEY, tracker } from '../features/assessment/telemetry/tracker'
+import { COACH_CONSENT_KEY, CONSENT_KEY, QUEUE_KEY, tracker } from '../features/assessment/telemetry/tracker'
+import { DEFAULT_PREFS, PREFS_KEY, useDevicePrefs } from '../state/devicePrefs'
+import { MOOD_NOTICE } from '../components/features/characters'
+import { useEmilyStore } from '../state/useEmilyStore'
 import { UID_KEY } from '../features/assessment/tasks/taskSource'
 import { GOALS_KEY, useGoalsStore } from '../features/insights/goals'
 import { SESSIONS_KEY, useSessionStore } from '../features/insights/sessionStore'
@@ -43,6 +46,8 @@ beforeEach(() => {
   useAppStore.getState().resetDemoState()
   tracker.resetConsent()
   tracker.clear()
+  useDevicePrefs.setState(DEFAULT_PREFS)
+  useEmilyStore.getState().reset()
 })
 afterEach(() => {
   vi.restoreAllMocks()
@@ -50,34 +55,24 @@ afterEach(() => {
 })
 
 describe('You (/you)', () => {
-  it('has one h1 with the guest name and exactly 4 rows', () => {
+  it('has one h1 with the guest name and exactly 3 rows: no sign-in (R13, users stay anonymous)', () => {
     const page = renderPage(<YouPage />)
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Guest')
     const rows = within(screen.getByRole('navigation', { name: 'You' })).getAllByRole('listitem')
-    expect(rows.map((r) => r.textContent?.trim())).toEqual(['Privacy', 'Settings', 'How we calculate this', 'Sign in'])
+    expect(rows.map((r) => r.textContent?.trim())).toEqual(['Privacy', 'Settings', 'How we calculate this'])
     expect(page.querySelector('a[href="/privacy"]')).not.toBeNull()
     expect(page.querySelector('a[href="/settings"]')).not.toBeNull()
     expect(page.querySelector('a[href="/methodology"]')).not.toBeNull()
+    expect(page.textContent).not.toMatch(/sign(ed)? (in|out)/i)
+    expect(screen.queryByRole('button')).toBeNull()
   })
 
-  it('shows the signed-in name, and Sign out signs out', () => {
+  it('a stored name still shows (no account behind it)', () => {
     useAppStore.getState().loginUser({ preferredName: 'Mazen', email: 'm@example.com', focusGoal: 'x' })
-    renderPage(<YouPage />)
+    const page = renderPage(<YouPage />)
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Mazen')
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
-    expect(useAppStore.getState().isAuthenticated).toBe(false)
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Guest')
-    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument()
-  })
-
-  it('Sign in opens the login sheet for a guest', () => {
-    vi.stubEnv('VITE_GOOGLE_CLIENT_ID', '')
-    renderPage(<YouPage />)
-    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
-    const sheet = screen.getByRole('dialog')
-    fireEvent.click(within(sheet).getByRole('button', { name: 'Continue as guest' }))
-    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(page.textContent).not.toMatch(/sign(ed)? (in|out)|m@example\.com/i)
   })
 
   it('keeps to 60 words and no technical words', () => {
@@ -98,21 +93,38 @@ describe('Privacy (/privacy)', () => {
     expect(screen.getByTestId('consent-line')).toHaveTextContent('Your answers are kept on this device only.')
   })
 
-  it('Change shows two equal choices that call the tracker and update the line', () => {
+  it('shows both purposes, each in its own line (research #6)', () => {
+    renderPage(<PrivacyPage />)
+    expect(screen.getByTestId('coach-line')).toHaveTextContent('AI replies from Loti: not chosen yet.')
+    act(() => tracker.setCoachConsent(true))
+    expect(screen.getByTestId('coach-line')).toHaveTextContent("Loti may use AI to reply when it's available.")
+    act(() => tracker.setCoachConsent(false))
+    expect(screen.getByTestId('coach-line')).toHaveTextContent('Loti uses scripted replies only.')
+    // Purpose 2 alone leaves purpose 1 as it was.
+    expect(screen.getByTestId('consent-line')).toHaveTextContent('Not chosen yet')
+  })
+
+  it('Choose opens two equal switches (both off); Done records both and updates the lines', () => {
     const grant = vi.spyOn(tracker, 'grantConsent')
     const deny = vi.spyOn(tracker, 'denyConsent')
     renderPage(<PrivacyPage />)
     fireEvent.click(screen.getByRole('button', { name: 'Choose' }))
-    const save = screen.getByRole('button', { name: 'Save my answers' })
-    const keep = screen.getByRole('button', { name: 'Keep them on this device only' })
-    expect(save.className).toBe(keep.className) // equal weight (R3)
+    const save = screen.getByRole('switch', { name: 'Save my answers to improve my training' })
+    const ai = screen.getByRole('switch', { name: "Let Loti use AI to reply when it's available" })
+    expect(save.className).toBe(ai.className) // equal weight (R3)
+    expect(save).toHaveAttribute('aria-checked', 'false')
+    expect(ai).toHaveAttribute('aria-checked', 'false')
     fireEvent.click(save)
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
     expect(grant).toHaveBeenCalledTimes(1)
     expect(screen.getByTestId('consent-line')).toHaveTextContent('Your answers are saved.')
-    expect(screen.queryByRole('button', { name: 'Save my answers' })).toBeNull()
+    expect(screen.getByTestId('coach-line')).toHaveTextContent('Loti uses scripted replies only.')
+    expect(screen.queryByRole('switch')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Change' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Keep them on this device only' }))
+    expect(screen.getByRole('switch', { name: 'Save my answers to improve my training' })).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(screen.getByRole('switch', { name: 'Save my answers to improve my training' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
     expect(deny).toHaveBeenCalledTimes(1)
     expect(screen.getByTestId('consent-line')).toHaveTextContent('Your answers are kept on this device only.')
   })
@@ -155,6 +167,22 @@ describe('Privacy (/privacy)', () => {
     expect(screen.getByTestId('consent-line')).toHaveTextContent('Not chosen yet')
   })
 
+  it('delete turns the mood guess OFF (never on), clears any correction and the AI-replies choice; the colour-blind inks stay', () => {
+    act(() => tracker.setCoachConsent(true))
+    useDevicePrefs.getState().setMoodGuess(true)
+    useDevicePrefs.getState().setCvdSafe(true)
+    useEmilyStore.getState().setManualEmotion('frustrated')
+    renderPage(<PrivacyPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete my data' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(useDevicePrefs.getState()).toMatchObject({ moodGuess: false, moodNoticeSeen: false, cvdSafe: true })
+    expect(JSON.parse(localStorage.getItem(PREFS_KEY)!)).toMatchObject({ moodGuess: false, moodNoticeSeen: false, cvdSafe: true })
+    expect(useEmilyStore.getState()).toMatchObject({ currentEmotion: 'calm_flow', isHumanLocked: false })
+    expect(tracker.getStatus().coachConsent).toBe('pending')
+    expect(localStorage.getItem(COACH_CONSENT_KEY)).toBeNull()
+    expect(screen.getByTestId('coach-line')).toHaveTextContent('not chosen yet')
+  })
+
   it('delete keeps the theme and reduce motion (preferences, not data) and clears Loti talk', () => {
     act(() => {
       useAppStore.getState().setTheme('dark')
@@ -187,6 +215,11 @@ describe('Privacy (/privacy)', () => {
     useSessionStore.getState().addSession(SESSION)
     useGoalsStore.getState().setGoal('focus', 10)
     act(() => tracker.denyConsent()) // the tracker itself writes the consent key
+    act(() => tracker.setCoachConsent(true))
+    useDevicePrefs.getState().setMoodGuess(true) // on, then off: the notice stays seen
+    useDevicePrefs.getState().setMoodGuess(false)
+    useDevicePrefs.getState().setCvdSafe(true)
+    useEmilyStore.getState().setManualEmotion('fatigued')
     localStorage.setItem(QUEUE_KEY, '[{"event":"held"}]')
     localStorage.setItem(UID_KEY, 'anon-1')
     seedLotiTalk()
@@ -213,7 +246,14 @@ describe('Privacy (/privacy)', () => {
       r.readAsText(blob as Blob)
     })
     const data = JSON.parse(text)
-    expect(Object.keys(data.localStorage).sort()).toEqual([CONSENT_KEY, GOALS_KEY, QUEUE_KEY, SESSIONS_KEY, UID_KEY].sort())
+    expect(Object.keys(data.localStorage).sort()).toEqual(
+      [CONSENT_KEY, COACH_CONSENT_KEY, GOALS_KEY, QUEUE_KEY, SESSIONS_KEY, UID_KEY, PREFS_KEY].sort(),
+    )
+    expect(data.localStorage[COACH_CONSENT_KEY]).toBe('granted')
+    expect(data.coachConsent).toBe('granted')
+    // The mood prefs are exported; the mood itself is never stored, so it is not in the file.
+    expect(data.localStorage[PREFS_KEY]).toEqual({ version: 1, moodGuess: false, moodNoticeSeen: true, cvdSafe: true })
+    expect(text).not.toMatch(/fatigued|frustrated|calm_flow|currentEmotion/)
     expect(data.localStorage[SESSIONS_KEY].sessions[0].id).toBe('s1')
     expect(data.localStorage[GOALS_KEY].goals).toEqual({ focus: 10 })
     expect(data.localStorage[CONSENT_KEY]).toBe('denied')
@@ -301,10 +341,85 @@ describe('Settings (/settings)', () => {
     expect(motion.className).toMatch(/\bmin-h-14\b/)
   })
 
+  it('"Mood guess" is OFF by default (opt-in) and carries the Art 50(3) notice as its description', () => {
+    renderPage(<SettingsPage />)
+    const mood = screen.getByRole('switch', { name: 'Mood guess' })
+    expect(mood).toHaveAttribute('aria-checked', 'false')
+    expect(mood).toHaveAccessibleDescription(MOOD_NOTICE)
+    expect(screen.getByText(MOOD_NOTICE)).toBeVisible()
+    // Off: no guess, no correction control.
+    expect(screen.queryByText(/Momo's guess today/)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Change' })).toBeNull()
+    fireEvent.click(mood)
+    expect(mood).toHaveAttribute('aria-checked', 'true')
+    // Turned on beside the notice: it counts as seen, and the guess becomes active.
+    expect(useDevicePrefs.getState()).toMatchObject({ moodGuess: true, moodNoticeSeen: true })
+    expect(JSON.parse(localStorage.getItem(PREFS_KEY)!)).toMatchObject({ moodGuess: true, moodNoticeSeen: true })
+    fireEvent.click(mood)
+    expect(useDevicePrefs.getState().moodGuess).toBe(false)
+  })
+
+  it('a hesitant guess reads "Unsure": the radio group checks none and its first choice is the one tab stop', () => {
+    useDevicePrefs.getState().setMoodGuess(true)
+    act(() => useEmilyStore.setState({ currentEmotion: 'hesitant' }))
+    renderPage(<SettingsPage />)
+    expect(screen.getByText("Momo's guess today: Unsure")).toBeInTheDocument()
+    expect(screen.queryByText(/Focused/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Change' }))
+    const radios = within(screen.getByRole('radiogroup', { name: 'How do you feel?' })).getAllByRole('radio')
+    expect(radios.filter((r) => r.getAttribute('aria-checked') === 'true')).toHaveLength(0)
+    expect(radios.filter((r) => r.tabIndex === 0)).toEqual([radios[0]])
+    expect(radios[0]).toHaveFocus()
+  })
+
+  it('while on, the row shows today\'s guess and a quiet "Change" that opens a radio group of four moods', () => {
+    useDevicePrefs.getState().setMoodGuess(true)
+    act(() => useEmilyStore.setState({ currentEmotion: 'energized' }))
+    renderPage(<SettingsPage />)
+    expect(screen.getByText("Momo's guess today: Happy")).toBeInTheDocument()
+    const change = screen.getByRole('button', { name: 'Change' })
+    expect(change).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(change)
+    const group = screen.getByRole('radiogroup', { name: 'How do you feel?' })
+    const radios = within(group).getAllByRole('radio')
+    // No "Focused": it maps to hesitant, which the engine treats as strain.
+    expect(radios.map((r) => r.textContent)).toEqual(['Calm', 'Happy', 'Tired', 'Frustrated'])
+    expect(within(group).getByRole('radio', { name: 'Happy' })).toHaveAttribute('aria-checked', 'true')
+    expect(within(group).getByRole('radio', { name: 'Happy' })).toHaveFocus()
+    // One tab stop; arrows move and choose.
+    expect(radios.filter((r) => r.tabIndex === 0)).toHaveLength(1)
+    fireEvent.keyDown(within(group).getByRole('radio', { name: 'Happy' }), { key: 'ArrowRight' })
+    expect(within(group).getByRole('radio', { name: 'Tired' })).toHaveFocus()
+    expect(within(group).getByRole('radio', { name: 'Tired' })).toHaveAttribute('aria-checked', 'true')
+    expect(useEmilyStore.getState()).toMatchObject({ currentEmotion: 'fatigued', isHumanLocked: true })
+    expect(screen.getByText("Momo's guess today: Tired")).toBeInTheDocument()
+    fireEvent.click(within(group).getByRole('radio', { name: 'Calm' }))
+    expect(useEmilyStore.getState().currentEmotion).toBe('calm_flow')
+    // In memory only: nothing about the mood is written to storage.
+    expect(Object.keys(localStorage).map((k) => localStorage.getItem(k)).join()).not.toMatch(/fatigued|tired|calm_flow/)
+    fireEvent.keyDown(within(group).getByRole('radio', { name: 'Calm' }), { key: 'Escape' })
+    expect(screen.queryByRole('radiogroup', { name: 'How do you feel?' })).toBeNull()
+    expect(change).toHaveFocus()
+  })
+
+  it('"Colour-blind friendly colours" is off by default and turns on the cvd_safe Color Clash inks', () => {
+    renderPage(<SettingsPage />)
+    const cvd = screen.getByRole('switch', { name: 'Colour-blind friendly colours' })
+    expect(cvd).toHaveAttribute('aria-checked', 'false')
+    expect(cvd).toHaveAccessibleDescription('Color Clash uses blue, yellow, red and black.')
+    fireEvent.click(cvd)
+    expect(useDevicePrefs.getState().cvdSafe).toBe(true)
+    expect(JSON.parse(localStorage.getItem(PREFS_KEY)!)).toMatchObject({ cvdSafe: true })
+  })
+
   it('shows only real settings: no technical or unwired switches', () => {
     const page = renderPage(<SettingsPage />)
     expect(screen.getAllByRole('radio')).toHaveLength(2)
-    expect(screen.getAllByRole('switch')).toHaveLength(1)
+    expect(screen.getAllByRole('switch').map((s) => s.getAttribute('aria-labelledby') && document.getElementById(s.getAttribute('aria-labelledby')!)?.textContent)).toEqual([
+      'Reduce motion',
+      'Mood guess',
+      'Colour-blind friendly colours',
+    ])
     expect(page.textContent).not.toMatch(TECHNICAL)
     expect(page.textContent).not.toMatch(/dimension|preset|zoom|glyph|rest day|shortcut|factory/i)
     expect(words(page)).toBeLessThanOrEqual(60)

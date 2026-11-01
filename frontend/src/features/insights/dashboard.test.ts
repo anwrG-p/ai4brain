@@ -12,7 +12,7 @@ import {
   weakestPillar,
   weekStart,
 } from './dashboard'
-import type { TaskScores } from './pillars'
+import { PILLAR_IDS, type PillarId, type PillarScore, type TaskScores } from './pillars'
 import type { SessionRecord } from './sessionStore'
 
 const DAY = 86_400_000
@@ -52,12 +52,27 @@ describe('currentPillars', () => {
   })
 })
 
-describe('weakestPillar', () => {
-  it('is the lowest measured pillar, or undefined', () => {
-    expect(weakestPillar(currentPillars([]))).toBeUndefined()
+describe('weakestPillar (the one weakest pillar: Home, Loti and Train)', () => {
+  const score = (s: number | null): PillarScore => ({ score: s, uncertainty: 10, coverage: s === null ? 0 : 1, proxies: [] })
+  const scores = (values: Record<PillarId, number | null>) =>
+    Object.fromEntries(PILLAR_IDS.map((p) => [p, score(values[p])])) as Record<PillarId, PillarScore>
+
+  it('is the lowest measured pillar, or null', () => {
+    expect(weakestPillar(currentPillars([]))).toBeNull()
     const s = full(60)
     s.MST_LDI = { score: 20, trials: 40 }
     expect(weakestPillar(currentPillars([rec('a', 1, s)]))).toBe('memory')
+  })
+
+  it('keeps the pillar order on ties and skips unscored pillars', () => {
+    expect(weakestPillar(scores({ focus: 40, agility: null, impulse: 40, memory: 90, visual: null }))).toBe('focus')
+  })
+
+  it('looks only among the pillars given (Train: the pillars on the page)', () => {
+    const all = scores({ focus: 80, agility: 60, impulse: 70, memory: 50, visual: 35 })
+    expect(weakestPillar(all)).toBe('visual')
+    expect(weakestPillar(all, ['agility', 'impulse'])).toBe('agility')
+    expect(weakestPillar(all, [])).toBeNull()
   })
 })
 
@@ -148,6 +163,17 @@ describe('exerciseWeeks', () => {
     expect(h.rows.find((r) => r.schema === 'mst')!.values).toEqual([30, 50])
     expect(h.cells).toBe(3)
     expect(h.rows.every((r) => r.values.some((v) => v !== null))).toBe(true) // empty exercises left out
+  })
+
+  it('files the newer inputs under Stop Light, Arrow Focus and Pair Finder; a proxy under Color Clash', () => {
+    const real = { SST_SSRT: { score: 40, trials: 50 }, ANT_Conflict: { score: 60, trials: 90 }, PAL_FirstTrialMemory: { score: 70, trials: 20 } }
+    const stand = { SST_SSRT: { score: 20, trials: 4, proxy: true as const }, ANT_Conflict: { score: 30, trials: 4, proxy: true as const } }
+    const h = exerciseWeeks([rec('a', 9, real), rec('b', 9, stand)])
+    const row = (s: string) => h.rows.find((r) => r.schema === s)
+    expect(row('stop_signal')).toMatchObject({ name: 'Stop Light', values: [40] })
+    expect(row('flanker')).toMatchObject({ name: 'Arrow Focus', values: [60] })
+    expect(row('pal')).toMatchObject({ name: 'Pair Finder', values: [70] })
+    expect(row('stroop')).toMatchObject({ name: 'Color Clash', values: [25] }) // mean of the two stand-ins
   })
 
   it('needs 20 cells for a heatmap', () => {

@@ -9,6 +9,8 @@ import { useSessionStore, type SessionRecord } from '../features/insights/sessio
 import DashboardPage from '../pages/DashboardPage'
 import { useAppStore } from '../state/useAppStore'
 import { useEmilyStore } from '../state/useEmilyStore'
+import { MOOD_NOTICE } from '../components/features/characters'
+import { DEFAULT_PREFS, useDevicePrefs } from '../state/devicePrefs'
 
 /* Home = /dashboard (ticket 08). Real sessions from the session store; need-to-know only (rules 13, 14). */
 
@@ -79,6 +81,8 @@ beforeEach(() => {
   useEmilyStore.getState().reset()
   useSessionStore.getState().clearSessions()
   useGoalsStore.getState().clearGoals()
+  // A fresh device: the mood guess is off until opted into in Settings (ADR 0002).
+  useDevicePrefs.setState(DEFAULT_PREFS)
 })
 
 afterEach(() => {
@@ -107,18 +111,83 @@ describe('Home (/dashboard)', () => {
     expect(screen.getByRole('heading', { name: 'Baseline page' })).toBeInTheDocument()
   })
 
-  it('above the fold: 3 blocks, at most 2 quiet controls besides the primary, and 60 words or fewer', () => {
-    for (const n of [0, 1, 4]) {
-      seed(sessions(n))
-      const { unmount } = renderHome()
-      expect(fold().children, `${n} sessions`).toHaveLength(3)
-      // Nothing else sits before the progress curve.
-      const progress = screen.getByRole('region', { name: 'Your progress' })
-      expect([...page().children].indexOf(progress)).toBe(1)
-      expect(within(fold()).getAllByRole('button').length, `${n} sessions`).toBeLessThanOrEqual(3)
-      expect(visibleWords(fold()), `${n} sessions`).toBeLessThanOrEqual(60)
-      unmount()
+  it('above the fold: 3 blocks, 1 primary + at most 2 quiet controls (buttons AND links, no exemptions), and 60 words or fewer', () => {
+    for (const active of [false, true]) {
+      for (const n of [0, 1, 4]) {
+        useDevicePrefs.setState(active ? { moodGuess: true, moodNoticeSeen: true } : DEFAULT_PREFS)
+        seed(sessions(n))
+        const { unmount } = renderHome()
+        const at = `${n} sessions, guess ${active ? 'on' : 'off'}`
+        expect(fold().children, at).toHaveLength(3)
+        // Nothing else sits before the progress curve.
+        const progress = screen.getByRole('region', { name: 'Your progress' })
+        expect([...page().children].indexOf(progress)).toBe(1)
+        const controls = [...within(fold()).queryAllByRole('button'), ...within(fold()).queryAllByRole('link')]
+        expect(controls.length, at).toBeLessThanOrEqual(3)
+        expect(visibleWords(fold()), at).toBeLessThanOrEqual(60)
+        unmount()
+      }
     }
+  })
+
+  describe('Momo on Home: a picture, never a control; the mood guess is opt-in (ADR 0002, R18)', () => {
+    it('by default: no notice, Momo a still neutral picture (not a button), the tint calm, whatever the store holds', () => {
+      useEmilyStore.setState({ currentEmotion: 'frustrated' })
+      seed(sessions(2))
+      renderHome()
+      expect(screen.queryByRole('note')).toBeNull()
+      expect(screen.queryByText(MOOD_NOTICE)).toBeNull()
+      expect(screen.queryByRole('button', { name: /Momo/ })).toBeNull()
+      expect(screen.getByRole('img', { name: 'Momo' })).toBeInTheDocument()
+      expect(page()).toHaveClass('mood-tint-calm')
+      expect(page()).toHaveAttribute('data-mood', 'calm')
+    })
+
+    it('a stored moodGuess without the notice seen stays inactive (defence in depth)', () => {
+      useDevicePrefs.setState({ moodGuess: true, moodNoticeSeen: false })
+      useEmilyStore.setState({ currentEmotion: 'fatigued' })
+      renderHome()
+      expect(screen.getByRole('img', { name: 'Momo' })).toBeInTheDocument()
+      expect(page()).toHaveClass('mood-tint-calm')
+    })
+
+    it('with the guess active, Momo shows it but is still not a button: the correction lives in Settings', () => {
+      useDevicePrefs.getState().setMoodGuess(true)
+      useEmilyStore.setState({ currentEmotion: 'fatigued' })
+      renderHome()
+      expect(screen.getByRole('img', { name: 'Momo looks tired' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Momo/ })).toBeNull()
+      expect(screen.queryByRole('radiogroup')).toBeNull()
+    })
+  })
+
+  describe('Goals: the weekly goal of 3 (research #10)', () => {
+    const at = (iso: string) => ({ id: iso, at: new Date(iso).toISOString(), inputs: full(50) })
+    const openGoals = async () => {
+      renderHome()
+      await userEvent.click(screen.getByRole('button', { name: 'Further explore my training' }))
+      return screen.getByTestId('weekly-goal')
+    }
+
+    it('one plain line counting this week only (Monday on); last week never shows', async () => {
+      // Now: Wednesday 28 Oct 2026, 15:00. Monday 26 Oct starts the week.
+      seed([at('2026-10-19T10:00:00'), at('2026-10-25T20:00:00'), at('2026-10-26T09:00:00')])
+      const line = await openGoals()
+      expect(line).toHaveTextContent(/^1 of 3 this week$/)
+    })
+
+    it('2 of 3 keeps the week (one skip allowed); no streak or guilt words anywhere', async () => {
+      seed([at('2026-10-26T09:00:00'), at('2026-10-27T09:00:00')])
+      const line = await openGoals()
+      expect(line).toHaveTextContent(/^2 of 3 this week · week kept$/)
+      expect(page().textContent).not.toMatch(/streak|missed|broke|lost|behind|don.t give up/i)
+    })
+
+    it('a week with no session starts again quietly at 0', async () => {
+      seed([at('2026-10-12T09:00:00'), at('2026-10-13T09:00:00'), at('2026-10-14T09:00:00')])
+      const line = await openGoals()
+      expect(line).toHaveTextContent(/^0 of 3 this week$/)
+    })
   })
 
   it('greets by name, with Momo beside the greeting', () => {
@@ -128,7 +197,8 @@ describe('Home (/dashboard)', () => {
     expect(screen.getByRole('img', { name: /Momo/ })).toBeInTheDocument()
   })
 
-  it('Momo follows the mood store, and the mood only changes the canvas tint class (no red, no banner)', () => {
+  it('with the guess active, Momo follows the mood store, and the mood only changes the canvas tint class (no red, no banner)', () => {
+    useDevicePrefs.getState().setMoodGuess(true)
     renderHome()
     expect(page()).toHaveClass('mood-tint-calm')
     act(() => useEmilyStore.setState({ currentEmotion: 'fatigued' }))
@@ -259,7 +329,8 @@ describe('Home (/dashboard)', () => {
     seed(later)
     renderHome()
     fireEvent.click(screen.getByRole('button', { name: 'Further explore my training' }))
-    expect(screen.getByText(/^Deep Memory 60 → goal 58 · reached$/)).toBeInTheDocument()
+    // Reached keeps its starting point in view: from 48 to 60.
+    expect(screen.getByText(/^Deep Memory 48 → 60 · goal 58 reached$/)).toBeInTheDocument()
   })
 
   it('motion: the blocks enter in sequence and the radar grows once; none with reduced motion', () => {

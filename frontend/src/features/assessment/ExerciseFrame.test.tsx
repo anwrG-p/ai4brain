@@ -2,11 +2,11 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { ExerciseDemo } from './ExerciseDemo'
 import { EXERCISE_NAME } from './exercises'
-import { ExerciseFrame, FIXATION_MS } from './ExerciseFrame'
+import { ExerciseFrame, FIXATION_MS, MAX_DOTS } from './ExerciseFrame'
 import fixtures from './tasks/fixtures.json'
 import { TaskRunner } from './tasks/TaskRunner'
 import { tracker, TrialRecorder } from './telemetry/tracker'
-import type { SchemaType, TaskPayload } from './telemetry/types'
+import type { SchemaType, StroopParams, TaskPayload } from './telemetry/types'
 
 const byType = (s: SchemaType) => (fixtures as TaskPayload[]).find((t) => t.schema_type === s)!
 
@@ -203,6 +203,45 @@ test('the progress dots advance as trials finish (n of N)', () => {
   expect(bar.querySelectorAll('[data-dot="done"]')).toHaveLength(1)
 })
 
+test('a block of more than 40 trials (Stop Light) shows one bar, not a dot per trial; it skips the frame fixation', () => {
+  const { task } = setup('stop_signal')
+  const n = (task.params as { trials: unknown[]; fixation_ms: number }).trials.length
+  expect(n).toBeGreaterThan(MAX_DOTS)
+  space()
+  // Its own cross: no frame fixation, the exercise mounts at once.
+  expect(screen.getByRole('region', { name: 'Stop Light' })).toBeInTheDocument()
+  const bar = screen.getByRole('progressbar', { name: 'Progress' })
+  expect(bar).toHaveAttribute('aria-valuemax', String(n))
+  expect(bar.querySelectorAll('[data-dot]')).toHaveLength(0)
+  expect(bar.querySelector<HTMLElement>('[data-bar-fill]')!.style.width).toBe('0%')
+  advance((task.params as { fixation_ms: number }).fixation_ms)
+  advance(200)
+  act(() => void fireEvent.keyDown(window, { key: 'ArrowLeft' }))
+  expect(bar).toHaveAttribute('aria-valuenow', '1')
+  expect(bar.querySelector<HTMLElement>('[data-bar-fill]')!.style.width).toBe(`${100 / n}%`)
+})
+
+test('Pair Finder: a retried round fills no new dots (one dot per pattern, first attempt only)', () => {
+  const { task } = setup('pal')
+  const p = task.params as { study_ms: number; stages: { items: unknown[] }[] }
+  space()
+  advance(FIXATION_MS)
+  const bar = screen.getByRole('progressbar', { name: 'Progress' })
+  expect(bar).toHaveAttribute('aria-valuemax', '20')
+  const studyRound = () => {
+    for (const _ of p.stages[0]!.items) advance(p.study_ms)
+  }
+  const missAll = () => {
+    for (const _ of p.stages[0]!.items) act(() => void fireEvent.pointerDown(screen.getByRole('button', { name: 'Box 1' })))
+  }
+  studyRound()
+  missAll() // box 1 holds none of round 1's shapes
+  expect(bar).toHaveAttribute('aria-valuenow', '2')
+  studyRound()
+  missAll() // attempt 2
+  expect(bar).toHaveAttribute('aria-valuenow', '2')
+})
+
 test('N-back: two events per trial (one per stream) advance the dots by one', () => {
   const { task } = setup('n_back')
   const p = task.params as { trials: unknown[]; streams: string[]; interval_ms: number }
@@ -289,6 +328,9 @@ test('the consumer names are the spec table', () => {
     stroop: 'Color Clash',
     matrix: 'Pattern Puzzle',
     mental_rotation: 'Shape Turn',
+    stop_signal: 'Stop Light',
+    pal: 'Pair Finder',
+    flanker: 'Arrow Focus',
   })
 })
 
@@ -306,6 +348,24 @@ test('an unknown exercise ends its block before handing over, so its host still 
   )
   act(() => void fireEvent.click(screen.getByRole('button', { name: 'finish' })))
   expect(calls).toEqual(['blockEnd', 'done'])
+  // A second end (a late timer in the exercise) is a no-op: the block ended once.
+  act(() => void fireEvent.click(screen.getByRole('button', { name: 'finish' })))
+  expect(calls).toEqual(['blockEnd', 'done'])
+})
+
+// A Color Clash block with black ink runs on a light plate (Stroop.tsx); its fixation sits on the same
+// plate, so the first word brings no jump from the dark board to the white plate.
+test('Color Clash with black: the fixation is on the same light plate as the trials; without black, no plate', () => {
+  const stroop = byType('stroop')
+  const cvd = { ...stroop, params: { ...(stroop.params as StroopParams), colors: ['blue', 'yellow', 'red', 'black'] } } as TaskPayload
+  const { unmount } = render(<ExerciseFrame task={cvd} onDone={vi.fn()}>{() => <p>trials</p>}</ExerciseFrame>)
+  space()
+  const cross = screen.getByRole('img', { name: 'Look at the cross' })
+  expect(cross.closest('[data-stroop-plate][data-theme="light"]')).not.toBeNull()
+  unmount()
+  render(<ExerciseFrame task={stroop} onDone={vi.fn()}>{() => <p>trials</p>}</ExerciseFrame>)
+  space()
+  expect(screen.getByRole('img', { name: 'Look at the cross' }).closest('[data-stroop-plate]')).toBeNull()
 })
 
 test('an unknown exercise skips the frame and runs as before', () => {

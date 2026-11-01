@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
+import { useDevicePrefs } from '../../../state/devicePrefs'
 import fixtures from './fixtures.json'
 import { fetchNextTask, forgetUserId, getUserId, newId } from './taskSource'
 import type {
@@ -84,6 +85,13 @@ describe('fetchNextTask', () => {
       expect(fetchFn).toHaveBeenCalledWith('/v1/tasks/next?user_id=a%20b%26c')
     })
 
+    test.each(['stop_signal', 'pal', 'flanker'] as const)('a server payload of the newer exercise %s is accepted', async (schema) => {
+      real()
+      const payload = tasks.find((t) => t.schema_type === schema)!
+      const fetchFn = vi.fn(async (_url: string) => okResponse(payload))
+      expect((await fetchNextTask('u1', 0, { fetchFn })).schema_type).toBe(schema)
+    })
+
     test('a 500 rejects', async () => {
       real()
       const fetchFn = async () => new Response('boom', { status: 500 })
@@ -116,6 +124,46 @@ describe('fetchNextTask', () => {
       const task_id = 'm5:v1.2-' + 'a'.repeat(40)
       const fetchFn = async () => okResponse({ ...first, task_id })
       expect((await fetchNextTask('u1', 0, { fetchFn })).task_id).toBe(task_id)
+    })
+  })
+
+  describe('colour-blind friendly Color Clash (cvd_safe)', () => {
+    const stroop = tasks.find((t) => t.schema_type === 'stroop')!
+    afterEach(() => useDevicePrefs.setState({ cvdSafe: false }))
+
+    test('off by default: the classic fixture and no inks parameter', async () => {
+      expect(useDevicePrefs.getState().cvdSafe).toBe(false)
+      expect((await fetchNextTask('u1', 0, { schemaType: 'stroop' })).params).toEqual(stroop.params)
+      vi.stubEnv('VITE_USE_MOCKS', 'false')
+      const fetchFn = vi.fn(async (_url: string) => okResponse(stroop))
+      await fetchNextTask('u1', 0, { fetchFn })
+      expect(fetchFn).toHaveBeenCalledWith('/v1/tasks/next?user_id=u1')
+    })
+
+    test('mock mode with the setting on: the Stroop fixture uses the cvd_safe inks; other tasks are untouched', async () => {
+      useDevicePrefs.setState({ cvdSafe: true })
+      const task = await fetchNextTask('u1', 0, { schemaType: 'stroop' })
+      expect((task.params as StroopParams).colors).toEqual(['blue', 'yellow', 'red', 'black'])
+      expect(JSON.stringify(task.params)).not.toMatch(/green/i)
+      expect(task.task_id).toBe(stroop.task_id)
+      expect(stroop.params).toEqual(byType<StroopParams>('stroop')) // the fixture itself is not mutated
+      expect((stroop.params as StroopParams).colors).toContain('green')
+      const tower = await fetchNextTask('u1', 0, { schemaType: 'tower' })
+      expect(tower).toBe(tasks.find((t) => t.schema_type === 'tower'))
+    })
+
+    test('real mode with the setting on asks for inks=cvd_safe, and converts a classic block that still comes back', async () => {
+      useDevicePrefs.setState({ cvdSafe: true })
+      vi.stubEnv('VITE_USE_MOCKS', 'false')
+      const fetchFn = vi.fn(async (_url: string) => okResponse(stroop))
+      const task = await fetchNextTask('a b', 0, { fetchFn })
+      expect(fetchFn).toHaveBeenCalledWith('/v1/tasks/next?user_id=a%20b&inks=cvd_safe')
+      expect((task.params as StroopParams).colors).toEqual(['blue', 'yellow', 'red', 'black'])
+    })
+
+    test('an explicit inks option wins over the setting', async () => {
+      useDevicePrefs.setState({ cvdSafe: true })
+      expect(((await fetchNextTask('u1', 0, { schemaType: 'stroop', inks: 'classic' })).params as StroopParams).colors).toContain('green')
     })
   })
 })
@@ -210,8 +258,7 @@ describe('getUserId', () => {
 describe('fixtures.json', () => {
   test('one entry per schema_type with the contract dimension', () => {
     const dims = Object.fromEntries(tasks.map((t) => [t.schema_type, t.dimension]))
-    expect(tasks).toHaveLength(8)
-    expect(dims).toEqual({
+    const expected = {
       n_back: 'working_memory',
       stroop: 'executive_function',
       matrix: 'pattern_induction',
@@ -220,8 +267,14 @@ describe('fixtures.json', () => {
       tower: 'executive_function',
       ufov: 'processing_speed',
       mst: 'episodic_memory',
-    } satisfies Record<SchemaType, string>)
-    expect(new Set(tasks.map((t) => t.task_id)).size).toBe(8)
+      stop_signal: 'executive_function',
+      pal: 'episodic_memory',
+      flanker: 'executive_function',
+    } satisfies Record<SchemaType, string>
+    const n = Object.keys(expected).length
+    expect(tasks).toHaveLength(n)
+    expect(dims).toEqual(expected)
+    expect(new Set(tasks.map((t) => t.task_id)).size).toBe(n)
     for (const t of tasks) expect(typeof t.surface_seed).toBe('number')
   })
 
