@@ -10,6 +10,7 @@ import pytest
 from dynamic_cache.generators import SCHEMA_TYPES, generate, validate_payload
 from dynamic_cache.parameter_projector import (
     BOUNDS,
+    FIXED_DESIGNS,
     PILLAR_IDS,
     SCHEMA_PILLAR_WEIGHTS,
     START_THETA,
@@ -48,7 +49,7 @@ def test_monotone_in_every_pillar(schema_type):
             assert all(a <= b + 1e-12 for a, b in zip(thetas, thetas[1:])), (pillar, base, thetas)
 
 
-@pytest.mark.parametrize("schema_type", [s for s in SCHEMA_TYPES if SCHEMA_PILLAR_WEIGHTS[s] and s != "mst"])
+@pytest.mark.parametrize("schema_type", [s for s in SCHEMA_TYPES if SCHEMA_PILLAR_WEIGHTS[s] and s not in FIXED_DESIGNS])
 def test_relevant_pillars_span_the_whole_range(schema_type):
     assert project({p: 0 for p in PILLAR_IDS}, schema_type) == pytest.approx(BOUNDS[schema_type][0])
     assert project({p: 100 for p in PILLAR_IDS}, schema_type) == pytest.approx(BOUNDS[schema_type][1])
@@ -74,9 +75,10 @@ def test_missing_pillars_renormalise_like_pillars_ts():
     assert project({"focus": 80, "agility": 20}, "n_back") == pytest.approx((0.45 * 80 + 0.40 * 20) / 0.85 / 100)
 
 
-def test_mst_is_pinned_because_its_generator_ignores_theta():
-    assert BOUNDS["mst"] == (0.5, 0.5)
-    assert project({"memory": 0}, "mst") == project({"memory": 100}, "mst") == 0.5
+@pytest.mark.parametrize("schema_type", FIXED_DESIGNS)
+def test_fixed_designs_are_pinned_because_their_generators_ignore_theta(schema_type):
+    assert BOUNDS[schema_type] == (0.5, 0.5)
+    assert project({p: 0 for p in PILLAR_IDS}, schema_type) == project({p: 100 for p in PILLAR_IDS}, schema_type) == 0.5
 
 
 def test_unknown_schema_raises():

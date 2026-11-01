@@ -35,7 +35,10 @@
         "relational",
         "tower",
         "ufov",
-        "mst"
+        "mst",
+        "stop_signal",
+        "pal",
+        "flanker"
       ]
     },
     "params": {
@@ -194,6 +197,63 @@
           },
           "params": {
             "$ref": "#/definitions/MstParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schema_type": {
+            "const": "stop_signal"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "dimension": {
+            "const": "executive_function"
+          },
+          "params": {
+            "$ref": "#/definitions/StopSignalParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schema_type": {
+            "const": "pal"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "dimension": {
+            "const": "episodic_memory"
+          },
+          "params": {
+            "$ref": "#/definitions/PalParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schema_type": {
+            "const": "flanker"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "dimension": {
+            "const": "executive_function"
+          },
+          "params": {
+            "$ref": "#/definitions/FlankerParams"
           }
         }
       }
@@ -459,7 +519,7 @@
         "trials",
         "time_limit_ms"
       ],
-      "$comment": "Inks come from StroopInk (served). The cvd_safe preset needs StroopInkUnserved, which only the opt-in validator uses.",
+      "$comment": "Inks come from StroopInk; a block uses one preset (stroop.py INK_PRESETS).",
       "properties": {
         "colors": {
           "type": "array",
@@ -501,12 +561,13 @@
       }
     },
     "StroopInk": {
-      "$comment": "Served inks: the four names Stroop.tsx INK maps to theme tokens today. Any other name paints in the text colour and the trial becomes unanswerable.",
+      "$comment": "Every ink Stroop.tsx INK maps to a theme token: the classic preset (red, green, blue, yellow) and the cvd_safe preset (blue, yellow, red, black; a block with black runs on the light plate).",
       "enum": [
         "red",
         "green",
         "blue",
-        "yellow"
+        "yellow",
+        "black"
       ]
     },
     "MatrixParams": {
@@ -874,15 +935,179 @@
         }
       }
     },
-    "StroopInkUnserved": {
-      "$comment": "NOT SERVED. The cvd_safe preset's inks; validate_payload(allow_unserved=True) swaps this in for StroopInk. Merge into StroopInk only once Stroop.tsx maps black.",
-      "enum": [
-        "red",
-        "green",
-        "blue",
-        "yellow",
-        "black"
-      ]
+    "StopSignalParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "time_limit_ms",
+        "fixation_ms",
+        "ssd_start_ms",
+        "ssd_step_ms",
+        "trials"
+      ],
+      "$comment": "Stop Light (StopSignal.tsx). ssd_start_ms may be 0 (a signal with the arrow); the client clamps the staircase to [0, time_limit_ms].",
+      "properties": {
+        "time_limit_ms": {
+          "$ref": "#/definitions/ms"
+        },
+        "fixation_ms": {
+          "$ref": "#/definitions/ms"
+        },
+        "ssd_start_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 600000
+        },
+        "ssd_step_ms": {
+          "$ref": "#/definitions/ms"
+        },
+        "trials": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 500,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "dir",
+              "stop"
+            ],
+            "properties": {
+              "dir": {
+                "enum": [
+                  "left",
+                  "right"
+                ]
+              },
+              "stop": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    "PalParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "boxes",
+        "study_ms",
+        "time_limit_ms",
+        "max_attempts",
+        "stages"
+      ],
+      "$comment": "Pair Finder (PairedAssociates.tsx): 8 shapes (pattern 0..7); boxes 2..8, keys 1..8 pick one.",
+      "properties": {
+        "boxes": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 8
+        },
+        "study_ms": {
+          "$ref": "#/definitions/ms"
+        },
+        "time_limit_ms": {
+          "$ref": "#/definitions/ms"
+        },
+        "max_attempts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "stages": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "items",
+              "recall"
+            ],
+            "properties": {
+              "items": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 8,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "pattern",
+                    "box"
+                  ],
+                  "properties": {
+                    "pattern": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 7
+                    },
+                    "box": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 7
+                    }
+                  }
+                }
+              },
+              "recall": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 8,
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 7
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "FlankerParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "time_limit_ms",
+        "fixation_ms",
+        "trials"
+      ],
+      "$comment": "Arrow Focus (Flanker.tsx): five arrows, the answer is the middle one's dir.",
+      "properties": {
+        "time_limit_ms": {
+          "$ref": "#/definitions/ms"
+        },
+        "fixation_ms": {
+          "$ref": "#/definitions/ms"
+        },
+        "trials": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 500,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "dir",
+              "congruent"
+            ],
+            "properties": {
+              "dir": {
+                "enum": [
+                  "left",
+                  "right"
+                ]
+              },
+              "congruent": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

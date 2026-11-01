@@ -35,7 +35,12 @@ from .llm_worker import LlmPoolWorker, VariantArchive
 
 router = APIRouter()
 
-SchemaType = Literal["n_back", "stroop", "matrix", "mental_rotation", "relational", "tower", "ufov", "mst"]
+SchemaType = Literal[
+    "n_back", "stroop", "matrix", "mental_rotation", "relational", "tower", "ufov", "mst", "stop_signal", "pal", "flanker"
+]  # fmt: skip
+# Stroop ink presets (cache_dispatcher.INKS): cvd_safe is the colour-blind-safe set (blue, yellow,
+# red, black) for users who turn on the frontend's setting. Anything else is a 422.
+Inks = Literal["classic", "cvd_safe"]
 Dimension = Literal[
     "working_memory",
     "pattern_induction",
@@ -226,7 +231,7 @@ register_user_store("task_registry", delete=_forget, export=_export)
     response_class=Response,
     responses={
         200: {"model": TaskPayload, "description": "The task to play"},
-        422: {"description": "bad user_id, unknown filter, or schema_type and dimension disagree"},
+        422: {"description": "bad user_id, unknown filter or inks, or schema_type and dimension disagree"},
         429: {"description": "too many calls for this user id; see Retry-After"},
         503: {"description": "no task could be built just now; retry"},
     },
@@ -237,8 +242,10 @@ def next_task(
     dimension: Dimension | None = None,
     session_id: Annotated[str | None, Query(pattern=ID_PATTERN)] = None,
     seq: Annotated[int, Query(ge=0, le=100_000)] = 0,
+    inks: Inks = "classic",
 ) -> Response:
-    """The next task for this user. With session_id (and seq), the same call returns the same task."""
+    """The next task for this user. With session_id (and seq), the same call returns the same task.
+    `inks` picks the Stroop ink preset when Stroop is served; the two presets never share a pool."""
     if not schemas_for(schema_type, dimension):
         raise HTTPException(status_code=422, detail=f"no {schema_type} task has dimension {dimension}")
     key = user_key(user_id)
@@ -247,7 +254,7 @@ def next_task(
         raise HTTPException(status_code=429, detail="too many task requests", headers={"Retry-After": str(retry)})
     try:
         served = get_dispatcher().next_task(
-            key, schema_type=schema_type, dimension=dimension, session_id=session_id, seq=seq
+            key, schema_type=schema_type, dimension=dimension, session_id=session_id, seq=seq, inks=inks
         )
     except (NoFreshTask, GenerationError):
         raise HTTPException(status_code=503, detail="no task available, retry", headers={"Retry-After": "1"})

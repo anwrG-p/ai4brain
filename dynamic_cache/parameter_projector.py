@@ -29,8 +29,14 @@ PILLAR_IDS: tuple[str, ...] = ("focus", "agility", "impulse", "memory", "visual"
 #   mst:    MST_LDI (memory .55)
 #   ufov:   UFOV_SOA (visual .50), ANT_Orienting (visual .50)
 #   mental_rotation: no pillar input, so no projection (None).
+#   stop_signal: SST_SSRT (impulse .50); pal: PAL_FirstTrialMemory (memory .45);
+#   flanker: ANT_Conflict (agility .40). Their theta is pinned (BOUNDS), so this only matters if
+#   one of them ever takes a difficulty knob.
 # ErrorRecovery reads every exercise, so it informs no single schema and is left out.
 SCHEMA_PILLAR_WEIGHTS: dict[str, dict[str, float]] = {
+    "stop_signal": {"impulse": 0.50},
+    "pal": {"memory": 0.45},
+    "flanker": {"agility": 0.40},
     "n_back": {"focus": 0.45, "agility": 0.40},
     "stroop": {"agility": 0.40, "impulse": 0.50},
     "tower": {"focus": 0.30, "impulse": 0.30},
@@ -43,9 +49,11 @@ SCHEMA_PILLAR_WEIGHTS: dict[str, dict[str, float]] = {
 
 # Per-schema theta bounds. Every generator already maps [0, 1] onto its designed range (n-back
 # n 1..3, tower 2..6 moves, ufov 2..16 distractors, ...), so the bounds are the full range, except
-# MST: its generator ignores theta (the oMST delta spread is fixed), so it is pinned to one level
-# and its pool never splits by difficulty.
-BOUNDS: dict[str, tuple[float, float]] = {s: (0.0, 1.0) for s in SCHEMA_TYPES} | {"mst": (0.5, 0.5)}
+# the fixed designs: their generators ignore theta (MST's oMST delta spread, Stop Light's guide
+# design with its in-block SSD staircase, Pair Finder's CANTAB stage series, Arrow Focus's ANT
+# block), so each is pinned to one level and its pool never splits by difficulty.
+FIXED_DESIGNS = ("mst", "stop_signal", "pal", "flanker")
+BOUNDS: dict[str, tuple[float, float]] = {s: (0.0, 1.0) for s in SCHEMA_TYPES} | {s: (0.5, 0.5) for s in FIXED_DESIGNS}
 
 # (A) Where a schema starts when nothing is known about the user: the middle of its range, the
 # usual starting point of an adaptive staircase. A design prior, not an estimate of the user.

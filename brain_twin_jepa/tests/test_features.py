@@ -57,10 +57,22 @@ def test_golden_case_matches_the_ts(name):
 
 
 def test_golden_set_covers_every_schema_and_the_edge_cases():
-    assert len(CASES) >= 10
+    assert len(CASES) == 32
     schemas = {schema_of(e) for c in DATA["cases"] for e in c["events"]}
-    assert schemas == {"n_back", "stroop", "mental_rotation", "relational", "tower", "ufov", "mst", "matrix"}
+    assert schemas == {
+        "n_back", "stroop", "mental_rotation", "relational", "tower", "ufov", "mst", "matrix",
+        "stop_signal", "pal", "flanker",
+    }  # fmt: skip
     assert CASES["empty"]["events"] == []
+    # F-B's new exercises: the SSRT exclusions, the PAL stage cut-off and the flanker precedence.
+    assert "SST_SSRT" not in CASES["stop_signal_race_violation"]["expected"]["inputs"]
+    assert "SST_SSRT" not in CASES["stop_signal_all_respond"]["expected"]["inputs"]
+    assert CASES["stop_signal_nonresponder"]["expected"]["inputs"]["SST_SSRT"]["score"] == 0
+    assert "proxy" not in CASES["full_session_new_exercises"]["expected"]["inputs"]["SST_SSRT"]
+    assert CASES["flanker_at_chance"]["expected"]["inputs"]["ANT_Conflict"]["score"] == 0
+    # F-B's fix round: the Stroop fallback of ANT_Conflict is a proxy, the flanker cost is not.
+    assert CASES["stroop"]["expected"]["inputs"]["ANT_Conflict"]["proxy"] is True
+    assert "proxy" not in CASES["flanker_over_stroop"]["expected"]["inputs"]["ANT_Conflict"]
     assert CASES["stroop_at_chance"]["expected"]["inputs"]["ANT_Conflict"]["score"] == 0
     assert CASES["nback_chance_nonresponder"]["expected"]["inputs"]["OSPAN"]["score"] == 0
     dup = CASES["duplicates"]
@@ -178,3 +190,58 @@ def test_error_recovery_skips_stroop_at_chance_but_counts_the_nback():
     alone = task_scores(nback)["ErrorRecovery"]
     together = task_scores(case["events"])["ErrorRecovery"]
     assert together == alone == {"score": pytest.approx(200 / 3), "trials": 3}
+
+
+# ---- F-B's exercises: the parts the golden cases do not pin by themselves ------------------------
+
+
+def _pal(i, attempt, ok, task="pa", total=4, boxes=8):
+    return {
+        "task_id": task,
+        "trial_index": i,
+        "dimension": "episodic_memory",
+        "error_flag": not ok,
+        "response_time_ms": 1500,
+        "trial_meta": {"pal_level": 2, "attempt": attempt, "pattern": i, "box": i, "chosen": i,
+                       "pal_total": total, "boxes": boxes},
+    }  # fmt: skip
+
+
+def test_pal_attempt_one_is_a_number_never_bool_true():
+    # JS `attempt === 1`: 1 and 1.0 count, True (== 1 in Python) does not.
+    events = [_pal(0, 1, True), _pal(1, 1.0, True), _pal(2, True, True), _pal(3, 2, True)]
+    # plain FAMS / pal_total, no chance correction (F-B fix round)
+    assert task_scores(events)["PAL_FirstTrialMemory"] == {"score": pytest.approx(100 * 2 / 4), "trials": 4}
+
+
+def test_pal_skips_a_task_without_a_valid_total():
+    bad = [_pal(0, 1, True, task="a", total=0), _pal(0, 1, True, task="b", total=True)]
+    assert "PAL_FirstTrialMemory" not in task_scores(bad)
+    assert task_scores([_pal(0, 1, True, boxes=1)])["PAL_FirstTrialMemory"]["trials"] == 4  # boxes unread
+    # PAL and Stop Light errors are not the user's to recover from (NO_RECOVERY).
+    misses = [_pal(i, 1, i % 2 == 0) for i in range(4)]
+    assert "ErrorRecovery" not in task_scores(misses)
+
+
+def test_quantile6_is_r_type_6():
+    xs = [1.0, 2.0, 3.0, 4.0]
+    assert features.quantile6(xs, 0.5) == 2.5  # R: quantile(1:4, .5, type = 6)
+    assert features.quantile6(xs, 0.1) == 1.0  # h <= 1: the first
+    assert features.quantile6(xs, 0.95) == 4.0  # h >= n: the last
+    assert features.quantile6(xs, 0.3) == pytest.approx(1.5)  # h = 1.5
+
+
+def test_stop_signal_needs_a_numeric_ssd_on_every_stop_trial():
+    def ev(i, stop, response, rt):
+        meta = {"stop_trial": stop, "dir": "left", "response": response}
+        if stop:
+            meta["ssd_ms"] = 200
+        wrong = response != "none" if stop else response != "left"
+        return {"task_id": "ss", "trial_index": i, "dimension": "executive_function",
+                "error_flag": wrong, "response_time_ms": rt, "trial_meta": meta}  # fmt: skip
+
+    events = [ev(0, False, "left", 500), ev(1, True, "left", 400), ev(2, True, "none", 1250), ev(3, False, "left", 520)]
+    assert features.ssrt(events) is not None
+    events[2]["trial_meta"]["ssd_ms"] = True  # a bool is not a number
+    assert features.ssrt(events) is None
+    assert "SST_SSRT" not in task_scores(events)

@@ -13,9 +13,11 @@ import argparse
 import sys
 from pathlib import Path
 
-from clustering_engine.clustering_gmm import DEFAULT_K, DEFAULT_SEED, PILLARS, ClusterModel, fit_gmm
-from clustering_engine.pillar_adapter import session_pillars
-from data.synthetic.generate import simulate_user
+# data.synthetic.generate puts backend/ on the path, which BE-07's telemetry_io (imported by the
+# pillar adapter) needs when this runs as `python -m clustering_engine.fit` from the repo root.
+from data.synthetic.generate import simulate_user  # isort: skip
+from clustering_engine.clustering_gmm import DEFAULT_K, DEFAULT_SEED, PILLARS, ClusterModel, fit_gmm  # noqa: E402
+from clustering_engine.pillar_adapter import session_pillars  # noqa: E402
 
 DEFAULT_OUT = Path(__file__).resolve().parents[1] / "models" / "clustering" / "gmm.json"
 

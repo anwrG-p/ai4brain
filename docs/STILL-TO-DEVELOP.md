@@ -15,18 +15,16 @@ This file replaces section 2 of `docs/HANDOVER-2026-11-01.md`. Every agent is st
   - BE-13: Gemini variant worker and slur blocklist.
 - **Frontend checks:** `npm run qa:checks` passes: 69 files, 1414 tests, build.
 
-### Known red backend tests (24): all fixed by SRV-1
-F-B changed the scorers and the 11-exercise contract, and the Python side catches up only in SRV-1 (section 2). Until SRV-1 merges:
-- 21 × `brain_twin_jepa/tests/test_features.py::test_golden_case_matches_the_ts[...]` and `test_golden_set_covers_every_schema_and_the_edge_cases`. The Python port of the new scorers is in SRV-1.
-- `dynamic_cache/tests/test_schema.py::test_enums_match_the_frontend`: the generators for the 3 new schemas are in SRV-1.
-- `dynamic_cache/tests/test_tasks_api.py::test_the_port_matches_task_source_ts`: the `inks` param is in SRV-1.
-- `dynamic_cache/tests/test_dispatcher.py::test_a_hung_job_marks_the_workers_broken` is **flaky**. It passes alone, and so does `test_a_worker_that_dies_at_spawn_falls_back_to_inline`. Both are timing tests from BE-04.
+### Tests: all green
+- Backend: `pytest -q -m "not benchmark"` passes (1658 + 4 xfailed).
+- Frontend: `qa:checks` passes (1446 tests, build).
+- Flaky under load: `src/tests/designSystem.test.tsx` "renders Page 01 Welcome". It passes on a re-run; worth a look.
 
-## 2. Built but NOT reviewed (pushed as `wip/` branches, not merged)
+## 2. Merged without an independent review (review recommended)
 
 | Branch on GitHub | What | State | Next step |
 |---|---|---|---|
-| `wip/srv-1-server-catchup` (local `worktree-agent-a7f8666a3f3925cf4`, head `faecef2`) | See the SRV-1 list below | All committed. It was stopped during its final evidence run, so it has no report. | 1. Merge `feat/ui-calm-clean` into it; there is **1 conflict, in `dynamic_cache/cache_dispatcher.py`**, against BE-11's `on_step` and BE-13's `variants` (keep all three). 2. Run `pytest -q -m "not benchmark"`: the 24 red tests above must turn green. 3. Review, then merge. |
+| `wip/srv-1-server-catchup` | See the SRV-1 list below | **MERGED at the owner's request.** At merge, the pool key gained inks, so BE-13's `offer`/`pool_stock` now target the default-inks pools only (cvd_safe Stroop stays procedural; `ponytail:` note) and `ARCHETYPE_OPTIONS` was restored. Tests were updated to F-B's `Object.keys` schema list. | An independent review is still recommended. |
 | `wip/art-1-brand-references` | See the ART-1 list below | **MERGED at the owner's request** (qa:checks on the merged branch: 69 files, 1446 tests, 128 contrast pairs, build green) | An independent review is still recommended. Regenerate `docs/ui/screenshots/`. |
 
 **SRV-1 contains:**
