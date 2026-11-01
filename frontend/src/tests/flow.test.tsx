@@ -197,8 +197,8 @@ describe('/results', () => {
     expect(screen.getByRole('img', { name: /Dolphin/ })).toBeInTheDocument()
     expect(screen.getByText('Good job! You finished all six.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'See my results' }))
-    const sheet = screen.getByRole('dialog', { name: 'Save your answers?' })
-    expect(within(sheet).getByRole('heading', { name: 'Save your answers?' })).toHaveFocus()
+    const sheet = screen.getByRole('dialog', { name: 'Your choices' })
+    expect(within(sheet).getByRole('heading', { name: 'Your choices' })).toHaveFocus()
     // No sign-in step: there is nothing to sign in with (rule 14).
     expect(within(sheet).queryByRole('button', { name: 'Continue as guest' })).toBeNull()
     expect(screen.queryByTestId('google-signin')).toBeNull()
@@ -210,16 +210,44 @@ describe('/results', () => {
     fireEvent.click(screen.getByRole('button', { name: 'See my results' }))
     expect(screen.getByTestId('google-signin')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Continue as guest' }))
-    expect(screen.getByRole('heading', { name: 'Save your answers?' })).toHaveFocus()
+    expect(screen.getByRole('heading', { name: 'Your choices' })).toHaveFocus()
   })
 
-  it('"Save my answers" sends the held events with this device\'s user_id and un-blurs the radar', async () => {
+  it('one message, two equal switches (both off), one primary "Continue" (research #6, R3, rule 14)', async () => {
     await runBaseline()
     fireEvent.click(screen.getByRole('button', { name: 'See my results' }))
-    expect(screen.getByRole('heading', { name: 'Save your answers?' })).toHaveFocus()
+    const sheet = screen.getByRole('dialog', { name: 'Your choices' })
+    const switches = within(sheet).getAllByRole('switch')
+    expect(switches.map((s) => s.textContent)).toEqual(['Save my answers to improve my training', 'Let Loti use AI to reply'])
+    for (const s of switches) expect(s).toHaveAttribute('aria-checked', 'false')
+    expect(switches[0]!.className).toBe(switches[1]!.className) // equal weight
+    const primaries = within(sheet).getAllByRole('button').filter((b) => b.className.includes('bg-brand '))
+    expect(primaries.map((b) => b.textContent)).toEqual(['Continue'])
+    // Turning a switch on decides nothing yet: nothing is sent before Continue.
+    await act(async () => void fireEvent.click(switches[0]!))
+    expect(switches[0]).toHaveAttribute('aria-checked', 'true')
+    expect(fetchFn).not.toHaveBeenCalled()
+    expect(tracker.getStatus()).toMatchObject({ consent: 'pending', coachConsent: 'pending' })
+  })
+
+  it('AI replies on, answers off: nothing is sent, and each purpose keeps its own choice', async () => {
+    await runBaseline()
+    fireEvent.click(screen.getByRole('button', { name: 'See my results' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'Let Loti use AI to reply' }))
+    await act(async () => void fireEvent.click(screen.getByRole('button', { name: 'Continue' })))
+    expect(tracker.getStatus()).toMatchObject({ consent: 'denied', coachConsent: 'granted', queuedCount: 0 })
+    expect(fetchFn).not.toHaveBeenCalled()
+    expect(radar()).toHaveAttribute('data-blurred', 'false')
+  })
+
+  it('"Save my answers to improve my training" + Continue sends the held events with this device\'s user_id and un-blurs the radar', async () => {
+    await runBaseline()
+    fireEvent.click(screen.getByRole('button', { name: 'See my results' }))
+    expect(screen.getByRole('heading', { name: 'Your choices' })).toHaveFocus()
     expect(screen.getByText('We record answer timing and accuracy only. No camera, no microphone.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'How we handle your data' })).toHaveAttribute('href', '/privacy')
-    await act(async () => void fireEvent.click(screen.getByRole('button', { name: 'Save my answers' })))
+    fireEvent.click(screen.getByRole('switch', { name: 'Save my answers to improve my training' }))
+    await act(async () => void fireEvent.click(screen.getByRole('button', { name: 'Continue' })))
 
     expect(fetchFn).toHaveBeenCalledTimes(1)
     const [url, init] = fetchFn.mock.calls[0] as [string, RequestInit]
@@ -228,7 +256,7 @@ describe('/results', () => {
     const sent = JSON.parse(String(init.body)) as TelemetryEvent[]
     expect(sent).toHaveLength(6)
     expect(new Set(sent.map((e) => e.user_id))).toEqual(new Set([getUserId()]))
-    expect(tracker.getStatus()).toMatchObject({ consent: 'granted', queuedCount: 0 })
+    expect(tracker.getStatus()).toMatchObject({ consent: 'granted', coachConsent: 'denied', queuedCount: 0 })
 
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(radar()).toHaveAttribute('data-blurred', 'false')
@@ -240,11 +268,11 @@ describe('/results', () => {
     expect(window.location.pathname).toBe('/dashboard')
   })
 
-  it('"Keep them on this device only" sends nothing, clears the buffer, and still shows the results', async () => {
+  it('Continue with both off sends nothing, clears the buffer, and still shows the results', async () => {
     await runBaseline()
     fireEvent.click(screen.getByRole('button', { name: 'See my results' }))
-    await act(async () => void fireEvent.click(screen.getByRole('button', { name: 'Keep them on this device only' })))
-    expect(tracker.getStatus()).toMatchObject({ consent: 'denied', queuedCount: 0 })
+    await act(async () => void fireEvent.click(screen.getByRole('button', { name: 'Continue' })))
+    expect(tracker.getStatus()).toMatchObject({ consent: 'denied', coachConsent: 'denied', queuedCount: 0 })
     expect(fetchFn).not.toHaveBeenCalled()
     expect(radar()).toHaveAttribute('data-blurred', 'false')
     // The real scores: measured pillars show a number, the others "Not measured yet", never a fake value.

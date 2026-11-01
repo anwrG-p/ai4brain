@@ -1,4 +1,5 @@
 import { useId, useRef, type KeyboardEvent } from 'react'
+import { useDevicePrefs } from '../state/devicePrefs'
 import { useAppStore, type ThemeMode } from '../state/useAppStore'
 
 const THEMES: { id: ThemeMode; label: string }[] = [
@@ -8,8 +9,10 @@ const THEMES: { id: ThemeMode; label: string }[] = [
 
 const NEXT: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }
 
-/* Settings: only what the app really applies. The theme (data-theme) and reduce motion
-   (data-reduced-motion, which turns every anim-* and character idle off). Text size, sounds,
+/* Settings: only what the app really applies. The theme (data-theme), reduce motion
+   (data-reduced-motion, which turns every anim-* and character idle off), the mood guess (off stops
+   the emotion listener; Momo shows a neutral face, ADR 0002) and the colour-blind friendly Color
+   Clash inks (devicePrefs). Text size, sounds,
    glyphs, study windows and rest days were never wired to anything, so they are gone; the
    dimension preset is a judge tool (R6), not a consumer setting. */
 export default function SettingsPage() {
@@ -17,6 +20,10 @@ export default function SettingsPage() {
   const setTheme = useAppStore((s) => s.setTheme)
   const reducedMotion = useAppStore((s) => s.reducedMotion)
   const setReducedMotion = useAppStore((s) => s.setReducedMotion)
+  const moodGuess = useDevicePrefs((s) => s.moodGuess)
+  const setMoodGuess = useDevicePrefs((s) => s.setMoodGuess)
+  const cvdSafe = useDevicePrefs((s) => s.cvdSafe)
+  const setCvdSafe = useDevicePrefs((s) => s.setCvdSafe)
   const themeId = useId()
   const radios = useRef<(HTMLButtonElement | null)[]>([])
 
@@ -66,31 +73,67 @@ export default function SettingsPage() {
             })}
           </div>
         </li>
-        <li>
-          {/* The whole row is the switch, so the tap target is the full row (≥ 44 px). */}
-          <button
-            type="button"
-            role="switch"
-            aria-checked={reducedMotion}
-            onClick={() => setReducedMotion(!reducedMotion)}
-            className="focus-ring flex min-h-14 w-full cursor-pointer items-center justify-between gap-4 rounded-b-2xl p-4 text-left hover:bg-surface-raised"
-          >
-            <span className="text-base font-medium text-ink">Reduce motion</span>
-            <span
-              aria-hidden="true"
-              className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-pill border ${
-                reducedMotion ? 'border-transparent bg-brand' : 'border-border-strong bg-surface-raised'
-              }`}
-            >
-              <span
-                className={`inline-block size-5 rounded-pill transition-transform ${
-                  reducedMotion ? 'translate-x-6 bg-brand-ink' : 'translate-x-1 bg-border-strong'
-                }`}
-              />
-            </span>
-          </button>
-        </li>
+        <SwitchRow label="Reduce motion" on={reducedMotion} onChange={setReducedMotion} />
+        <SwitchRow label="Mood guess" hint="Momo guesses your mood on this device." on={moodGuess} onChange={setMoodGuess} />
+        <SwitchRow
+          label="Colour-blind friendly colours"
+          hint="Color Clash uses blue, yellow, red and black."
+          on={cvdSafe}
+          onChange={setCvdSafe}
+          last
+        />
       </ul>
     </div>
+  )
+}
+
+/* One on/off setting. The whole row is the switch, so the tap target is the full row (≥ 44 px).
+   Named by its label only; the hint is its description. */
+function SwitchRow({
+  label,
+  hint,
+  on,
+  onChange,
+  last = false,
+}: {
+  label: string
+  hint?: string
+  on: boolean
+  onChange: (on: boolean) => void
+  last?: boolean
+}) {
+  const labelId = useId()
+  const hintId = useId()
+  return (
+    <li>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-labelledby={labelId}
+        aria-describedby={hint ? hintId : undefined}
+        onClick={() => onChange(!on)}
+        className={`focus-ring flex min-h-14 w-full cursor-pointer items-center justify-between gap-4 p-4 text-left hover:bg-surface-raised ${last ? 'rounded-b-2xl' : ''}`}
+      >
+        <span className="flex flex-col">
+          <span id={labelId} className="text-base font-medium text-ink">
+            {label}
+          </span>
+          {hint && (
+            <span id={hintId} className="text-sm text-ink-muted">
+              {hint}
+            </span>
+          )}
+        </span>
+        <span
+          aria-hidden="true"
+          className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-pill border ${
+            on ? 'border-transparent bg-brand' : 'border-border-strong bg-surface-raised'
+          }`}
+        >
+          <span className={`inline-block size-5 rounded-pill transition-transform ${on ? 'translate-x-6 bg-brand-ink' : 'translate-x-1 bg-border-strong'}`} />
+        </span>
+      </button>
+    </li>
   )
 }

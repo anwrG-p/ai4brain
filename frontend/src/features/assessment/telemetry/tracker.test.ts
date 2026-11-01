@@ -714,6 +714,7 @@ describe('Tracker', () => {
         droppedCount: 0,
         maxCapacity: 500,
         consent: 'granted',
+        coachConsent: 'pending',
       })
       expect(storage.getItem(KEY)).toBeNull()
       unsubscribe()
@@ -1036,6 +1037,82 @@ describe('Tracker', () => {
       await trySendEverything(t)
       expect(fetchFn).not.toHaveBeenCalled()
       expect(t.getStatus().queuedCount).toBe(1)
+    })
+  })
+
+  describe('consent per purpose (research #6)', () => {
+    const COACH_KEY = 'synapsetwin_consent_coach_v1'
+    // Every path that could send: the timer, online, pagehide, hidden, a beacon and a flush.
+    async function trySendEverything(t: Tracker) {
+      await vi.advanceTimersByTimeAsync(10 * 60_000)
+      window.dispatchEvent(new Event('online'))
+      window.dispatchEvent(new Event('pagehide'))
+      setVisibility('hidden')
+      t.flushBeacon()
+      await t.flush()
+      await vi.advanceTimersByTimeAsync(10 * 60_000)
+    }
+
+    test.each([
+      ['granted', 'granted'],
+      ['denied', 'denied'],
+      [null, 'pending'],
+    ] as const)('a stored v1 consent %s reads as purpose 1 %s and purpose 2 not chosen', (v1, telemetry) => {
+      const t = make({ fetchFn: okFetch(), beacon: vi.fn(), storage: memStorage({}, v1) })
+      expect(t.getStatus()).toMatchObject({ consent: telemetry, coachConsent: 'pending' })
+    })
+
+    test('setCoachConsent stores purpose 2 on its own key, sends nothing and leaves purpose 1 alone', async () => {
+      const storage = memStorage({}, null)
+      const fetchFn = okFetch()
+      const t = make({ fetchFn, beacon: vi.fn(), storage })
+      const listener = vi.fn()
+      t.subscribe(listener)
+      t.push(full(1))
+      t.setCoachConsent(true)
+      expect(listener).toHaveBeenCalledTimes(2)
+      expect(t.getStatus()).toMatchObject({ consent: 'pending', coachConsent: 'granted', queuedCount: 1 })
+      expect(storage.getItem(COACH_KEY)).toBe('granted')
+      expect(storage.getItem(CONSENT_KEY)).toBeNull()
+      await trySendEverything(t)
+      expect(fetchFn).not.toHaveBeenCalled()
+      t.setCoachConsent(false)
+      expect(storage.getItem(COACH_KEY)).toBe('denied')
+      expect(make({ fetchFn, beacon: vi.fn(), storage }).getStatus().coachConsent).toBe('denied')
+    })
+
+    test('choose records both purposes; purpose 1 off clears the held answers and sends nothing', async () => {
+      const storage = memStorage({}, null)
+      const fetchFn = okFetch()
+      const t = make({ fetchFn, beacon: vi.fn(), storage })
+      t.push(full(1))
+      t.choose({ telemetry: false, coach: true })
+      expect(t.getStatus()).toMatchObject({ consent: 'denied', coachConsent: 'granted', queuedCount: 0 })
+      await trySendEverything(t)
+      expect(fetchFn).not.toHaveBeenCalled()
+      t.push(full(2))
+      t.choose({ telemetry: true, coach: false })
+      expect(t.getStatus()).toMatchObject({ consent: 'granted', coachConsent: 'denied' })
+      await vi.advanceTimersByTimeAsync(0)
+      expect(fetchFn).not.toHaveBeenCalled() // the event pushed while declined was never kept
+    })
+
+    test('resetConsent forgets both purposes', () => {
+      const storage = memStorage()
+      const t = make({ fetchFn: okFetch(), beacon: vi.fn(), storage })
+      t.setCoachConsent(true)
+      t.resetConsent()
+      expect(t.getStatus()).toMatchObject({ consent: 'pending', coachConsent: 'pending' })
+      expect(storage.getItem(COACH_KEY)).toBeNull()
+      expect(storage.getItem(CONSENT_KEY)).toBeNull()
+    })
+
+    test('another tab changing purpose 2 is followed at once', () => {
+      const storage = memStorage()
+      const t = make({ fetchFn: okFetch(), beacon: vi.fn(), storage })
+      storage.setItem(COACH_KEY, 'granted')
+      window.dispatchEvent(new StorageEvent('storage', { key: COACH_KEY, newValue: 'granted' }))
+      expect(t.getStatus()).toMatchObject({ consent: 'granted', coachConsent: 'granted' })
     })
   })
 

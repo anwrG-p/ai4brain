@@ -66,4 +66,30 @@ test.describe('Page 14: Settings (/settings)', () => {
     await page.keyboard.press('Space')
     await expect(motion).toHaveAttribute('aria-checked', 'true')
   })
+
+  test('"Mood guess" (on) and "Colour-blind friendly colours" (off) are stored on this device', async ({ page }) => {
+    await page.goto('/settings', { waitUntil: 'networkidle' })
+    const mood = page.getByRole('switch', { name: 'Mood guess' })
+    const cvd = page.getByRole('switch', { name: 'Colour-blind friendly colours' })
+    await expect(mood).toHaveAttribute('aria-checked', 'true')
+    await expect(cvd).toHaveAttribute('aria-checked', 'false')
+    await mood.click()
+    await cvd.click()
+    await page.reload({ waitUntil: 'networkidle' })
+    await expect(page.getByRole('switch', { name: 'Mood guess' })).toHaveAttribute('aria-checked', 'false')
+    await expect(page.getByRole('switch', { name: 'Colour-blind friendly colours' })).toHaveAttribute('aria-checked', 'true')
+  })
+
+  test('with colour-blind friendly colours on, Color Clash uses blue, yellow, red and black on the light plate', async ({ page }) => {
+    await page.addInitScript(() =>
+      window.localStorage.setItem('synapsetwin_prefs_v1', JSON.stringify({ version: 1, moodGuess: true, moodNoticeSeen: true, cvdSafe: true })),
+    )
+    await page.setViewportSize({ width: 375, height: 812 })
+    await page.goto('/task/inhibition_control?schema=stroop', { waitUntil: 'networkidle' })
+    await page.getByRole('button', { name: 'Begin' }).click()
+    const answers = page.getByRole('region', { name: 'Color Clash' }).getByRole('button')
+    await expect(answers).toHaveText(['blue (1)', 'yellow (2)', 'red (3)', 'black (4)'])
+    await expect(page.locator('[data-stroop-plate]')).toBeVisible()
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+  })
 })

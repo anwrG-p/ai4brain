@@ -34,6 +34,7 @@ describe('UI telemetry goes through the Tracker', () => {
       droppedCount: 0,
       maxCapacity: 500,
       consent: 'granted',
+      coachConsent: 'pending',
     })
     render(
       <MemoryRouter future={future} initialEntries={['/dashboard']}>
@@ -61,6 +62,7 @@ describe('UI telemetry goes through the Tracker', () => {
       droppedCount: 0,
       maxCapacity: 500,
       consent: 'pending',
+      coachConsent: 'pending',
     })
     useAppStore.getState().setSimulateOffline(true)
     renderShell()
@@ -77,6 +79,7 @@ describe('UI telemetry goes through the Tracker', () => {
       droppedCount: 0,
       maxCapacity: 500,
       consent: 'denied',
+      coachConsent: 'pending',
     })
     renderShell()
     expect(screen.queryByText(/offline/i)).not.toBeInTheDocument()
@@ -95,6 +98,7 @@ describe('UI telemetry goes through the Tracker', () => {
       droppedCount: 0,
       maxCapacity: 500,
       consent,
+      coachConsent: 'pending',
     })
 
   it.each([
@@ -104,9 +108,9 @@ describe('UI telemetry goes through the Tracker', () => {
   ] as const)('the privacy page states the %s consent in one plain line', (consent, line) => {
     statusWith(consent)
     renderPrivacy()
-    expect(screen.getByText(line)).toBeInTheDocument()
-    // Only the quiet link is visible; the two equal choices sit behind it.
-    expect(screen.queryByRole('button', { name: /^Save my answers$/i })).not.toBeInTheDocument()
+    expect(screen.getByTestId('consent-line')).toHaveTextContent(line)
+    // Only the quiet link is visible; the two equal switches sit behind it.
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
   })
 
   it('before any choice the link reads "Choose"', () => {
@@ -116,21 +120,24 @@ describe('UI telemetry goes through the Tracker', () => {
     expect(screen.queryByRole('button', { name: /^Change$/ })).not.toBeInTheDocument()
   })
 
-  it('"Change" reveals two equal choices that call the tracker', () => {
+  it('"Change" reveals the two equal switches, set to what holds now, and Done records both', () => {
     statusWith('granted')
-    const deny = vi.spyOn(tracker, 'denyConsent').mockImplementation(() => {})
-    const grant = vi.spyOn(tracker, 'grantConsent').mockImplementation(() => {})
+    const choose = vi.spyOn(tracker, 'choose').mockImplementation(() => {})
     renderPrivacy()
     const toggle = screen.getByRole('button', { name: /^Change$/ })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
     fireEvent.click(toggle)
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    fireEvent.click(screen.getByRole('button', { name: /^Keep them on this device only$/i }))
-    expect(deny).toHaveBeenCalledOnce()
-    expect(screen.queryByRole('button', { name: /^Keep them on this device only$/i })).not.toBeInTheDocument()
-    fireEvent.click(toggle)
-    fireEvent.click(screen.getByRole('button', { name: /^Save my answers$/i }))
-    expect(grant).toHaveBeenCalledOnce()
+    const save = screen.getByRole('switch', { name: 'Save my answers to improve my training' })
+    const ai = screen.getByRole('switch', { name: 'Let Loti use AI to reply' })
+    expect(save).toHaveAttribute('aria-checked', 'true')
+    expect(ai).toHaveAttribute('aria-checked', 'false')
+    expect(save.className).toBe(ai.className) // equal weight (R3)
+    fireEvent.click(save)
+    fireEvent.click(ai)
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    expect(choose).toHaveBeenCalledExactlyOnceWith({ telemetry: false, coach: true })
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
   })
 
   it('the privacy purge resets consent, so nothing is sent until the user accepts again', () => {

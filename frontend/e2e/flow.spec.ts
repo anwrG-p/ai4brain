@@ -108,7 +108,10 @@ async function openConsent(page: Page, info: TestInfo, theme: string) {
   await page.getByRole('button', { name: 'See my results' }).click()
   const sheet = page.getByRole('dialog')
   // R4 and rule 14: no client id in this build, so no sign-in step and nothing Google-shaped.
-  await expect(sheet.getByRole('heading', { name: 'Save your answers?' })).toBeFocused()
+  await expect(sheet.getByRole('heading', { name: 'Your choices' })).toBeFocused()
+  // Consent per purpose (research #6): two equal switches, both off until chosen.
+  for (const name of ['Save my answers to improve my training', 'Let Loti use AI to reply'])
+    await expect(sheet.getByRole('switch', { name })).toHaveAttribute('aria-checked', 'false')
   await expect(sheet.getByRole('button', { name: 'Continue as guest' })).toHaveCount(0)
   await expect(page.getByTestId('google-signin')).toHaveCount(0)
   await shot(page, info, `07-results-consent-${theme}`)
@@ -128,7 +131,7 @@ async function expectBlurredResults(page: Page, info: TestInfo, theme: string) {
 test.describe('Flow: Welcome → Baseline → Results', () => {
   test.setTimeout(180_000)
 
-  test('light: nothing is sent before consent; "Save my answers" sends the held events with this user_id', async ({ page }, info) => {
+  test('light: nothing is sent before consent; "Save my answers to improve my training" sends the held events with this user_id', async ({ page }, info) => {
     const posts = await recordPosts(page)
     await page.goto('/?fast=1', { waitUntil: 'networkidle' })
     await shot(page, info, '07-welcome-light')
@@ -138,7 +141,9 @@ test.describe('Flow: Welcome → Baseline → Results', () => {
     expect(posts, 'no POST before consent').toHaveLength(0)
 
     const sheet = await openConsent(page, info, 'light')
-    await sheet.getByRole('button', { name: 'Save my answers' }).click()
+    await sheet.getByRole('switch', { name: 'Save my answers to improve my training' }).click()
+    expect(posts, 'a switch alone decides nothing').toHaveLength(0)
+    await sheet.getByRole('button', { name: 'Continue' }).click()
     await expect.poll(() => posts.length).toBeGreaterThan(0)
     const uid = await page.evaluate(() => localStorage.getItem('aura_uid'))
     const events = posts.flat()
@@ -154,7 +159,7 @@ test.describe('Flow: Welcome → Baseline → Results', () => {
     await expect(page).toHaveURL(/\/dashboard$/)
   })
 
-  test('dark: "Keep them on this device only" sends nothing and still shows the results', async ({ page }, info) => {
+  test('dark: Continue with both switches off sends nothing and still shows the results', async ({ page }, info) => {
     const posts = await recordPosts(page)
     await page.goto('/?fast=1', { waitUntil: 'networkidle' })
     await page.getByRole('button', { name: /Dark \(Night Lab\)/i }).click()
@@ -163,7 +168,7 @@ test.describe('Flow: Welcome → Baseline → Results', () => {
 
     await expectBlurredResults(page, info, 'dark')
     const sheet = await openConsent(page, info, 'dark')
-    await sheet.getByRole('button', { name: 'Keep them on this device only' }).click()
+    await sheet.getByRole('button', { name: 'Continue' }).click()
 
     await expect(page.locator('figure[data-blurred="false"]')).toBeVisible()
     await shot(page, info, '07-results-clear-dark')

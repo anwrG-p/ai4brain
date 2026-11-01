@@ -1,3 +1,4 @@
+import { tracker } from '../assessment/telemetry/tracker'
 import { scriptedBrain } from './scriptedBrain'
 import type { LotiBrain, LotiContext, LotiMessage } from './types'
 
@@ -17,8 +18,18 @@ import type { LotiBrain, LotiContext, LotiMessage } from './types'
 
 export type CrisisResult = { crisis: false } | { crisis: true; message: LotiMessage }
 export type CrisisGate = (text: string) => CrisisResult
+/** What the coach may be told: Loti's context without Momo's mood. The mood guess never leaves the
+    device (ADR 0002), so the type has no field for it and `ask` strips it at run time too. */
+export type CoachContext = Omit<LotiContext, 'mood'>
 /** The future LLM call. ponytail: sync for now; a real one makes `ask` async with a timeout. */
-export type CoachTransport = (text: string, ctx: LotiContext) => LotiMessage | null
+export type CoachTransport = (text: string, ctx: CoachContext) => LotiMessage | null
+
+/** Loti's context as the coach may see it: everything but the mood. */
+export function coachContext(ctx: LotiContext): CoachContext {
+  const rest: LotiContext = { ...ctx }
+  delete rest.mood
+  return rest
+}
 
 /** One calm, plain line: emergency help and a crisis line, named as such. No choices. */
 export const CRISIS_MESSAGE: LotiMessage = {
@@ -55,9 +66,17 @@ export interface CoachBrainOptions {
   crisisGate: CrisisGate
   transport?: CoachTransport
   fallback?: LotiBrain
+  /** The user's "Let Loti use AI to reply" choice (consent purpose 2). Without it, no transport. */
+  consented?: () => boolean
 }
 
-export function createCoachBrain({ enabled, crisisGate, transport, fallback = scriptedBrain }: CoachBrainOptions): CoachBrain {
+export function createCoachBrain({
+  enabled,
+  crisisGate,
+  transport,
+  fallback = scriptedBrain,
+  consented = () => false,
+}: CoachBrainOptions): CoachBrain {
   return {
     enabled,
     opening: (ctx) => fallback.opening(ctx),
@@ -65,7 +84,7 @@ export function createCoachBrain({ enabled, crisisGate, transport, fallback = sc
     ask: (text, ctx) => {
       const gate = crisisGate(text)
       if (gate.crisis) return gate.message
-      return enabled && transport ? transport(text, ctx) : null
+      return enabled && transport && consented() ? transport(text, coachContext(ctx)) : null
     },
   }
 }
@@ -73,4 +92,8 @@ export function createCoachBrain({ enabled, crisisGate, transport, fallback = sc
 /** Off unless the build sets VITE_LOTI_COACH=on. */
 export const COACH_ENABLED = import.meta.env.VITE_LOTI_COACH === 'on'
 
-export const coachBrain = createCoachBrain({ enabled: COACH_ENABLED, crisisGate: keywordCrisisGate })
+export const coachBrain = createCoachBrain({
+  enabled: COACH_ENABLED,
+  crisisGate: keywordCrisisGate,
+  consented: () => tracker.getStatus().coachConsent === 'granted',
+})

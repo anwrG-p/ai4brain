@@ -45,9 +45,15 @@ function sessions(n: number) {
   }))
 }
 
-async function seed(page: Page, n: number) {
+async function seed(page: Page, n: number, moodNoticeSeen = true) {
   const value = JSON.stringify({ version: 1, sessions: sessions(n) })
   await page.addInitScript((v) => window.localStorage.setItem('synapsetwin_sessions_v1', v), value)
+  // A returning device has acknowledged Momo's first-exposure notice; its own test shows it.
+  const prefs = JSON.stringify({ version: 1, moodGuess: true, moodNoticeSeen, cvdSafe: false })
+  // Only when absent, so a reload keeps what the page stored.
+  await page.addInitScript((v) => {
+    if (window.localStorage.getItem('synapsetwin_prefs_v1') === null) window.localStorage.setItem('synapsetwin_prefs_v1', v)
+  }, prefs)
 }
 
 async function shot(page: Page, info: TestInfo, name: string) {
@@ -130,10 +136,48 @@ test.describe('Page 06: Home (/dashboard)', () => {
     await expect(page.locator('[data-line="keep"]')).toHaveCount(1)
   })
 
-  test('six sessions: the heatmap behind "Further explore"; axe and overflow in light and dark', async ({ page }, info) => {
+  test('six sessions: the heatmap and "When you train" behind "Further explore"; axe and overflow in light and dark', async ({ page }, info) => {
     await checkHome(page, info, 6)
     await expect(page.getByRole('grid', { name: 'Past results by week' })).toBeVisible()
     await expect(page.getByRole('list', { name: 'Score scale' })).toBeVisible()
+    const when = page.getByRole('grid', { name: 'When you train' })
+    await expect(when).toBeVisible()
+    await expect(when.getByRole('rowheader')).toHaveText(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])
+    // One tab stop: arrows move inside the grid.
+    await when.getByRole('gridcell').first().focus()
+    await page.keyboard.press('ArrowDown')
+    await expect(when.getByRole('gridcell').nth(3)).toBeFocused()
+    // The weekly goal sits in the Goals block as one plain line.
+    await expect(page.getByTestId('weekly-goal')).toHaveText(/^\d+ (of 3 )?this week( · week kept)?$/)
+  })
+
+  test('first visit: the mood notice beside Momo, then the correction picker; axe and overflow in light and dark', async ({ page }, info) => {
+    await seed(page, 2, false)
+    await page.goto('/dashboard', { waitUntil: 'networkidle' })
+    const note = page.getByRole('note')
+    await expect(note).toHaveText(/Momo guesses your mood from how you use the app, on this device only\. You can change it or turn it off\./)
+    await expect(page.getByRole('dialog')).toHaveCount(0) // inline, not a modal wall
+    for (const theme of ['light', 'dark'] as const) {
+      if (theme === 'dark') await page.getByRole('button', { name: /Dark \(Night Lab\)/i }).first().click()
+      await checkViewports(page, `mood notice, ${theme}`, info, `08-home-notice-${theme}`)
+    }
+    await note.getByRole('button', { name: 'Got it' }).click()
+    await expect(page.getByRole('note')).toHaveCount(0)
+    const momo = page.getByRole('button', { name: /^Momo guesses you feel/ })
+    await expect(momo).toBeFocused()
+    await momo.click()
+    const picker = page.getByRole('group', { name: 'How do you feel?' })
+    await expect(picker.getByRole('button')).toHaveText(['Calm', 'Happy', 'Focused', 'Tired', 'Frustrated'])
+    for (const theme of ['dark', 'light'] as const) {
+      if (theme === 'light') await page.getByRole('button', { name: /Light \(Playful Lab\)/i }).first().click()
+      if (!(await picker.isVisible())) await momo.click()
+      await checkViewports(page, `mood picker, ${theme}`, info, `08-home-picker-${theme}`)
+    }
+    if (!(await picker.isVisible())) await momo.click()
+    await picker.getByRole('button', { name: 'Tired' }).click()
+    await expect(page.getByRole('img', { name: 'Momo looks tired' })).toBeVisible()
+    await page.reload({ waitUntil: 'networkidle' })
+    await expect(page.getByRole('note')).toHaveCount(0) // acknowledged on this device
   })
 
   test('"View as table" shows the 5 rows with ranges; "Start today\'s session" trains the weakest pillar', async ({ page }) => {

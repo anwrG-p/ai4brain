@@ -1,3 +1,4 @@
+import { useDevicePrefs } from '../../../state/devicePrefs'
 import { useEmilyStore } from '../../../state/useEmilyStore'
 import type { EmilyEmotion } from '../../../styles/emilyTokens'
 import {
@@ -151,8 +152,10 @@ function MomoFace({ mood }: { mood: MomoMood }) {
   }
 }
 
-/** Momo following the shared emotion store (see EMOTION_TO_MOOD). */
+/** Momo following the shared emotion store (see EMOTION_TO_MOOD); neutral (calm) while the
+    "Mood guess" setting is off. The tappable, correctable Momo is MomoGuess. */
 export function MomoFromStore(props: Omit<MomoProps, 'mood'>) {
   const emotion = useEmilyStore((s) => s.currentEmotion)
-  return <Momo {...props} mood={EMOTION_TO_MOOD[emotion]} />
+  const on = useDevicePrefs((s) => s.moodGuess)
+  return <Momo {...props} mood={on ? EMOTION_TO_MOOD[emotion] : 'calm'} />
 }

@@ -9,6 +9,7 @@ import { useSessionStore } from '../features/insights/sessionStore'
 import TaskRunnerPage from '../pages/TaskRunnerPage'
 import { useAppStore } from '../state/useAppStore'
 import { useEmilyStore } from '../state/useEmilyStore'
+import { useDevicePrefs } from '../state/devicePrefs'
 import { begin } from './exerciseFrame'
 
 // Same flags as App.tsx, so the router prints no v7 warnings.
@@ -128,6 +129,28 @@ describe('Emotion engine without the mood pill (gap FE-03)', () => {
       expect(useEmilyStore.getState().metrics).not.toBe(before)
       expect(document.documentElement.getAttribute('data-emotion')).toBe(useEmilyStore.getState().currentEmotion)
     } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('with "Mood guess" off the listener stops and the mood goes back to calm (ADR 0002)', () => {
+    vi.useFakeTimers()
+    try {
+      useEmilyStore.setState({ currentEmotion: 'energized' })
+      useDevicePrefs.setState({ moodGuess: false })
+      shellAt('/dashboard')
+      expect(useEmilyStore.getState().currentEmotion).toBe('calm_flow')
+      const before = useEmilyStore.getState().metrics
+      for (let i = 0; i < 6; i++) fireEvent.click(document.body, { clientX: 10 * i, clientY: 5 * i })
+      act(() => void vi.advanceTimersByTime(3100))
+      expect(useEmilyStore.getState().metrics).toBe(before)
+      // Back on: it listens again.
+      act(() => useDevicePrefs.setState({ moodGuess: true }))
+      for (let i = 0; i < 6; i++) fireEvent.click(document.body, { clientX: 10 * i, clientY: 5 * i })
+      act(() => void vi.advanceTimersByTime(3100))
+      expect(useEmilyStore.getState().metrics).not.toBe(before)
+    } finally {
+      useDevicePrefs.setState({ moodGuess: true })
       vi.useRealTimers()
     }
   })

@@ -9,6 +9,8 @@ import { useSessionStore, type SessionRecord } from '../features/insights/sessio
 import DashboardPage from '../pages/DashboardPage'
 import { useAppStore } from '../state/useAppStore'
 import { useEmilyStore } from '../state/useEmilyStore'
+import { MOOD_NOTICE } from '../components/features/characters'
+import { PREFS_KEY, useDevicePrefs } from '../state/devicePrefs'
 
 /* Home = /dashboard (ticket 08). Real sessions from the session store; need-to-know only (rules 13, 14). */
 
@@ -79,6 +81,8 @@ beforeEach(() => {
   useEmilyStore.getState().reset()
   useSessionStore.getState().clearSessions()
   useGoalsStore.getState().clearGoals()
+  // The mood notice was acknowledged on this device; its own tests set it due.
+  useDevicePrefs.setState({ moodGuess: true, moodNoticeSeen: true, cvdSafe: false })
 })
 
 afterEach(() => {
@@ -108,17 +112,115 @@ describe('Home (/dashboard)', () => {
   })
 
   it('above the fold: 3 blocks, at most 2 quiet controls besides the primary, and 60 words or fewer', () => {
-    for (const n of [0, 1, 4]) {
-      seed(sessions(n))
-      const { unmount } = renderHome()
-      expect(fold().children, `${n} sessions`).toHaveLength(3)
-      // Nothing else sits before the progress curve.
-      const progress = screen.getByRole('region', { name: 'Your progress' })
-      expect([...page().children].indexOf(progress)).toBe(1)
-      expect(within(fold()).getAllByRole('button').length, `${n} sessions`).toBeLessThanOrEqual(3)
-      expect(visibleWords(fold()), `${n} sessions`).toBeLessThanOrEqual(60)
-      unmount()
+    // With the mood notice still due too: it stands in for Loti's line, so the budget holds.
+    for (const noticeSeen of [true, false]) {
+      for (const n of [0, 1, 4]) {
+        useDevicePrefs.setState({ moodNoticeSeen: noticeSeen })
+        seed(sessions(n))
+        const { unmount } = renderHome()
+        const at = `${n} sessions, notice ${noticeSeen ? 'seen' : 'due'}`
+        expect(fold().children, at).toHaveLength(3)
+        // Nothing else sits before the progress curve.
+        const progress = screen.getByRole('region', { name: 'Your progress' })
+        expect([...page().children].indexOf(progress)).toBe(1)
+        // Momo itself (the picture you tap to correct its guess, ADR 0002) is not counted as a control.
+        const controls = within(fold()).getAllByRole('button').filter((b) => !b.hasAttribute('data-momo-trigger'))
+        expect(controls.length, at).toBeLessThanOrEqual(3)
+        expect(visibleWords(fold()), at).toBeLessThanOrEqual(60)
+        unmount()
+      }
     }
+  })
+
+  describe('Momo, a guess you own (ADR 0002, AI Act Art 50(3))', () => {
+    it('the first time, a plain notice sits beside Momo, with "Got it" and a Settings link; Got it hides it for good', async () => {
+      useDevicePrefs.setState({ moodNoticeSeen: false })
+      seed(sessions(2))
+      const { unmount } = renderHome()
+      const note = screen.getByRole('note')
+      expect(note).toHaveTextContent(MOOD_NOTICE)
+      expect(within(note).getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
+      // Not a modal wall: no dialog, the page stays usable.
+      expect(screen.queryByRole('dialog')).toBeNull()
+      expect(screen.getByRole('button', { name: "Start today's session" })).toBeEnabled()
+      await userEvent.click(within(note).getByRole('button', { name: 'Got it' }))
+      expect(screen.queryByRole('note')).toBeNull()
+      expect(screen.getByRole('button', { name: /Momo guesses you feel/ })).toHaveFocus()
+      expect(JSON.parse(localStorage.getItem(PREFS_KEY)!)).toMatchObject({ moodNoticeSeen: true })
+      unmount()
+      renderHome()
+      expect(screen.queryByRole('note')).toBeNull()
+    })
+
+    it('no notice while the mood guess is off: Momo is a still, neutral picture', () => {
+      useDevicePrefs.setState({ moodGuess: false, moodNoticeSeen: false })
+      useEmilyStore.setState({ currentEmotion: 'frustrated' })
+      renderHome()
+      expect(screen.queryByRole('note')).toBeNull()
+      expect(screen.queryByRole('button', { name: /Momo/ })).toBeNull()
+      expect(screen.getByRole('img', { name: 'Momo' })).toBeInTheDocument()
+      expect(page()).toHaveClass('mood-tint-calm')
+    })
+
+    it('tapping Momo opens a picker of its moods; a pick overrides the guess for this visit', async () => {
+      useEmilyStore.setState({ currentEmotion: 'energized' })
+      renderHome()
+      const momo = screen.getByRole('button', { name: 'Momo guesses you feel happy. Change it' })
+      expect(momo).toHaveAttribute('aria-expanded', 'false')
+      await userEvent.click(momo)
+      const picker = screen.getByRole('group', { name: 'How do you feel?' })
+      expect(within(picker).getAllByRole('button').map((b) => b.textContent)).toEqual(['Calm', 'Happy', 'Focused', 'Tired', 'Frustrated'])
+      expect(within(picker).getByRole('button', { name: 'Happy' })).toHaveAttribute('aria-pressed', 'true')
+      expect(within(picker).getByRole('button', { name: 'Happy' })).toHaveFocus()
+      await userEvent.click(within(picker).getByRole('button', { name: 'Tired' }))
+      expect(screen.queryByRole('group', { name: 'How do you feel?' })).toBeNull()
+      expect(momo).toHaveFocus()
+      expect(screen.getByRole('img', { name: 'Momo looks tired' })).toBeInTheDocument()
+      expect(useEmilyStore.getState()).toMatchObject({ currentEmotion: 'fatigued', isHumanLocked: true })
+      // The guess no longer moves it: interaction updates only the metrics while the pick holds.
+      act(() => useEmilyStore.getState().updateTelemetry([]))
+      expect(useEmilyStore.getState().currentEmotion).toBe('fatigued')
+      // In memory only: nothing about the mood is written to storage.
+      expect(Object.values({ ...localStorage }).join()).not.toMatch(/fatigued|tired/)
+    })
+
+    it('Escape closes the picker and returns focus to Momo', async () => {
+      renderHome()
+      const momo = screen.getByRole('button', { name: /Momo guesses you feel/ })
+      await userEvent.click(momo)
+      await userEvent.keyboard('{Escape}')
+      expect(screen.queryByRole('group', { name: 'How do you feel?' })).toBeNull()
+      expect(momo).toHaveFocus()
+    })
+  })
+
+  describe('Goals: the weekly goal of 3 (research #10)', () => {
+    const at = (iso: string) => ({ id: iso, at: new Date(iso).toISOString(), inputs: full(50) })
+    const openGoals = async () => {
+      renderHome()
+      await userEvent.click(screen.getByRole('button', { name: 'Further explore my training' }))
+      return screen.getByTestId('weekly-goal')
+    }
+
+    it('one plain line counting this week only (Monday on); last week never shows', async () => {
+      // Now: Wednesday 28 Oct 2026, 15:00. Monday 26 Oct starts the week.
+      seed([at('2026-10-19T10:00:00'), at('2026-10-25T20:00:00'), at('2026-10-26T09:00:00')])
+      const line = await openGoals()
+      expect(line).toHaveTextContent(/^1 of 3 this week$/)
+    })
+
+    it('2 of 3 keeps the week (one skip allowed); no streak or guilt words anywhere', async () => {
+      seed([at('2026-10-26T09:00:00'), at('2026-10-27T09:00:00')])
+      const line = await openGoals()
+      expect(line).toHaveTextContent(/^2 of 3 this week · week kept$/)
+      expect(page().textContent).not.toMatch(/streak|missed|broke|lost|behind|don.t give up/i)
+    })
+
+    it('a week with no session starts again quietly at 0', async () => {
+      seed([at('2026-10-12T09:00:00'), at('2026-10-13T09:00:00'), at('2026-10-14T09:00:00')])
+      const line = await openGoals()
+      expect(line).toHaveTextContent(/^0 of 3 this week$/)
+    })
   })
 
   it('greets by name, with Momo beside the greeting', () => {
