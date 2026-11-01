@@ -35,7 +35,7 @@ The Train tab lists each exercise under one skill (`frontend/src/features/train/
 | Display refresh rate | **Done.** UFOV records the actually rendered duration (`shown_ms`). |
 | Disengaged or random answering | **Done.** Chance gates: a non-responder scores about 0, not a perfect difference score. |
 | Hidden tab or interruption | **Done.** Hiding the tab pauses the exercise; a paused attempt is never scored or sent. |
-| Colour vision | **Partly.** The server's Stroop generator has a `cvd_safe` ink set; the app enables it once `black` is mapped (ticket F-D). |
+| Colour vision | **Partly.** The server serves a `cvd_safe` Stroop ink set (blue, yellow, red, black) on `GET /v1/tasks/next?inks=cvd_safe`; the UI maps black and draws that block on a light plate. |
 | Practice effects | **Planned (F-A).** No "real improvement" before session 3, with a practice-adjusted reliable-change check. |
 | Too few trials | **Planned (F-A).** Minimum trials per input, and "Building your profile" below it. |
 | Input device and timing | **Planned (F-A).** Device and input logging, and flags for very fast answers. |

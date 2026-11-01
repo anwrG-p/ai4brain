@@ -16,12 +16,10 @@ INK_PRESETS: dict[str, tuple[str, ...]] = {
     # (Maastricht study, §6). Yellow is used rather than orange because orange sits between red and
     # yellow in hue; black (the research's "black/ink") takes the fourth slot, and keeps
     # STROOP_CHANCE = 1/4 in taskScores.ts true.
-    # Not servable yet: Stroop.tsx INK has no "black" (it falls back to --color-ink, which is light
-    # in the dark theme), so the frontend must map it first. Until then generate() refuses it
-    # without allow_unserved=True, and the served schema rejects black.
+    # Served: Stroop.tsx maps black (--color-stroop-black) and draws a block whose ink list holds
+    # black on a light plate in both themes, decided per block so the plate gives nothing away.
     "cvd_safe": ("blue", "yellow", "red", "black"),
 }
-UNSERVED_PRESETS = frozenset({"cvd_safe"})
 
 # Default length: 96 trials, 48 congruent + 48 incongruent. Design judgement (J): the research
 # cites no trial count that makes the classic Stroop cost stable.

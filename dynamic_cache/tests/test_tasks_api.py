@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from dynamic_cache import api, cache_dispatcher
-from dynamic_cache.generators import DIMENSION_OF, SCHEMA_TYPES
+from dynamic_cache.generators import DIMENSION_OF, SCHEMA_TYPES, validate_payload
 
 URL = "/v1/tasks/next"
 TASK_SOURCE = Path(__file__).resolve().parents[2] / "frontend" / "src" / "features" / "assessment" / "tasks" / "taskSource.ts"
@@ -77,16 +77,81 @@ def test_the_frontends_exact_request_gets_a_valid_task(client):
 
 @pytest.mark.parametrize("schema_type", SCHEMA_TYPES)
 def test_every_schema_is_served_and_valid(client, schema_type):
+    """All 11 schemas, F-B's Stop Light, Pair Finder and Arrow Focus included."""
     r = client.get(URL, params={"user_id": "u1", "schema_type": schema_type})
     assert r.status_code == 200
     t = r.json()
-    assert valid_task(t) and t["schema_type"] == schema_type and t["dimension"] == DIMENSION_OF[schema_type]
+    assert validate_payload(t) == []  # the served schema and the solvers
+    assert t["schema_type"] == schema_type and t["dimension"] == DIMENSION_OF[schema_type]
+    assert set(t) == {"task_id", "dimension", "schema_type", "params", "surface_seed"}
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="taskSource.ts validTask does not list stop_signal, pal and flanker yet (frontend follow-up, "
+    "SRV-1 report); when it does, this passes and the marker must go",
+)
+@pytest.mark.parametrize("schema_type", ["stop_signal", "pal", "flanker"])
+def test_the_frontend_accepts_the_new_exercises(client, schema_type):
+    t = client.get(URL, params={"user_id": "u1", "schema_type": schema_type}).json()
+    src = TASK_SOURCE.read_text(encoding="utf-8")  # the live list, not the port
+    listed = re.findall(r"'(\w+)'", re.search(r"const SCHEMA_TYPES[^=]*=\s*\[([^\]]*)\]", src).group(1))
+    assert t["schema_type"] in listed
 
 
 def test_dimension_filter(client):
-    for _ in range(4):
+    for _ in range(6):
         t = client.get(URL, params={"user_id": "u1", "dimension": "executive_function"}).json()
-        assert t["schema_type"] in {"stroop", "tower"}
+        assert t["schema_type"] in {"stroop", "tower", "stop_signal", "flanker"}
+
+
+# --- Stroop inks: the colour-blind-safe preset ------------------------------------------------------
+
+
+def _stroop(client, user, **params):
+    r = client.get(URL, params={"user_id": user, "schema_type": "stroop", **params})
+    assert r.status_code == 200
+    return r.json()
+
+
+def test_inks_cvd_safe_serves_the_colour_blind_safe_stroop(client):
+    t = _stroop(client, "u1", inks="cvd_safe")
+    assert validate_payload(t) == []
+    assert set(t["params"]["colors"]) == {"blue", "yellow", "red", "black"}
+    assert set(_stroop(client, "u2")["params"]["colors"]) == {"red", "green", "blue", "yellow"}  # default
+    assert set(_stroop(client, "u3", inks="classic")["params"]["colors"]) == {"red", "green", "blue", "yellow"}
+
+
+@pytest.mark.parametrize("inks", ["pastel", "CVD_SAFE", "", "black"])
+def test_unknown_inks_are_422(client, inks):
+    assert client.get(URL, params={"user_id": "u1", "inks": inks}).status_code == 422
+
+
+def test_inks_never_mix_in_the_pools(client):
+    """The two presets fill separate pools, and a session replay keeps the preset it was served."""
+    d = api.get_dispatcher()
+    d.warm(schema_types=("stroop",), at=0.5, inks=cache_dispatcher.INKS)  # stocked pools to draw from
+    for k in range(6):
+        assert "black" in _stroop(client, f"c{k}", inks="cvd_safe")["params"]["colors"]
+        assert "black" not in _stroop(client, f"k{k}")["params"]["colors"]
+    stroop_pools = {key for key in d._pools if key[1] == "stroop"}
+    assert {key[3] for key in stroop_pools} == {"classic", "cvd_safe"}
+    assert sum(len(d._pools[key]) for key in stroop_pools) >= 2 * (cache_dispatcher.POOL_SIZE - 6)
+    for key in stroop_pools:
+        for entry in d._pools[key]:
+            assert ("black" in json.loads(entry.body)["params"]["colors"]) == (key[3] == "cvd_safe")
+    # Idempotency is per preset: the same session and seq with the other inks is another task.
+    a = _stroop(client, "u9", session_id="s1", seq=0, inks="cvd_safe")
+    assert _stroop(client, "u9", session_id="s1", seq=0, inks="cvd_safe") == a
+    b = _stroop(client, "u9", session_id="s1", seq=0)
+    assert b["task_id"] != a["task_id"] and "black" not in b["params"]["colors"]
+
+
+def test_inks_leave_other_schemas_alone(client):
+    # n-back has no inks: both kinds of user draw from the one pool
+    a = client.get(URL, params={"user_id": "u1", "schema_type": "n_back", "inks": "cvd_safe"})
+    assert a.status_code == 200 and validate_payload(a.json()) == []
+    assert {key[3] for key in api.get_dispatcher()._pools if key[1] == "n_back"} == {""}
 
 
 @pytest.mark.parametrize(
@@ -169,7 +234,9 @@ def test_export_puts_the_registry_after_the_events(client):
 def test_openapi_documents_the_payload(client):
     op = client.get("/openapi.json").json()["paths"][URL]["get"]
     assert "TaskPayload" in json.dumps(op["responses"]["200"])
-    assert {p["name"] for p in op["parameters"]} == {"user_id", "schema_type", "dimension", "session_id", "seq"}
+    assert {p["name"] for p in op["parameters"]} == {"user_id", "schema_type", "dimension", "session_id", "seq", "inks"}
+    inks = next(p for p in op["parameters"] if p["name"] == "inks")
+    assert inks["schema"]["enum"] == list(cache_dispatcher.INKS)
     assert [p["name"] for p in op["parameters"] if p["required"]] == ["user_id"]
 
 

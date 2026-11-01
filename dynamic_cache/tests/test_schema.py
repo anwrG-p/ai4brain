@@ -46,6 +46,9 @@ TS_TO_SCHEMA = {
     "TowerParams": "TowerParams",
     "UfovParams": "UfovParams",
     "MstParams": "MstParams",
+    "StopSignalParams": "StopSignalParams",
+    "PalParams": "PalParams",
+    "FlankerParams": "FlankerParams",
 }
 
 
@@ -159,9 +162,23 @@ def test_drift_is_caught():
 def test_enums_match_the_frontend():
     dims = re.search(r"export type Dimension =([^/]*?)\n\n", types_ts(), re.S).group(1)
     assert set(re.findall(r"'(\w+)'", dims)) == set(SCHEMA["properties"]["dimension"]["enum"])
+    # The app's one schema union (types/index.ts TaskSchemaType, F-B added the last three).
+    union = (ROOT / "frontend" / "src" / "types" / "index.ts").read_text(encoding="utf-8")
+    literals = re.search(r"export type TaskSchemaType =([^/]*?)\n\n", union, re.S).group(1)
+    assert re.findall(r"'(\w+)'", literals) == list(SCHEMA_TYPES) == SCHEMA["properties"]["schema_type"]["enum"]
+    # taskSource.ts validTask's own list must stay within it (it still lacks F-B's three: SRV-1
+    # report, Requests; test_tasks_api pins the gap).
     source = (TASKS / "tasks" / "taskSource.ts").read_text(encoding="utf-8")
     listed = re.search(r"const SCHEMA_TYPES: readonly SchemaType\[\] = \[([^\]]*)\]", source).group(1)
-    assert re.findall(r"'(\w+)'", listed) == list(SCHEMA_TYPES) == SCHEMA["properties"]["schema_type"]["enum"]
+    assert set(re.findall(r"'(\w+)'", listed)) <= set(SCHEMA_TYPES)
+
+
+@requires_frontend
+def test_stroop_inks_are_the_ones_stroop_tsx_paints():
+    src = (TASKS / "tasks" / "Stroop.tsx").read_text(encoding="utf-8")
+    ink_map = re.search(r"const INK[^=]*=\s*\{([^}]*)\}", src, re.S).group(1)
+    painted = set(re.findall(r"^\s*(\w+):", ink_map, re.M))
+    assert set(SCHEMA["definitions"]["StroopInk"]["enum"]) == painted
 
 
 @requires_frontend
@@ -176,20 +193,17 @@ def test_schema_is_package_data():
     assert SCHEMA["title"] == "TaskPayload" and "StroopParams" in SCHEMA["definitions"]
 
 
-# ---- served vs not-yet-servable Stroop inks -------------------------------------------------------
+# ---- Stroop inks: both presets are served ---------------------------------------------------------
 
 
-def test_served_schema_rejects_black_ink():
-    assert SCHEMA["definitions"]["StroopInk"]["enum"] == ["red", "green", "blue", "yellow"]
-    p = generate("stroop", 0.5, 3, inks="cvd_safe", allow_unserved=True)
-    assert schema_problems(p) and validate_payload(p)  # the served gate refuses it
-    assert schema_problems(p, allow_unserved=True) == [] and validate_payload(p, allow_unserved=True) == []
-
-
-def test_unserved_schema_only_widens_the_ink_list():
-    p = copy.deepcopy(generate("stroop", 0.5, 3, inks="cvd_safe", allow_unserved=True))
+def test_served_schema_takes_both_ink_presets():
+    assert SCHEMA["definitions"]["StroopInk"]["enum"] == ["red", "green", "blue", "yellow", "black"]
+    assert "StroopInkUnserved" not in SCHEMA["definitions"]
+    p = generate("stroop", 0.5, 3, inks="cvd_safe")
+    assert schema_problems(p) == [] and validate_payload(p) == []
+    p = copy.deepcopy(p)
     p["params"]["trials"][0]["ink"] = "purple"
-    assert schema_problems(p, allow_unserved=True)
+    assert schema_problems(p)
 
 
 # ---- the schema rejects what the client would choke on -------------------------------------------
@@ -208,7 +222,6 @@ BROKEN = {
     "wrong dimension for schema": ("stroop", lambda p: p.update(dimension="working_memory")),
     "extra envelope field": ("tower", lambda p: p.update(extra=1)),
     "stroop ink the UI cannot paint": ("stroop", lambda p: p["params"]["trials"][0].update(ink="purple")),
-    "stroop black ink not served yet": ("stroop", lambda p: p["params"]["colors"].__setitem__(1, "black")),
     "matrix with no empty cell": ("matrix", lambda p: p["params"]["cells"].__setitem__(8, p["params"]["options"][0])),
     "matrix glyph colour unmapped": ("matrix", lambda p: p["params"]["options"][0].update(color="teal")),
     "n_back pos off the grid": ("n_back", lambda p: p["params"]["trials"][0].update(pos=[3, 0])),
@@ -220,6 +233,15 @@ BROKEN = {
     "relational token not a word": ("relational", lambda p: p["params"]["levels"][0][0]["question"].update(a="<b>")),
     "mst unknown kind": ("mst", lambda p: p["params"]["test"][0].update(kind="maybe")),
     "params field typo": ("mst", lambda p: p["params"].update(encode_ms_=1)),
+    "stop_signal dir up": ("stop_signal", lambda p: p["params"]["trials"][0].update(dir="up")),
+    "stop_signal stop not a bool": ("stop_signal", lambda p: p["params"]["trials"][0].update(stop=1)),
+    "stop_signal negative ssd": ("stop_signal", lambda p: p["params"].update(ssd_start_ms=-50)),
+    "stop_signal wrong dimension": ("stop_signal", lambda p: p.update(dimension="episodic_memory")),
+    "pal pattern 8 has no shape": ("pal", lambda p: p["params"]["stages"][0]["items"][0].update(pattern=8)),
+    "pal 9 boxes": ("pal", lambda p: p["params"].update(boxes=9)),
+    "pal recall missing": ("pal", lambda p: p["params"]["stages"][0].pop("recall")),
+    "flanker congruent word": ("flanker", lambda p: p["params"]["trials"][0].update(congruent="yes")),
+    "flanker missing fixation": ("flanker", lambda p: p["params"].pop("fixation_ms")),
 }
 
 

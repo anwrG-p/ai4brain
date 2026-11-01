@@ -49,7 +49,7 @@ Find your section and skip the rest.
   - Tower: `goal` + `optimal_moves` + `counter_intuitive`
   - UFOV: `central` + `peripheral_dir` (0..7)
 - **Colours are CSS colour names** (`"blue"`), not hex. Screen readers read them aloud.
-- **Stroop colours must be `red`, `green`, `blue`, `yellow` or `black`** (in `colors`, `ink` and `answer`). The UI maps only those five to theme tokens. A block whose `colors` include `black` (the generator's `cvd_safe` preset) draws its words on a light plate in both themes, so black stays readable on a dark screen. Any other name renders in the normal text colour, with no error, so the ink can't be seen and the trial is unanswerable. The UI side is ready for `cvd_safe`; enabling it on the server is still a separate decision.
+- **Stroop colours must be `red`, `green`, `blue`, `yellow` or `black`** (in `colors`, `ink` and `answer`). The UI maps only those five to theme tokens. A block whose `colors` include `black` (the generator's `cvd_safe` preset) draws its words on a light plate in both themes, so black stays readable on a dark screen. Any other name renders in the normal text colour, with no error, so the ink can't be seen and the trial is unanswerable. The server serves `cvd_safe` when the request carries `inks=cvd_safe` (`GET /v1/tasks/next`; classic is the default, any other value is a 422).
 - **Staircased Relational** expects `levels: Trial[][]`, easiest first.
 - **UFOV** expects `duration_grid_ms` (non-empty, roughly log-spaced 17–500). `similarity` and `mask_noise` must be in [0,1] and are fixed per block. Adapt them between blocks from Member 1's telemetry.
 - **N-back difficulty** (`n`, lure density) changes only between blocks, so you adapt it from the telemetry.

@@ -69,6 +69,9 @@ def test_dimensions_follow_the_fixtures():
         "tower": "executive_function",
         "ufov": "processing_speed",
         "mst": "episodic_memory",
+        "stop_signal": "executive_function",
+        "pal": "episodic_memory",
+        "flanker": "executive_function",
     }
 
 
@@ -140,6 +143,9 @@ def test_stroop_raises_when_a_repeat_cannot_be_repaired(monkeypatch):
         ("mst", {"repeats": 20, "lures": 44, "foils": 20}),
         ("matrix", {"n_options": None}),
         ("tower", {"l_min": None}),
+        ("stop_signal", {"trials": 200, "stop_share": 0.25}),
+        ("pal", {"stages": [2, 4, 6, 8], "max_attempts": 3}),
+        ("flanker", {"trials": 96}),
     ],
 )
 def test_explicit_defaults_give_the_same_payload(schema_type, defaults):
@@ -168,6 +174,16 @@ BAD_OPTIONS = [
     ("mst", {"repeats": 0, "lures": 0}),
     ("matrix", {"n_options": 9}),
     ("tower", {"l_min": 9}),
+    ("stop_signal", {"trials": 501}),
+    ("stop_signal", {"trials": 7}),
+    ("stop_signal", {"stop_share": 0.05}),  # under 1 stop per 8 trials
+    ("stop_signal", {"stop_share": 0.4}),  # over 1 in 3: waiting for the signal pays
+    ("pal", {"stages": [2, 9]}),
+    ("pal", {"stages": []}),
+    ("pal", {"stages": 4}),
+    ("pal", {"max_attempts": 0}),
+    ("flanker", {"trials": 3}),
+    ("flanker", {"trials": 501}),
 ]
 
 
@@ -199,7 +215,11 @@ GOLDEN = {
     ("tower", 0.8, 1234): "2543b49a61d34ee545922a48ae2148edd3ee701b9bcdb81f83e302ed8382073c",
     ("ufov", 0.3, 1234): "8ca4404deca466190f006a5b266d179093937b2925d42fbe2bf0239407a04714",
     ("mst", 0.5, 1234): "1e345dc5e1c56015d0168aa36948a22049426731c13fc2a7665706dac67612dc",
+    ("stop_signal", 0.5, 1234): "718171a287aa01cae54a2eeb136cf491fb1c80c7b70f03db91a8fb115d3abbca",
+    ("pal", 0.5, 1234): "11cfaba8d2fcbc7ee0e71e83a1ca1be33b502803affc0b2b8ee2631a865060af",
+    ("flanker", 0.5, 1234): "bfb63f47e9b0eb8829b41a247ae8917e583ec060fe4f21ac8b96132823c00399",
 }
+GOLDEN_CVD_SAFE = "3970c51d832796b427498fd54b2669d48adc5025daeb22fcf8421112e4353143"  # stroop 0.2 1234
 GOLDEN_BLOCKS = {
     ("tower", 1234): "c8c828321d06f0a2cafb5f5a8b0b40ee4fb42bf1442a64e3fa8a1d2ee11ef031",
     ("matrix", 1234): "53fbe8ab8bcd60bd7d6e9579f92a136651f8193ba1c8cfe56839efafa606006e",
@@ -216,6 +236,7 @@ def test_golden_payload_hashes():
     got_blocks = {key: _digest(generate_block(key[0], 0.5, key[1])) for key in GOLDEN_BLOCKS}
     assert got == GOLDEN
     assert got_blocks == GOLDEN_BLOCKS
+    assert _digest(generate("stroop", 0.2, 1234, inks="cvd_safe")) == GOLDEN_CVD_SAFE
 
 
 # ---- Stroop inks ------------------------------------------------------------------------------
@@ -231,18 +252,17 @@ def test_default_stroop_inks_are_the_four_the_ui_paints():
         assert {t["word"].lower() for t in p["trials"]} <= ui
 
 
-def test_cvd_safe_needs_an_explicit_opt_in():
-    with pytest.raises(ValueError, match="allow_unserved"):
-        generate("stroop", 0.5, 1, inks="cvd_safe")
-    p = generate("stroop", 0.5, 1, inks="cvd_safe", allow_unserved=True)
-    assert validate_payload(p)  # the served gate still refuses it: black is not painted by the UI
-    assert validate_payload(p, allow_unserved=True) == []
+def test_cvd_safe_is_served():
+    # Stroop.tsx maps black and draws a black-ink block on its light plate (F-D)
+    p = generate("stroop", 0.5, 1, inks="cvd_safe")
+    assert validate_payload(p) == []
+    assert p["task_id"] != generate("stroop", 0.5, 1)["task_id"]
 
 
 def test_cvd_safe_preset_drops_the_red_green_pair():
     for seed in range(200):
-        p = generate("stroop", 0.5, seed, inks="cvd_safe", allow_unserved=True)
-        assert validate_payload(p, allow_unserved=True) == []
+        p = generate("stroop", 0.5, seed, inks="cvd_safe")
+        assert validate_payload(p) == []
         used = set(p["params"]["colors"]) | {t["ink"] for t in p["params"]["trials"]}
         assert used == set(INK_PRESETS["cvd_safe"]) == {"red", "blue", "yellow", "black"}
         assert "green" not in used

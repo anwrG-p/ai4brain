@@ -12,12 +12,15 @@ from dynamic_cache.generators import generate, generate_block, verify
 from dynamic_cache.generators.solvers import (
     colour_only_pairs,
     counter_intuitive_steps,
+    flanker_row,
     is_chiral,
+    pal_answers,
     poly_distance,
     poly_structure,
     rotation_answer,
     solve_matrix,
     solve_relational,
+    sst_replay,
     tower_bfs,
 )
 
@@ -36,9 +39,24 @@ def fixtures() -> dict:
 # ---- the fixtures the UI plays today ----------------------------------------------------------
 
 
-@pytest.mark.parametrize("schema_type", ["n_back", "stroop", "mental_rotation", "relational", "tower", "ufov"])
+@pytest.mark.parametrize(
+    "schema_type", ["n_back", "stroop", "mental_rotation", "relational", "tower", "ufov", "stop_signal", "pal", "flanker"]
+)
 def test_solvers_agree_with_the_hand_made_fixtures(fixtures, schema_type):
     assert verify(fixtures[schema_type]) == []
+
+
+def test_new_exercise_solvers_by_hand():
+    # Flanker.tsx draws LLRLL for an incongruent right trial; the answer is the middle arrow
+    assert flanker_row({"dir": "right", "congruent": False}) == ["left", "left", "right", "left", "left"]
+    assert flanker_row({"dir": "left", "congruent": True}) == ["left"] * 5
+    # Pair Finder: the recall step asks for the box its pattern was studied in
+    stage = {"items": [{"pattern": 5, "box": 2}, {"pattern": 1, "box": 7}], "recall": [1, 0]}
+    assert pal_answers(stage) == [7, 2]
+    # Stop Light's staircase (StopSignal.tsx nextSsd): +50 after a stop, -50 after a failed one, >= 0
+    p = {"ssd_start_ms": 50, "ssd_step_ms": 50, "time_limit_ms": 1250}
+    assert sst_replay(p, [False, False, True, True, True]) == [50, 100, 150, 100, 50]
+    assert sst_replay(p, [True, True]) == [50, 0]
 
 
 def test_tower_bfs_and_counter_intuitive_reproduce_the_fixture(fixtures):
@@ -216,7 +234,77 @@ def _mst_lure_is_studied(p):
     t["delta"] = 0.1
 
 
+def _sst_open_on_stop(p):
+    p["params"]["trials"][0]["stop"] = True
+
+
+def _sst_three_stops(p):
+    for t in p["params"]["trials"][10:13]:
+        t["stop"] = True
+
+
+def _sst_all_stops_left(p):
+    for t in p["params"]["trials"]:
+        if t["stop"]:
+            t["dir"] = "left"
+
+
+def _sst_ssd_after_window(p):
+    p["params"]["ssd_start_ms"] = p["params"]["time_limit_ms"]
+
+
+def _sst_too_many_stops(p):
+    for t in p["params"]["trials"][2::2]:
+        t["stop"] = True
+
+
+def _pal_shared_box(p):
+    items = p["params"]["stages"][1]["items"]
+    items[1]["box"] = items[0]["box"]
+
+
+def _pal_pattern_twice(p):
+    items = p["params"]["stages"][2]["items"]
+    items[1]["pattern"] = items[0]["pattern"]
+
+
+def _pal_recall_in_study_order(p):
+    stage = p["params"]["stages"][3]
+    stage["recall"] = list(range(len(stage["items"])))
+
+
+def _pal_recall_skips_one(p):
+    stage = p["params"]["stages"][1]
+    stage["recall"][0] = stage["recall"][1]
+
+
+def _pal_box_off_board(p):
+    p["params"]["boxes"] = 4  # stage 4 has 8 patterns in boxes up to 7
+
+
+def _flanker_unbalanced(p):
+    t = next(t for t in p["params"]["trials"] if t["congruent"])
+    t["congruent"] = False
+
+
+def _flanker_long_run(p):
+    trials = p["params"]["trials"]
+    trials[20:24] = [dict(trials[20]) for _ in range(4)]
+
+
 MUTATIONS = {
+    "stop_signal opens on a stop": ("stop_signal", _sst_open_on_stop),
+    "stop_signal three stops in a row": ("stop_signal", _sst_three_stops),
+    "stop_signal stop arrows all left": ("stop_signal", _sst_all_stops_left),
+    "stop_signal first SSD after the go window": ("stop_signal", _sst_ssd_after_window),
+    "stop_signal stops are half the block": ("stop_signal", _sst_too_many_stops),
+    "pal two patterns in one box": ("pal", _pal_shared_box),
+    "pal pattern shown twice": ("pal", _pal_pattern_twice),
+    "pal recall repeats study order": ("pal", _pal_recall_in_study_order),
+    "pal recall skips a pattern": ("pal", _pal_recall_skips_one),
+    "pal box beyond the board": ("pal", _pal_box_off_board),
+    "flanker cells unbalanced": ("flanker", _flanker_unbalanced),
+    "flanker one cell 4 times running": ("flanker", _flanker_long_run),
     "n_back answer flipped": ("n_back", _flip_nback),
     "n_back target labelled standard": ("n_back", _relabel_nback),
     "stroop answer is the word": ("stroop", _stroop_answer_word),

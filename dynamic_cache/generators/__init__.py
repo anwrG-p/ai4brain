@@ -15,8 +15,8 @@
   each is accepted.
 - Each payload passes task_payload.schema.json (package data, next to this file) and the solvers in
   solvers.py before it is returned, unless validate=False.
-- Content the UI cannot show yet (the cvd_safe Stroop inks) needs allow_unserved=True and is
-  checked against a non-served schema; never serve it.
+- Stroop has two served ink presets: "classic" (the default) and "cvd_safe" (blue, yellow, red,
+  black; Stroop.tsx draws a block with black on a light plate).
 
 Calling from a server: generation is synchronous and CPU-bound (an MST block, the slowest type, takes
 about 4 ms to build and about 7 ms with validation, median on a dev laptop with CPython 3.13; far
@@ -36,6 +36,12 @@ Length options and their defaults (the source of each is in its module):
   | tower           | generate_block            | TOL-F shape: 2 + 4 practice, 24 test |
   | ufov            | trials                    | 80                               |
   | mst             | repeats, lures, foils     | 20 / 44 / 20 (oMST)              |
+  | stop_signal     | trials, stop_share        | 200, 0.25 (50 stops; guide)      |
+  | pal             | stages, max_attempts      | (2, 4, 6, 8), 3 (CANTAB PAL 2-8) |
+  | flanker         | trials                    | 96 = 24 per cell (one ANT block) |
+
+theta is not used by mst, stop_signal, pal and flanker: their designs are fixed by the protocol
+(Stop Light's SSD staircase adapts inside the block), so the dispatcher pins them to one level.
 """
 
 from __future__ import annotations
@@ -44,7 +50,7 @@ import inspect
 import random
 from typing import Any, Callable
 
-from . import matrix, mental_rotation, mst, n_back, relational, stroop, tower, ufov
+from . import flanker, matrix, mental_rotation, mst, n_back, pal, relational, stop_signal, stroop, tower, ufov
 from ._common import (
     DIMENSION_OF,
     MAX_TRIALS,
@@ -82,6 +88,9 @@ BUILDERS: dict[str, Callable[..., dict]] = {
     "tower": tower.build,
     "ufov": ufov.build,
     "mst": mst.build,
+    "stop_signal": stop_signal.build,
+    "pal": pal.build,
+    "flanker": flanker.build,
 }
 
 
@@ -100,10 +109,10 @@ def _merged_options(build: Callable[..., dict], options: dict[str, Any]) -> dict
     return {p.name: options.get(p.name, p.default) for p in params}
 
 
-def _finish(schema_type: str, seed: int, params: dict, tag: str | None, validate: bool, allow_unserved: bool = False) -> dict:
+def _finish(schema_type: str, seed: int, params: dict, tag: str | None, validate: bool) -> dict:
     payload = envelope(schema_type, seed, params, tag)
     if validate:
-        problems = validate_payload(payload, allow_unserved=allow_unserved)
+        problems = validate_payload(payload)
         if problems:
             raise GenerationError(f"{payload['task_id']}: " + "; ".join(problems[:5]))
     return payload
@@ -122,7 +131,6 @@ def generate(
     seed: int,
     *,
     validate: bool = True,
-    allow_unserved: bool = False,
     **options: Any,
 ) -> dict:
     """One task payload; options are the schema's length and preset knobs (see the table above)."""
@@ -130,11 +138,9 @@ def generate(
     theta, seed = check_theta(theta), check_seed(seed)
     build = BUILDERS[schema_type]
     merged = _merged_options(build, options)
-    if schema_type == "stroop" and merged["inks"] in stroop.UNSERVED_PRESETS and not allow_unserved:
-        raise ValueError(f"inks={merged['inks']!r} is not servable until Stroop.tsx maps its inks; pass allow_unserved=True to build it anyway")
     rng = make_rng(schema_type, theta, seed, canonical_json(merged))
     params = _build(schema_type, rng, theta, build, **merged)
-    return _finish(schema_type, seed, params, None, validate, allow_unserved)
+    return _finish(schema_type, seed, params, None, validate)
 
 
 def generate_block(schema_type: str, theta: float, seed: int, *, size: int | None = None, validate: bool = True) -> list[dict]:

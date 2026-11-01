@@ -100,9 +100,9 @@ def test_filters_that_disagree_raise(make):
         make().next_task("u1", schema_type="stroop", dimension="working_memory")
 
 
-def test_no_filter_cycles_through_all_eight_schemas(make):
+def test_no_filter_cycles_through_all_eleven_schemas(make):
     d = make()
-    first = [task(d.next_task("u1"))["schema_type"] for _ in range(8)]
+    first = [task(d.next_task("u1"))["schema_type"] for _ in range(len(SCHEMA_TYPES))]
     assert first == list(SCHEMA_TYPES)
     assert task(d.next_task("u1"))["schema_type"] == SCHEMA_TYPES[0]
 
@@ -194,7 +194,7 @@ def test_pool_entries_a_user_saw_stay_for_others(make):
     d = make(seed_source=lambda: next(seeds), pool_size=2)
     d.warm(schema_types=("tower",), at=START_THETA["tower"])
     a = d.next_task("u1", schema_type="tower")  # takes seed 7 from the pool
-    d._fill(("neutral", "tower", 0.5))  # refills seeds 7 and 8 again
+    d._fill(("neutral", "tower", 0.5, ""))  # refills seeds 7 and 8 again
     assert d.next_task("u1", schema_type="tower").task_id != a.task_id
     assert d.next_task("u2", schema_type="tower").task_id == a.task_id
 
@@ -363,13 +363,24 @@ def test_one_step_counts_at_most_the_newest_window(make):
 # --- what is served --------------------------------------------------------------------------------
 
 
-def test_stroop_is_served_with_the_classic_inks_only(make):
+def test_stroop_is_served_with_the_classic_inks_by_default(make):
     d = make()
     classic = set(INK_PRESETS["classic"])
     for _ in range(10):
         p = task(d.next_task("u1", schema_type="stroop"))["params"]
         assert set(p["colors"]) <= classic
         assert {t["ink"] for t in p["trials"]} <= classic and "black" not in json.dumps(p)
+
+
+def test_cvd_safe_stroop_has_its_own_pool(make):
+    d = make()
+    cvd = set(INK_PRESETS["cvd_safe"])
+    for k in range(5):
+        p = task(d.next_task(f"c{k}", schema_type="stroop", inks="cvd_safe"))["params"]
+        assert set(p["colors"]) == cvd and {t["ink"] for t in p["trials"]} <= cvd
+    assert {k for k in d._pools if k[1] == "stroop"} == {("neutral", "stroop", 0.5, "cvd_safe")}
+    with pytest.raises(ValueError, match="inks"):
+        d.next_task("u1", inks="pastel")
 
 
 def test_pools_are_per_archetype(make):
@@ -393,7 +404,7 @@ def test_background_refill_keeps_the_pool_warm(make):
     for _ in range(3):
         d.next_task("u1", schema_type="matrix")
     # At half its target (2 of 4) the pool was queued for a top-up, run in a worker process.
-    wait_for(lambda: len(d._pools[("neutral", "matrix", 0.5)]) >= 4 and d._busy == 0)
+    wait_for(lambda: len(d._pools[("neutral", "matrix", 0.5, "")]) >= 4 and d._busy == 0)
     assert d._cost["matrix"] > 0  # build cost learned from the worker's timing
 
 
@@ -424,7 +435,7 @@ class Instant:
         self.count = itertools.count()
         self.jobs = 0
 
-    def submit(self, fn, archetype, schema, level, seeds):
+    def submit(self, fn, archetype, schema, level, inks, seeds):
         from concurrent.futures import Future
 
         self.jobs += 1
@@ -461,7 +472,7 @@ def quiet(d, timeout=30.0):
 
 def test_a_hot_pool_grows_with_demand_and_shrinks_back(make):
     d = recording(make)
-    key = ("neutral", "mst", 0.5)
+    key = ("neutral", "mst", 0.5, "")
     with d._lock:
         assert d._target(key, 0.0) == 0  # never used: no floor, nothing stocked
         for k in range(100):  # 100 pops/s: after one time constant (2 s) the estimate is at ~63%
@@ -474,12 +485,12 @@ def test_a_hot_pool_grows_with_demand_and_shrinks_back(make):
         assert d._target(key, 6.0) == min(cd.POOL_MAX, math.floor(rate * cd.POOL_HORIZON_S + 0.5))
         assert d._target(key, 40.0) == cd.POOL_SIZE  # the wave passed: back to the floor
         assert d._target(key, 6.0 + cd.POOL_IDLE_S + 1) == 0  # idle: no floor either
-        assert d._target(("neutral", "tower", 0.5), 6.0) == 0  # other pools unaffected
+        assert d._target(("neutral", "tower", 0.5, ""), 6.0) == 0  # other pools unaffected
 
 
 def test_growth_stops_at_the_per_pool_cap_and_the_growth_budget(make):
     d = recording(make, pool_max=40)
-    key = ("neutral", "mst", 0.5)
+    key = ("neutral", "mst", 0.5, "")
     with d._lock:
         for k in range(1000):
             d._note_pop(key, k * 0.001)  # 1000 pops/s
@@ -499,8 +510,8 @@ def test_memory_stays_under_the_hard_cap_with_nine_archetypes(make):
     real, d._workers = d._workers, Instant(size=18_000)
     real.shutdown()
     d._mono = mono
-    keys = [(f"archetype{a}", s, lv) for a in range(9) for s in SCHEMA_TYPES for lv in cd.levels(s)]
-    assert len(keys) == 702
+    keys = [(f"archetype{a}", s, lv, cd.pool_inks(s, "classic")) for a in range(9) for s in SCHEMA_TYPES for lv in cd.levels(s)]
+    assert len(keys) == 729  # 7 schemas x 11 levels + 4 fixed designs x 1, times 9 archetypes
     peak = 0
     for i, key in enumerate(keys):  # every pool is used once
         with d._lock:
@@ -541,7 +552,7 @@ def test_a_wave_s_growth_is_handed_back(make):
     real, d._workers = d._workers, Instant(size=1000)
     real.shutdown()
     d._mono = mono
-    key = ("neutral", "tower", 0.5)
+    key = ("neutral", "tower", 0.5, "")
     for _ in range(300):  # 200 pops/s for 1.5 s
         mono.t += 0.005
         with d._lock:
@@ -566,7 +577,7 @@ def test_refill_starts_at_the_low_water_mark(make):
     assert d._workers.jobs == []
     d.next_task("u7", schema_type="tower")  # 8 = half: topped up
     (job,) = d._workers.jobs
-    assert job[:3] == ("neutral", "tower", 0.5) and len(job[3]) == 16 - 8  # up to the target
+    assert job[:4] == ("neutral", "tower", 0.5, "") and len(job[4]) == 16 - 8  # up to the target
 
 
 def first_job(make, pools, workers=1):
@@ -575,7 +586,7 @@ def first_job(make, pools, workers=1):
     with d._lock:
         now = d._mono()
         for schema, (stock, rate) in pools.items():
-            key = ("neutral", schema, 0.5)
+            key = ("neutral", schema, 0.5, "")
             d._pools[key] = deque(cd.Entry(f"{schema}{i}", b"{}", i) for i in range(stock))
             d._key_bytes[key] = 2 * stock
             d._demand[key] = (rate, now)
@@ -618,7 +629,7 @@ class Failing:
     def __init__(self):
         self.calls = {}
 
-    def submit(self, fn, archetype, schema, level, seeds):
+    def submit(self, fn, archetype, schema, level, inks, seeds):
         from concurrent.futures import Future
 
         self.calls[schema] = self.calls.get(schema, 0) + 1
@@ -643,7 +654,7 @@ def test_a_failing_refill_backs_off_instead_of_looping(make, caplog):
     time.sleep(0.5)
     quiet(d)
     assert d._workers.calls == {"mst": 1}  # not resubmitted in a loop (was ~1000/s)
-    key = ("neutral", "mst", 0.5)
+    key = ("neutral", "mst", 0.5, "")
     assert key not in d._topping and d._key_retry[key][1] == 1
     d.next_task("u2", schema_type="mst")  # still backing off: no new job
     quiet(d)
@@ -1137,7 +1148,10 @@ def test_a_worker_that_dies_at_spawn_falls_back_to_inline(make, caplog):
 
     d = make(background=True)
     real, d._workers = d._workers, DeadOnArrival()
-    d.start()
+    # The fallback runs on the pumper thread: wait for start()'s future, which settles after it
+    # (asserting straight after start() raced it, about 1 run in 6 on Windows).
+    with pytest.raises(OSError, match="spawn failed"):
+        d.start().result(timeout=30)
     assert d._workers is None and "task worker process unavailable (OSError)" in caplog.text
     assert json.loads(d.next_task("u1", schema_type="mst").body)["schema_type"] == "mst"
     real.shutdown()
