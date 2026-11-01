@@ -314,6 +314,28 @@ export default function MethodologyPage() {
             no exercise yet. The scale ends are working values we will tune as data comes in.
             </p>
           ) : null}
+          <h3 className="pt-2 font-semibold">AI Collaboration Score</h3>
+          <Formula>
+            AI Collaboration Score = 0.20·Clarification + 0.25·Critical Verification + 0.20·Iteration + 0.20·Autonomy + 0.15·Responsible Use
+          </Formula>
+          <ul className="flex list-disc flex-col gap-1 pl-5 text-sm">
+            <li>Composite score from 0 to 100 capturing effective, responsible partnership with the coach.</li>
+            <li><strong>Clarification (20%)</strong>: Prompt framing, requesting constraints, and scoping context.</li>
+            <li><strong>Critical Verification (25%)</strong>: Inspecting explanations, cross-checking rationale, and testing limits.</li>
+            <li><strong>Iteration (20%)</strong>: Progressive refinement across conversational turns.</li>
+            <li><strong>Autonomy (20%)</strong>: Independent problem synthesis without passive dependence.</li>
+            <li><strong>Responsible Use (15%)</strong>: Adhering to privacy, ethical boundaries, and constructive intent.</li>
+            <li>Weights dynamically re-normalize across dimensions where conversational evidence is present.</li>
+          </ul>
+
+          <h3 className="pt-2 font-semibold">Measurement bias controls</h3>
+          <ul className="flex list-disc flex-col gap-1 pl-5 text-sm">
+            <li><strong>Display timing logging</strong>: Raw visual duration is recorded via <code>shown_ms</code> to isolate presentation latencies from screen refresh rates.</li>
+            <li><strong>Chance performance gating</strong>: Trials completed at or below chance rate are excluded from reaction cost models.</li>
+            <li><strong>Tab blur pauses</strong>: Telemetry pauses when window visibility changes to avoid penalizing distraction.</li>
+            <li><strong>Accessible color safety</strong>: Uses Okabe-Ito high-contrast color palettes combined with distinct shapes.</li>
+            <li><strong>Practice plateau isolation</strong>: Reliable Change Index evaluates progress starting at session 3 onward to distinguish genuine gains from familiarity.</li>
+          </ul>
           <Sources>
             <li>d′ correction: Hautus 1995, Behavior Research Methods, Instruments, &amp; Computers.</li>
             <li>LDI: Stark et al. 2023, Frontiers in Behavioral Neuroscience.</li>

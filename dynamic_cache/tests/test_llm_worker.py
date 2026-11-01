@@ -368,6 +368,16 @@ def test_with_a_key_the_defaults_are_bounded():
     worker.runner.close()
 
 
+def test_openrouter_key_configures_worker():
+    assert lw.pool_config({"OPENROUTER_API_KEY": KEY}) == (lw.DEFAULT_RPM, lw.DEFAULT_DAILY_CAP)
+    worker = LlmPoolWorker.from_env(lambda: None, {"OPENROUTER_API_KEY": KEY})
+    assert worker is not None
+    assert worker.runner.timeout_s == lw.CALL_TIMEOUT_S
+    assert "OpenRouterRunner" in repr(worker.runner)
+    assert KEY not in repr(worker.runner)
+    worker.runner.close()
+
+
 def test_no_key_means_no_call_from_the_server(monkeypatch):
     calls = []
     monkeypatch.setattr(GeminiRunner, "generate", lambda *a, **k: calls.append(1))

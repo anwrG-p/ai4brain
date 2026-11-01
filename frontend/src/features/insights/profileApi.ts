@@ -15,6 +15,15 @@ export type WhyThisDecision = {
   at: string
 }
 
+export type CollaborationData = {
+  status: 'ok' | 'not_enough_data' | 'unavailable'
+  composite_score?: number
+  dimension_scores?: Record<string, number | null>
+  dimension_weights?: Record<string, number | null>
+  growth_recommendation?: string
+  evidence?: { typed_turns: number; marked_turns: Record<string, number> }
+}
+
 export type ProfileResponse = {
   user_id: string
   status: 'ok' | 'not_enough_data'
@@ -25,7 +34,7 @@ export type ProfileResponse = {
   archetype_reason?: string | null
   forecast?: { status: string; validated: boolean; mode: string; [key: string]: unknown } | null
   forecast_reason?: string | null
-  collaboration?: { status: string } | null
+  collaboration?: CollaborationData | null
   why_this?: WhyThisDecision[]
 }
 

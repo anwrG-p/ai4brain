@@ -53,7 +53,9 @@ from ai_coach import chat_store
 from ai_coach.agent import AICoachAgent, known_loti_replies, split_bubbles
 from ai_coach.collaboration_scorer import CollaborationScorer
 from ai_coach.crisis_classifier import CrisisClassifier
+from ai_coach.llm_config import active_llm_config
 from ai_coach.llm_gemini import GeminiRunner, config_from_env
+from ai_coach.llm_openrouter import OpenRouterRunner
 from ai_coach.schemas import ChatMessage, ChatMessageRole, ChatRequest, ReplySource
 from app.privacy.telemetry_store import ID_PATTERN, LockTimeout, user_key
 from brain_twin_jepa import state_bus
@@ -159,26 +161,36 @@ class CoachChatResponse(BaseModel):
 
 # -- the runner: built from the environment, reused while the key and model stay the same -------
 
-_runner: Optional[GeminiRunner] = None
+_runner: Any = None
 _runner_lock = threading.Lock()
+_runner_config: Optional[Tuple[str, str, str]] = None
 
 
-def get_runner() -> Optional[GeminiRunner]:
-    """The configured GeminiRunner, or None without GEMINI_API_KEY. Tests override this.
+def get_runner() -> Optional[Any]:
+    """The configured runner (Gemini or OpenRouter), or None without a key. Tests override this.
 
-    Swapping (a new key or model) happens under a lock, so two requests never build or close the
-    same runner at once. A request still using the old runner when it is closed gets an error,
-    which fails closed like any other.
+    Swapping (a new key, model or provider) happens under a lock, so two requests never build or
+    close the same runner at once. A request still using the old runner when it is closed gets an
+    error, which fails closed like any other.
     """
-    global _runner
-    config = config_from_env()
+    global _runner, _runner_config
+    cfg = active_llm_config()
     with _runner_lock:
-        if config is None:
-            return None
-        if _runner is None or not _runner.matches(config):
+        if cfg is None:
             if _runner is not None:
                 _runner.close()
-            _runner = GeminiRunner(*config)
+                _runner = None
+                _runner_config = None
+            return None
+        provider, key, model = cfg
+        if _runner is None or _runner_config != cfg:
+            if _runner is not None:
+                _runner.close()
+            if provider == "openrouter":
+                _runner = OpenRouterRunner(key, model)
+            else:
+                _runner = GeminiRunner(key, model)
+            _runner_config = cfg
         return _runner
 
 
@@ -197,7 +209,7 @@ class TurnRunner:
 
 @router.post("/v1/coach/chat", response_model=CoachChatResponse, response_model_exclude_none=True)
 def coach_chat(
-    req: CoachChatRequest, runner: Optional[GeminiRunner] = Depends(get_runner)
+    req: CoachChatRequest, runner: Optional[Any] = Depends(get_runner)
 ) -> CoachChatResponse:
     deadline = time.monotonic() + TURN_DEADLINE_S
     key = user_key(req.user_id)

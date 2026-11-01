@@ -6,7 +6,7 @@ from app.main import app
 
 @pytest.fixture(autouse=True)
 def isolated_stores_and_no_llm(monkeypatch, tmp_path_factory):
-    """Every test: the coach store in a temp dir (never the repo's data/), and no Gemini key.
+    """Every test: the coach store in a temp dir (never the repo's data/), and no LLM key.
 
     app.main loads backend/.env at import, so a developer's real key could be in os.environ;
     tests that want a runner inject a fake one instead.
@@ -14,6 +14,9 @@ def isolated_stores_and_no_llm(monkeypatch, tmp_path_factory):
     monkeypatch.setenv("COACH_DIR", str(tmp_path_factory.mktemp("coach")))
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GEMINI_MODEL", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_MODEL", raising=False)
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
 
 
 @pytest.fixture

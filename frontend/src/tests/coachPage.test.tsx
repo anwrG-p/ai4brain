@@ -243,4 +243,25 @@ describe('CoachPage (/coach)', () => {
     expect(last.isConnected).toBe(true)
     expect(last.textContent).toBe(`You: turn ${MAX_TURNS - 1}`)
   })
+
+  it('typing a message into chat input appends user turn and renders Loti reply', async () => {
+    const user = userEvent.setup()
+    const mockBrain = {
+      ...createCoachBrain({ enabled: true, crisisGate: keywordCrisisGate }),
+      ask: vi.fn(async () => ({
+        id: 'reply-1',
+        text: 'Great focus strategy!',
+        choices: [],
+      })),
+    }
+    renderAt('/coach', <CoachPage brain={mockBrain} />)
+    const input = screen.getByRole('textbox', { name: /message to loti/i })
+    await user.type(input, 'How can I stay focused?')
+    await user.click(screen.getByRole('button', { name: /send/i }))
+
+    expect(mockBrain.ask).toHaveBeenCalledTimes(1)
+    expect(mockBrain.ask).toHaveBeenCalledWith('How can I stay focused?', expect.anything(), expect.anything())
+    expect(within(log()).getByText('How can I stay focused?')).toBeInTheDocument()
+    expect(within(log()).getByText('Great focus strategy!')).toBeInTheDocument()
+  })
 })

@@ -45,7 +45,10 @@ def test_mock_error_fails_closed_on_every_message_the_gate_missed():
     assert report["BENIGN_TRAINING_MESSAGES"]["error"] == 54
 
 
-def test_cli_runs_without_a_key(capsys):
+def test_cli_runs_without_a_key(capsys, monkeypatch):
+    monkeypatch.delenv('GEMINI_API_KEY', raising=False)
+    from ai_coach.llm_gemini import GeminiRunner
+    monkeypatch.setattr(GeminiRunner, "from_env", classmethod(lambda cls: None))
     assert crisis_eval.main([]) == 0
     out = json.loads(capsys.readouterr().out)
     assert set(out) == {"keyword", "mock_oracle", "mock_error", "live", "redteam_mock", "redteam_live"}

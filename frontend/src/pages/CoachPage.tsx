@@ -9,13 +9,13 @@ import { coachBrain, type CoachBrain } from '../features/loti/coachAdapter'
 import { useLotiContext } from '../features/loti/lotiContext'
 import { nextTurnId, useLotiSession } from '../features/loti/lotiSession'
 import { useLotiActions } from '../features/loti/useLotiActions'
-import type { LotiChoice } from '../features/loti/types'
+import type { LotiChoice, LotiMessage } from '../features/loti/types'
 
 /* /coach: the whole talk with Loti in one column. Loti's bubbles on the left, the user's picks on the
-   right, the open question's chips at the bottom. The talk lives in the session (lotiSession), so a
-   talk started on another page's Loti bubble continues here, and leaving and coming back resumes it.
-   The brain goes through the coach adapter, which today answers from the script (no network); the
-   one-line disclosure shows only when its LLM path is on.
+   right, the open question's chips at the bottom, and a chat input to ask Loti anything.
+   The talk lives in the session (lotiSession), so a talk started on another page's Loti bubble
+   continues here, and leaving and coming back resumes it.
+   The brain goes through the coach adapter; when connected, it forwards typed messages to the AI coach.
    Escape does nothing here: the only control that clears anything is "Start over". */
 export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }) {
   const context = useLotiContext()
@@ -24,13 +24,17 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
   const { turns, current, begin, record, clear } = useLotiSession()
   const [talking, setTalking] = useState(true)
   const [coachConsent, setCoachConsent] = useState(() => tracker.getStatus().coachConsent === 'granted')
+  const [input, setInput] = useState('')
+  const [sending, setSending] = useState(false)
+
   const grantConsent = () => {
     tracker.setCoachConsent(true)
     setCoachConsent(true)
   }
-  const focusNext = useRef<'chips' | 'log' | null>(null)
+  const focusNext = useRef<'chips' | 'log' | 'input' | null>(null)
   const chipsRef = useRef<HTMLDivElement>(null)
   const logRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const questionId = useId()
   // The id the next turn gets: it only grows, so it marks each new bubble even once the history is trimmed.
   const beat = nextTurnId(turns)
@@ -52,6 +56,7 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
   useEffect(() => {
     if (focusNext.current === 'chips') chipsRef.current?.querySelector('button')?.focus()
     if (focusNext.current === 'log') logRef.current?.focus()
+    if (focusNext.current === 'input') inputRef.current?.focus()
     focusNext.current = null
   }, [turns, current])
 
@@ -61,6 +66,49 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
     record(current, choice, next)
     focusNext.current = next && next.choices.length > 0 ? 'chips' : 'log'
     if (choice.action && choice.action.kind !== 'reply') run(choice.action)
+  }
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const trimmed = input.trim()
+    if (!trimmed || sending) return
+
+    if (!coachConsent) {
+      grantConsent()
+    }
+
+    setInput('')
+    setSending(true)
+    setTalking(true)
+
+    const activeQuestion = current ?? { id: `q-${Date.now()}`, text: '', choices: [] }
+    const userChoice: LotiChoice = { id: `typed-${Date.now()}`, label: trimmed }
+
+    try {
+      const shownTranscript = turns.map((t) => ({ from: t.from, text: t.text }))
+      const reply = await brain.ask(trimmed, context, shownTranscript)
+      const nextMessage: LotiMessage = reply ?? {
+        id: 'reply',
+        pose: 'talk',
+        text: "I'm reflecting on your practice. What would you like to explore next?",
+        choices: [
+          { id: 'focus', label: 'Practice Focus', action: { kind: 'train', pillar: 'focus' } },
+          { id: 'strategy', label: 'More exercises', action: { kind: 'navigate', to: '/train' } },
+        ],
+      }
+      record(activeQuestion, userChoice, nextMessage)
+    } catch {
+      record(activeQuestion, userChoice, {
+        id: 'offline-reply',
+        pose: 'idle',
+        text: "I'm here with you. What would you like to explore next?",
+        choices: [],
+      })
+    } finally {
+      setSending(false)
+      setTalking(false)
+      focusNext.current = 'log'
+    }
   }
 
   const startOver = () => {
@@ -132,6 +180,23 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
           ))}
         </div>
       )}
+
+      {/* Free-text chat input form */}
+      <form onSubmit={handleSend} className="flex items-center gap-2 pt-2">
+        <input
+          ref={inputRef}
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Ask Loti a question..."
+          className="focus-ring flex-1 rounded-xl border border-border bg-surface px-4 py-2 text-base text-ink placeholder:text-ink-muted"
+          aria-label="Message to Loti"
+          disabled={sending}
+        />
+        <Button type="submit" size="sm" disabled={!input.trim() || sending}>
+          {sending ? '...' : 'Send'}
+        </Button>
+      </form>
 
       {turns.length > 0 && (
         <div className="flex justify-center">

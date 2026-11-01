@@ -66,7 +66,9 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from ai_coach.llm_config import active_llm_config
 from ai_coach.llm_gemini import GeminiError, GeminiRunner, config_from_env as gemini_config
+from ai_coach.llm_openrouter import OpenRouterRunner
 from ai_coach.safety_guardrails import BANNED_RULES, lint_text
 
 from .bloom import DAY_S, TTL_DAYS
@@ -117,7 +119,7 @@ def pool_config(environ: Mapping[str, str] | None = None) -> tuple[float, int] |
     """(calls per minute, calls per UTC day), or None when the worker must stay off: no key, a
     zero, or a setting that is not a number (fail safe, logged without the value)."""
     env = os.environ if environ is None else environ
-    if gemini_config(env) is None:
+    if active_llm_config(env) is None:
         return None
     try:
         rpm = float(env.get("LLM_POOL_RPM") or DEFAULT_RPM)
@@ -591,9 +593,16 @@ class LlmPoolWorker:
         config = pool_config(environ)
         if config is None:
             return None
-        key, model = gemini_config(environ)  # type: ignore[misc]
+        cfg = active_llm_config(environ)
+        if cfg is None:
+            return None
+        provider, key, model = cfg
         rpm, cap = config
-        return cls(GeminiRunner(key, model, timeout_s=CALL_TIMEOUT_S), dispatcher, rpm=rpm, daily_cap=cap, **kw)
+        if provider == "openrouter":
+            runner = OpenRouterRunner(key, model, timeout_s=CALL_TIMEOUT_S)
+        else:
+            runner = GeminiRunner(key, model, timeout_s=CALL_TIMEOUT_S)
+        return cls(runner, dispatcher, rpm=rpm, daily_cap=cap, **kw)
 
     def _target(self, d: Dispatcher) -> tuple[str, str, float] | None:
         """The pool, among those in use, holding the fewest LLM variants (and fewer than per_pool)."""

@@ -17,6 +17,7 @@ import {
 import { fetchProfile, profileToPillars, type ProfileResponse } from '../features/insights/profileApi'
 import { usingMocks } from '../features/assessment/tasks/taskSource'
 import { hasGoalsForYear, useGoalsStore, weeklyGoal, weeklyGoalText, type WeeklyGoal } from '../features/insights/goals'
+import { AICollaborationCard } from '../features/coach/AICollaborationCard'
 import { PastResults } from '../features/insights/PastResults'
 import { PillarRadar, REAL_IMPROVEMENT } from '../features/insights/PillarRadar'
 import { PILLAR_LABELS, type PillarId, type PillarScore } from '../features/insights/pillars'
@@ -155,6 +156,9 @@ export default function DashboardPage() {
           archetype={profile?.archetype?.name}
         />
         <Goals week={weeklyGoal(sessions, now)} lines={goalList} context={context} onAction={onLoti} />
+        <ExploreBlock title="AI Collaboration" className="md:col-span-2">
+          <AICollaborationCard collaboration={profile?.collaboration} />
+        </ExploreBlock>
         <ExploreBlock title="Past results" className="md:col-span-2">
           <PastResults sessions={sessions} />
         </ExploreBlock>

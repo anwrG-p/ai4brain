@@ -72,4 +72,26 @@ describe('createCoachBrain: the crisis gate runs before any transport', () => {
     expect(brain.opening(ctx)).toEqual(scriptedBrain.opening(ctx))
     expect(brain.respond('day', 'great', ctx)).toEqual(scriptedBrain.respond('day', 'great', ctx))
   })
+
+  it('httpCoachTransport sends transcript to /v1/coach/chat and parses response', async () => {
+    const { httpCoachTransport } = await import('./coachAdapter')
+    const mockFetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        crisis: false,
+        message: { id: 'loti_reply', text: 'Keep practicing focus!', choices: [], pose: 'talk' },
+      }),
+    })) as unknown as typeof fetch
+
+    const res = await httpCoachTransport('how to focus?', { now: new Date(), hasGoalsThisYear: false, sessionsThisWeek: 1 }, [{ from: 'you', text: 'hi' }], mockFetch)
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    expect(res).toEqual({ id: 'loti_reply', text: 'Keep practicing focus!', choices: [], pose: 'talk' })
+  })
+
+  it('httpCoachTransport returns null on fetch error or 500', async () => {
+    const { httpCoachTransport } = await import('./coachAdapter')
+    const mockFetch = vi.fn(async () => ({ ok: false, status: 500 })) as unknown as typeof fetch
+    const res = await httpCoachTransport('hello', { now: new Date(), hasGoalsThisYear: false, sessionsThisWeek: 1 }, [], mockFetch)
+    expect(res).toBeNull()
+  })
 })

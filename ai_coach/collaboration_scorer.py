@@ -268,7 +268,9 @@ class CollaborationScorer:
 
         return tier_prefix + recommendations.get(priority_dim, "Keep exploring collaborative cognitive workflows!")
 
-    def score_stored_history(self, typed_turns: List[str]) -> Dict[str, Any]:
+    def score_stored_history(
+        self, typed_turns: List[str], weights: Optional[DimensionWeights] = None
+    ) -> Dict[str, Any]:
         """The score from what the user typed to Loti, with evidence or not at all (OQ-3, R15).
 
         `typed_turns`: the user's typed messages from ai_coach/chat_store. Clicked chips are our own
@@ -282,7 +284,7 @@ class CollaborationScorer:
 
         {"status": "not_enough_data"} below MIN_TYPED_TURNS typed turns or MIN_DIMENSIONS
         evidenced dimensions. The composite is the mean of the evidenced dimensions (equal weights;
-        no archetype is known until clustering lands, so none is claimed).
+        no archetype is known until clustering lands, so none is claimed unless weights are provided).
         """
         if len(typed_turns) < MIN_TYPED_TURNS:
             return {"status": "not_enough_data"}
@@ -302,15 +304,31 @@ class CollaborationScorer:
         evidenced = {k: v for k, v in scores.items() if v is not None}
         if len(evidenced) < MIN_DIMENSIONS:
             return {"status": "not_enough_data"}
-        weight = round(1 / len(evidenced), 4)
+
+        if weights is not None:
+            raw_w = weights.to_dict() if hasattr(weights, "to_dict") else weights
+            weight_sum = sum(raw_w[k] for k in evidenced)
+            normalized_weights = {
+                k: round(raw_w[k] / weight_sum, 4) if k in evidenced else None
+                for k in scores
+            }
+        else:
+            eq = round(1.0 / len(evidenced), 4)
+            normalized_weights = {
+                k: eq if k in evidenced else None
+                for k in scores
+            }
+
+        composite = sum(evidenced[k] * normalized_weights[k] for k in evidenced)
         weakest = min(evidenced, key=evidenced.get)
         tip_scores = DimensionScores(**{k: (0.0 if k == weakest else 100.0) for k in scores})
+        tip_weights = weights if weights is not None else CISTAC_PROPOSED_WEIGHTS
         return {
             "status": "ok",
-            "composite_score": round(sum(evidenced.values()) / len(evidenced), 1),
+            "composite_score": round(max(0.0, min(100.0, composite)), 1),
             "dimension_scores": scores,
-            "dimension_weights": {k: (weight if v is not None else None) for k, v in scores.items()},
-            "growth_recommendation": self._generate_growth_recommendation(tip_scores, EQUAL_WEIGHTS, None),
+            "dimension_weights": normalized_weights,
+            "growth_recommendation": self._generate_growth_recommendation(tip_scores, tip_weights, None),
             "evidence": {"typed_turns": n, "marked_turns": marked},
         }
 
@@ -343,6 +361,15 @@ EVIDENCE_MARKERS: Dict[str, Pattern[str]] = {
         r"just give me the answer|do it for me)\b"
     ),
 }
+# Canonical CISTAC 1.0 proposed baseline weights (Layer C specification):
+# clarification 20%, critical verification 25%, iteration 20%, autonomy 20%, responsible use 15%
+CISTAC_PROPOSED_WEIGHTS = DimensionWeights(
+    clarification=0.20,
+    critical_verification=0.25,
+    iteration=0.20,
+    autonomy=0.20,
+    responsible_use=0.15,
+)
 EQUAL_WEIGHTS = DimensionWeights(
     clarification=0.2, critical_verification=0.2, iteration=0.2, autonomy=0.2, responsible_use=0.2
 )
