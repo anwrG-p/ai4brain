@@ -1,7 +1,7 @@
 # Ticket F-D: engagement and ethics
 
-**Status:** DONE_WITH_CONCERNS (the concerns are listed below; none blocks a merge)
-**Base:** `929c9bb` (reset as FRONTEND-COMMON says). **Commit:** `e50298e feat(F-D): …`, with no AI attribution.
+**Status:** DONE (after fix round 1; see the end of this file, which overrides the opt-out, Home-picker and "Focused" details below)
+**Base:** `929c9bb` (reset as FRONTEND-COMMON says). **Commits:** `e50298e feat(F-D): …`, `5853483 fix(F-D): …`, with no AI attribution.
 
 ## What was built
 
@@ -105,3 +105,58 @@
 4. **`projection.ts` `SESSIONS_PER_WEEK = 4`** (the "If you keep training" curve) is still 4. It is F-A's area. Research #3.2 suggests 3.
 5. **Rule 14 on Home:** Momo itself is now a tap target. The fold test counts it apart from the controls (one primary and up to 2 quiet ones), because the brief requires tap-to-correct. While the notice is showing, "Got it" takes the Loti line's place.
 6. **Purpose 2 has no visible effect yet:** the LLM path is off (R14), so "Let Loti use AI to reply" is recorded and enforced in `createCoachBrain` but changes nothing the user sees today.
+
+---
+
+## Fix round 1 (review: Needs fixes, 1 Critical), commit `5853483`
+
+This round supersedes concerns 1, 5 and 6 above.
+
+### Critical (R18, ADR 0002): the mood guess is opt-in
+- **Default off:** `DEFAULT_PREFS.moodGuess = false`. `clearMoodPrefs` (the purge) also returns it to off and forgets the notice, so a purge never re-enables it. The `myData.ts` comments are updated.
+- **Notice where the user opts in:** the exact notice copy (`MOOD_NOTICE`) is the description of the Settings "Mood guess" switch, both visible and as its `aria-describedby`. Turning the switch on (`setMoodGuess(true)`) also sets `moodNoticeSeen`. Home shows no notice, and `MomoNotice` and `useMoodNoticeDue` are deleted.
+- **Defence in depth:** `moodGuessActive = moodGuess && moodNoticeSeen` gates all four mood readers:
+  - `EmotionListener`, which doesn't start, and the store stays calm;
+  - `MomoFromStore`, which is a still picture named "Momo" with a calm face;
+  - Home's tint, `data-mood` and the context it passes to Loti, which carries no `mood` key when inactive;
+  - `lotiContext`, which reads no emotion when inactive.
+- **Tests:**
+  - every test that pinned "on by default" now expects off;
+  - a stored `moodGuess` without `moodNoticeSeen` stays inactive;
+  - new appShell test: with default prefs, rage-clicking (mousedown, mouseup, click bursts) on /dashboard adds no `pointermove` listener and leaves `currentEmotion` at `calm_flow`, `proposedEmotion` at null and the metrics untouched.
+
+### Important
+2. **Rule 14 on Home:** Momo is a picture on Home, not a button.
+   - The correction moved to Settings (`MoodCorrection`). While the guess is on, the row shows "Momo's guess today: X" and a quiet "Change" that opens the picker.
+   - The Home fold test now counts buttons and links together, at most 3, with no exemptions.
+3. **"Focused" is dropped from the picker.** The choices are Calm, Happy, Tired and Frustrated. The picker is a `radiogroup` (item 10): one tab stop, arrows that move, wrap and choose, and Escape to close with focus back on "Change".
+
+### Minor
+4. **Import-boundary test** (`moodNeverLeaves.test.ts`):
+   - No file under `features/assessment/**`, and not `features/loti/coachAdapter.ts`, imports `useEmilyStore`, `emilyEngine` or `lotiContext`.
+   - The assessment sources contain no mood or emotion word, and every `trial_meta` key is a literal there.
+   - A runtime check confirms that the `trial_meta` keys of a recorded event never match the mood regex.
+5. **`coachContext` is an allow-list:** `now`, `weakestPillar`, `hasGoalsThisYear` and `sessionsThisWeek`. A test passes extra fields and checks they never reach the coach.
+6. **Purpose-2 copy:** while `VITE_LOTI_COACH` is off, the switch reads "Let Loti use AI to reply when it's available", and the granted Privacy line reads "Loti may use AI to reply when it's available."
+7. **Weekend nudge:** `!weekKept(ctx.sessionsThisWeek)`, the same rule `weeklyGoal().kept` uses.
+8. **Shared Switch:** `components/ui/Switch.tsx` is used by `ConsentChoices` and by all three Settings switches.
+9. **`devicePrefs` follows other tabs:** a `storage` listener for its key, or for `null` (cleared storage), reloads the prefs. Test added.
+11. **`emilyTokens.ts`:** "…protects your streak." is now "Pacing is slowing down. A short rest is fine."
+12. **`flow.test.tsx`:** finds "Continue" by role and name, and checks that the sheet's only buttons are Close and Continue and its only link is "How we handle your data".
+
+### Checks
+- `npm run qa:checks`: all checks pass:
+  - lint:tokens, lint:copy and check:contrast (112 pairs) pass;
+  - vitest: **65 files, 1313 tests passed**, 0 act() warnings;
+  - the build succeeds.
+- **e2e on Edge** (scratch config, deleted afterwards): **80/80 passed**. After a final CSS tweak (the radio group is a 2×2 grid on phones), the settings and dashboard specs were re-run: 12/12 passed.
+- New or changed e2e:
+  - Home: no notice, Momo not a control, neutral by default; after opting in under Settings and picking Tired, Home's Momo shows tired.
+  - Settings: off by default, with the notice as the description.
+  - Settings opted in: the radio group, with axe and overflow checks in light and dark at 1440/768/375.
+- Screenshots: `shots-F-D\14-settings-*`.
+
+### Still open (not mine)
+- **F-B:** `ExerciseDemo` still shows red/green with cvd_safe on.
+- **Backend:** `UNSERVED_PRESETS` (concern 2 above).
+- **F-A:** `SESSIONS_PER_WEEK` (concern 4 above).
