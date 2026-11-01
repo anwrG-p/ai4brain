@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
+import { useDevicePrefs } from '../../../state/devicePrefs'
 import fixtures from './fixtures.json'
 import { fetchNextTask, forgetUserId, getUserId, newId } from './taskSource'
 import type {
@@ -116,6 +117,46 @@ describe('fetchNextTask', () => {
       const task_id = 'm5:v1.2-' + 'a'.repeat(40)
       const fetchFn = async () => okResponse({ ...first, task_id })
       expect((await fetchNextTask('u1', 0, { fetchFn })).task_id).toBe(task_id)
+    })
+  })
+
+  describe('colour-blind friendly Color Clash (cvd_safe)', () => {
+    const stroop = tasks.find((t) => t.schema_type === 'stroop')!
+    afterEach(() => useDevicePrefs.setState({ cvdSafe: false }))
+
+    test('off by default: the classic fixture and no inks parameter', async () => {
+      expect(useDevicePrefs.getState().cvdSafe).toBe(false)
+      expect((await fetchNextTask('u1', 0, { schemaType: 'stroop' })).params).toEqual(stroop.params)
+      vi.stubEnv('VITE_USE_MOCKS', 'false')
+      const fetchFn = vi.fn(async (_url: string) => okResponse(stroop))
+      await fetchNextTask('u1', 0, { fetchFn })
+      expect(fetchFn).toHaveBeenCalledWith('/v1/tasks/next?user_id=u1')
+    })
+
+    test('mock mode with the setting on: the Stroop fixture uses the cvd_safe inks; other tasks are untouched', async () => {
+      useDevicePrefs.setState({ cvdSafe: true })
+      const task = await fetchNextTask('u1', 0, { schemaType: 'stroop' })
+      expect((task.params as StroopParams).colors).toEqual(['blue', 'yellow', 'red', 'black'])
+      expect(JSON.stringify(task.params)).not.toMatch(/green/i)
+      expect(task.task_id).toBe(stroop.task_id)
+      expect(stroop.params).toEqual(byType<StroopParams>('stroop')) // the fixture itself is not mutated
+      expect((stroop.params as StroopParams).colors).toContain('green')
+      const tower = await fetchNextTask('u1', 0, { schemaType: 'tower' })
+      expect(tower).toBe(tasks.find((t) => t.schema_type === 'tower'))
+    })
+
+    test('real mode with the setting on asks for inks=cvd_safe, and converts a classic block that still comes back', async () => {
+      useDevicePrefs.setState({ cvdSafe: true })
+      vi.stubEnv('VITE_USE_MOCKS', 'false')
+      const fetchFn = vi.fn(async (_url: string) => okResponse(stroop))
+      const task = await fetchNextTask('a b', 0, { fetchFn })
+      expect(fetchFn).toHaveBeenCalledWith('/v1/tasks/next?user_id=a%20b&inks=cvd_safe')
+      expect((task.params as StroopParams).colors).toEqual(['blue', 'yellow', 'red', 'black'])
+    })
+
+    test('an explicit inks option wins over the setting', async () => {
+      useDevicePrefs.setState({ cvdSafe: true })
+      expect(((await fetchNextTask('u1', 0, { schemaType: 'stroop', inks: 'classic' })).params as StroopParams).colors).toContain('green')
     })
   })
 })

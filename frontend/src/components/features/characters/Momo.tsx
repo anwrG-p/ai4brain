@@ -1,3 +1,4 @@
+import { moodGuessActive, useDevicePrefs } from '../../../state/devicePrefs'
 import { useEmilyStore } from '../../../state/useEmilyStore'
 import type { EmilyEmotion } from '../../../styles/emilyTokens'
 import {
@@ -151,8 +152,11 @@ function MomoFace({ mood }: { mood: MomoMood }) {
   }
 }
 
-/** Momo following the shared emotion store (see EMOTION_TO_MOOD). */
+/** Momo following the shared emotion store (see EMOTION_TO_MOOD) while the mood guess is active
+    (opted in, notice seen: ADR 0002). Otherwise a still picture with a neutral face that reads
+    nothing from the store. The correction lives in Settings (MoodCorrection). */
 export function MomoFromStore(props: Omit<MomoProps, 'mood'>) {
+  const active = useDevicePrefs(moodGuessActive)
   const emotion = useEmilyStore((s) => s.currentEmotion)
-  return <Momo {...props} mood={EMOTION_TO_MOOD[emotion]} />
+  return active ? <Momo {...props} mood={EMOTION_TO_MOOD[emotion]} /> : <Momo {...props} mood="calm" title="Momo" />
 }

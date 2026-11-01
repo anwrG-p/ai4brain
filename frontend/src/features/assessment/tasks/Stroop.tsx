@@ -8,9 +8,9 @@ import { EXERCISE_NAME } from '../names'
 
 // Payload ink names → theme tokens that reach >= 4.5:1 text contrast on --color-surface in light
 // and dark (ratios in brand-v2 tickets 01 and 06). Red is its own pure red: --color-danger reads
-// rose in dark. Not --dim-5 (4.29:1 light). Black is for the server's cvd_safe preset (blue, yellow,
-// red, black; not served yet): no dark surface carries black at 4.5:1, so a block with black draws
-// its stimuli on a light plate in both themes (StimulusCard).
+// rose in dark. Not --dim-5 (4.29:1 light). Black is for the cvd_safe preset (blue, yellow, red,
+// black), on with Settings' "Colour-blind friendly colours": no dark surface carries black at 4.5:1,
+// so a block with black draws its stimuli on a light plate in both themes (StimulusCard).
 // ponytail: only the names the fixtures and the presets use; anything else paints in ink.
 export const INK: Record<string, string> = {
   red: 'var(--color-stroop-red)',
@@ -18,6 +18,28 @@ export const INK: Record<string, string> = {
   blue: 'var(--dim-1)',
   yellow: 'var(--dim-7)',
   black: 'var(--color-stroop-black)',
+}
+
+/** The server's cvd_safe ink set (dynamic_cache/generators/stroop.py), in its button order: no
+    red/green pair, and the four differ in lightness. */
+export const CVD_SAFE_INKS = ['blue', 'yellow', 'red', 'black'] as const
+const CLASSIC = ['red', 'green', 'blue', 'yellow']
+
+/** The colour-blind friendly version of a classic block, made on the device (mock mode, or a server
+    that ignored inks=cvd_safe): green becomes black in every word, ink and answer, and the buttons
+    take the cvd_safe order. The congruent/incongruent design is unchanged. Any other ink set is
+    returned as it is. */
+export function toCvdSafe(params: StroopParams): StroopParams {
+  // A malformed payload is left for the exercise's own error boundary (SkipOnError).
+  if (!Array.isArray(params.colors) || !Array.isArray(params.trials)) return params
+  const inks = params.colors.map((c) => String(c).toLowerCase())
+  if (inks.length !== CLASSIC.length || !CLASSIC.every((c) => inks.includes(c))) return params
+  const swap = (name: string) => (name.toLowerCase() === 'green' ? (name === 'GREEN' ? 'BLACK' : 'black') : name)
+  return {
+    ...params,
+    colors: [...CVD_SAFE_INKS],
+    trials: params.trials.map((t) => ({ word: swap(t.word), ink: swap(t.ink), answer: swap(t.answer) })),
+  }
 }
 
 /** A block with black ink runs on the light plate. Decided from the block's ink list, never per
