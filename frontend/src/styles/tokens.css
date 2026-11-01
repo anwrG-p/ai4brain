@@ -8,7 +8,7 @@
    No purple, no gradients, no backdrop blur (anti-slop rules 1, 2, 9; tokens.test.ts checks them). */
 @theme {
   --color-canvas: #FFFFFF;
-  --color-wood: #E2B179;
+  --color-page: #F6F5F0;
   --color-surface: #FFFFFF;
   --color-surface-raised: #E8F3FB;
   --color-ink: #0F2233;
@@ -58,7 +58,7 @@
      Never put coral text on a brand-subtle chip: accent-strong on brand-subtle is 4.42:1 (light).
      Never use brand-vivid or the coral fill as text (tokens.test.ts scans src for it). */
   --color-canvas: #FFFFFF;
-  --color-wood: #E2B179;
+  --color-page: #F6F5F0;
   --color-surface: #FFFFFF;
   --color-surface-raised: #E8F3FB;
   --color-ink: #0F2233;
@@ -114,7 +114,7 @@
   --color-stroop-black: #111111;
 
   /* Home: the board (--color-canvas, #root) takes a faint tint from Momo's mood; calm keeps the plain
-     board, and the wood frame never changes. Never red. Text on them is audited in token-metadata.ts. */
+     board, and the page margin and blobs never change. Never red. Text on them is audited in token-metadata.ts. */
   --color-canvas-happy: #FFF7F2;
   --color-canvas-tired: #F5F7F9;
   --color-canvas-frustrated: #FFF8EC;
@@ -153,36 +153,30 @@
   --shadow-soft-hover: var(--shadow-elevation);
   --shadow-hero: var(--shadow-elevation);
 
-  /* Clay depth: characters, illustrations and at most the primary CTA (anti-slop rule 9). */
+  /* Clay depth: at most the primary CTA (anti-slop rule 9). The characters are flat line art. */
   --clay: 0 12px 28px rgb(30 111 168 / 0.16), inset 0 2px 6px rgb(255 255 255 / 0.7), inset 0 -4px 10px rgb(15 34 51 / 0.1);
-  /* --clay's outer shadow as a filter, for SVG characters (the inner highlight is drawn in the SVG). */
-  --clay-drop: drop-shadow(0 6px 10px rgb(30 111 168 / 0.16));
 
-  /* Character clay (Loti, Dolphin, Momo; components/features/characters). Graphics only, never text.
-     Each ramp is lit (-hi), mid, shaded (-lo) for one key light from the top-left. The sky ramp centres
-     on --color-brand-vivid, softened for matte clay; the coral mid is --color-accent. Faces stay navy in both themes. */
-  --char-sky-hi: #BFE3FA;
+  /* Board blobs (docs/design/references/presentation-style.jpg): soft sky shapes top-left and
+     bottom-left, coral top-right and bottom-right, behind all content. Pale enough that every text
+     colour keeps its contrast on them (audited in token-metadata.ts). */
+  --color-blob-sky: #E5F3F9;
+  --color-blob-coral: #FEECE9;
+
+  /* Characters (Loti, Momo, the logo mark; components/features/characters): flat line art as in
+     docs/design/references. Graphics only, never text. One body fill, a lighter belly, one darker
+     blue outline, coral accents with a deeper coral edge, navy faces. Same in both themes.
+     --char-sky and --char-amber also colour the end card's sparkles (ExerciseFrame). */
+  --char-body: #A6DAF0;
+  --char-belly: #D6EEF9;
+  --char-line: #33698C;
+  --char-coral: #F7937A;
+  --char-coral-line: #CB6250;
+  --char-blush: #F9A48C;
   --char-sky: #4DA6E2;
-  --char-sky-lo: #2479BC;
-  --char-coral-hi: #FFD3C4;
-  --char-coral: #F2876B;
-  --char-coral-lo: #D2654A;
-  --char-pale-hi: #E4F3FD;
-  --char-pale: #9FD1F2;
-  --char-pale-lo: #5FA7DA;
-  --char-peach-hi: #FFE6DC;
-  --char-peach: #FFB59C;
-  --char-peach-lo: #EA8A6E;
-  --char-mist-hi: #E6EDF2;
-  --char-mist: #B2C2CF;
-  --char-mist-lo: #8297A9;
-  --char-amber-hi: #FCE8C4;
   --char-amber: #EFBD72;
-  --char-amber-lo: #CB9147;
-  --char-face: #0F2233;
+  --char-mist: #C4D9E4;
+  --char-face: #1A3747;
   --char-glint: #FFFFFF;
-  --char-shadow: #1D4F78;
-  --char-shadow-alpha: 0.28;
 
   /* Typography Families: Quicksand for headings of 20 px and up, Inter for everything else */
   --font-display: 'Quicksand', 'Inter', system-ui, sans-serif;
@@ -243,7 +237,7 @@
   /* Brand v2 semantic colour roles (dark). Cards are green slate, the hue of the chalkboard
      (--color-canvas), lifted a step and edged by --color-border: no navy on the board. */
   --color-canvas: #162621;
-  --color-wood: #6E3F1F;
+  --color-page: #0F1B17;
   --color-surface: #1A2D28;
   --color-surface-raised: #1D312B;
   --color-ink: #F2F8FC;
@@ -325,12 +319,10 @@
   --shadow-hero: none;
 
   --clay: 0 12px 28px rgb(0 0 0 / 0.35), inset 0 2px 6px rgb(255 255 255 / 0.14), inset 0 -4px 10px rgb(0 0 0 / 0.3);
-  --clay-drop: drop-shadow(0 8px 14px rgb(0 0 0 / 0.55));
-  --char-sky-lo: #2272B0;
-  --char-pale-lo: #6AAFE0;
-  --char-mist-lo: #8C9FB0;
-  --char-shadow: #000000;
-  --char-shadow-alpha: 0.75;
+
+  /* Board blobs, dimmed on the chalkboard. */
+  --color-blob-sky: #1A3238;
+  --color-blob-coral: #3A2B29;
 }
 
 @layer base {
@@ -537,7 +529,6 @@
 /* Characters (ticket 02): still when idle; motion only on an event (anti-slop rule 10).
    Every class plays once or a few times and stops. Ease-out on enter, ease-in on the way down. */
 .char-figure {
-  filter: var(--clay-drop);
   overflow: visible;
 }
 
@@ -581,45 +572,25 @@
 .char-anim-think > :nth-child(2) { animation-delay: 120ms; }
 .char-anim-think > :nth-child(3) { animation-delay: 240ms; }
 
-@keyframes char-swim-in {
-  from { opacity: 0; transform: translateX(-70px) rotate(-6deg); }
-  40% { opacity: 1; }
-  to { opacity: 1; transform: translateX(0) rotate(0deg); }
+/* Momo's celebration: one leap in, then the splash marks pop out one by one. */
+@keyframes char-leap {
+  0% { opacity: 0; transform: translateY(28px) rotate(12deg); }
+  55% { opacity: 1; transform: translateY(-6px) rotate(-4deg); }
+  100% { opacity: 1; transform: none; }
 }
-.char-anim-swim-in {
+.char-anim-leap {
   transform-box: fill-box;
   transform-origin: center;
-  animation: char-swim-in 900ms var(--ease-out) 1 both;
+  animation: char-leap 820ms var(--ease-out) 1 both;
 }
-
-@keyframes char-hop {
-  0% { transform: translateY(0); animation-timing-function: var(--ease-out); }
-  45% { transform: translateY(-22px) rotate(-4deg); animation-timing-function: var(--ease-in); }
-  100% { transform: translateY(0); }
-}
-.char-anim-hop {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-  animation: char-hop 720ms 1 both;
-}
-
-@keyframes char-hop-shadow {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  45% { transform: scale(0.7); opacity: 0.5; }
-}
-.char-anim-hop-shadow {
+.char-anim-splash > * {
   transform-box: fill-box;
   transform-origin: center;
-  animation: char-hop-shadow 720ms var(--ease-in-out) 1 both;
+  animation: char-appear 320ms var(--ease-out) both;
+  animation-delay: 480ms;
 }
-
-@keyframes char-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-.char-anim-fade-in {
-  animation: char-fade-in 900ms var(--ease-out) 1 both;
-}
+.char-anim-splash > :nth-child(2n) { animation-delay: 560ms; }
+.char-anim-splash > :nth-child(3n) { animation-delay: 640ms; }
 
 @keyframes char-mood {
   0% { transform: scale(1, 1); }
@@ -893,16 +864,19 @@
   transform: none !important;
 }
 
-/* Classroom board (user, 2026-10-31: "make the platform bg like the first one" → the classroom board).
-   The page is a wooden frame; the app sits on the board inside it: a dotted whiteboard in light,
-   a chalkboard in dark (--color-canvas is the board surface). Flat wood, no gradient. Static, so
-   nothing moves behind a stimulus. */
-/* --board-gap: the wood frame's width (body padding); --board-edge: the board's border. The board's
-   min-height is the viewport minus the frame (border-box, so the edge is inside it): a short page is
-   exactly one screen tall. */
+/* Board + blobs (brand art ART-1, docs/design/references/presentation-style.jpg). The page is an
+   off-white margin (--color-page); the app sits on the board inside it: a dotted whiteboard in light,
+   a chalkboard in dark (--color-canvas is the board surface). Soft organic blobs sit on the board's
+   corners, sky on the left and coral on the right: decorative, behind all content, no motion, so
+   nothing moves behind a stimulus. Flat colours, no gradient (the dot grid is a dot pattern). */
+/* --board-gap: the page margin's width (body padding); --board-edge: the board's border. The board's
+   min-height is the viewport minus the margin (border-box, so the edge is inside it): a short page is
+   exactly one screen tall. --blob-size: one blob's width; --blob-top clears the 64 px header. */
 :root {
   --board-gap: var(--space-2);
-  --board-edge: 2.5px;
+  --board-edge: 2px;
+  --blob-size: clamp(150px, 26vw, 360px);
+  --blob-top: var(--space-16);
 }
 
 @media (min-width: 640px) {
@@ -912,16 +886,18 @@
 }
 
 body {
-  background-color: var(--color-wood);
+  background-color: var(--color-page);
   padding: var(--board-gap);
 }
 
 #root {
+  position: relative;
+  isolation: isolate;
   min-height: calc(100dvh - 2 * var(--board-gap));
   background-color: var(--color-canvas);
   background-image: radial-gradient(color-mix(in srgb, var(--color-ink) 9%, transparent) 1.2px, transparent 1.2px);
   background-size: 24px 24px;
-  border: var(--board-edge) solid var(--color-border-strong);
+  border: var(--board-edge) solid var(--color-border);
   border-radius: var(--radius-xl);
   /* Keep the app's own backgrounds inside the board's rounded edge (ticket 08 review). */
   overflow: clip;
@@ -929,8 +905,39 @@ body {
   flex-direction: column;
 }
 
-/* The phone tab bar is fixed to the viewport, so it is inset by the frame and the board's edge: it
-   sits on the bottom of the board, inside the wood, with the board's rounded corners. */
+/* The blobs: one layer per colour, each masked by two blob shapes. z-index -1 inside the board's
+   own stacking context (isolation), so they paint over the board and under everything on it. */
+#root::before,
+#root::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: var(--blob-size) var(--blob-size);
+  mask-size: var(--blob-size) var(--blob-size);
+}
+
+#root::before {
+  background-color: var(--color-blob-sky);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath d='M0 0H152C182 0 198 24 186 52C174 80 140 84 118 106C96 128 90 170 58 184C32 196 0 186 0 160Z'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath d='M0 200V48C22 28 54 40 72 64C90 88 122 94 148 118C174 142 172 182 152 200Z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath d='M0 0H152C182 0 198 24 186 52C174 80 140 84 118 106C96 128 90 170 58 184C32 196 0 186 0 160Z'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath d='M0 200V48C22 28 54 40 72 64C90 88 122 94 148 118C174 142 172 182 152 200Z'/%3E%3C/svg%3E");
+  -webkit-mask-position: left 0 top var(--blob-top), left 0 bottom 0;
+  mask-position: left 0 top var(--blob-top), left 0 bottom 0;
+}
+
+#root::after {
+  background-color: var(--color-blob-coral);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath d='M200 0H56C26 0 6 22 16 50C26 78 62 80 84 104C106 128 110 168 142 182C168 194 200 182 200 156Z'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath d='M200 200V60C176 36 142 48 124 72C106 96 74 100 50 124C26 148 30 184 48 200Z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath d='M200 0H56C26 0 6 22 16 50C26 78 62 80 84 104C106 128 110 168 142 182C168 194 200 182 200 156Z'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath d='M200 200V60C176 36 142 48 124 72C106 96 74 100 50 124C26 148 30 184 48 200Z'/%3E%3C/svg%3E");
+  -webkit-mask-position: right 0 top var(--blob-top), right 0 bottom 0;
+  mask-position: right 0 top var(--blob-top), right 0 bottom 0;
+}
+
+/* The phone tab bar is fixed to the viewport, so it is inset by the margin and the board's edge: it
+   sits on the bottom of the board, inside the page margin, with the board's rounded corners. */
 .board-tabs {
   left: calc(var(--board-gap) + var(--board-edge));
   right: calc(var(--board-gap) + var(--board-edge));
@@ -943,7 +950,7 @@ body {
   border-color: color-mix(in srgb, var(--color-ink) 30%, transparent);
 }
 
-/* Home: Momo's mood tints the board (the canvas inside the wood frame) while the dashboard is
+/* Home: Momo's mood tints the board (the canvas inside the page margin) while the dashboard is
    mounted (DashboardPage puts .mood-tint-<mood> on its root). Calm is the plain board. */
 :root:has(.mood-tint-happy) { --color-canvas: var(--color-canvas-happy); }
 :root:has(.mood-tint-tired) { --color-canvas: var(--color-canvas-tired); }

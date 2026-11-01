@@ -3,7 +3,7 @@ import AxeBuilder from '@axe-core/playwright'
 import path from 'node:path'
 import { FULL_PAGE_CSS } from './testUtils'
 
-/* The new-user flow (ticket 07): Welcome → the six-exercise baseline → Results (blur, Dolphin,
+/* The new-user flow (ticket 07): Welcome → the six-exercise baseline → Results (blur, Momo,
    consent, un-blur). This build has no VITE_GOOGLE_CLIENT_ID, so "See my results" opens straight on
    the consent choice (no sign-in step).
 
@@ -122,7 +122,7 @@ async function openConsent(page: Page, info: TestInfo, theme: string) {
 async function expectBlurredResults(page: Page, info: TestInfo, theme: string) {
   await expect(page.getByRole('heading', { level: 1, name: 'Your results are ready' })).toBeVisible()
   await expect(page.locator('figure[data-blurred="true"]')).toBeVisible()
-  await expect(page.getByRole('img', { name: /Dolphin/ })).toBeVisible()
+  await expect(page.getByRole('img', { name: /Momo/ })).toBeVisible()
   await expect(page.getByText('Good job! You finished all six.')).toBeVisible()
   await shot(page, info, `07-results-blurred-${theme}`)
   await checkViewports(page, `results blurred (${theme})`, info, `07-results-blurred-${theme}`)

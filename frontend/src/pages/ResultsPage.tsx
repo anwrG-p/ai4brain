@@ -1,7 +1,7 @@
 import { useMemo, useState, useSyncExternalStore } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import type { BaselineResult } from './BaselinePage'
-import { Dolphin } from '../components/features/characters'
+import { Momo } from '../components/features/characters'
 import { Button } from '../components/ui/Button'
 import { tracker } from '../features/assessment/telemetry/tracker'
 import { LoginSheet } from '../features/flow/LoginSheet'
@@ -23,7 +23,7 @@ function finishedLine(run: BaselineResult | null): string {
   return `Good job! You finished ${run.finished} of ${run.total}.`
 }
 
-/* Results, in order: the radar blurred ("Your results are ready") and the Dolphin's "Good job!";
+/* Results, in order: the radar blurred ("Your results are ready") and Momo's "Good job!";
    one button opens the sheet (Loti with Google per R4 or guest, then the equal consent choice, R3;
    with no Google client id it opens on the consent choice); the choice un-blurs the radar; one button goes to the dashboard. Someone who already chose
    sees the clear radar at once. Each step: one message, one action (rules 13, 14). */
@@ -45,8 +45,8 @@ export default function ResultsPage() {
       <PillarRadar scores={scores} blurred={blurred} className="max-w-lg" />
       {blurred ? (
         <>
-          <div className="flex flex-col items-center gap-2">
-            <Dolphin pose="swim-in" size="md" />
+          <div className="flex items-center gap-3">
+            <Momo celebrate size="md" />
             <p className="text-lg text-ink">{finishedLine(run)}</p>
           </div>
           <Button size="lg" onClick={() => setSheet(true)}>

@@ -189,12 +189,12 @@ describe('/baseline', () => {
 })
 
 describe('/results', () => {
-  it('starts blurred, with the Dolphin; without a Google client id the sheet opens on the consent choice', async () => {
+  it('starts blurred, with Momo; without a Google client id the sheet opens on the consent choice', async () => {
     vi.stubEnv('VITE_GOOGLE_CLIENT_ID', '')
     await runBaseline()
     expect(radar()).toHaveAttribute('data-blurred', 'true')
     expect(screen.queryByRole('table')).toBeNull() // the blurred scores are not read out either
-    expect(screen.getByRole('img', { name: /Dolphin/ })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /Momo/ })).toBeInTheDocument()
     expect(screen.getByText('Good job! You finished all six.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'See my results' }))
     const sheet = screen.getByRole('dialog', { name: 'Your choices' })
@@ -263,7 +263,7 @@ describe('/results', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(radar()).toHaveAttribute('data-blurred', 'false')
     expect(screen.getByRole('heading', { level: 1, name: 'Your results' })).toBeInTheDocument()
-    expect(screen.queryByRole('img', { name: /Dolphin/ })).toBeNull()
+    expect(screen.queryByRole('img', { name: /Momo/ })).toBeNull()
     const go = screen.getByRole('button', { name: 'Go to my space' })
     expect(go).toHaveFocus()
     fireEvent.click(go)

@@ -5,13 +5,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PREFS, useDevicePrefs } from '../../../state/devicePrefs'
 import { useAppStore } from '../../../state/useAppStore'
 import { useEmilyStore } from '../../../state/useEmilyStore'
-import { Dolphin, type DolphinPose } from './Dolphin'
 import { Loti, type LotiPose } from './Loti'
 import { Momo, MomoFromStore, EMOTION_TO_MOOD, type MomoMood } from './Momo'
 import { CHARACTER_PX } from './shared'
 
-const LOTI_POSES: LotiPose[] = ['idle', 'talk', 'think', 'happy', 'wave']
-const DOLPHIN_POSES: DolphinPose[] = ['swim-in', 'cheer']
+const LOTI_POSES: LotiPose[] = ['idle', 'talk', 'think', 'happy', 'wave', 'low']
 const MOODS: MomoMood[] = ['calm', 'happy', 'tired', 'frustrated', 'focused']
 
 const ANIM = '[class*="char-anim-"]'
@@ -22,6 +20,8 @@ function expectCleanSvg(container: HTMLElement) {
   const html = container.innerHTML
   expect(html).not.toMatch(/#[0-9a-f]{3,8}\b/i)
   expect(html).not.toMatch(/\brgba?\(|\bhsla?\(/i)
+  // Flat line art: no clay gradients, sheen, filters or contact shadows.
+  expect(container.querySelector('radialGradient, linearGradient, filter')).toBeNull()
 }
 
 function mockReducedMotionQuery(matches: boolean) {
@@ -46,6 +46,7 @@ describe('Loti', () => {
     const { container } = render(<Loti pose={pose} size="md" />)
     expect(screen.getByRole('img', { name: /loti/i })).toBeInTheDocument()
     expectCleanSvg(container)
+    expect(container.innerHTML).toContain('stroke="var(--char-line)"')
   })
 
   it('gives each pose its own label', () => {
@@ -63,8 +64,10 @@ describe('Loti', () => {
     expect(screen.getByRole('img', { name: 'Loti says hello' })).toBeInTheDocument()
   })
 
-  it('is still when idle and animates only on events', () => {
+  it('is still when idle or low and animates only on events', () => {
     const { container, rerender } = render(<Loti pose="idle" />)
+    expect(container.querySelector(ANIM)).toBeNull()
+    rerender(<Loti pose="low" />)
     expect(container.querySelector(ANIM)).toBeNull()
     rerender(<Loti pose="talk" />)
     expect(container.querySelector('.char-anim-talk')).not.toBeNull()
@@ -81,7 +84,7 @@ describe('Loti', () => {
     unmount()
     render(
       <>
-        <Dolphin pose="cheer" size={size} />
+        <Momo celebrate size={size} />
         <Momo mood="calm" size={size} />
       </>,
     )
@@ -95,36 +98,46 @@ describe('Loti', () => {
     expect(container.querySelector('title')).toBeNull()
   })
 
-  it('keeps the coral core apart from the mouth and uses a peach tongue', () => {
-    for (const pose of ['talk', 'happy', 'wave'] as const) {
+  it('happy and wave have the thriving look (blush); low has closed eyes', () => {
+    const blush = (pose: LotiPose) => {
       const { container, unmount } = render(<Loti pose={pose} />)
-      expect(container.innerHTML).not.toContain('fill="var(--char-coral)"')
-      expect(container.innerHTML).toContain('fill="var(--char-peach)"')
+      const n = container.querySelectorAll('ellipse[fill="var(--char-blush)"][rx="5.5"]').length
       unmount()
+      return n
     }
+    expect(blush('happy')).toBe(2)
+    expect(blush('wave')).toBe(2)
+    expect(blush('idle')).toBe(0)
+    expect(blush('low')).toBe(0)
+    const { container } = render(<Loti pose="low" />)
+    expect(container.querySelector('ellipse[fill="var(--char-face)"]')).toBeNull()
   })
 })
 
-describe('Dolphin', () => {
-  it.each(DOLPHIN_POSES)('renders the %s pose as a labelled SVG image', (pose) => {
-    const { container } = render(<Dolphin pose={pose} size="lg" />)
-    expect(screen.getByRole('img', { name: /dolphin/i })).toBeInTheDocument()
-    expectCleanSvg(container)
-  })
-
-  it('plays one entrance or one hop', () => {
-    const { container, rerender } = render(<Dolphin pose="swim-in" />)
-    expect(container.querySelector('.char-anim-swim-in')).not.toBeNull()
-    rerender(<Dolphin pose="cheer" />)
-    expect(container.querySelector('.char-anim-hop')).not.toBeNull()
-  })
-})
-
-describe('Momo', () => {
+describe('Momo, the dolphin', () => {
   it.each(MOODS)('renders the %s mood as a labelled SVG image', (mood) => {
     const { container } = render(<Momo mood={mood} size="sm" />)
     expect(screen.getByRole('img', { name: new RegExp(`momo.*${mood}`, 'i') })).toBeInTheDocument()
     expectCleanSvg(container)
+  })
+
+  it('celebrates with one leap and splash marks', () => {
+    const { container } = render(<Momo celebrate size="md" />)
+    expect(screen.getByRole('img', { name: /momo.*good job/i })).toBeInTheDocument()
+    expect(container.querySelector('.char-anim-leap')).not.toBeNull()
+    expect(container.querySelector('.char-anim-splash')).not.toBeNull()
+    expectCleanSvg(container)
+  })
+
+  it('shows each mood by face, fin and posture, not by colour alone', () => {
+    const shape = (mood: MomoMood) => {
+      const { container, unmount } = render(<Momo mood={mood} />)
+      const posture = container.querySelector('[transform^="translate"]')!
+      const drawing = posture.outerHTML.replace(/var\(--char-[a-z-]+\)/g, '')
+      unmount()
+      return drawing
+    }
+    expect(new Set(MOODS.map(shape)).size).toBe(MOODS.length)
   })
 
   it('paints frustrated with the amber tint, never red', () => {
@@ -174,8 +187,7 @@ describe('reduced motion', () => {
       <Loti pose="happy" />
       <Loti pose="wave" />
       <Loti pose="think" />
-      <Dolphin pose="swim-in" />
-      <Dolphin pose="cheer" />
+      <Momo celebrate />
       <Momo mood="happy" />
     </>
   )
@@ -231,10 +243,10 @@ describe('Loti idle and gaze (ticket 07b)', () => {
 
   it('`look` moves both eyes', () => {
     const { container } = render(<Loti pose="idle" look={[2, -1]} />)
-    const eyes = [...container.querySelectorAll('ellipse[rx="6"][ry="8"]')].map((e) => [e.getAttribute('cx'), e.getAttribute('cy')])
+    const eyes = [...container.querySelectorAll('ellipse[fill="var(--char-face)"]')].map((e) => [e.getAttribute('cx'), e.getAttribute('cy')])
     expect(eyes).toEqual([
-      ['65', '79'],
-      ['99', '79'],
+      ['68', '49'],
+      ['96', '49'],
     ])
   })
 })
