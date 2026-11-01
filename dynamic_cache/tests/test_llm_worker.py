@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import json
 import threading
+from pathlib import Path
 
 import httpx
 import pytest
@@ -61,11 +62,12 @@ def setup(tmp_path):
 
     def _setup(*answers, schema="relational", level=0.5, clock=None, daily_cap=100, rpm=60.0, pool=True, **kw):
         clock = clock or Clock()
-        d = Dispatcher(registry_dir=lambda: tmp_path / "registry", background=False, pool_size=4,
+        d = Dispatcher(registry_dir=lambda: tmp_path / "registry", background=False, pool_size=8,
                        variants=VariantArchive(lambda: tmp_path / "variants").get, clock=clock)
         made.append(d)
-        if pool:  # a pool exists once it was asked for (here: created empty)
-            d.offer("neutral", schema, level, [])
+        if pool:  # a request creates the pool (empty, by setdefault) and puts it in use
+            d.next_task("warmup", schema_type=schema)
+            assert ("neutral", schema, level) in d.pool_stock()
         fake = FakeGemini(*answers)
         runner = GeminiRunner(KEY, transport=httpx.MockTransport(fake), timeout_s=5)
         worker = LlmPoolWorker(runner, lambda: d, rpm=rpm, daily_cap=daily_cap,
@@ -95,7 +97,8 @@ def test_valid_variants_enter_the_pool_and_are_served(setup, schema):
 
     task = served(d, "u1", schema)
     assert "-llm-" in task["task_id"]
-    assert task["params"] in variants
+    shown = [lw.rename_terms(v) for v in variants] if schema == "relational" else variants
+    assert task["params"] in shown
     assert validate_payload(task) == []
     # the request: key in the header, strict JSON with a response schema, room for a whole block
     body = fake.requests[0]
@@ -261,13 +264,53 @@ def rename_term(p: dict, new: str) -> dict:
         ("bad", "a real or rude short word as a term"),  # the generator's own blocked words
     ],
 )
-def test_the_lint_blocks_bad_words_in_relational_terms(setup, term, why):
+def test_the_denylist_still_flags_bad_relational_terms(term, why):
+    """Defence in depth: the lint and the harm list still read LLM terms (the renaming below means
+    they are never shown anyway)."""
     variant = rename_term(params("relational", 0.5, 5), term)
     assert validate_payload({**generate("relational", 0.5, 5), "params": variant}) == []  # only content is wrong
     assert why in lw.content_problems("relational", variant)
+
+
+def rename_items(p: dict, words: list[str]) -> dict:
+    """Rename the first term of the first len(words) items of level 1, one word per item."""
+    p = copy.deepcopy(p)
+    for item, new in zip(p["levels"][0], words):
+        old = item["premises"][0]["a"]
+        for s in item["premises"] + [item["question"]]:
+            for k in ("a", "b"):
+                if s[k] == old:
+                    s[k] = new
+    return p
+
+
+SLURS = ["kike", "spic", "coon", "chink", "gook", "wetback", "patient", "iq", "killab", "black"]
+
+
+def test_relational_terms_are_always_procedural_tokens(setup):
+    """Term safety is structural: whatever words the LLM writes, the served block shows only fresh
+    procedural tokens, renamed consistently per item, and the solver's answers are unchanged."""
+    from dynamic_cache.generators.relational import BLOCKED, CONSONANTS, VOWELS
+
+    variant = rename_items(params("relational", 0.5, 5), SLURS)
     d, worker, _ = setup(reply([variant]))
-    worker.run_once()
-    assert worker.stats["rejected_content"] == 1 and worker.stats["offered"] == 0
+    assert worker.run_once() == "ok" and worker.stats["offered"] == 1
+    body = d.next_task("u1", schema_type="relational").body.decode()
+    task = json.loads(body)
+    assert "-llm-" in task["task_id"] and validate_payload(task) == []
+    for word in SLURS:
+        assert f'"{word}"' not in body
+    terms = set(lw.visible_text("relational", task["params"]))
+    assert all(len(t) == 3 and t[0] in CONSONANTS and t[1] in VOWELS and t[2] in CONSONANTS for t in terms)
+    assert not terms & BLOCKED
+    # same structure, same answers: only the names changed
+    for lv_in, lv_out in zip(variant["levels"], task["params"]["levels"]):
+        for a, b in zip(lv_in, lv_out):
+            assert (a["answer"], a["inverted"], a["hops"]) == (b["answer"], b["inverted"], b["hops"])
+            assert [s["rel"] for s in a["premises"]] == [s["rel"] for s in b["premises"]]
+    # the id is the hash of what is served, and equal LLM output gives the equal variant
+    assert task["task_id"] == lw.variant_id("relational", task["params"])[0]
+    assert lw.rename_terms(variant) == lw.rename_terms(copy.deepcopy(variant))
 
 
 def test_stroop_words_come_only_from_the_colour_set():
@@ -286,14 +329,15 @@ def test_clean_variants_pass_the_content_check():
 
 
 def test_procedural_terms_meet_the_same_bar():
-    """Every term the relational generator can spell passes the LLM content check. (Before BE-13
-    it could spell four slurs or rude words; relational.BLOCKED now has them.)"""
+    """Every term the relational generator can spell passes the LLM content check (BE-13 added 39
+    slurs, rude words and insults to relational.BLOCKED; all of them were spellable)."""
     from dynamic_cache.generators.relational import BLOCKED, CONSONANTS, VOWELS
 
     terms = {a + b + c for a in CONSONANTS for b in VOWELS for c in CONSONANTS} - BLOCKED
     hit = sorted(t for t in terms if t in lw.HARM_WORDS or any(s in t for s in lw.HARM_STEMS))
     assert hit == []
-    assert lw.HARM_WORDS >= {"fag", "jew", "tit", "fap"} and BLOCKED >= {"fag", "jew", "tit", "fap"}
+    added = set("fag jew tit fap vag vaj zeb fak fok git fek nit dum nul jip neg kut lul kuk pik kus".split())
+    assert lw.HARM_WORDS >= added and BLOCKED >= added
 
 
 # --- off, failures, budget -------------------------------------------------------------------------
@@ -347,7 +391,7 @@ def test_the_server_starts_and_stops_the_worker_with_a_key(monkeypatch, tmp_path
     monkeypatch.setattr(GeminiRunner, "generate", fake_generate)
     monkeypatch.setenv("GEMINI_API_KEY", KEY)
     monkeypatch.setenv("LLM_POOL_RPM", "60")
-    api.get_dispatcher().offer("neutral", "stroop", 0.5, [])  # a pool in use
+    api.get_dispatcher().next_task("warmup", schema_type="stroop")  # a pool in use
     api.start_llm_pool()
     try:
         assert api._llm_worker is not None
@@ -426,6 +470,56 @@ def test_the_daily_budget_is_respected_and_survives_a_restart(setup, tmp_path):
     assert again.run_once() == "ok" and len(fake2.requests) == 1
 
 
+def test_an_unreadable_budget_is_spent_today_and_rewritten(setup, tmp_path, caplog):
+    clock = Clock()
+    d, worker, fake = setup(reply([params("relational", 0.5, 1)]), clock=clock)
+    (tmp_path / "variants").mkdir(exist_ok=True)
+    (tmp_path / "variants" / "budget.json").write_text("{torn")
+    assert worker.run_once() == "budget" and fake.requests == []
+    doc = json.loads((tmp_path / "variants" / "budget.json").read_text())
+    assert doc == {"day": lw.Budget.day(clock.t), "calls": 100}
+    assert sum("budget unreadable" in r.message for r in caplog.records) == 1
+    assert worker.run_once() == "budget"  # no second warning: the file reads again
+    assert sum("budget unreadable" in r.message for r in caplog.records) == 1
+    clock.t += 86_400
+    assert worker.run_once() == "ok" and len(fake.requests) == 1  # not off for good
+
+
+def test_writes_use_a_per_process_tmp_name(setup, tmp_path, monkeypatch):
+    names = []
+    real = lw.os.replace
+    monkeypatch.setattr(lw.os, "replace", lambda a, b: (names.append(Path(a).name), real(a, b)))
+    d, worker, _ = setup(reply([params("relational", 0.5, 1)]))
+    worker.run_once()
+    pid = str(lw.os.getpid())
+    assert len(names) == 2 and all(n.endswith(f".{pid}.tmp") for n in names)  # budget + archive
+    assert not list((tmp_path / "variants").glob("*.tmp"))
+
+
+def test_a_replay_runs_the_content_gate_again(tmp_path):
+    archive = VariantArchive(lambda: tmp_path)
+    bad = lw._envelope("relational", rename_items(params("relational", 0.5, 5), ["coon"]))  # an older, laxer build
+    archive.put(bad, {"source": "llm"})
+    assert archive.get(bad["task_id"]) is None
+    ok = lw._envelope("relational", params("relational", 0.5, 5))
+    archive.put(ok, {"source": "llm"})
+    assert archive.get(ok["task_id"]) == lw.serialise(ok)
+
+
+def test_the_purge_removes_stale_tmp_files(tmp_path):
+    import os
+
+    archive = VariantArchive(lambda: tmp_path)
+    stale, fresh = tmp_path / "stroop-llm-00.json.123.tmp", tmp_path / "budget.json.456.tmp"
+    stale.write_text("x")
+    fresh.write_text("x")
+    old = T0 - 2 * lw.STALE_TMP_S
+    os.utime(stale, (old, old))
+    os.utime(fresh, (T0, T0))
+    archive.purge(now=T0)
+    assert not stale.exists() and fresh.exists()
+
+
 def test_an_unwritable_budget_means_no_call(setup, tmp_path, monkeypatch):
     d, worker, fake = setup(reply([params("relational", 0.5, 1)]))
     monkeypatch.setattr(lw.os, "replace", lambda *a: (_ for _ in ()).throw(PermissionError()))
@@ -448,13 +542,161 @@ def test_a_full_llm_share_stops_the_calls(setup):
     assert worker.run_once() == "no_target" and len(fake.requests) == 1
 
 
-def test_the_offer_hook_is_bounded(tmp_path):
-    d = Dispatcher(registry_dir=lambda: tmp_path, background=False, pool_size=2)
-    entries = [lw.Entry(f"stroop-llm-{k:016x}", b"{}", 0, "llm") for k in range(10)]
-    assert d.offer("neutral", "stroop", 0.5, entries) == 4  # at most 2 x pool_size
-    assert d.offer("neutral", "stroop", 0.5, [lw.Entry("x", b"{}", 1)]) == 0  # never a procedural entry
+# --- the dispatcher hook on hot pools (offer / pool_stock) ---------------------------------------
+
+
+class Mono:
+    def __init__(self, t: float = 1000.0) -> None:
+        self.t = t
+
+    def __call__(self) -> float:
+        return self.t
+
+
+def llm_entries(n: int, size: int = 0, start: int = 500) -> list:
+    """Real stroop variants as LLM entries (bodies padded to `size` when given)."""
+    out = []
+    for k in range(n):
+        payload = lw._envelope("stroop", params("stroop", 0.5, start + k))
+        body = lw.serialise(payload)
+        out.append(lw.Entry(payload["task_id"], body + b" " * max(0, size - len(body)), 0, "llm"))
+    return out
+
+
+def bytes_consistent(d: Dispatcher) -> None:
+    assert d._pool_bytes == sum(len(e.body) for pool in d._pools.values() for e in pool)
+    for key, pool in d._pools.items():
+        assert d._key_bytes.get(key, 0) == sum(len(e.body) for e in pool)
+
+
+@pytest.fixture
+def disp(tmp_path):
+    made = []
+
+    def _make(**kw):
+        mono = Mono()
+        d = Dispatcher(registry_dir=lambda: tmp_path / "registry", background=False, pool_size=8, **kw)
+        d._mono = mono
+        made.append(d)
+        return d, mono
+
+    yield _make
+    for d in made:
+        d.close()
+
+
+KEY_S = ("neutral", "stroop", 0.5)
+
+
+def test_offer_needs_a_pool_in_use(disp):
+    d, mono = disp()
+    assert d.offer("neutral", "stroop", 0.5, llm_entries(2)) == 0  # no such pool: never created
+    assert KEY_S not in d._pools and d.pool_stock() == {}
+    d.warm(schema_types=("stroop",), at=0.5)
+    assert d.pool_stock() == {KEY_S: (8, 0)}
+    mono.t += d.pool_idle_s + 1  # idle: floor 0
+    assert d.offer("neutral", "stroop", 0.5, llm_entries(2)) == 0
+    assert d.pool_stock() == {}  # only pools in use are listed
     d.close()
-    assert d.offer("neutral", "stroop", 0.5, entries) == 0
+    assert d.offer("neutral", "stroop", 0.5, llm_entries(2)) == 0
+
+
+def test_offer_to_a_pool_created_by_a_request_does_not_raise(disp):
+    """A request's setdefault makes an empty pool with no _key_bytes entry; offers and pops after
+    it must keep the tallies (this was a KeyError in _take)."""
+    d, _ = disp()
+    d.next_task("u0", schema_type="stroop")
+    assert KEY_S in d._pools and KEY_S not in d._key_bytes
+    assert d.offer("neutral", "stroop", 0.5, llm_entries(3)) == 3
+    for k in range(5):
+        d.next_task(f"u{k + 1}", schema_type="stroop")
+        bytes_consistent(d)
+
+
+def test_pool_bytes_stay_exact_through_offers_and_pops(disp):
+    d, _ = disp()
+    d.warm(schema_types=("stroop",), at=0.5)
+    before = list(d._pools[KEY_S])
+    assert d.offer("neutral", "stroop", 0.5, llm_entries(3)) == 3
+    pool = list(d._pools[KEY_S])
+    assert len(pool) == 8  # within the target: three procedural entries made room
+    assert [e.source for e in pool[:3]] == ["llm"] * 3  # served first
+    assert pool[3:] == before[:5]
+    bytes_consistent(d)
+    served_ids = [d.next_task(f"u{k}", schema_type="stroop").task_id for k in range(4)]
+    assert all("-llm-" in t for t in served_ids[:3]) and "-llm-" not in served_ids[3]
+    bytes_consistent(d)
+    assert d.offer("neutral", "stroop", 0.5, [lw.Entry("stroop-1-x", b"{}", 1)]) == 0  # never procedural
+
+
+def test_a_full_pool_of_paid_entries_takes_no_more(disp):
+    d, _ = disp()
+    d.next_task("u0", schema_type="stroop")
+    assert d.offer("neutral", "stroop", 0.5, llm_entries(12)) == 8  # the target: floor 8 at low demand
+    assert d.offer("neutral", "stroop", 0.5, llm_entries(1, start=900)) == 0
+    bytes_consistent(d)
+
+
+def test_an_offer_stops_at_pool_bytes_max(disp):
+    d, _ = disp(pool_bytes_max=25_000)
+    d.next_task("u0", schema_type="stroop")
+    assert d.offer("neutral", "stroop", 0.5, llm_entries(5, size=10_000)) == 2
+    assert d._pool_bytes == 20_000 <= d.pool_bytes_max
+    bytes_consistent(d)
+
+
+def test_offered_entries_survive_a_sweep_at_low_demand(disp):
+    d, mono = disp()
+    d.warm(schema_types=("stroop",), at=0.5)
+    with d._lock:
+        d._demand[KEY_S] = (10.0, mono.t)  # a wave: target 20
+        assert d._want(KEY_S, mono.t) == 20
+        while len(d._pools[KEY_S]) < 20:
+            assert d._add(KEY_S, lw.Entry(f"stroop-{len(d._pools[KEY_S])}-pad", b"x" * 100, 1))
+    assert d.offer("neutral", "stroop", 0.5, llm_entries(3)) == 3
+    ids = [e.task_id for e in list(d._pools[KEY_S])[:3]]
+    mono.t += 60  # the wave is over (demand decays), the pool still in use
+    with d._lock:
+        d._swept_at = 0.0
+        d._sweep(mono.t)
+    pool = list(d._pools[KEY_S])
+    assert len(pool) == 8 and [e.task_id for e in pool[:3]] == ids  # the paid ones stayed
+    bytes_consistent(d)
+
+
+def test_an_offer_is_not_demand(disp):
+    d, mono = disp()
+    d.warm(schema_types=("stroop",), at=0.5)
+    snapshot = (dict(d._active_at), dict(d._demand), dict(d._inflight))
+    mono.t += 5
+    d.offer("neutral", "stroop", 0.5, llm_entries(2))
+    assert (dict(d._active_at), dict(d._demand), dict(d._inflight)) == snapshot
+
+
+# --- one failing pool cannot take the budget --------------------------------------------------
+
+
+def test_a_pool_that_is_always_rejected_does_not_starve_the_others(setup):
+    seeds = iter(range(1000, 2000))
+    calls = {"relational": 0, "stroop": 0}
+
+    def answer(request):
+        text = json.loads(request.content)["contents"][0]["parts"][0]["text"]
+        if "one relational task" in text:
+            calls["relational"] += 1
+            return reply([flip_first_relational_answer(params("relational", 0.5, 4))])  # always wrong
+        calls["stroop"] += 1
+        return reply([params("stroop", 0.5, next(seeds)) for _ in range(2)])
+
+    clock = Clock()
+    d, worker, _ = setup(answer, clock=clock, rpm=60, per_pool=100)
+    d.next_task("warm2", schema_type="stroop")  # a second pool in use
+    for _ in range(12):  # t = 0, 30, ..., 330 s
+        worker.run_once()
+        clock.t += 30
+    # relational: at 0 s, then when its first cool-down (300 s) ended; the next one is 600 s
+    assert calls["relational"] == 2 and worker.stats["rejected_solver"] == 2
+    assert calls["stroop"] == 10 and worker.stats["accepted"] == 20
 
 
 # --- no user data -------------------------------------------------------------------------------------

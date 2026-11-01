@@ -11,9 +11,12 @@ counted, never served:
 3. shape: the variant has the shape of the procedural payload at that level (trial counts, levels,
    time limit, colour order, number of options and of varying rules), so an LLM variant measures
    the same thing as a procedural one; only its content differs.
-4. content: the visible text (relational terms, Stroop words) passes the banned-terms lint
-   (ai_coach/banned_terms.json) and a profanity and harm list. Stroop words come only from the
-   served colour set.
+4. content: term safety is structural. After validation, every relational item's terms are
+   renamed to fresh procedural tokens (relational._token: CONSONANTS x VOWELS x CONSONANTS minus
+   BLOCKED), one consistent renaming per item, so the solver's result cannot change and no word
+   the LLM wrote is ever shown. Stroop words are an allowlist (the served colour set). As defence
+   in depth the visible text still passes the banned-terms lint (ai_coach/banned_terms.json) and a
+   profanity and harm list, and a replay from the archive runs that check again.
 
 Accepted variants get `source: "llm"` (the pool Entry and the session recipe; the payload envelope
 itself is unchanged, the frontend contract has no such field) and a content-hash task_id,
@@ -24,15 +27,19 @@ cache_dispatcher.schema_of() working, so trials on LLM variants step the stairca
 Each accepted variant is also written to a content-addressed archive (LLM_VARIANT_DIR), so a
 session replay after a restart serves the same bytes: an LLM variant cannot be rebuilt from a seed.
 
+A call that yields no accepted variant puts its pool on a cool-down (POOL_COOL_FIRST_S, doubling
+to MAX_BACKOFF_S), so one pool whose replies are always rejected cannot take the whole budget.
+
 Fail safe. With no GEMINI_API_KEY, with LLM_POOL_RPM=0 or LLM_POOL_DAILY_CAP=0, or with a bad
 setting, no worker exists and no call is made. A Gemini error, a safety block, a 429 or no network
 makes nothing happen: the worker backs off, and the procedural generators keep the pools full as
-before. The worker never blocks a request: it runs on its own thread and only appends to pools.
+before. The worker never blocks a request: it runs on its own thread and only offers to pools.
 
 Budget. LLM_POOL_RPM (default 2 calls a minute once the key is set) paces the calls, and
 LLM_POOL_DAILY_CAP (default 200 calls per UTC day) caps them. The day's count is kept in
 {LLM_VARIANT_DIR}/budget.json, so a restart does not reset it; if it cannot be written, no call is
-made.
+made. An unreadable file is logged once and rewritten as spent for that day, so the next day
+starts afresh instead of the worker staying off for good.
 
 Privacy. No user data goes into the prompt (only the schema, the level and the shape), and none
 comes out: a variant is task content, shared by every user, with no user id. So the privacy delete
@@ -48,6 +55,7 @@ import json
 import logging
 import math
 import os
+import random
 import threading
 import time
 from collections import Counter
@@ -65,6 +73,7 @@ from .cache_dispatcher import ARCHETYPE_OPTIONS, NEUTRAL, Dispatcher, Entry, the
 from .generators import DIMENSION_OF, TASK_ID_RE, generate, schema_problems, validate_payload
 from .generators._common import canonical_json
 from .generators.relational import BLOCKED as RELATIONAL_BLOCKED
+from .generators.relational import _token as procedural_token
 from .generators.stroop import INK_PRESETS
 from .generators.validate import load_schema
 
@@ -90,6 +99,8 @@ ERROR_BACKOFF_S = 60.0  # after an error, doubled per error in a row, up to MAX_
 RATE_LIMIT_BACKOFF_S = 300.0  # after a 429
 MAX_BACKOFF_S = 3600.0
 ARCHIVE_DAYS = TTL_DAYS + 1  # a session recipe lives TTL_DAYS; its variant must outlive it
+POOL_COOL_FIRST_S = 300.0  # a pool whose call yielded nothing waits this long, doubling per miss
+STALE_TMP_S = 3600.0  # a temporary file older than this was left by a crashed write
 
 REJECT_REASONS = ("parse", "schema", "solver", "shape", "content", "duplicate")
 
@@ -151,19 +162,22 @@ class VariantArchive:
     def put(self, payload: dict, record: Mapping[str, Any]) -> None:
         path = self._path(payload["task_id"])
         path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".json.tmp")
+        tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
         tmp.write_text(json.dumps({**record, "payload": payload}, allow_nan=False), encoding="utf-8")
         os.replace(tmp, path)
 
     def get(self, task_id: str) -> bytes | None:
-        """The served bytes of a variant, or None (unknown, unreadable, or not what its id says)."""
+        """The served bytes of a variant, or None: unknown, unreadable, not what its id says, or
+        failing the content gate (run again here, in case the lists grew since it was archived)."""
         try:
             doc = json.loads(self._path(task_id).read_text(encoding="utf-8"))
             payload = doc["payload"]
             if variant_id(payload["schema_type"], payload["params"])[0] != task_id or payload["task_id"] != task_id:
                 return None
+            if content_problems(payload["schema_type"], payload["params"]):
+                return None
             return serialise(payload)
-        except (OSError, ValueError, KeyError, TypeError):
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
             return None
 
     def purge(self, days: int = ARCHIVE_DAYS, now: float | None = None) -> int:
@@ -177,6 +191,13 @@ class VariantArchive:
                 if path.stat().st_mtime < cutoff:
                     path.unlink()
                     removed += 1
+            except FileNotFoundError:
+                pass
+        stale = (time.time() if now is None else now) - STALE_TMP_S
+        for path in directory.glob("*.tmp"):  # left by a write cut short
+            try:
+                if path.stat().st_mtime < stale:
+                    path.unlink()
             except FileNotFoundError:
                 pass
         return removed
@@ -194,14 +215,28 @@ class Budget:
     def day(now: float) -> str:
         return datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%d")
 
+    def _write(self, day: str, calls: int) -> None:
+        path = self.directory() / "budget.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(f"budget.json.{os.getpid()}.tmp")
+        tmp.write_text(json.dumps({"day": day, "calls": calls}), encoding="utf-8")
+        os.replace(tmp, path)
+
     def used(self, now: float) -> int:
+        """Calls counted today. An unreadable file counts as spent (fail safe); it is logged and
+        rewritten as spent for today, so tomorrow starts at 0 instead of the worker staying off."""
         try:
             doc = json.loads((self.directory() / "budget.json").read_text(encoding="utf-8"))
             return int(doc["calls"]) if doc.get("day") == self.day(now) else 0
         except FileNotFoundError:
             return 0
-        except (OSError, ValueError, KeyError, TypeError):
-            return self.cap  # unreadable: assume spent (fail safe)
+        except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:
+            log.warning("LLM pool budget unreadable (%s); today counts as spent", type(e).__name__)
+            try:
+                self._write(self.day(now), self.cap)
+            except OSError:
+                pass  # still unreadable tomorrow: still no call (fail safe)
+            return self.cap
 
     def try_spend(self, now: float) -> bool:
         """Count one call if the day has room. False when spent, or when the count cannot be
@@ -210,12 +245,8 @@ class Budget:
             used = self.used(now)
             if used >= self.cap:
                 return False
-            path = self.directory() / "budget.json"
             try:
-                path.parent.mkdir(parents=True, exist_ok=True)
-                tmp = path.with_suffix(".json.tmp")
-                tmp.write_text(json.dumps({"day": self.day(now), "calls": used + 1}), encoding="utf-8")
-                os.replace(tmp, path)
+                self._write(self.day(now), used + 1)
             except OSError as e:
                 log.warning("LLM pool budget not writable (%s); no call made", type(e).__name__)
                 return False
@@ -429,7 +460,12 @@ HARM_WORDS = frozenset(
     "ass arse sex die dead death gun cum tit tits fap fag kkk con cul pd pute bite hate drug weed "
     "jew jews arab black white gay trans muslim islam negro asian gypsy nazi isis "
     # three-letter spellings a nonsense term can hit (the relational generator blocks them too)
-    "fuk fap jap nig nip wog wop kum jiz dik pis nob lez kok zob nik kul kon pak".split()
+    "fuk fap jap nig nip wog wop kum jiz dik pis nob lez kok zob nik kul kon pak "
+    "vag vaj zeb fak fok git fek nit dum nul jip neg kut lul kuk pik kus "
+    # slurs and insults of four letters or more (terms are renamed before serving; this is defence
+    # in depth, and the replay check)
+    "kike kikes spic spick coon coons chink gook wetback beaner tranny dyke paki raghead towelhead "
+    "retard retarded mong spaz cripple".split()
 )
 
 
@@ -458,21 +494,52 @@ def content_problems(schema_type: str, params: dict) -> list[str]:
     return out
 
 
-def check_variant(schema_type: str, params: Any, ref: dict) -> tuple[dict | None, str | None, list[str]]:
-    """(payload, None, []) for a servable variant, else (None, reason, problems)."""
-    if not isinstance(params, dict):
-        return None, "schema", ["a variant is not an object"]
+def rename_terms(params: dict) -> dict:
+    """The relational params with every item's terms replaced by fresh procedural tokens: one
+    consistent renaming per item (a term keeps one new name across its premises and question), so
+    the solver's answer and hop count are unchanged. Seeded by the content, so equal LLM output
+    still gives an equal variant (and id)."""
+    rng = random.Random("llm-terms|" + hashlib.sha256(canonical_json(params).encode()).hexdigest())
+    out = json.loads(json.dumps(params))
+    for level in out["levels"]:
+        for item in level:
+            names: dict[str, str] = {}
+            taken: set = set()
+            for statement in item["premises"] + [item["question"]]:
+                for k in ("a", "b"):
+                    if statement[k] not in names:
+                        names[statement[k]] = procedural_token(rng, taken)
+                    statement[k] = names[statement[k]]
+    return out
+
+
+def _envelope(schema_type: str, params: dict) -> dict:
     task_id, surface_seed = variant_id(schema_type, params)
-    payload = {
+    return {
         "task_id": task_id,
         "dimension": DIMENSION_OF[schema_type],
         "schema_type": schema_type,
         "params": params,
         "surface_seed": surface_seed,
     }
+
+
+def check_variant(schema_type: str, params: Any, ref: dict) -> tuple[dict | None, str | None, list[str]]:
+    """(payload, None, []) for a servable variant, else (None, reason, problems)."""
+    if not isinstance(params, dict):
+        return None, "schema", ["a variant is not an object"]
+    payload = _envelope(schema_type, params)
     problems = validate_payload(payload)  # served schema only, then the solvers
     if problems:
         return None, "schema" if schema_problems(payload) else "solver", problems
+    if schema_type == "relational":
+        # No word the LLM wrote is shown: the terms are procedural tokens from here on, and the id
+        # is the hash of what is served.
+        params = rename_terms(params)
+        payload = _envelope(schema_type, params)
+        problems = validate_payload(payload)
+        if problems:  # a renaming bug, never the LLM's: still never served
+            return None, "solver", problems
     for reason, check in (("shape", lambda: shape_problems(schema_type, params, ref)), ("content", lambda: content_problems(schema_type, params))):
         problems = check()
         if problems:
@@ -511,6 +578,7 @@ class LlmPoolWorker:
         self._paused_until = 0.0
         self._failures = 0
         self._purged_day = ""
+        self._cool: dict[tuple[str, str, float], tuple[float, int]] = {}  # pool -> (until, misses)
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
@@ -529,8 +597,18 @@ class LlmPoolWorker:
     def _target(self, d: Dispatcher) -> tuple[str, str, float] | None:
         """The pool, among those in use, holding the fewest LLM variants (and fewer than per_pool)."""
         stock = d.pool_stock()
-        wanted = [(llm, key) for key, (_, llm) in stock.items() if key[1] in self.schemas and llm < self.per_pool]
+        now = self.clock()
+        wanted = [
+            (llm, key)
+            for key, (_, llm) in stock.items()
+            if key[1] in self.schemas and llm < self.per_pool and now >= self._cool.get(key, (0.0, 0))[0]
+        ]
         return min(wanted)[1] if wanted else None
+
+    def _miss(self, target: tuple[str, str, float], now: float) -> None:
+        """A call that yielded no accepted variant: that pool cools down, doubling per miss."""
+        _, misses = self._cool.get(target, (0.0, 0))
+        self._cool[target] = (now + min(MAX_BACKOFF_S, POOL_COOL_FIRST_S * 2**misses), misses + 1)
 
     def _backoff(self, now: float, base: float) -> None:
         self._failures += 1
@@ -582,6 +660,7 @@ class LlmPoolWorker:
             variants = parse_variants(text, count)
         except VariantParseError:
             self._reject("parse")
+            self._miss(target, now)
             return "ok"
         entries = []
         for params in variants:
@@ -600,6 +679,10 @@ class LlmPoolWorker:
                 continue
             entries.append(Entry(payload["task_id"], serialise(payload), 0, LLM_SOURCE))
         self.stats["accepted"] += len(entries)
+        if entries:
+            self._cool.pop(target, None)
+        else:
+            self._miss(target, now)
         if entries and not self._stop.is_set():
             self.stats["offered"] += d.offer(archetype, schema_type, level, entries)
         day = Budget.day(now)

@@ -45,8 +45,10 @@
   server passes it in through dynamic_cache.api, the CLI uses it as its --days default.
   forget() and export() back the privacy delete and export.
 - LLM variants (BE-13, llm_worker.py): offer() puts already-validated entries with a non-procedural
-  `source` into the same pools. Their session recipe records that source, and a replay looks the
-  body up through `variants` (they cannot be rebuilt from a seed).
+  `source` into pools in use, at the front (served first, never trimmed first), within the pool's
+  demand target and the byte caps, replacing procedural stock when the pool is full. Their
+  session recipe records that source, and a replay looks the body up through `variants` (they
+  cannot be rebuilt from a seed).
 
 Thread safety: a per-user lock serialises one user's calls (so a double GET in the same session
 cannot hand out two tasks); one dispatcher lock guards the pools and the user table.
@@ -1076,24 +1078,63 @@ class Dispatcher:
     # --- LLM variants (BE-13) ----------------------------------------------------------------------
 
     def offer(self, archetype: str, schema_type: str, level: float, entries: Sequence[Entry]) -> int:
-        """Add validated non-procedural entries to a pool; returns how many went in. The caller
-        (llm_worker) has already run the served schema, the solvers and the content checks. A pool
-        holds at most twice pool_size, so offers can never grow memory without bound."""
+        """Stock validated non-procedural entries (BE-13 LLM variants) in a pool in use; returns how
+        many went in. The caller (llm_worker) has already run the served schema, the solvers and
+        the content checks.
+
+        - Only a pool that exists and is in use (floor > 0) takes offers.
+        - The pool never passes its demand target (_want): when it is full, an LLM entry takes the
+          place of a procedural one (the rightmost), and stops when only paid entries are left.
+        - Every entry goes through _add, so the byte tallies and POOL_BYTES_MAX hold; the first
+          refusal stops the offer. Entries above the floor count into the growth budget, as
+          _refilled counts them.
+        - LLM entries go to the left: served first, and never the ones _sweep trims (it pops from
+          the right).
+        Demand, activity and in-flight counts are not touched: an offer is not a pop.
+        """
         pool_key = (archetype, schema_type, theta_level(schema_type, level))
         with self._lock:
-            if self._closed:
+            now = self._mono()
+            pool = self._pools.get(pool_key)
+            if self._closed or pool is None or self._floor(pool_key, now) == 0:
                 return 0
-            pool = self._pools.setdefault(pool_key, deque())
-            room = max(0, 2 * self.pool_size - len(pool))
-            taken = [e for e in entries if e.source != PROCEDURAL][:room]
-            pool.extend(taken)
-            return len(taken)
+            floor, want = self._floor(pool_key, now), self._want(pool_key, now)
+            taken = 0
+            for entry in entries:
+                if entry.source == PROCEDURAL:
+                    continue
+                evict = len(pool) >= want
+                if evict and (not pool or pool[-1].source != PROCEDURAL):
+                    break  # full of paid entries already
+                # Every check before the eviction, so a refused offer never costs a procedural entry.
+                size, out = len(entry.body), len(pool[-1].body) if evict else 0
+                above = len(pool) - evict >= floor
+                freed = out if evict and len(pool) > floor else 0
+                if above and self._growth_bytes - freed + size > self.pool_growth_bytes:
+                    break  # the growth budget
+                if self._pool_bytes - out + size > self.pool_bytes_max:
+                    break  # the hard cap
+                if evict:
+                    self._take(pool_key, pool.pop())
+                    self._growth_bytes -= freed
+                if not self._add(pool_key, entry):
+                    break  # the hard cap (not reached: checked above)
+                pool.appendleft(pool.pop())  # _add appended it on the right
+                if above:
+                    self._growth_bytes += len(entry.body)
+                taken += 1
+            return taken
 
     def pool_stock(self) -> dict[tuple[str, str, float], tuple[int, int]]:
-        """Every pool's (entries, non-procedural entries): which pools exist and how many LLM
-        variants each holds, so the LLM worker fills the pools that are used."""
+        """The pools in use (floor > 0) as (entries, non-procedural entries), so the LLM worker
+        fills only pools that serve someone."""
         with self._lock:
-            return {k: (len(p), sum(e.source != PROCEDURAL for e in p)) for k, p in self._pools.items()}
+            now = self._mono()
+            return {
+                k: (len(p), sum(e.source != PROCEDURAL for e in p))
+                for k, p in self._pools.items()
+                if self._floor(k, now) > 0
+            }
 
     def close(self) -> None:
         """Stop the worker processes, the pumper and the writer, and write what is pending.

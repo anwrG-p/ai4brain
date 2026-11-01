@@ -26,6 +26,9 @@ BLOCKED = {
     # content check (llm_worker.HARM_WORDS) holds procedural terms to the same bar.
     "dik", "fag", "fap", "fuk", "jap", "jew", "jiz", "kok", "kon", "kul", "kum", "lez", "nig", "nik",
     "nip", "nob", "pak", "pis", "tit", "wog", "wop", "zob",
+    # Review round 1 (BE-13): more slang, slurs and insults in English, French, Dutch and German.
+    "dum", "fak", "fek", "fok", "git", "jip", "kuk", "kus", "kut", "lul", "neg", "nit", "nul", "pik",
+    "vag", "vaj", "zeb",
 }
 
 
