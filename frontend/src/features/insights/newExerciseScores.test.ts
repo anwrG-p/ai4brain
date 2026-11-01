@@ -204,3 +204,78 @@ describe('Pair Finder: first-attempt memory (CANTAB FAMS, unreached stages misse
     expect(pillarScores(taskScores(failingRun())).memory.score).toBeCloseTo(inputs.PAL_FirstTrialMemory!.score, 9)
   })
 })
+
+// ---- Arrow Focus -----------------------------------------------------------------------------
+
+const flEv = (flanker: 'congruent' | 'incongruent', rt: number, ok = true, task = 'fl') =>
+  ev({ flanker, dir: 'left', response: ok ? 'left' : 'right' }, { ok, rt, task })
+
+// Congruent correct at 500/520/540/560 (mean 530), incongruent correct at 600/620/640/660 (mean
+// 630), then one wrong of each: accuracy 8/10.
+const flankerRun = (task = 'fl') => [
+  ...[500, 520, 540, 560].map((rt) => flEv('congruent', rt, true, task)),
+  ...[600, 620, 640, 660].map((rt) => flEv('incongruent', rt, true, task)),
+  flEv('congruent', 700, false, task),
+  flEv('incongruent', 700, false, task),
+]
+
+describe('Arrow Focus: flanker conflict cost (ANT_Conflict)', () => {
+  it('is read from the flanker signature, never as Color Clash', () => {
+    expect(schemaOf(flEv('congruent', 500))).toBe('flanker')
+  })
+
+  it('scores (1 - cost / 200 ms) times the gate (accuracy - 1/2) / (1/2), correct trials only', () => {
+    // cost = 630 - 530 = 100 ms -> 0.5; gate = (0.8 - 0.5) / 0.5 = 0.6 -> 30. trials = 8 correct.
+    const out = taskScores(flankerRun()).ANT_Conflict!
+    expect(out.score).toBeCloseTo(30, 9)
+    expect(out.trials).toBe(8)
+  })
+
+  it('clamps a negative cost at 100 before the gate', () => {
+    // Incongruent 100 ms faster: the RT term is 1, times gate 0.6 -> 60.
+    const fast = [
+      ...[600, 620, 610, 630].map((rt) => flEv('congruent', rt)),
+      ...[500, 520, 510, 530].map((rt) => flEv('incongruent', rt)),
+      flEv('congruent', 700, false),
+      flEv('incongruent', 700, false),
+    ]
+    expect(taskScores(fast).ANT_Conflict!.score).toBeCloseTo(60, 9)
+  })
+
+  it('scores 0 at chance accuracy, even with a cost, and 0 over every trial when nothing is right', () => {
+    const coin = [flEv('congruent', 500), flEv('incongruent', 600), flEv('congruent', 500, false), flEv('incongruent', 600, false)]
+    expect(taskScores(coin).ANT_Conflict).toEqual({ score: 0, trials: 2 })
+    const none = [flEv('congruent', 1700, false), flEv('incongruent', 1700, false), flEv('congruent', 1700, false)]
+    expect(taskScores(none).ANT_Conflict).toEqual({ score: 0, trials: 3 })
+  })
+
+  it('gives no input above chance without a correct trial in both conditions', () => {
+    const onlyCon = [flEv('congruent', 500), flEv('congruent', 520), flEv('congruent', 540), flEv('incongruent', 700, false)]
+    expect(taskScores(onlyCon).ANT_Conflict).toBeUndefined()
+  })
+
+  it('replaces the Color Clash stand-in: Stroop feeds ANT_Conflict only without Arrow Focus trials', () => {
+    // Stroop alone: cost 100 ms of 300 -> 2/3, accuracy 1 -> 66.67.
+    const stroop = [ev({ congruent: true }, { task: 'st', rt: 500 }), ev({ congruent: false }, { task: 'st', rt: 600 })]
+    expect(taskScores(stroop).ANT_Conflict!.score).toBeCloseTo((100 * 2) / 3, 9)
+    const both = taskScores([...stroop, ...flankerRun()])
+    expect(both.ANT_Conflict!.score).toBeCloseTo(30, 9)
+    expect(both.ANT_Conflict!.trials).toBe(8)
+    expect(both.SST_SSRT).toMatchObject({ proxy: true }) // Stroop still stands in for SSRT here
+  })
+
+  it('counts toward ErrorRecovery, except a task played at chance', () => {
+    // flankerRun: wrong at trials 8 and 9; trial 9 is the only one after an error, and wrong: 0 of 1.
+    expect(taskScores(flankerRun()).ErrorRecovery).toEqual({ score: 0, trials: 1 })
+    const coin = [flEv('congruent', 500, false), flEv('incongruent', 600), flEv('congruent', 500, false), flEv('incongruent', 600)]
+    expect(taskScores(coin).ErrorRecovery).toBeUndefined()
+  })
+
+  it('wires Mental Agility: ANT_Conflict at weight 0.4, no proxy', () => {
+    const agility = pillarScores(taskScores(flankerRun())).agility
+    // ANT_Conflict 30 (0.4) and ErrorRecovery 0 (0.2): (0.4 x 30 + 0.2 x 0) / 0.6 = 20.
+    expect(agility.coverage).toBeCloseTo(0.6, 12)
+    expect(agility.score).toBeCloseTo(20, 9)
+    expect(agility.proxies).toEqual([])
+  })
+})

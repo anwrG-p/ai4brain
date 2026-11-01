@@ -61,6 +61,7 @@ describe('How to play (INT-1 item 13)', () => {
     // The arrow exercises read ArrowLeft / ArrowRight (tasks/useFixatedTrials.ts ARROW_KEYS).
     const arrows = Object.values(ARROW_KEYS).map((d) => (d === 'left' ? '←' : '→'))
     expect(keys('stop_signal')).toEqual(arrows)
+    expect(keys('flanker')).toEqual(arrows)
     // Pair Finder: digit k picks box k (PairedAssociates.tsx boxForKey), 1 to the box count.
     const { boxes } = task('pal').params as PalParams
     expect(keys('pal')).toEqual(['1', String(boxes)])

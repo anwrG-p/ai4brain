@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import type { TrialRecorder } from '../telemetry/tracker'
 import type {
+  FlankerParams,
   MatrixParams,
   MstParams,
   NBackParams,
@@ -13,6 +14,7 @@ import type {
   TowerParams,
   UfovParams,
 } from '../telemetry/types'
+import { Flanker } from './Flanker'
 import { Matrix } from './Matrix'
 import { MentalRotation } from './MentalRotation'
 import { Mst } from './Mst'
@@ -53,6 +55,8 @@ export function TaskRunner(props: Props) {
       return <StopSignal params={task.params as StopSignalParams} recorder={recorder} onDone={onDone} />
     case 'pal':
       return <PairedAssociates params={task.params as PalParams} recorder={recorder} onDone={onDone} />
+    case 'flanker':
+      return <Flanker params={task.params as FlankerParams} recorder={recorder} onDone={onDone} />
     default:
       return <Unsupported schemaType={task.schema_type} onDone={onDone} />
   }

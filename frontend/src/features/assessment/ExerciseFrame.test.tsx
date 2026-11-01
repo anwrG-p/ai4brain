@@ -309,6 +309,7 @@ test('the consumer names are the spec table', () => {
     mental_rotation: 'Shape Turn',
     stop_signal: 'Stop Light',
     pal: 'Pair Finder',
+    flanker: 'Arrow Focus',
   })
 })
 

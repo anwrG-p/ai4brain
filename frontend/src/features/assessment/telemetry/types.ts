@@ -278,3 +278,15 @@ export type PalParams = {
     recall: number[] // indices into items, the recall order
   }[]
 }
+
+/* Arrow Focus (tasks/Flanker.tsx): the arrow flanker task (Eriksen & Eriksen 1974), as in the ANT's
+   flanker part (Fan et al. 2002). Five arrows; answer the middle one (left/right). Congruent: the
+   four flankers point the same way; incongruent: the other way. A cross (`fixation_ms`) before each
+   trial; the arrows stay up to `time_limit_ms`. One event per trial, trial_meta { flanker:
+   'congruent' | 'incongruent', dir, response: 'left' | 'right' | 'none' }; `flanker` is the
+   signature schemaOf reads (never Stroop's `congruent`). Trial counts: FLANKER_DESIGN in Flanker.tsx. */
+export type FlankerParams = {
+  time_limit_ms: number
+  fixation_ms: number
+  trials: { dir: 'left' | 'right'; congruent: boolean }[]
+}

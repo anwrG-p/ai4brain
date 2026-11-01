@@ -206,6 +206,36 @@ function Pal() {
   )
 }
 
+// Arrow Focus: five arrows, the middle one marked; first all one way, then the flankers turn
+// against it while the middle keeps pointing right.
+function FlankerArrow({ cx, left, mark }: { cx: number; left: boolean; mark: boolean }) {
+  const s = left ? -1 : 1
+  return (
+    <path
+      d={`M${cx - 10 * s} 40 H${cx + 10 * s} M${cx + 2 * s} 32 L${cx + 10 * s} 40 L${cx + 2 * s} 48`}
+      fill="none"
+      stroke={mark ? MARK : INKC}
+      strokeWidth={3.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  )
+}
+function Flanker() {
+  const xs = [32, 56, 80, 104, 128]
+  return (
+    <>
+      {[false, true].map((against, i) => (
+        <g key={i} className={`anim-demo-cycle ${i ? 'demo-later' : ''}`} style={at(i * 1.5)}>
+          {xs.map((x, k) => (
+            <FlankerArrow key={x} cx={x} left={against && k !== 2} mark={k === 2} />
+          ))}
+        </g>
+      ))}
+    </>
+  )
+}
+
 const DEMOS: Record<SchemaType, (p: { n?: number }) => ReactNode> = {
   stroop: Stroop,
   n_back: NBack,
@@ -217,6 +247,7 @@ const DEMOS: Record<SchemaType, (p: { n?: number }) => ReactNode> = {
   matrix: Matrix,
   stop_signal: StopSignal,
   pal: Pal,
+  flanker: Flanker,
 }
 
 /** `n`: the n-back distance the Memory Gauntlet demo draws (its caption names it). */

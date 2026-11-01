@@ -35,9 +35,11 @@ export function isPillarId(value: unknown): value is PillarId {
                          those, (A) planning 0 s -> 1, 30 s -> 0
    OTS_Execution         tower: mean of l_min / l_user (0 when unsolved)
    FluidMatrices         mean of matrix accuracy and relational accuracy weighted by hops
-   ANT_Conflict          Stroop RT cost (incongruent - congruent, correct trials), (A) 0 ms -> 100,
-                         300 ms -> 0, times the gate (accuracy - 1/4) / (3/4) (chance = 4 inks);
-                         0 when accuracy is at chance and no cost can be measured
+   ANT_Conflict          Arrow Focus (flanker) RT cost (incongruent - congruent, correct trials),
+                         (A) 0 ms -> 100, 200 ms -> 0, times the gate (accuracy - 1/2) / (1/2).
+                         Only when the session has no Arrow Focus trials: Stroop RT cost, (A) 0 ms ->
+                         100, 300 ms -> 0, times the gate (accuracy - 1/4) / (3/4) (chance = 4 inks).
+                         Either is 0 when accuracy is at chance and no cost can be measured
    DCCS_SwitchCost       n-back accuracy on switch trials vs the rule stream's non-switch noise
                          trials, (A) cost 0 -> 100, 0.5 -> 0, times the gate min(1, d' / 1) (A)
    ErrorRecovery         accuracy on the trial right after an error, all exercises; tasks played at

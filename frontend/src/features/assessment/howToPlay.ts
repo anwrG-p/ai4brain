@@ -128,6 +128,14 @@ export function howToPlay(task: TaskPayload): HowToPlay | null {
         more: ['It measures remembering where things were.', 'Each round adds more shapes, up to eight.'],
       }
     }
+    case 'flanker':
+      // Flanker.tsx: right when ← / → (or Left / Right) matches the middle arrow; flankers ignored.
+      return {
+        steps: ['Look only at the middle arrow.', 'Tap its way, or press [←]/[→].', 'Ignore the arrows beside it.'],
+        caption: 'Middle points right → Right',
+        pillar: 'agility',
+        more: ['It measures keeping focus when nearby things disagree.', 'Mismatched arrows feel slower for everyone.'],
+      }
     default:
       return null
   }

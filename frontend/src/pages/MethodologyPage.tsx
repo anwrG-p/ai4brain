@@ -25,6 +25,7 @@ import {
 } from '../features/insights/projection'
 import {
   D_PRIME_MAX,
+  FLANKER_COST_MAX_MS,
   PLAN_SHARE,
   PLAN_TIME_MAX_MS,
   SSRT_BEST_MS,
@@ -75,11 +76,15 @@ const MEASURES: Record<InputId, Measure> = {
   },
   ANT_Conflict: {
     name: 'Handling conflict',
-    from: ['stroop'],
+    from: ['flanker', 'stroop'],
+    note: 'from Color Clash without Arrow Focus',
     how: (
       <>
-        Time cost = mean time on mismatched colours − mean time on matching ones, correct answers only.
-        Scale: 0 ms → 100, {STROOP_COST_MAX_MS} ms → 0. Multiplied by (accuracy − ¼) ÷ ¾, so guessing scores 0.
+        Arrow Focus: time cost = mean time when the side arrows point against the middle one − mean time when they
+        agree, correct answers only. Scale: 0 ms → 100, {FLANKER_COST_MAX_MS} ms → 0. Multiplied by (accuracy − ½) ÷
+        ½. Without Arrow Focus, Color Clash: time cost = mean time on mismatched colours − mean time on matching
+        ones, correct answers only. Scale: 0 ms → 100, {STROOP_COST_MAX_MS} ms → 0. Multiplied by (accuracy − ¼) ÷ ¾,
+        so guessing scores 0.
       </>
     ),
   },
@@ -303,6 +308,7 @@ export default function MethodologyPage() {
             <li>LDI: Stark et al. 2023, Frontiers in Behavioral Neuroscience.</li>
             <li>Stopping time (integration method): Verbruggen et al. 2019, eLife.</li>
             <li>Remembering pairs: Sahakian et al. 1988, Brain (CANTAB Paired Associates Learning).</li>
+            <li>Arrow conflict: Eriksen &amp; Eriksen 1974, Perception &amp; Psychophysics; Fan et al. 2002, J Cogn Neurosci.</li>
             <li>
               Time-cost scores are unreliable from one test to the next: Hedge, Powell &amp; Sumner 2018, Behavior
               Research Methods.

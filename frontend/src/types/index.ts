@@ -19,6 +19,7 @@ export type TaskSchemaType =
   | 'mst'
   | 'stop_signal'
   | 'pal'
+  | 'flanker'
 
 export type MarkerShape =
   | 'circle'

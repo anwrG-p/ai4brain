@@ -15,6 +15,7 @@ export function schemaOf(e: TelemetryEvent): SchemaType | null {
   const m = e.trial_meta ?? {}
   if ('stop_trial' in m) return 'stop_signal'
   if ('pal_level' in m) return 'pal'
+  if ('flanker' in m) return 'flanker'
   if ('stream' in m) return 'n_back'
   if ('congruent' in m) return 'stroop'
   if ('angle_deg' in m) return 'mental_rotation'
@@ -70,6 +71,8 @@ export const UFOV_MAX_MS = 500 // the top of the UFOV duration grid
 export const SSRT_BEST_MS = 150 // SSRT 150 ms -> 100, 450 ms -> 0
 export const SSRT_WORST_MS = 450
 const SST_CHANCE = 0.5 // two arrows on the go task
+export const FLANKER_COST_MAX_MS = 200 // flanker cost 0 ms -> 100, 200 ms -> 0
+const FLANKER_CHANCE = 0.5 // two arrows
 // Exclusion rules of the consensus guide (Verbruggen et al. 2019), evidence, not tuning: outside
 // this P(respond | signal) range the integration estimate is unreliable.
 export const SST_P_RESPOND_MIN = 0.25
@@ -109,20 +112,16 @@ export function taskScores(events: readonly TelemetryEvent[]): TaskScores {
     out.DCCS_SwitchCost = input((1 - cost / SWITCH_COST_MAX) * clamp01(d / D_PRIME_GATE), switches.length + quiet.length)
   }
 
-  // Stroop: RT cost on correct trials, gated by accuracy above chance so random or absent
-  // pressing (no RT difference) scores 0, not 100. Incongruent accuracy stands in for SSRT.
+  // ANT_Conflict: Arrow Focus's flanker cost when the session played it; else Stroop's RT cost.
+  // Both: RT cost on correct trials, gated by accuracy above chance so random or absent pressing
+  // (no RT difference) scores 0, not 100. Stroop's incongruent accuracy stands in for SSRT.
   const st = get('stroop')
   const inc = st.filter((e) => e.trial_meta?.congruent === false)
-  const incOk = inc.filter(ok)
-  const conOk = st.filter((e) => e.trial_meta?.congruent === true && ok(e))
-  const gate = st.length ? stroopGate(st) : 0
-  if (incOk.length && conOk.length) {
-    const cost = mean(incOk.map((e) => e.response_time_ms)) - mean(conOk.map((e) => e.response_time_ms))
-    // The RT term is clamped before the gate: a negative cost must not lift a guesser above the gate.
-    out.ANT_Conflict = input(clamp01(1 - cost / STROOP_COST_MAX_MS) * gate, incOk.length + conOk.length)
-  } else if (st.length && gate === 0) {
-    out.ANT_Conflict = input(0, st.length) // no cost to measure, and nothing above chance either
-  }
+  const fl = get('flanker')
+  const conflict = fl.length
+    ? conflictInput(fl, (e) => e.trial_meta?.flanker === 'incongruent', (e) => e.trial_meta?.flanker === 'congruent', FLANKER_CHANCE, FLANKER_COST_MAX_MS)
+    : conflictInput(st, (e) => e.trial_meta?.congruent === false, (e) => e.trial_meta?.congruent === true, STROOP_CHANCE, STROOP_COST_MAX_MS)
+  if (conflict) out.ANT_Conflict = conflict
   // SST_SSRT: Stop Light's SSRT when the session played it; Stroop's stand-in only otherwise.
   const ss = get('stop_signal')
   if (ss.length) {
@@ -295,8 +294,34 @@ function palInput(pal: TelemetryEvent[]): InputScore | null {
   return total ? input(weighted / total, total) : null
 }
 
+/** 0 at accuracy `chance` or below, 1 at perfect accuracy. */
+const accuracyGate = (es: TelemetryEvent[], chance: number) => clamp01((share(es, ok) - chance) / (1 - chance))
+
+/** A conflict cost input (Stroop, Arrow Focus): mean correct RT on incongruent trials minus mean
+    correct RT on congruent ones, scaled 0 ms -> 100, `costMax` -> 0 and clamped, then times the
+    accuracy gate (over all the task's trials). Without a correct trial in either condition: 0 over
+    all trials when the gate is 0 (nothing above chance), else no input. */
+function conflictInput(
+  es: TelemetryEvent[],
+  isInc: (e: TelemetryEvent) => boolean,
+  isCon: (e: TelemetryEvent) => boolean,
+  chance: number,
+  costMax: number,
+): InputScore | null {
+  if (!es.length) return null
+  const incOk = es.filter((e) => isInc(e) && ok(e))
+  const conOk = es.filter((e) => isCon(e) && ok(e))
+  const gate = accuracyGate(es, chance)
+  if (incOk.length && conOk.length) {
+    const cost = mean(incOk.map((e) => e.response_time_ms)) - mean(conOk.map((e) => e.response_time_ms))
+    // The RT term is clamped before the gate: a negative cost must not lift a guesser above the gate.
+    return input(clamp01(1 - cost / costMax) * gate, incOk.length + conOk.length)
+  }
+  return gate === 0 ? input(0, es.length) : null // no cost to measure, and nothing above chance either
+}
+
 /** 0 at chance accuracy (1 in 4 inks) or below, 1 at perfect accuracy. */
-const stroopGate = (st: TelemetryEvent[]) => clamp01((share(st, ok) - STROOP_CHANCE) / (1 - STROOP_CHANCE))
+const stroopGate = (st: TelemetryEvent[]) => accuracyGate(st, STROOP_CHANCE)
 
 /** Exercises whose errors are not the user's to recover from: Stop Light's staircase holds stop
     trials near half wrong by design; in Pair Finder a wrong box is a memory miss, and the next
@@ -335,5 +360,6 @@ function atChance(taskEvents: TelemetryEvent[]): boolean {
   const schema = first ? schemaOf(first) : null
   if (schema === 'n_back') return nbackDPrime(taskEvents) === 0
   if (schema === 'stroop') return stroopGate(taskEvents) === 0
+  if (schema === 'flanker') return accuracyGate(taskEvents, FLANKER_CHANCE) === 0
   return false
 }

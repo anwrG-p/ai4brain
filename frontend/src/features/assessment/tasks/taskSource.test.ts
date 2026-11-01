@@ -221,6 +221,7 @@ describe('fixtures.json', () => {
       mst: 'episodic_memory',
       stop_signal: 'executive_function',
       pal: 'episodic_memory',
+      flanker: 'executive_function',
     } satisfies Record<SchemaType, string>
     const n = Object.keys(expected).length
     expect(tasks).toHaveLength(n)

@@ -35,7 +35,7 @@ export const FULL_DIMENSION_POOL: readonly DimensionConfig[] = [
     uncertaintyNote: 'Fast impulsive guesses inflate error bursts and increase interval width.',
     knownBiases: ['Color vision differences (mitigated via shape/label pairing)', 'Motor speed variance'],
     backendDimensionKey: 'executive_function',
-    schemaTypes: ['stroop', 'stop_signal'],
+    schemaTypes: ['stroop', 'stop_signal', 'flanker'],
     colorCssVar: 'var(--dim-2)',
     markerShape: 'square',
     markerGlyph: '■',

@@ -13,4 +13,5 @@ export const EXERCISE_NAME: Record<SchemaType, string> = {
   mental_rotation: 'Shape Turn',
   stop_signal: 'Stop Light',
   pal: 'Pair Finder',
+  flanker: 'Arrow Focus',
 }

@@ -16,6 +16,11 @@
 // stream === rule), and ErrorRecovery reads that stream. The LF sha256 of the TS files the scores
 // depend on is under `source`.
 //
+// Ticket F-B (2026-11-01) regenerated it: PAL_FirstTrialMemory is sourceable now (Pair Finder), so a
+// session without it widens Deep Memory's uncertainty (pillars.ts UNSOURCED_INPUTS = DDM_Caution
+// only), and it added the stop_signal, pal and flanker cases (taskScores.ts ssrt(), palInput(),
+// conflictInput()).
+//
 // Dedupe: the server stores events at least once (the client retries a batch), so each case is
 // scored after dropping repeats of (session_id, trial_meta.item_id, trial_meta.stream), first one
 // kept. `dedupe()` below is that contract; brain_twin_jepa/telemetry_io.py implements the same.
@@ -188,6 +193,61 @@ function ufovRun(session, task, n, { pPeripheral = 0.7, threshold = 120.4 } = {}
   })
 }
 
+/** A seeded Stop Light run (StopSignal.tsx layout): go RT uniform in [goMin, goMin + 400), a stop
+    fails when the go RT would beat SSD + ssrt (the race model); the SSD staircase moves 50 ms. */
+function stopRun(session, task, n, { ssrt = 230, goMin = 350, pOmit = 0.04, pChoiceErr = 0.03, stopShare = 0.25, respondAll = false } = {}) {
+  let ssd = 250
+  return Array.from({ length: n }, (_, i) => {
+    const dir = pick(['left', 'right'])
+    const other = dir === 'left' ? 'right' : 'left'
+    const goRt = Math.round(goMin + rand() * 400)
+    if (i > 1 && chance(stopShare)) {
+      const failed = respondAll || goRt < ssd + ssrt
+      const meta = { stop_trial: true, dir, response: failed ? dir : 'none', ssd_ms: ssd }
+      ssd = Math.min(1200, Math.max(0, ssd + (failed ? -50 : 50)))
+      return ev(session, task, i, 'executive_function', meta, { ok: !failed, rt: failed ? goRt : 1250 })
+    }
+    if (chance(pOmit)) return ev(session, task, i, 'executive_function', { stop_trial: false, dir, response: 'none' }, { ok: false, rt: 1250 })
+    const wrong = chance(pChoiceErr)
+    return ev(session, task, i, 'executive_function', { stop_trial: false, dir, response: wrong ? other : dir }, { ok: !wrong, rt: goRt })
+  })
+}
+
+/** A Pair Finder run (PairedAssociates.tsx layout): stages of 2, 4, 6, 8 in 8 boxes, up to 3
+    attempts. `pOk(level, attempt)` is the chance a choice is right; a failed third attempt ends it. */
+function palRun(session, task, pOk) {
+  const events = []
+  let i = 0
+  for (const level of [2, 4, 6, 8]) {
+    let passed = false
+    for (let attempt = 1; attempt <= 3 && !passed; attempt++) {
+      let wrong = 0
+      for (let k = 0; k < level; k++) {
+        const box = Math.floor(rand() * 8)
+        const ok = chance(pOk(level, attempt))
+        if (!ok) wrong++
+        const chosen = ok ? box : (box + 1 + Math.floor(rand() * 7)) % 8
+        events.push(ev(session, task, i++, 'episodic_memory', { pal_level: level, attempt, pattern: k % 8, box, chosen, pal_total: 20, boxes: 8 }, { ok, rt: 1800 }))
+      }
+      passed = wrong === 0
+    }
+    if (!passed) break
+  }
+  return events
+}
+
+/** A seeded Arrow Focus run (Flanker.tsx layout). */
+function flankerRun(session, task, n, { pOk = 0.92, conRt = 480, incRt = 560, pTimeout = 0.02 } = {}) {
+  return Array.from({ length: n }, (_, i) => {
+    const congruent = i % 2 === 0
+    const dir = pick(['left', 'right'])
+    if (chance(pTimeout)) return ev(session, task, i, 'executive_function', { flanker: congruent ? 'congruent' : 'incongruent', dir, response: 'none' }, { ok: false, rt: 1700 })
+    const ok = chance(pOk)
+    const rt = Math.round((congruent ? conRt : incRt) + (rand() - 0.5) * 120)
+    return ev(session, task, i, 'executive_function', { flanker: congruent ? 'congruent' : 'incongruent', dir, response: ok ? dir : dir === 'left' ? 'right' : 'left' }, { ok, rt })
+  })
+}
+
 // ---- cases -----------------------------------------------------------------------------------
 
 const cases = []
@@ -332,6 +392,60 @@ for (const s of [81, 82, 83]) {
     ]
   }, s)
 }
+
+// ---- F-B: Stop Light, Pair Finder, Arrow Focus -----------------------------------------------
+
+add('stop_signal', 'Stop Light: SSRT by integration (omissions -> slowest go RT, type-6 quantile at P(respond|signal)) minus mean SSD, times the go gate.', () =>
+  stopRun('s_sst', 'ss1', 120), 91)
+
+add('stop_signal_all_respond', 'Stop Light pressing on every stop sign: P(respond|signal) = 1 > 0.75, excluded, so no SST_SSRT (and no Stroop proxy either).', () => [
+  ...stopRun('s_sst_x', 'ss2', 60, { respondAll: true }),
+  ...stroopRun('s_sst_x', 'st9', 12),
+], 92)
+
+add('stop_signal_race_violation', 'Stop Light whose signal-respond RTs are not faster than go RTs: the race check excludes it.', () => [
+  ...[400, 420, 440, 460, 480, 500].map((rt, i) => ev('s_sst_r', 'ss3', i, 'executive_function', { stop_trial: false, dir: 'left', response: 'left' }, { rt })),
+  ...[[200, 600], [150, null], [200, 640], [250, null]].map(([ssd, rt], k) =>
+    ev('s_sst_r', 'ss3', 6 + k, 'executive_function', { stop_trial: true, dir: 'left', response: rt === null ? 'none' : 'left', ssd_ms: ssd }, { ok: rt === null, rt: rt ?? 1250 })),
+])
+
+add('stop_signal_nonresponder', 'Stop Light never pressed: go gate 0, so SST_SSRT 0 over the stop trials; the task is left out of ErrorRecovery.', () =>
+  Array.from({ length: 12 }, (_, i) => {
+    const stop = i % 4 === 3
+    return ev('s_sst_n', 'ss4', i, 'executive_function', stop ? { stop_trial: true, dir: 'left', response: 'none', ssd_ms: 250 + 50 * Math.floor(i / 4) } : { stop_trial: false, dir: 'left', response: 'none' }, { ok: stop, rt: 1250 })
+  }))
+
+add('pal_full', 'Pair Finder: first-attempt hits over pal_total, chance-corrected for 1 in 8 boxes; retries do not count.', () =>
+  palRun('s_pal', 'pa1', (level, attempt) => (attempt > 1 ? 0.95 : level <= 4 ? 0.9 : 0.7)), 93)
+
+add('pal_failed_early', 'Pair Finder ending on a failed third attempt: unreached stages count as missed.', () =>
+  palRun('s_pal_f', 'pa2', (level) => (level <= 2 ? 1 : level <= 4 ? 0.75 : 0.3)), 94)
+
+add('flanker', 'Arrow Focus: flanker RT cost on correct trials (200 ms -> 0), times the gate (accuracy - 1/2) / (1/2).', () =>
+  flankerRun('s_fl', 'fl1', 96), 95)
+
+add('flanker_over_stroop', 'Arrow Focus and Color Clash together: ANT_Conflict from the flanker; Stroop still stands in for SSRT.', () => [
+  ...flankerRun('s_fl_st', 'fl2', 48, { pOk: 0.85, incRt: 610 }),
+  ...stroopRun('s_fl_st', 'st8', 24),
+], 96)
+
+add('flanker_at_chance', 'Arrow Focus at exactly half right: gate 0, ANT_Conflict 0 although a cost exists; left out of ErrorRecovery.', () =>
+  Array.from({ length: 40 }, (_, i) => {
+    const flanker = i % 2 === 0 ? 'congruent' : 'incongruent'
+    const ok = i % 4 < 2
+    return ev('s_fl_c', 'fl3', i, 'executive_function', { flanker, dir: 'left', response: ok ? 'left' : 'right' }, { ok, rt: flanker === 'congruent' ? 500 : 620 })
+  }))
+
+add('full_session_new_exercises', 'All 11 exercises: every input but DDM_Caution, Deep Memory at coverage 1.', () => {
+  const sess = 's_all'
+  seed(98)
+  return [
+    ...fullSession(sess, 98),
+    ...stopRun(sess, `${sess}_ss`, 80),
+    ...palRun(sess, `${sess}_pa`, (level, attempt) => (attempt > 1 ? 0.9 : 0.8)),
+    ...flankerRun(sess, `${sess}_fl`, 48),
+  ]
+}, 98)
 
 // ---- expected values -------------------------------------------------------------------------
 
