@@ -4,7 +4,7 @@ import { Dumbbell, House, MessageCircle, Moon, Sun, User, WifiOff, type LucideIc
 import { BRAND_CONFIG } from '../../config/brand'
 import { useAppStore } from '../../state/useAppStore'
 import { tracker } from '../../features/assessment/telemetry/tracker'
-import { BrianLogo } from '../features/brand/BrianLogo'
+import { LogoLockup, LogoMark } from '../features/brand/Logo'
 import { HumanReviewGate } from '../dev/HumanReviewGate'
 import { Button } from '../ui/Button'
 import { EmotionListener } from './EmotionListener'
@@ -26,7 +26,8 @@ const UNDER_YOU = ['/you', '/privacy', '/settings', '/methodology']
 const isActive = (path: string, pathname: string) =>
   path === '/you' ? UNDER_YOU.some((p) => pathname.startsWith(p)) : pathname.startsWith(path)
 
-const ICON = { strokeWidth: 1.75, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true } as const
+// Continuous-line icons with rounded caps and joins (docs/design/references/presentation-style.jpg).
+const ICON = { strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true } as const
 
 const subscribeTracker = (onChange: () => void) => tracker.subscribe(onChange)
 const trackerStatus = () => tracker.getStatus()
@@ -76,16 +77,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               aria-label={`${BRAND_CONFIG.productName} Home`}
               className="focus-ring rounded-md flex min-h-11 min-w-11 items-center justify-center text-ink no-underline shrink-0"
             >
-              {/* Symbol only on phones so the header fits 375 px; viewBox cropped to the lockup's ink */}
-              <BrianLogo variant="symbol" size={40} aria-hidden="true" className="sm:hidden" />
-              <BrianLogo
-                variant="lockup"
-                viewBox="112 24 552 208"
-                width={106}
-                height={40}
-                aria-hidden="true"
-                className="max-sm:hidden"
-              />
+              {/* The mark only on phones so the header fits 375 px; the lockup from sm up. */}
+              <LogoMark size={40} aria-hidden="true" className="sm:hidden" />
+              <LogoLockup className="max-sm:hidden" />
             </Link>
 
             {withNav && (

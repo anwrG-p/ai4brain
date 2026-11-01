@@ -78,6 +78,6 @@ describe('AppShell (Calm & Clean)', () => {
       </MemoryRouter>,
     )
     expect(screen.getByRole('banner').className).toMatch(/\bh-16\b/)
-    expect(screen.getByRole('link', { name: 'BRIAN Home' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'SynapseTwin Home' })).toBeInTheDocument()
   })
 })
