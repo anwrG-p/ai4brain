@@ -42,7 +42,11 @@ export function isPillarId(value: unknown): value is PillarId {
                          trials, (A) cost 0 -> 100, 0.5 -> 0, times the gate min(1, d' / 1) (A)
    ErrorRecovery         accuracy on the trial right after an error, all exercises; tasks played at
                          chance (n-back d' 0, Stroop accuracy <= 1/4) are left out
-   SST_SSRT              PROXY: Stroop incongruent accuracy (no stop-signal task exists)
+   SST_SSRT              Stop Light (stop_signal): SSRT by the integration method with go omissions
+                         replaced (Verbruggen et al. 2019 consensus guide, taskScores.ts ssrt()), none
+                         when the guide's exclusion rules reject it; (A) 150 ms -> 100, 450 ms -> 0,
+                         times the go gate (go accuracy - 1/2) / (1/2). Only when the session has no
+                         Stop Light trials: PROXY, Stroop incongruent accuracy
    DDM_Caution           omitted: no source
    PAL_FirstTrialMemory  omitted: no source
    MST_LDI               P(similar | lure) - P(similar | new), clamped to 0..1

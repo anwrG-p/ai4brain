@@ -108,6 +108,15 @@ export function howToPlay(task: TaskPayload): HowToPlay | null {
         pillar: 'agility',
         more: ['It measures turning shapes in your mind.', 'Bigger turns take longer for everyone.'],
       }
+    case 'stop_signal':
+      // StopSignal.tsx: ← / → or Left / Right on a go trial; on a stop trial any press is wrong. The
+      // consensus guide asks to say "do not wait for the stop sign" (Verbruggen et al. 2019).
+      return {
+        steps: ['Tap the way the arrow points, or [←]/[→].', 'Be quick: never wait for a stop.', 'Stop sign? Press nothing at all.'],
+        caption: 'An arrow, then the stop sign',
+        pillar: 'impulse',
+        more: ['It measures stopping an action you already started.', 'Each stop you make brings the next sign later.'],
+      }
     default:
       return null
   }

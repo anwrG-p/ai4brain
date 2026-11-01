@@ -107,7 +107,8 @@ describe('How we calculate this (/methodology)', () => {
     const row = (id: string) => table.querySelector(`tr[data-input="${id}"]`)
     expect(row('OSPAN')).toHaveTextContent('(from Memory Gauntlet)')
     expect(row('DCCS_SwitchCost')).toHaveTextContent('(from Memory Gauntlet)')
-    expect(row('SST_SSRT')).toHaveTextContent('(estimated)')
+    // Stop Light measures it; Color Clash only stands in without it (taskScores.ts).
+    expect(row('SST_SSRT')).toHaveTextContent('(estimated from Color Clash without Stop Light)')
     expect(row('MST_LDI')).not.toHaveTextContent('(')
   })
 

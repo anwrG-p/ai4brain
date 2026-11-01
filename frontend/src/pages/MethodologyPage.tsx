@@ -27,6 +27,8 @@ import {
   D_PRIME_MAX,
   PLAN_SHARE,
   PLAN_TIME_MAX_MS,
+  SSRT_BEST_MS,
+  SSRT_WORST_MS,
   STROOP_COST_MAX_MS,
   SWITCH_COST_MAX,
   UFOV_MAX_MS,
@@ -99,9 +101,16 @@ const MEASURES: Record<InputId, Measure> = {
   },
   SST_SSRT: {
     name: 'Stopping a habit',
-    from: ['stroop'],
-    note: 'estimated',
-    how: <>A stand-in for now: accuracy on mismatched Color Clash trials. There is no stop-signal exercise yet.</>,
+    from: ['stop_signal', 'stroop'],
+    note: 'estimated from Color Clash without Stop Light',
+    how: (
+      <>
+        Stop Light: stopping time = your go time at the rank P(press | stop sign), minus the mean stop-sign delay
+        (a missed go counts as your slowest). Scale: {SSRT_BEST_MS} ms → 100, {SSRT_WORST_MS} ms → 0, times (go
+        accuracy − ½) ÷ ½. Not scored when you press on fewer than ¼ or more than ¾ of stop signs. Without Stop
+        Light, accuracy on mismatched Color Clash trials stands in.
+      </>
+    ),
   },
   OTS_Execution: {
     name: 'Moving with care',
@@ -283,6 +292,7 @@ export default function MethodologyPage() {
           <Sources>
             <li>d′ correction: Hautus 1995, Behavior Research Methods, Instruments, &amp; Computers.</li>
             <li>LDI: Stark et al. 2023, Frontiers in Behavioral Neuroscience.</li>
+            <li>Stopping time (integration method): Verbruggen et al. 2019, eLife.</li>
             <li>
               Time-cost scores are unreliable from one test to the next: Hedge, Powell &amp; Sumner 2018, Behavior
               Research Methods.

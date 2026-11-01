@@ -119,7 +119,7 @@ export function eventProblem(x: unknown): string | null {
 
 export const isTelemetryEvent = (x: unknown): x is TelemetryEvent => eventProblem(x) === null
 
-// One union for the whole app: the UI's registry type has the same 8 literals.
+// One union for the whole app: the UI's registry type has the same literals.
 export type SchemaType = TaskSchemaType
 
 export type TaskPayload = {
@@ -244,4 +244,19 @@ export type MstParams = {
   encode_ms: number
   encode: Poly[]
   test: { item: Poly; kind: 'old' | 'lure' | 'new'; delta: number }[]
+}
+
+/* Stop Light (tasks/StopSignal.tsx): a two-choice go task (left/right arrow) with a stop signal on
+   some trials, shown after a stop-signal delay (SSD). A one-up/one-down staircase moves the SSD by
+   `ssd_step_ms`: later after a stop, earlier after a failed stop (Verbruggen et al. 2019, eLife
+   8:e46323, the consensus guide). The go window is `time_limit_ms`: a go trial with no press is an
+   omission, a stop trial with no press a successful stop. One event per trial, trial_meta
+   { stop_trial, dir, response: 'left' | 'right' | 'none', ssd_ms (stop trials only) }; `stop_trial`
+   is the signature schemaOf reads. Trial count and stop share: SST_DESIGN in StopSignal.tsx. */
+export type StopSignalParams = {
+  time_limit_ms: number
+  fixation_ms: number // the cross before every arrow
+  ssd_start_ms: number
+  ssd_step_ms: number
+  trials: { dir: 'left' | 'right'; stop: boolean }[]
 }

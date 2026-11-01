@@ -6,6 +6,7 @@ import type {
   NBackParams,
   RelationalParams,
   RotationParams,
+  StopSignalParams,
   StroopParams,
   TaskPayload,
   TowerParams,
@@ -16,6 +17,7 @@ import { MentalRotation } from './MentalRotation'
 import { Mst } from './Mst'
 import { NBack } from './NBack'
 import { Relational } from './Relational'
+import { StopSignal } from './StopSignal'
 import { Stroop } from './Stroop'
 import { Tower } from './Tower'
 import { Ufov } from './Ufov'
@@ -45,6 +47,8 @@ export function TaskRunner(props: Props) {
       return <Ufov params={task.params as UfovParams} recorder={recorder} onDone={onDone} />
     case 'mst':
       return <Mst params={task.params as MstParams} recorder={recorder} onDone={onDone} />
+    case 'stop_signal':
+      return <StopSignal params={task.params as StopSignalParams} recorder={recorder} onDone={onDone} />
     default:
       return <Unsupported schemaType={task.schema_type} onDone={onDone} />
   }

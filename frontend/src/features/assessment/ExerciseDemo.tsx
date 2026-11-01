@@ -169,6 +169,25 @@ function Matrix() {
   )
 }
 
+// Stop Light: an arrow shows, then the stop sign (an octagon and the word) closes round it.
+const OCTAGON = Array.from({ length: 8 }, (_, k) => {
+  const a = ((22.5 + k * 45) * Math.PI) / 180
+  return `${(80 + 34 * Math.cos(a)).toFixed(1)},${(40 + 34 * Math.sin(a)).toFixed(1)}`
+}).join(' ')
+function StopSignal() {
+  return (
+    <>
+      <path d="M62 40 H96 M84 28 L98 40 L84 52" fill="none" stroke={INKC} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />
+      <g className="anim-demo-seq" style={at(3)}>
+        <polygon points={OCTAGON} fill="none" stroke={MARK} strokeWidth={4} strokeLinejoin="round" />
+        <text x={138} y={45} fontSize={13} fill={INKC} {...TEXT}>
+          Stop
+        </text>
+      </g>
+    </>
+  )
+}
+
 const DEMOS: Record<SchemaType, (p: { n?: number }) => ReactNode> = {
   stroop: Stroop,
   n_back: NBack,
@@ -178,6 +197,7 @@ const DEMOS: Record<SchemaType, (p: { n?: number }) => ReactNode> = {
   tower: Tower,
   mst: Mst,
   matrix: Matrix,
+  stop_signal: StopSignal,
 }
 
 /** `n`: the n-back distance the Memory Gauntlet demo draws (its caption names it). */

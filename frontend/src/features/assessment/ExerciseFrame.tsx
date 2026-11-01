@@ -74,10 +74,25 @@ function useTrialsDone(taskId: string) {
 }
 
 // Small dots, n of N. They change only when a trial ends; a dot pops once as it fills (the only
-// motion near a running trial, spec R8).
-// ponytail: one dot per trial, wrapping; a block of 60+ trials would want a bar instead.
+// motion near a running trial, spec R8). A block longer than MAX_DOTS (Stop Light's 200 trials) shows
+// one thin bar instead, so the dots never push the stimulus down; it steps without motion.
+export const MAX_DOTS = 40
 function ProgressDots({ done, total }: { done: number; total: number }) {
   const n = Math.min(done, total)
+  if (total > MAX_DOTS)
+    return (
+      <div
+        role="progressbar"
+        aria-label="Progress"
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={n}
+        aria-valuetext={`${n} of ${total} done`}
+        className="h-2 w-full max-w-xs overflow-hidden rounded-pill border border-border-strong"
+      >
+        <div data-bar-fill className="h-full bg-brand" style={{ width: `${(100 * n) / total}%` }} />
+      </div>
+    )
   return (
     <div
       role="progressbar"

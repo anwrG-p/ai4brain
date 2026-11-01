@@ -8,9 +8,12 @@ import type { InputScore, TaskScores } from './pillars'
 /** The exercise an event came from. The event has no schema_type and task_id is the server's own
     (only mock ids carry a prefix), so it is read from the trial_meta signature, which is unique per
     exercise (assessment_engine/README.md, "trial_meta by schema_type"). Matrix logs no extra keys,
-    so it is the pattern_induction event without relational's `hops`. */
+    so it is the pattern_induction event without relational's `hops`. The newer exercises are read
+    first: their keys are their own (stop_trial; Arrow Focus logs `flanker`, never Stroop's
+    `congruent`). */
 export function schemaOf(e: TelemetryEvent): SchemaType | null {
   const m = e.trial_meta ?? {}
+  if ('stop_trial' in m) return 'stop_signal'
   if ('stream' in m) return 'n_back'
   if ('congruent' in m) return 'stroop'
   if ('angle_deg' in m) return 'mental_rotation'
@@ -63,6 +66,13 @@ export const PLAN_SHARE = 0.8 // OTS_Planning = 0.8 x solved in minimum moves + 
 export const PLAN_TIME_MAX_MS = 30_000 // half of the TOL-F 60 s limit
 export const UFOV_MIN_MS = 17 // one 60 Hz frame
 export const UFOV_MAX_MS = 500 // the top of the UFOV duration grid
+export const SSRT_BEST_MS = 150 // SSRT 150 ms -> 100, 450 ms -> 0
+export const SSRT_WORST_MS = 450
+const SST_CHANCE = 0.5 // two arrows on the go task
+// Exclusion rules of the consensus guide (Verbruggen et al. 2019), evidence, not tuning: outside
+// this P(respond | signal) range the integration estimate is unreliable.
+export const SST_P_RESPOND_MIN = 0.25
+export const SST_P_RESPOND_MAX = 0.75
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length
@@ -112,7 +122,12 @@ export function taskScores(events: readonly TelemetryEvent[]): TaskScores {
   } else if (st.length && gate === 0) {
     out.ANT_Conflict = input(0, st.length) // no cost to measure, and nothing above chance either
   }
-  if (inc.length) out.SST_SSRT = { ...input(share(inc, ok), inc.length), proxy: true }
+  // SST_SSRT: Stop Light's SSRT when the session played it; Stroop's stand-in only otherwise.
+  const ss = get('stop_signal')
+  if (ss.length) {
+    const sst = stopSignalInput(ss)
+    if (sst) out.SST_SSRT = sst
+  } else if (inc.length) out.SST_SSRT = { ...input(share(inc, ok), inc.length), proxy: true }
 
   // Tower: one event per problem.
   const tw = get('tower').filter((e) => num(e, 'l_min') !== null && num(e, 'l_user') !== null)
@@ -191,23 +206,85 @@ function nbackDPrime(nb: TelemetryEvent[]): number | null {
   return Math.max(0, dPrime(hits, signal.length, fas, noise.length))
 }
 
+/** Hyndman & Fan (1996) type-6 sample quantile of ascending `sorted` (R's quantile(type = 6), the
+    one the consensus guide's script uses): h = (n + 1) p, interpolated between the order statistics
+    around h, clamped to the first and last. */
+export function quantile6(sorted: readonly number[], p: number): number {
+  const n = sorted.length
+  const h = (n + 1) * p
+  if (h <= 1) return sorted[0]!
+  if (h >= n) return sorted[n - 1]!
+  const lo = Math.floor(h)
+  return sorted[lo - 1]! + (h - lo) * (sorted[lo]! - sorted[lo - 1]!)
+}
+
+const responded = (e: TelemetryEvent) => {
+  const r = e.trial_meta?.response
+  return typeof r === 'string' && r !== 'none'
+}
+const isStopTrial = (e: TelemetryEvent) => e.trial_meta?.stop_trial === true
+const isGoTrial = (e: TelemetryEvent) => e.trial_meta?.stop_trial === false
+
+/** Stop-signal reaction time by the integration method with go omissions replaced, as the consensus
+    guide recommends (Verbruggen et al. 2019, eLife 8:e46323):
+    - the go RT distribution is every go trial, choice errors included, with each omission
+      (response 'none') replaced by the slowest go RT;
+    - nth RT = its type-6 quantile at p = P(respond | signal);
+    - SSRT = nth RT - mean SSD over all stop trials.
+    Null (not estimable) under the guide's exclusion rules: no stop trial or no go response,
+    P(respond | signal) outside [0.25, 0.75], or a mean signal-respond RT not below the mean go RT
+    (responses on go trials only), which breaks the race model's independence. */
+export function ssrt(events: readonly TelemetryEvent[]): number | null {
+  const go = events.filter(isGoTrial)
+  const stop = events.filter(isStopTrial)
+  const goRts = go.filter(responded).map((e) => e.response_time_ms)
+  const ssds = stop.map((e) => num(e, 'ssd_ms')).filter((v): v is number => v !== null)
+  if (!stop.length || !goRts.length || ssds.length !== stop.length) return null
+  const pRespond = share(stop, responded)
+  if (pRespond < SST_P_RESPOND_MIN || pRespond > SST_P_RESPOND_MAX) return null
+  if (mean(stop.filter(responded).map((e) => e.response_time_ms)) >= mean(goRts)) return null
+  const slowest = Math.max(...goRts)
+  const dist = go.map((e) => (responded(e) ? e.response_time_ms : slowest)).sort((a, b) => a - b)
+  return quantile6(dist, pRespond) - mean(ssds)
+}
+
+/** SST_SSRT from one session's Stop Light events: SSRT scaled SSRT_BEST_MS -> 100, SSRT_WORST_MS -> 0,
+    times the go-task gate (go accuracy - 1/2) / (1/2) (omissions count wrong), so pressing at random
+    or not at all scores 0. A gate of 0 scores 0 even when no SSRT can be estimated; otherwise an
+    SSRT the guide excludes gives no input. `trials` = stop trials. */
+function stopSignalInput(ss: TelemetryEvent[]): InputScore | null {
+  const go = ss.filter(isGoTrial)
+  const stops = ss.filter(isStopTrial).length
+  if (!stops) return null
+  const gate = go.length ? clamp01((share(go, ok) - SST_CHANCE) / (1 - SST_CHANCE)) : 0
+  if (gate === 0) return input(0, stops)
+  const value = ssrt(ss)
+  if (value === null) return null
+  return input(clamp01((SSRT_WORST_MS - value) / (SSRT_WORST_MS - SSRT_BEST_MS)) * gate, stops)
+}
+
 /** 0 at chance accuracy (1 in 4 inks) or below, 1 at perfect accuracy. */
 const stroopGate = (st: TelemetryEvent[]) => clamp01((share(st, ok) - STROOP_CHANCE) / (1 - STROOP_CHANCE))
+
+/** Exercises whose errors are not the user's to recover from: Stop Light's staircase holds stop
+    trials near half wrong by design. A task is read by its first event's schema. */
+const NO_RECOVERY: ReadonlySet<SchemaType> = new Set<SchemaType>(['stop_signal'])
 
 /** Accuracy on the trial right after an error, within each task. A trial is wrong when any of its
     events is; n-back logs one event per stream, and only its rule-stream event (which carries the
     trial's verdict, off-rule presses included) is read. Tasks played at chance or below (n-back d' 0,
     Stroop accuracy <= 1 in 4) are left out: a non-responder's next n-back trial is "correct" by
-    withholding, which is not recovery. */
+    withholding, which is not recovery. So are the NO_RECOVERY exercises. */
 function errorRecovery(events: readonly TelemetryEvent[]): InputScore | null {
   const byTask = new Map<string, TelemetryEvent[]>()
   for (const e of events) byTask.set(e.task_id, [...(byTask.get(e.task_id) ?? []), e])
   let after = 0
   let recovered = 0
   for (const taskEvents of byTask.values()) {
-    if (atChance(taskEvents)) continue
     const first = taskEvents[0]
-    const read = first && schemaOf(first) === 'n_back' ? ruleStream(taskEvents) : taskEvents
+    const schema = first ? schemaOf(first) : null
+    if ((schema && NO_RECOVERY.has(schema)) || atChance(taskEvents)) continue
+    const read = schema === 'n_back' ? ruleStream(taskEvents) : taskEvents
     const trials = new Map<number, boolean>()
     for (const e of read) trials.set(e.trial_index, (trials.get(e.trial_index) ?? true) && ok(e))
     const seq = [...trials.entries()].sort((x, y) => x[0] - y[0]).map(([, correct]) => correct)

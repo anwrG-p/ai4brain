@@ -4,6 +4,7 @@ import type {
   RelationalParams,
   RotationParams,
   SchemaType,
+  StopSignalParams,
   StroopParams,
   TaskPayload,
   UfovParams,
@@ -25,6 +26,7 @@ const LINE: Record<SchemaType, string> = {
   stroop: 'Pick the color of the ink, not the word.',
   matrix: 'Pick the piece that completes the pattern.',
   mental_rotation: 'Say if the right shape is the left one turned or mirrored.',
+  stop_signal: 'Press the way the arrow points. Stop for the sign.',
 }
 
 // The instruction screen: the name, one sentence on what to do (under 12 words, anti-slop rule 4)
@@ -57,10 +59,12 @@ export function trialCount(task: TaskPayload): number {
       return (p as UfovParams).trials.filter(isValidTrial).length
     case 'mst':
       return (p as MstParams).test.length
+    case 'stop_signal':
+      return (p as StopSignalParams).trials.length
     default:
       return 1 // matrix and tower: one trial
   }
 }
 
-// UFOV draws its own fixation cross before every trial, so the frame does not add one.
-export const OWN_FIXATION: ReadonlySet<SchemaType> = new Set<SchemaType>(['ufov'])
+// UFOV and Stop Light draw their own fixation cross before every trial, so the frame does not add one.
+export const OWN_FIXATION: ReadonlySet<SchemaType> = new Set<SchemaType>(['ufov', 'stop_signal'])
