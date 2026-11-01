@@ -8,8 +8,8 @@
     "trial_meta.stream"
   ],
   "source": {
-    "insights/taskScores.ts": "b3c34c9075afc6fd685d9d66d1f76a2ff5de27137db071d1c500e22b7839f99f",
-    "insights/pillars.ts": "5d21d7cbaee080d93f7a0fbc8c717d6df75f09fd0f0ffae67774d77a3178dfa6",
+    "insights/taskScores.ts": "d01e2c44ae251b7079196f244447f4ef5384fba3494eb38aa20e7baae7680090",
+    "insights/pillars.ts": "ec530a8c3e2a6fa15ab335ab72017a33f567107f2a64edb777088f777aca87a1",
     "assessment/telemetry/types.ts": "26d2d753e1b76cc14fbc6f07a0c11b0b0c0d133fdba875e9c8fd803bf5610447"
   },
   "cases": [
@@ -679,7 +679,8 @@
           },
           "ANT_Conflict": {
             "score": 0,
-            "trials": 8
+            "trials": 8,
+            "proxy": true
           },
           "SST_SSRT": {
             "score": 50,
@@ -702,7 +703,9 @@
             "score": 22.222222222222218,
             "uncertainty": 49.70075058843173,
             "coverage": 0.6000000000000001,
-            "proxies": []
+            "proxies": [
+              "ANT_Conflict"
+            ]
           },
           "impulse": {
             "score": 50,
@@ -760,7 +763,8 @@
         "inputs": {
           "ANT_Conflict": {
             "score": 71.53296247499146,
-            "trials": 34
+            "trials": 34,
+            "proxy": true
           },
           "SST_SSRT": {
             "score": 95.83333333333334,
@@ -783,7 +787,9 @@
             "score": 81.02197498332762,
             "uncertainty": 42.78817461297267,
             "coverage": 0.6000000000000001,
-            "proxies": []
+            "proxies": [
+              "ANT_Conflict"
+            ]
           },
           "impulse": {
             "score": 95.83333333333334,
@@ -855,7 +861,8 @@
         "inputs": {
           "ANT_Conflict": {
             "score": 0,
-            "trials": 4
+            "trials": 4,
+            "proxy": true
           },
           "SST_SSRT": {
             "score": 12.5,
@@ -874,7 +881,9 @@
             "score": 0,
             "uncertainty": 50,
             "coverage": 0.4,
-            "proxies": []
+            "proxies": [
+              "ANT_Conflict"
+            ]
           },
           "impulse": {
             "score": 12.5,
@@ -926,7 +935,8 @@
         "inputs": {
           "ANT_Conflict": {
             "score": 0,
-            "trials": 8
+            "trials": 8,
+            "proxy": true
           },
           "SST_SSRT": {
             "score": 0,
@@ -945,7 +955,9 @@
             "score": 0,
             "uncertainty": 50,
             "coverage": 0.4,
-            "proxies": []
+            "proxies": [
+              "ANT_Conflict"
+            ]
           },
           "impulse": {
             "score": 0,
@@ -1432,7 +1444,8 @@
           },
           "ANT_Conflict": {
             "score": 39.47001763668431,
-            "trials": 19
+            "trials": 19,
+            "proxy": true
           },
           "SST_SSRT": {
             "score": 75,
@@ -1479,7 +1492,9 @@
             "score": 54.173100222375595,
             "uncertainty": 12.196900510632886,
             "coverage": 1,
-            "proxies": []
+            "proxies": [
+              "ANT_Conflict"
+            ]
           },
           "impulse": {
             "score": 81.875,
@@ -1682,7 +1697,8 @@
           },
           "ANT_Conflict": {
             "score": 63.46031746031746,
-            "trials": 22
+            "trials": 22,
+            "proxy": true
           },
           "SST_SSRT": {
             "score": 87.5,
@@ -1729,7 +1745,9 @@
             "score": 72.49546327092355,
             "uncertainty": 12.192182905834542,
             "coverage": 1,
-            "proxies": []
+            "proxies": [
+              "ANT_Conflict"
+            ]
           },
           "impulse": {
             "score": 89.6875,
@@ -1964,7 +1982,8 @@
           },
           "ANT_Conflict": {
             "score": 66.97037037037035,
-            "trials": 14
+            "trials": 14,
+            "proxy": true
           },
           "SST_SSRT": {
             "score": 100,
@@ -1995,7 +2014,9 @@
             "score": 69.50551052875392,
             "uncertainty": 14.56717771796125,
             "coverage": 1,
-            "proxies": []
+            "proxies": [
+              "ANT_Conflict"
+            ]
           },
           "impulse": {
             "score": 100,
@@ -2133,7 +2154,8 @@
           },
           "ANT_Conflict": {
             "score": 32.074074074074055,
-            "trials": 15
+            "trials": 15,
+            "proxy": true
           },
           "SST_SSRT": {
             "score": 69.23076923076923,
@@ -2168,7 +2190,9 @@
             "score": 71.29116809116809,
             "uncertainty": 13.311225714226431,
             "coverage": 1,
-            "proxies": []
+            "proxies": [
+              "ANT_Conflict"
+            ]
           },
           "impulse": {
             "score": 69.23076923076923,
@@ -2322,7 +2346,8 @@
           },
           "ANT_Conflict": {
             "score": 3.1066991756647027,
-            "trials": 20
+            "trials": 20,
+            "proxy": true
           },
           "SST_SSRT": {
             "score": 57.89473684210527,
@@ -2369,7 +2394,9 @@
             "score": 17.242679670265883,
             "uncertainty": 13.009731029090316,
             "coverage": 1,
-            "proxies": []
+            "proxies": [
+              "ANT_Conflict"
+            ]
           },
           "impulse": {
             "score": 73.68421052631578,
@@ -2691,7 +2718,8 @@
         "inputs": {
           "ANT_Conflict": {
             "score": 71.66666666666667,
-            "trials": 12
+            "trials": 12,
+            "proxy": true
           }
         },
         "pillars": {
@@ -2705,7 +2733,9 @@
             "score": 71.66666666666667,
             "uncertainty": 50,
             "coverage": 0.4,
-            "proxies": []
+            "proxies": [
+              "ANT_Conflict"
+            ]
           },
           "impulse": {
             "score": null,
@@ -2923,7 +2953,7 @@
         "unique_events": 44,
         "inputs": {
           "PAL_FirstTrialMemory": {
-            "score": 42.857142857142854,
+            "score": 50,
             "trials": 20
           }
         },
@@ -2947,7 +2977,7 @@
             "proxies": []
           },
           "memory": {
-            "score": 42.857142857142854,
+            "score": 50,
             "uncertainty": 48.696591509995415,
             "coverage": 0.45,
             "proxies": []
@@ -2959,7 +2989,7 @@
             "proxies": []
           }
         },
-        "unified": 42.857142857142854
+        "unified": 50
       },
       "events": [
         {"user_id":"golden_user","session_id":"s_pal","task_id":"pa1","trial_index":0,"dimension":"episodic_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"pa1:0","pal_level":2,"attempt":1,"pattern":0,"box":2,"chosen":2,"pal_total":20,"boxes":8},"client_ts":"2026-10-30T09:00:01.500Z"},
@@ -3015,7 +3045,7 @@
         "unique_events": 14,
         "inputs": {
           "PAL_FirstTrialMemory": {
-            "score": 14.285714285714285,
+            "score": 25,
             "trials": 20
           }
         },
@@ -3039,7 +3069,7 @@
             "proxies": []
           },
           "memory": {
-            "score": 14.285714285714285,
+            "score": 25,
             "uncertainty": 48.696591509995415,
             "coverage": 0.45,
             "proxies": []
@@ -3051,7 +3081,7 @@
             "proxies": []
           }
         },
-        "unified": 14.285714285714285
+        "unified": 25
       },
       "events": [
         {"user_id":"golden_user","session_id":"s_pal_f","task_id":"pa2","trial_index":0,"dimension":"episodic_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"pa2:0","pal_level":2,"attempt":1,"pattern":0,"box":1,"chosen":1,"pal_total":20,"boxes":8},"client_ts":"2026-10-30T09:00:01.500Z"},
@@ -3472,7 +3502,7 @@
             "trials": 18
           },
           "PAL_FirstTrialMemory": {
-            "score": 60,
+            "score": 65,
             "trials": 20
           },
           "MST_LDI": {
@@ -3512,7 +3542,7 @@
             "proxies": []
           },
           "memory": {
-            "score": 40.75,
+            "score": 43,
             "uncertainty": 16.082321211676984,
             "coverage": 1,
             "proxies": []
@@ -3524,7 +3554,7 @@
             "proxies": []
           }
         },
-        "unified": 64.62319324921855
+        "unified": 65.07319324921855
       },
       "events": [
         {"user_id":"golden_user","session_id":"s_all","task_id":"s_all_nb","trial_index":0,"dimension":"working_memory","score_norm":1,"response_time_ms":1800,"error_flag":false,"error_burst":0,"hesitation_jitter":12.5,"keystroke_latency_ms":null,"trial_meta":{"item_id":"s_all_nb:0","trial_type":"standard","rule":"position","stream":"position"},"client_ts":"2026-10-30T09:00:01.500Z"},

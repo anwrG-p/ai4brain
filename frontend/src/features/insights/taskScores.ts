@@ -112,16 +112,20 @@ export function taskScores(events: readonly TelemetryEvent[]): TaskScores {
     out.DCCS_SwitchCost = input((1 - cost / SWITCH_COST_MAX) * clamp01(d / D_PRIME_GATE), switches.length + quiet.length)
   }
 
-  // ANT_Conflict: Arrow Focus's flanker cost when the session played it; else Stroop's RT cost.
-  // Both: RT cost on correct trials, gated by accuracy above chance so random or absent pressing
-  // (no RT difference) scores 0, not 100. Stroop's incongruent accuracy stands in for SSRT.
+  // ANT_Conflict: Arrow Focus's flanker cost when the session played it; else Stroop's RT cost,
+  // flagged a proxy (controller ruling: both Color Clash fallbacks are proxies). Both: RT cost on
+  // correct trials, gated by accuracy above chance so random or absent pressing (no RT difference)
+  // scores 0, not 100. Stroop's incongruent accuracy stands in for SSRT.
   const st = get('stroop')
   const inc = st.filter((e) => e.trial_meta?.congruent === false)
   const fl = get('flanker')
-  const conflict = fl.length
-    ? conflictInput(fl, (e) => e.trial_meta?.flanker === 'incongruent', (e) => e.trial_meta?.flanker === 'congruent', FLANKER_CHANCE, FLANKER_COST_MAX_MS)
-    : conflictInput(st, (e) => e.trial_meta?.congruent === false, (e) => e.trial_meta?.congruent === true, STROOP_CHANCE, STROOP_COST_MAX_MS)
-  if (conflict) out.ANT_Conflict = conflict
+  if (fl.length) {
+    const conflict = conflictInput(fl, (e) => e.trial_meta?.flanker === 'incongruent', (e) => e.trial_meta?.flanker === 'congruent', FLANKER_CHANCE, FLANKER_COST_MAX_MS)
+    if (conflict) out.ANT_Conflict = conflict
+  } else {
+    const conflict = conflictInput(st, (e) => e.trial_meta?.congruent === false, (e) => e.trial_meta?.congruent === true, STROOP_CHANCE, STROOP_COST_MAX_MS)
+    if (conflict) out.ANT_Conflict = { ...conflict, proxy: true }
+  }
   // SST_SSRT: Stop Light's SSRT when the session played it; Stroop's stand-in only otherwise.
   const ss = get('stop_signal')
   if (ss.length) {
@@ -272,24 +276,21 @@ function stopSignalInput(ss: TelemetryEvent[]): InputScore | null {
     - FAMS = recall events on attempt 1 that were right (CANTAB's first-attempt memory score);
     - out of pal_total, every pattern of every stage, so the stages a failed run never reached count
       as not recalled (CANTAB's "adjusted" convention for unreached stages);
-    - chance-corrected: (FAMS / pal_total - 1/boxes) / (1 - 1/boxes), clamped to 0..1 (A: one random
-      tap finds a pattern's box 1 time in `boxes`), so tapping at random scores 0.
+    - score = FAMS / pal_total, clamped to 0..1, with no chance correction: a failed stage ends the
+      run, so guessing earns next to nothing.
     Tasks are pooled weighted by pal_total; `trials` = the summed pal_total. A task without a valid
-    pal_total (>= 1) or boxes (>= 2) on its events is left out. */
+    pal_total (>= 1) on its first event is left out. */
 function palInput(pal: TelemetryEvent[]): InputScore | null {
   const byTask = new Map<string, TelemetryEvent[]>()
   for (const e of pal) byTask.set(e.task_id, [...(byTask.get(e.task_id) ?? []), e])
   let total = 0
   let weighted = 0
   for (const es of byTask.values()) {
-    const first = es[0]!
-    const n = num(first, 'pal_total')
-    const boxes = num(first, 'boxes')
-    if (n === null || n < 1 || boxes === null || boxes < 2) continue
+    const n = num(es[0]!, 'pal_total')
+    if (n === null || n < 1) continue
     const fams = es.filter((e) => e.trial_meta?.attempt === 1 && ok(e)).length
-    const chance = 1 / boxes
     total += n
-    weighted += n * clamp01((fams / n - chance) / (1 - chance))
+    weighted += n * clamp01(fams / n)
   }
   return total ? input(weighted / total, total) : null
 }

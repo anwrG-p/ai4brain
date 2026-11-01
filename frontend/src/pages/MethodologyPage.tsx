@@ -77,7 +77,7 @@ const MEASURES: Record<InputId, Measure> = {
   ANT_Conflict: {
     name: 'Handling conflict',
     from: ['flanker', 'stroop'],
-    note: 'from Color Clash without Arrow Focus',
+    note: 'estimated from Color Clash without Arrow Focus',
     how: (
       <>
         Mean correct time, mismatched − matching. Arrow Focus: 0 ms → 100, {FLANKER_COST_MAX_MS} ms → 0, × (accuracy −
@@ -128,8 +128,8 @@ const MEASURES: Record<InputId, Measure> = {
     from: ['pal'],
     how: (
       <>
-        Pair Finder: shapes placed in the right box on the first try, out of every shape in all rounds (rounds
-        not reached count as missed). Corrected for guessing: (share − 1 ÷ boxes) ÷ (1 − 1 ÷ boxes).
+        Pair Finder: shapes placed in the right box on the first try ÷ every shape in all rounds (rounds not
+        reached count as missed). Scale: 0 → 0, all → 100.
       </>
     ),
   },

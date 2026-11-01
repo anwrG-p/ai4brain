@@ -158,32 +158,32 @@ describe('Pair Finder: first-attempt memory (CANTAB FAMS, unreached stages misse
     expect(schemaOf(palEv(2, 1, true))).toBe('pal')
   })
 
-  it('counts attempt-1 hits over pal_total, chance-corrected for 1 box in 8', () => {
-    // 7 / 20 = 0.35 -> (0.35 - 1/8) / (7/8) = 0.257142857 -> 25.714; trials = pal_total 20.
+  it('is attempt-1 hits over pal_total, with no chance correction', () => {
+    // 7 / 20 = 0.35 -> 35; trials = pal_total 20.
     const out = taskScores(failingRun()).PAL_FirstTrialMemory!
-    expect(out.score).toBeCloseTo((100 * (0.35 - 0.125)) / 0.875, 9)
+    expect(out.score).toBeCloseTo(35, 9)
     expect(out.trials).toBe(20)
   })
 
-  it('scores 100 for every pattern right on its first attempt, 0 at or below chance', () => {
+  it('scores 100 for every pattern right on its first attempt; later attempts never count', () => {
     const perfect = [...run(2, 1, 2, 0), ...run(4, 1, 4, 0), ...run(6, 1, 6, 0), ...run(8, 1, 8, 0)]
     expect(taskScores(perfect).PAL_FirstTrialMemory).toEqual({ score: 100, trials: 20 })
-    // 2 of 20 = 0.1 < 1/8; the later attempts' hits do not count.
+    // 2 attempt-1 hits of 20 = 10; the retries' 3 hits do not count.
     const guesser = [...run(2, 1, 1, 1), ...run(2, 2, 2, 0), ...run(4, 1, 1, 3), ...run(4, 2, 0, 4), ...run(4, 3, 1, 3)]
-    expect(taskScores(guesser).PAL_FirstTrialMemory).toEqual({ score: 0, trials: 20 })
+    expect(taskScores(guesser).PAL_FirstTrialMemory).toEqual({ score: 10, trials: 20 })
   })
 
   it('pools tasks weighted by pal_total', () => {
-    // A: 0.257142857 (20 patterns); B: all 20 right at once -> 1. (20 x 0.2571 + 20 x 1) / 40.
+    // A: 7 of 20; B: all 20 right at once. (7 + 20) / 40 = 0.675.
     const b = [...run(2, 1, 2, 0, 'b'), ...run(4, 1, 4, 0, 'b'), ...run(6, 1, 6, 0, 'b'), ...run(8, 1, 8, 0, 'b')]
     const out = taskScores([...failingRun('a'), ...b]).PAL_FirstTrialMemory!
-    expect(out.score).toBeCloseTo((100 * ((0.35 - 0.125) / 0.875 + 1)) / 2, 9)
+    expect(out.score).toBeCloseTo(67.5, 9)
     expect(out.trials).toBe(40)
   })
 
-  it('leaves out a task without a usable pal_total or boxes', () => {
+  it('leaves out a task without a usable pal_total', () => {
     expect(taskScores([palEv(2, 1, true, { total: 0 })]).PAL_FirstTrialMemory).toBeUndefined()
-    expect(taskScores([palEv(2, 1, true, { boxes: 1 })]).PAL_FirstTrialMemory).toBeUndefined()
+    expect(taskScores([ev({ pal_level: 2, attempt: 1 }, { dim: 'episodic_memory' })]).PAL_FirstTrialMemory).toBeUndefined()
   })
 
   it('is not an ErrorRecovery source', () => {
@@ -258,9 +258,12 @@ describe('Arrow Focus: flanker conflict cost (ANT_Conflict)', () => {
     // Stroop alone: cost 100 ms of 300 -> 2/3, accuracy 1 -> 66.67.
     const stroop = [ev({ congruent: true }, { task: 'st', rt: 500 }), ev({ congruent: false }, { task: 'st', rt: 600 })]
     expect(taskScores(stroop).ANT_Conflict!.score).toBeCloseTo((100 * 2) / 3, 9)
+    expect(taskScores(stroop).ANT_Conflict!.proxy).toBe(true) // a Color Clash fallback is a proxy
+    expect(pillarScores(taskScores(stroop)).agility.proxies).toEqual(['ANT_Conflict'])
     const both = taskScores([...stroop, ...flankerRun()])
     expect(both.ANT_Conflict!.score).toBeCloseTo(30, 9)
     expect(both.ANT_Conflict!.trials).toBe(8)
+    expect(both.ANT_Conflict!.proxy).toBeUndefined()
     expect(both.SST_SSRT).toMatchObject({ proxy: true }) // Stroop still stands in for SSRT here
   })
 

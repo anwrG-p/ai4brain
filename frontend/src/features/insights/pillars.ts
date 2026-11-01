@@ -51,8 +51,8 @@ export function isPillarId(value: unknown): value is PillarId {
                          Stop Light trials: PROXY, Stroop incongruent accuracy
    DDM_Caution           omitted: no source
    PAL_FirstTrialMemory  Pair Finder (pal): patterns placed right on the first attempt over all the
-                         task's patterns (unreached stages count as missed), chance-corrected for
-                         one box in `boxes` (A)
+                         task's patterns (unreached stages count as missed), CANTAB's first-attempt
+                         memory score with no chance correction
    MST_LDI               P(similar | lure) - P(similar | new), clamped to 0..1
    UFOV_SOA              QUEST threshold, 17 ms -> 100, 500 ms -> 0 (the payload's duration grid)
    ANT_Orienting         UFOV peripheral accuracy
