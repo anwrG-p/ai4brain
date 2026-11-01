@@ -259,11 +259,12 @@ def test_chat_history_is_exported_and_deleted(client, tmp_path):
     assert r.status_code == 200
     rows = [json.loads(line) for line in r.text.splitlines()]
     assert rows[0]["session_id"] == "s1"  # telemetry first
-    assert [(row["record"], row["from"]) for row in rows[1:]] == [("coach_turn", "you"), ("coach_turn", "loti")]
+    assert [(row["record"], row["from"]) for row in rows[1:3]] == [("coach_turn", "you"), ("coach_turn", "loti")]
     assert rows[1]["text"] == SECRET
+    assert [row["record"] for row in rows[3:]] == ["state_bus"]  # the coach read the bus (BE-11)
 
     r = client.delete("/v1/user/telemetry", params={"user_id": "u1"})
-    assert r.json() == {"deleted_events": 1, "deleted_chat_turns": 2, "deleted_files": 2}
+    assert r.json() == {"deleted_events": 1, "deleted_chat_turns": 2, "deleted_files": 3}
     assert stored() == []
     assert client.get("/v1/user/export", params={"user_id": "u1"}).status_code == 404
 

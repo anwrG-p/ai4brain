@@ -164,7 +164,7 @@ def test_cli_runs_from_the_repo_root(tmp_path):
     empty = {"files": 0, "kept": 0, "dropped": 0, "undated": 0, "removed_files": 0}
     assert json.loads(out.stdout) == {
         "files": 1, "kept": 1, "dropped": 1, "undated": 0, "removed_files": 0, "coach": empty,
-        "registries_removed": 0,
+        "registries_removed": 0, "state_bus_removed": 0,
     }
 
 

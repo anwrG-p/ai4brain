@@ -1,13 +1,15 @@
 """Retention: drop telemetry events and coach chat turns received more than N days ago, and task
-registries (GET /v1/tasks/next's per-user files) nobody touched for N days.
+registries (GET /v1/tasks/next's per-user files) and state bus files (BE-11) nobody touched for
+N days.
 
 Run from the repo root (e.g. daily from cron):  python -m backend.app.privacy.retention --days 30
 In the container (WORKDIR /srv is the repo root there too):
     docker compose exec backend python -m backend.app.privacy.retention --days 30
 Prints one JSON line:
-{"files", "kept", "dropped", "undated", "removed_files", "coach": {...}, "registries_removed"}.
+{"files", "kept", "dropped", "undated", "removed_files", "coach": {...}, "registries_removed",
+ "state_bus_removed"}.
 The top-level counts are the telemetry store's; "coach" has the same counts for the chat history
-(COACH_DIR); "registries_removed" counts idle task registries deleted. "dropped" counts expired
+(COACH_DIR); "registries_removed" and "state_bus_removed" count idle per-user files deleted. "dropped" counts expired
 lines; "undated" counts lines with no readable received_at, which are also removed. No FastAPI
 here: another server can import purge_expired.
 """
@@ -22,7 +24,7 @@ from pathlib import Path
 
 # Relative, so the module runs as `backend.app.privacy.retention` from the repo root and
 # imports as `app.privacy.retention` inside the server and the tests.
-from .telemetry_store import LockTimeout, coach_dir, telemetry_dir, telemetry_lock
+from .telemetry_store import LockTimeout, coach_dir, state_bus_dir, telemetry_dir, telemetry_lock
 
 # GDPR Art 5(1)(e) storage limitation; the period README.md promises for raw telemetry.
 DEFAULT_DAYS = 30
@@ -137,6 +139,9 @@ def main(argv: list[str] | None = None) -> int:
     from dynamic_cache.cache_dispatcher import default_registry_dir, purge_idle
 
     report["registries_removed"] = purge_idle(default_registry_dir(), days)
+    # The state bus (BE-11): per-user cluster state, rewritten whenever new telemetry is read, so a
+    # file idle that long belongs to a user whose telemetry has expired too.
+    report["state_bus_removed"] = purge_idle(state_bus_dir(), days)
     print(json.dumps(report))
     return 0
 

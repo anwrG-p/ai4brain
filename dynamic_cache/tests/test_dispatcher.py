@@ -293,6 +293,19 @@ def test_perfect_play_walks_up_to_harder_levels_and_stays_bounded(make, tmp_path
     assert levels == sorted(levels) and levels[-1] == 1.0
 
 
+def test_each_change_of_the_served_level_is_reported_once(make, tmp_path):
+    """BE-11: on_step feeds the "why this" trail; it fires when the 85% rule moves the served
+    level of a seeded staircase, never on the seeding serve and never when the level stays."""
+    steps = []
+    d = make(trials=telemetry(tmp_path), on_step=lambda *a: steps.append(a))
+    levels = []
+    for k in range(12):
+        telemetry(tmp_path, events("ufov", [False] * 12, session=f"s{k}"))
+        levels.append(d.next_task("u1", schema_type="ufov").theta)
+    changes = [(levels[i - 1], levels[i]) for i in range(1, len(levels)) if levels[i] != levels[i - 1]]
+    assert changes and steps == [("u1", "ufov", old, new) for old, new in changes]
+
+
 @pytest.mark.parametrize("ability", [0.7, 1.0])
 def test_single_trial_tasks_do_not_wind_the_staircase_up(make, ability):
     """matrix and tower: one trial per task. Re-reading a 60-trial window after every task made

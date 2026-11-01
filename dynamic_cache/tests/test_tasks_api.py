@@ -163,7 +163,9 @@ def test_export_puts_the_registry_after_the_events(client):
     assert client.post("/v1/telemetry/event", json=event).status_code == 202
     client.get(URL, params={"user_id": "u1"})
     rows = [json.loads(line) for line in client.get("/v1/user/export", params={"user_id": "u1"}).text.splitlines()]
-    assert rows[0]["task_id"] == "n_back-1-abc" and rows[1]["record"] == "task_registry"
+    assert rows[0]["task_id"] == "n_back-1-abc"
+    # The stores follow the events; the state bus (BE-11) keeps a record for this user too.
+    assert "task_registry" in [r.get("record") for r in rows[1:]]
 
 
 def test_openapi_documents_the_payload(client):

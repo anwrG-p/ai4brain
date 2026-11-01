@@ -53,7 +53,7 @@ from ai_coach.schemas import (
     ReplySource,
     SafetyMetadata,
 )
-from ai_coach.xai_explainer import XAIExplainer
+from ai_coach.xai_explainer import XAIExplainer, is_profile_delta
 
 logger = logging.getLogger(__name__)
 
@@ -194,13 +194,18 @@ class AICoachAgent:
         self,
         cluster_id: int = 4,
         delta_vector: Optional[Dict[str, float]] = None,
-        uncertainty: float = 0.0,
+        uncertainty: Optional[float] = None,
+        adaptation_reason: Optional[str] = None,
     ) -> str:
         """Compose the full system instruction with XAI injection and safety rules."""
-        xai_context = self.explainer.format_xai_prompt_context(
-            delta_vector=delta_vector,
-            cluster_id=cluster_id,
-        )
+        if is_profile_delta(delta_vector) or adaptation_reason:
+            # The state bus (BE-11): pillar-keyed Δc and the latest adaptation, as words only.
+            xai_context = self.explainer.format_profile_context(delta_vector, uncertainty, adaptation_reason)
+        else:
+            xai_context = self.explainer.format_xai_prompt_context(
+                delta_vector=delta_vector,
+                cluster_id=cluster_id,
+            )
         guardrail_mandate = self.guardrail.get_system_prompt_guardrails()
 
         return (
@@ -246,6 +251,7 @@ class AICoachAgent:
         xai_justification = self.explainer.generate_adaptation_rationale(
             delta_vector=delta_vec,
             active_cluster_id=cluster_id,
+            uncertainty=request.uncertainty or 0.0,
         )
 
         # 3 + 4. Loti's reply, linted, with an explicit fallback
@@ -256,6 +262,8 @@ class AICoachAgent:
             delta_vector=delta_vec,
             collab_result=collab_result,
             llm_allowed=llm_allowed,
+            uncertainty=request.uncertainty,
+            adaptation_reason=request.adaptation_reason,
         )
 
         suggested_actions = self._generate_suggested_actions(
@@ -396,12 +404,17 @@ class AICoachAgent:
         delta_vector: Dict[str, float],
         collab_result: CollaborationScoreResult,
         llm_allowed: bool = True,
+        uncertainty: Optional[float] = None,
+        adaptation_reason: Optional[str] = None,
     ) -> Tuple[str, SafetyMetadata, ReplySource]:
         """Call the LLM if one is configured. Any failure is logged, counted and answered offline."""
         offline_reply = self._generate_offline_coaching_response(
             message=message,
             cluster_id=cluster_id,
             collab_result=collab_result,
+            delta_vector=delta_vector,
+            uncertainty=uncertainty,
+            adaptation_reason=adaptation_reason,
         )
 
         if not llm_allowed:  # the backup classifier failed: fail closed
@@ -417,6 +430,8 @@ class AICoachAgent:
         system_prompt = self.assemble_system_prompt(
             cluster_id=cluster_id,
             delta_vector=delta_vector,
+            uncertainty=uncertainty,
+            adaptation_reason=adaptation_reason,
         )
         messages_payload = [{"role": "system", "content": system_prompt}]
         for msg in history[-HISTORY_WINDOW:]:  # the redacted window from handle_chat
@@ -469,16 +484,31 @@ class AICoachAgent:
         message: str,
         cluster_id: int,
         collab_result: CollaborationScoreResult,
+        delta_vector: Optional[Dict[str, float]] = None,
+        uncertainty: Optional[float] = None,
+        adaptation_reason: Optional[str] = None,
     ) -> str:
         """Deterministic reply in Loti's voice: at most 12 words per bubble, lint-clean.
 
-        The adaptation reason itself travels in `CoachingResponse.xai_explanation`.
+        A "why" question gets the state bus's reasons when there are any (BE-11): the latest
+        adaptation as the user saw it, and the Δc line. Neither carries a number.
         """
         lower_msg = message.lower()
         tier = self.scorer.get_tier_for_cluster(cluster_id)
 
         if any(w in lower_msg for w in ["why", "harder", "faster", "change", "adapted", "pacing", "different"]):
-            return OFFLINE_WHY_REPLY
+            profile_line = self.explainer.profile_delta_line(delta_vector, uncertainty)
+            if not (adaptation_reason or profile_line):
+                return OFFLINE_WHY_REPLY
+            bubbles = [adaptation_reason or OFFLINE_WHY_REPLY.split(BUBBLE_SEPARATOR)[0]]
+            if profile_line:
+                bubbles.append(profile_line)
+            bubbles.append(OFFLINE_WHY_REPLY.split(BUBBLE_SEPARATOR)[-1])
+            reply = BUBBLE_SEPARATOR.join(bubbles)
+            # The reasons are fixed templates; this only guards a template edit that breaks the shape.
+            if fit_bubbles(reply) != reply or numbers_in(reply) or self.guardrail.sanitize(reply)[1].sanitized:
+                return OFFLINE_WHY_REPLY
+            return reply
 
         if any(w in lower_msg for w in ["score", "collab", "collaboration", "rating", "progress"]):
             return OFFLINE_SCORE_REPLY

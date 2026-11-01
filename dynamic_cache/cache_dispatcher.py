@@ -27,7 +27,8 @@
     before it counts as hung, so spawn time is not held against JOB_TIMEOUT_S. Warnings are
     rate-limited. Callbacks from the process pool, and the kill of a hung pool, only hand over to
     the pumper thread: the pool's manager thread runs callbacks holding its own locks.
-- Archetype: until clustering (BE-09/BE-11) assigns one, every user is NEUTRAL.
+- Archetype: the state bus (BE-11) names the user's pool. Every cluster maps to NEUTRAL until
+  per-style generator options exist (see state_bus.pool_name).
 - No repeats: a per-user TimedBloom (bloom.py) of served task ids; nothing seen in the last 14 days
   is served again.
 - Idempotent per (user, session_id, seq, filter): the same call in the same session returns the
@@ -402,6 +403,7 @@ class Dispatcher:
         pillars: Callable[[str], Mapping[str, float | None] | None] = lambda key: None,
         archetype: Callable[[str], str] = lambda key: NEUTRAL,
         variants: Callable[[str], bytes | None] = lambda task_id: None,
+        on_step: Callable[[str, str, float, float], None] | None = None,
         difficulty_rule: Callable[..., float] | None = None,
         clock: Callable[[], float] = time.time,
         seed_source: Callable[[], int] = lambda: random.SystemRandom().randrange(2**32),
@@ -418,6 +420,7 @@ class Dispatcher:
         self.pillars = pillars
         self.archetype = archetype
         self.variants = variants  # task_id -> body of a non-procedural entry (session replays)
+        self.on_step = on_step  # (key, schema_type, old level, new level) when a staircase moves the served level
         self.difficulty_rule = difficulty_rule
         self.clock = clock
         self.seed_source = seed_source
@@ -1115,7 +1118,13 @@ class Dispatcher:
                     entry = e
 
             st.seen.add(entry.task_id, now)
+            previous = st.schemas.get(chosen)
             st.schemas[chosen] = {"theta": theta, "marker": marker, "served_at": now}
+            if self.on_step is not None and previous is not None:
+                # Only the 85% rule moves a seeded staircase, so a new served level is its decision.
+                old_level = theta_level(chosen, previous["theta"])
+                if old_level != level:
+                    self.on_step(key, chosen, old_level, level)
             st.last = now
             if ikey:
                 st.sessions[ikey] = {
