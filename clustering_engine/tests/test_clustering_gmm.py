@@ -324,20 +324,19 @@ def test_archetype_names_are_nine_distinct_names():
 # --- golden fit on fixed synthetic data -----------------------------------------------------------
 
 # Refit by SRV-1 on BE-07's pillar scores of BE-08's data with all 11 exercises and R16 n-back.
-GOLDEN_IDS = [1, 5, 6, 8, None, None, None, None, None]
-GOLDEN_WEIGHTS = [0.1803, 0.2069, 0.0833, 0.197, 0.1158, 0.0838, 0.0496, 0.0417, 0.0417]
+GOLDEN_IDS = [1, 2, 5, 6, None, None, None, None, None]
+GOLDEN_WEIGHTS = [0.1242, 0.1304, 0.1829, 0.0833, 0.1538, 0.1334, 0.1004, 0.05, 0.0417]
 GOLDEN_MEANS = [
-    [37.76, 74.54, 67.93, 62.6, 74.38],
-    [64.07, 82.08, 80.51, 75.97, 78.39],
-    [7.34, 5.13, 0.4, 9.63, 5.62],
-    [68.8, 43.36, 82.68, 74.03, 81.93],
-    [56.49, 53.06, 74.19, 19.69, 72.55],
-    [21.19, 48.76, 51.84, 21.25, 77.48],
-    [12.2, 26.31, 40.07, 20.42, 64.69],
-    [39.76, 44.05, 39.95, 39.25, 64.2],
-    [25.99, 27.36, 58.31, 75.6, 76.25],
+    [36.8, 81.64, 56.81, 66.96, 76.39],
+    [47.88, 66.28, 74.87, 53.85, 74.93],
+    [66.72, 81.3, 76.33, 76.45, 78.96],
+    [7.34, 5.13, 5.26, 9.63, 5.62],
+    [71.6, 42.53, 77.2, 79.14, 82.24],
+    [29.73, 49.91, 46.25, 24.36, 75.13],
+    [55.63, 40.62, 69.71, 23.66, 70.93],
+    [12.38, 28.09, 40.71, 23.58, 61.12],
+    [25.99, 27.36, 56.36, 75.6, 76.25],
 ]
-
 
 def _pinned(package: str) -> str:
     text = (Path(__file__).resolve().parents[1] / "requirements.txt").read_text(encoding="utf-8")
@@ -352,7 +351,7 @@ def test_golden_fit_on_fixed_synthetic_data():
     m = fit_synthetic(users=40, sessions=3, data_seed=7, k=9, seed=0)
     assert m.archetype_ids == GOLDEN_IDS
     assert [m.name(i) for i in range(9)] == [
-        "Nimble switcher", "All-rounder", "Fresh starter", "Methodical solver",
+        "Nimble switcher", "Careful checker", "All-rounder", "Fresh starter",
         FALLBACK_NAME, FALLBACK_NAME, FALLBACK_NAME, FALLBACK_NAME, FALLBACK_NAME,
     ]
     assert m.weights == pytest.approx(GOLDEN_WEIGHTS, abs=1e-3)

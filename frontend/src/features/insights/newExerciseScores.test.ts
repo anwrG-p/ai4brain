@@ -122,10 +122,11 @@ describe('Stop Light: SSRT (integration method, Verbruggen et al. 2019)', () => 
     expect(taskScores(session()).ErrorRecovery).toBeUndefined()
   })
 
-  it('wires Impulse Control: SST_SSRT at weight 0.5, no proxy listed', () => {
-    const p = pillarScores(taskScores(session())).impulse
-    expect(p.coverage).toBe(0.5)
-    expect(p.score).toBeCloseTo(35, 9)
+  it('wires Impulse Control: SST_SSRT (0.5) and DDM_Caution (0.2) at coverage 0.7, no proxy listed', () => {
+    const inputs = taskScores(session())
+    const p = pillarScores(inputs).impulse
+    expect(p.coverage).toBeCloseTo(0.7, 10)
+    expect(p.score).toBeCloseTo((0.5 * inputs.SST_SSRT!.score + 0.2 * inputs.DDM_Caution!.score) / 0.7, 9)
     expect(p.proxies).toEqual([])
   })
 })
@@ -280,5 +281,13 @@ describe('Arrow Focus: flanker conflict cost (ANT_Conflict)', () => {
     expect(agility.coverage).toBeCloseTo(0.6, 12)
     expect(agility.score).toBeCloseTo(20, 9)
     expect(agility.proxies).toEqual([])
+  })
+
+  it('reads ANT_Orienting when cue conditions are present (FE-10)', () => {
+    const cTrials = [1, 2, 3, 4].map(() => ev({ flanker: 'congruent', dir: 'left', response: 'left', cue: 'center' }, { ok: true, rt: 500, task: 'fl' }))
+    const sTrials = [1, 2, 3, 4].map(() => ev({ flanker: 'congruent', dir: 'left', response: 'left', cue: 'spatial' }, { ok: true, rt: 450, task: 'fl' }))
+    const scores = taskScores([...cTrials, ...sTrials])
+    expect(scores.ANT_Orienting).toBeDefined()
+    expect(scores.ANT_Orienting!.score).toBeCloseTo(50, 4)
   })
 })

@@ -70,12 +70,24 @@ describe('fetchNextTask', () => {
       expect(task).toEqual(first)
     })
 
-    test('ignores schemaType: the generator decides (R2)', async () => {
+    test('sends schema_type, session_id and seq when provided', async () => {
       real()
       const fetchFn = vi.fn(async (_url: string) => okResponse(first))
-      const task = await fetchNextTask('u1', 0, { schemaType: 'tower', fetchFn })
-      expect(fetchFn).toHaveBeenCalledWith('/v1/tasks/next?user_id=u1')
+      const task = await fetchNextTask('u1', 2, { schemaType: 'tower', sessionId: 'sess1', fetchFn })
+      expect(fetchFn).toHaveBeenCalledWith('/v1/tasks/next?user_id=u1&schema_type=tower&session_id=sess1&seq=2')
       expect(task.schema_type).toBe(first.schema_type)
+    })
+
+    test.each([
+      [413, /413/],
+      [422, /422/],
+      [429, /429/],
+      [501, /501/],
+      [503, /503/],
+    ])('handles HTTP %i error with specific error message', async (status, pattern) => {
+      real()
+      const fetchFn = async () => new Response('error', { status, headers: status === 429 ? { 'Retry-After': '5' } : undefined })
+      await expect(fetchNextTask('u1', 0, { fetchFn })).rejects.toThrow(pattern)
     })
 
     test('user id is URL-encoded', async () => {

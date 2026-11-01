@@ -62,7 +62,12 @@ export const usingMocks = () => import.meta.env.VITE_USE_MOCKS !== 'false'
 export async function fetchNextTask(
   userId: string,
   seq = 0,
-  opts: { schemaType?: SchemaType; fetchFn?: FetchFn; inks?: 'cvd_safe' | 'classic' } = {},
+  opts: {
+    schemaType?: SchemaType
+    sessionId?: string
+    fetchFn?: FetchFn
+    inks?: 'cvd_safe' | 'classic'
+  } = {},
 ): Promise<TaskPayload> {
   const cvd = (opts.inks ?? (useDevicePrefs.getState().cvdSafe ? 'cvd_safe' : 'classic')) === 'cvd_safe'
   const inks = (task: TaskPayload): TaskPayload =>
@@ -74,8 +79,25 @@ export async function fetchNextTask(
     return inks(task)
   }
   const fetchFn = opts.fetchFn ?? ((url: string) => fetch(url))
-  const res = await fetchFn(`/v1/tasks/next?user_id=${encodeURIComponent(userId)}${cvd ? '&inks=cvd_safe' : ''}`)
-  if (!res.ok) throw new Error(`GET /v1/tasks/next failed: HTTP ${res.status}`)
+  const base = `/v1/tasks/next?user_id=${encodeURIComponent(userId)}${cvd ? '&inks=cvd_safe' : ''}`
+  const extras: string[] = []
+  if (opts.schemaType) extras.push(`schema_type=${encodeURIComponent(opts.schemaType)}`)
+  if (opts.sessionId) extras.push(`session_id=${encodeURIComponent(opts.sessionId)}`)
+  if (seq > 0 || opts.sessionId) extras.push(`seq=${seq}`)
+  if (!cvd && opts.inks && opts.inks !== 'classic') extras.push(`inks=${encodeURIComponent(opts.inks)}`)
+
+  const res = await fetchFn(extras.length > 0 ? `${base}&${extras.join('&')}` : base)
+  if (!res.ok) {
+    if (res.status === 413) throw new Error('GET /v1/tasks/next failed: HTTP 413 (telemetry too large)')
+    if (res.status === 422) throw new Error('GET /v1/tasks/next failed: HTTP 422 (invalid parameters)')
+    if (res.status === 429) {
+      const retryAfter = res.headers?.get?.('Retry-After')
+      throw new Error(`GET /v1/tasks/next failed: HTTP 429 (rate limited${retryAfter ? `, retry after ${retryAfter}s` : ''})`)
+    }
+    if (res.status === 501) throw new Error('GET /v1/tasks/next failed: HTTP 501 (not implemented)')
+    if (res.status === 503) throw new Error('GET /v1/tasks/next failed: HTTP 503')
+    throw new Error(`GET /v1/tasks/next failed: HTTP ${res.status}`)
+  }
   const task: unknown = await res.json()
   if (!validTask(task)) throw new Error('GET /v1/tasks/next returned an invalid task payload')
   return inks(task)

@@ -23,7 +23,7 @@ Three layers of naming:
 | Pair Finder | `pal` | `episodic_memory` | PAL_FirstTrialMemory (first-attempt memory score) → Deep Memory |
 | Arrow Focus | `flanker` | `executive_function` | ANT_Conflict (flanker cost) → Mental Agility |
 
-ErrorRecovery (→ Mental Agility) uses the trial after an error in every exercise except Stop Light (its staircase makes stop errors by design) and Pair Finder. DDM_Caution has no source yet, so it is left out. A skill below 30% coverage shows "Not measured yet".
+ErrorRecovery (→ Mental Agility) uses the trial after an error in every exercise except Stop Light (its staircase makes stop errors by design) and Pair Finder. DDM_Caution is derived from EZ-diffusion boundary separation across speeded decisions (Stop Light, Arrow Focus, Color Clash). ANT_Orienting measures spatial vs center cue RT benefit in Arrow Focus with UFOV fallback. A skill below 30% coverage shows "Not measured yet".
 
 The Train tab lists each exercise under one skill (`frontend/src/features/train/catalog.ts`); the scoring above is what the numbers use. The **baseline** plays 6: Logic Web, Memory Gauntlet, Color Clash, Strategic Blueprint, Perceptual Radar, Precision Archive. Stop Light, Pair Finder and Arrow Focus are in Train only. Their fixtures follow published designs: Stop Light 200 trials with 25% stop signs (Verbruggen et al. 2019), Pair Finder rounds of 2, 4, 6 and 8 shapes (CANTAB PAL), Arrow Focus 96 trials, one ANT block (Fan et al. 2002).
 
@@ -39,9 +39,9 @@ The Train tab lists each exercise under one skill (`frontend/src/features/train/
 | Disengaged or random answering | **Done.** Chance gates: a non-responder scores about 0, not a perfect difference score. |
 | Hidden tab or interruption | **Done.** Hiding the tab pauses the exercise; a paused attempt is never scored or sent. |
 | Colour vision | **Partly.** The server serves a `cvd_safe` Stroop ink set (blue, yellow, red, black) on `GET /v1/tasks/next?inks=cvd_safe`; the UI maps black and draws that block on a light plate. |
-| Practice effects | **Planned (F-A).** No "real improvement" before session 3, with a practice-adjusted reliable-change check. |
-| Too few trials | **Planned (F-A).** Minimum trials per input, and "Building your profile" below it. |
-| Input device and timing | **Planned (F-A).** Device and input logging, and flags for very fast answers. |
+| Practice effects | **Done (F-A).** No "real improvement" before session 3, with a practice-adjusted reliable-change check (Chelune 1993). |
+| Too few trials | **Done (F-A).** Minimum trials per input, and "Building your profile" state below it. |
+| Input device and timing | **Done (F-A).** Device and input logging, and low-effort flags (reaction times < 150 ms, timeouts > 50%, repetitive presses > 90%). |
 
 Evidence for each: [research 2026-10-31](../research/2026-10-31-improvement-opportunities.md).
 
@@ -71,3 +71,8 @@ One event per trial, sent only after "Save my answers". Full contract: [contract
 `hesitation_jitter` and `keystroke_latency_ms` are for task scoring only. The server must not infer emotion from them ([ADR 0002](../adr/0002-no-server-side-emotion-inference.md)).
 
 *Rewritten 2026-10-31. The earlier version (6 "skills", tasks that were never built, Doodle framing) is in git history.*
+
+
+## 5. Ruling R17: SAT-JEPA Shadow Mode
+
+The SAT-JEPA Brain Twin operates strictly in shadow mode (`mode: "shadow"`, `validated: false`) until evaluated and promoted on real participant data. In accordance with Ruling R17, the frontend dashboard only draws measured data and never renders forward prediction curves or trajectory ribbons while `validated` is `false`.

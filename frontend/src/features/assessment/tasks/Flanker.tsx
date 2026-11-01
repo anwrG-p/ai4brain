@@ -31,7 +31,14 @@ export function Flanker({ params, recorder, onDone }: TaskProps<FlankerParams>) 
   const onFinish = useCallback(
     (k: number) => {
       const t = trials[k]
-      return t && { flanker: t.congruent ? 'congruent' : 'incongruent', dir: t.dir, response: 'none' }
+      return (
+        t && {
+          flanker: t.congruent ? 'congruent' : 'incongruent',
+          dir: t.dir,
+          response: 'none',
+          ...(t.cue ? { cue: t.cue } : {}),
+        }
+      )
     },
     [trials],
   )
@@ -40,7 +47,7 @@ export function Flanker({ params, recorder, onDone }: TaskProps<FlankerParams>) 
 
   const answer = useCallback(
     (dir: Dir) => {
-      if (t) respond(dir === t.dir, { response: dir })
+      if (t) respond(dir === t.dir, { response: dir, ...(t.cue ? { cue: t.cue } : {}) })
     },
     [t, respond],
   )
@@ -50,7 +57,23 @@ export function Flanker({ params, recorder, onDone }: TaskProps<FlankerParams>) 
   return (
     <section aria-label={EXERCISE_NAME.flanker} className="flex w-full flex-col items-center gap-4">
       <Card className="flex w-full max-w-sm items-center justify-center px-4" style={{ minHeight: 160 }}>
-        {showing ? <FlankerRow dir={t.dir} congruent={t.congruent} /> : <Cross />}
+        {showing ? (
+          <FlankerRow dir={t.dir} congruent={t.congruent} />
+        ) : (
+          <div className="relative flex items-center justify-center">
+            <Cross />
+            {t.cue && (
+              <span
+                data-testid="flanker-cue"
+                className={`absolute text-lg font-bold text-accent-strong select-none ${
+                  t.cue === 'center' ? '-top-3' : t.dir === 'left' ? '-left-8' : '-right-8'
+                }`}
+              >
+                *
+              </span>
+            )}
+          </div>
+        )}
       </Card>
       <ArrowButtons answer={answer} />
     </section>

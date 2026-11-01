@@ -73,7 +73,7 @@ export function howToPlay(task: TaskPayload): HowToPlay | null {
         steps: ['Guess how many moves you need.', 'Move the top disc: tap from, then to.', 'Match the goal in the fewest moves.'],
         caption: 'The top disc moves across',
         pillar: 'focus',
-        more: ['It measures planning before you act.', 'Extra moves lower the score.'],
+        more: ['It measures planning before you act.', '60-second limit; ends at 3 times minimum moves.'],
       }
     case 'ufov':
       // Ufov.tsx: a letter (A/B) and a target circle flash; right only when both answers are right.

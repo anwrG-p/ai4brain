@@ -189,4 +189,19 @@ describe('Arrow Focus', () => {
     expect(pushed).toHaveLength(2)
     for (const e of pushed) expect(eventProblem(e)).toBeNull()
   })
+
+  test('cue conditions: center and spatial cues display during fixation and log in trial_meta (FE-10)', () => {
+    setup(params([
+      { dir: 'left', congruent: true, cue: 'center' },
+      { dir: 'right', congruent: false, cue: 'spatial' },
+    ]))
+    expect(screen.getByTestId('flanker-cue')).toBeInTheDocument()
+    show(200)
+    key('ArrowLeft')
+    expect(pushed[0]!.trial_meta).toMatchObject({ cue: 'center' })
+    expect(screen.getByTestId('flanker-cue')).toBeInTheDocument()
+    show(250)
+    key('ArrowRight')
+    expect(pushed[1]!.trial_meta).toMatchObject({ cue: 'spatial' })
+  })
 })

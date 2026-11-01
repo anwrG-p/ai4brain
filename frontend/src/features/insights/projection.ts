@@ -10,11 +10,11 @@
    - Tmax = 90: a ceiling below 100, since timed tasks have a physiological limit; raised to the best
      score seen when the user is already above it.
    - alpha falls back to 0.05 per session with fewer than 3 points (about 60% of the gap closed in
-     30 days at 4 sessions a week), and is clamped to 0.01-0.3. */
+     30 days at 3 sessions a week), and is clamped to 0.01-0.3. */
 
 const DAY_MS = 86_400_000
 export const DEFAULT_TMAX = 90
-export const SESSIONS_PER_WEEK = 4
+export const SESSIONS_PER_WEEK = 3
 export const FALLBACK_ALPHA = 0.05
 export const ALPHA_MIN = 0.01
 export const ALPHA_MAX = 0.3
@@ -39,7 +39,7 @@ export type ProjectionPoint = { day: number; at: number; score: number }
 export type Projection = {
   alpha: number
   tmax: number
-  /** Training 4 sessions a week from now. */
+  /** Training 3 sessions a week from now. */
   optimal: ProjectionPoint[]
 }
 
@@ -51,7 +51,7 @@ export type ProjectionOptions = {
 
 /** Daily points from today (day 0) for `days` days, or null without history. The series starts at the
     latest score: because the exponential has no memory, re-basing T0 to it and counting N from today
-    is the same curve as the doc's formula. It counts 4/7 of a session per day (a smooth expected
+    is the same curve as the doc's formula. It counts 3/7 of a session per day (a smooth expected
     count) and is clamped to 0..Tmax. */
 export function projection(
   history: readonly { at: string | number; score: number }[],
@@ -81,14 +81,24 @@ export const RCI_SD = 10
 
 /** Reliable Change Index (Jacobson & Truax 1991): (current - baseline) / SEdiff, with
     SEdiff = sqrt(2) * sd * sqrt(1 - rxx). */
-export function rci(current: number, baseline: number, rxx = RCI_R, sd = RCI_SD): number {
-  return (current - baseline) / (Math.SQRT2 * sd * Math.sqrt(1 - rxx))
+/** Reliable Change Index (Jacobson & Truax 1991) with Chelune et al. (1993) practice adjustment:
+    ((current - baseline) - practice) / SEdiff, with SEdiff = sqrt(2) * sd * sqrt(1 - rxx). */
+export function rci(current: number, baseline: number, rxx = RCI_R, sd = RCI_SD, practice = 0): number {
+  return (current - baseline - practice) / (Math.SQRT2 * sd * Math.sqrt(1 - rxx))
 }
 
 export const RCI_THRESHOLD = 1.96
 
-/** A change counts as real only when RCI >= 1.96 (p < .05). The 1e-9 absorbs float rounding at the
-    boundary itself. */
-export function isRealImprovement(current: number, baseline: number, rxx = RCI_R, sd = RCI_SD): boolean {
-  return rci(current, baseline, rxx, sd) >= RCI_THRESHOLD - 1e-9
+/** A change counts as real only when RCI >= 1.96 (p < .05) AND sessionCount >= 3 (practice plateau).
+    The 1e-9 absorbs float rounding at the boundary itself. */
+export function isRealImprovement(
+  current: number,
+  baseline: number,
+  sessionCount = 3,
+  rxx = RCI_R,
+  sd = RCI_SD,
+  practice = 0,
+): boolean {
+  if (sessionCount < 3) return false
+  return rci(current, baseline, rxx, sd, practice) >= RCI_THRESHOLD - 1e-9
 }

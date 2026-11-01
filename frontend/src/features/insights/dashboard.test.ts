@@ -77,13 +77,15 @@ describe('weakestPillar (the one weakest pillar: Home, Loti and Train)', () => {
 })
 
 describe('improvedPillars (RCI >= 1.96)', () => {
-  it('flags a pillar whose latest score passes RCI against its first, and nothing with one session', () => {
+  it('flags a pillar whose latest score passes RCI against its first, and nothing with fewer than 3 sessions', () => {
     expect(improvedPillars([rec('a', 5, full(40))])).toEqual([])
-    // SEdiff = sqrt(2) * 10 * sqrt(0.2) = 6.32; 1.96 x 6.32 = 12.4 points.
     const later = full(40)
     later.MST_LDI = { score: 53, trials: 40 } // +13: real
     later.UFOV_SOA = { score: 52, trials: 40 } // visual: (52 + 40) / 2 = 46, +6: not real
-    expect(improvedPillars([rec('a', 5, full(40)), rec('b', 1, later)])).toEqual(['memory'])
+    // 2 sessions: practice plateau requires >= 3 sessions
+    expect(improvedPillars([rec('a', 5, full(40)), rec('b', 1, later)])).toEqual([])
+    // 3 sessions: passes RCI and session threshold
+    expect(improvedPillars([rec('a', 5, full(40)), rec('mid', 3, full(42)), rec('b', 1, later)])).toEqual(['memory'])
   })
 })
 

@@ -40,6 +40,7 @@ UFOV_MAX_MS = 500  # the top of the UFOV duration grid
 SSRT_BEST_MS = 150  # SSRT 150 ms -> 100, 450 ms -> 0
 SSRT_WORST_MS = 450
 SST_CHANCE = 0.5  # two arrows on the go task
+DDM_CAUTION_MAX = 0.25  # boundary a: 0 -> 0, 0.25 -> 100
 FLANKER_COST_MAX_MS = 200  # flanker cost 0 ms -> 100, 200 ms -> 0
 FLANKER_CHANCE = 0.5  # two arrows
 # Exclusion rules of the consensus guide (Verbruggen et al. 2019), evidence, not tuning: outside
@@ -373,6 +374,44 @@ def _error_recovery(events: Sequence[Event]) -> dict[str, Any] | None:
     return _input(recovered / after, after) if after else None
 
 
+def ez_diffusion_boundary(trials: Sequence[Event], s: float = 0.1) -> float | None:
+    """EZ-diffusion model boundary separation a (Wagenmakers et al. 2007) for speeded 2AFC trials."""
+    n = len(trials)
+    if n < 6:
+        return None
+    correct = [e for e in trials if _ok(e)]
+    n_correct = len(correct)
+    if n_correct == n:
+        pc = 1.0 - (1.0 / (2.0 * n))
+    elif n_correct == 0:
+        pc = 1.0 / (2.0 * n)
+    else:
+        pc = n_correct / n
+    if abs(pc - 0.5) < 1e-5:
+        pc = 0.5001 if pc >= 0.5 else 0.4999
+
+    rts_sec = [e.get("response_time_ms", 0.0) / 1000.0 for e in correct]
+    if len(rts_sec) > 1:
+        m = sum(rts_sec) / len(rts_sec)
+        v_rt = sum((x - m) ** 2 for x in rts_sec) / (len(rts_sec) - 1)
+    elif len(rts_sec) == 1:
+        v_rt = 0.04
+    else:
+        all_rts = [e.get("response_time_ms", 0.0) / 1000.0 for e in trials]
+        m = sum(all_rts) / len(all_rts)
+        v_rt = sum((x - m) ** 2 for x in all_rts) / (len(all_rts) - 1) if len(all_rts) > 1 else 0.04
+    v_rt = max(v_rt, 1e-4)
+
+    logit_p = math.log(pc / (1.0 - pc))
+    sign = 1.0 if pc > 0.5 else -1.0
+    num_val = logit_p * (pc * pc * logit_p - pc * logit_p + pc - 0.5)
+    inner = max(num_val / v_rt, 1e-6)
+    v = sign * s * (inner ** 0.25)
+    if abs(v) < 1e-6:
+        v = 1e-6 * sign
+    return abs((s * s * logit_p) / v)
+
+
 def task_scores(events: Sequence[Event]) -> dict[str, dict[str, Any]]:
     """One session's events -> the doc's 0-100 inputs (only the inputs that have data)."""
     by: dict[str, list[Event]] = {}
@@ -499,8 +538,26 @@ def task_scores(events: Sequence[Event]) -> dict[str, dict[str, Any]]:
     thresholds = [t for t in (_num(e, "quest_threshold_ms") for e in uf) if t is not None]
     if thresholds:
         out["UFOV_SOA"] = _input((UFOV_MAX_MS - _mean(thresholds)) / (UFOV_MAX_MS - UFOV_MIN_MS), len(uf))
-    if uf:
+    fl_cues = [e for e in fl if _meta(e).get("cue") in ("center", "spatial")]
+    if len(fl_cues) >= 8:
+        center = [e for e in fl_cues if _meta(e).get("cue") == "center" and _ok(e)]
+        spatial = [e for e in fl_cues if _meta(e).get("cue") == "spatial" and _ok(e)]
+        if center and spatial:
+            orienting_benefit_ms = _mean([_rt(e) for e in center]) - _mean([_rt(e) for e in spatial])
+            gate = max(0.0, (_share(fl_cues, _ok) - 0.5) / 0.5)
+            fraction = _clamp01(orienting_benefit_ms / 100.0) * gate
+            out["ANT_Orienting"] = _input(fraction, len(fl_cues))
+    elif uf:
         out["ANT_Orienting"] = _input(_share(uf, lambda e: _meta(e).get("peripheral_ok", _MISSING) is True), len(uf))
+
+    # DDM_Caution: EZ-diffusion boundary separation a on 2AFC speeded decisions (Stop Light go trials,
+    # Flanker, Stroop), Wagenmakers et al. 2007.
+    speeded = [e for e in ss if _is_go_trial(e)] + fl + st
+    speeded = [e for e in speeded if e.get("response_time_ms", 0) > 0]
+    if len(speeded) >= 6:
+        a = ez_diffusion_boundary(speeded)
+        if a is not None:
+            out["DDM_Caution"] = _input(a / DDM_CAUTION_MAX, len(speeded))
 
     recovery = _error_recovery(events)
     if recovery:
@@ -544,7 +601,7 @@ PILLAR_WEIGHTS: dict[str, dict[str, float]] = {
 MIN_COVERAGE = 0.3
 MAX_UNCERTAINTY = 50
 # Inputs with no source by design: they lower `coverage` but do not widen the band forever.
-UNSOURCED_INPUTS = ("DDM_Caution",)
+UNSOURCED_INPUTS = ()
 
 
 def pillar_scores(inputs: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:

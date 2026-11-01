@@ -290,6 +290,57 @@ def archetype_section(state, model, model_reason: str | None) -> tuple[dict | No
     return {"name": t["archetype"], "confidence": round(float(t["confidence"]), 2), "model_id": t["model_id"]}, None
 
 
+def snapshots_section(summaries: list[SessionSummary], state) -> list[dict]:
+    """REQ-BE-03: Historical snapshots array for time-travel and longitudinal comparison."""
+    cluster_id = state.tasks["archetype"] if state is not None and getattr(state, "tasks", None) else "Unassigned"
+    out = []
+    for s in summaries:
+        out.append({
+            "snapshot_id": s.session_id,
+            "timestamp_iso": s.started_at.isoformat(),
+            "trigger_event": "session_complete",
+            "profile_pct": {p: round(s.pillars[p], 1) if s.pillars.get(p) is not None else 0.0 for p in PILLARS},
+            "uncertainty_sigma": {p: round(s.uncertainty[p], 1) for p in PILLARS},
+            "cluster_id": cluster_id,
+        })
+    return out
+
+
+def fatigue_grid_section(sessions: list[Session]) -> list[dict]:
+    """REQ-BE-04: Session fatigue heatmap grid grouped by day of week and time of day bucket."""
+    buckets: dict[tuple[int, str], list[dict]] = {}
+    session_counts: dict[tuple[int, str], set[str]] = {}
+    for s in sessions:
+        for e in s.events:
+            ts = client_time(e)
+            dow = ts.weekday()
+            hour = ts.hour
+            bucket = (
+                "night" if hour < 6
+                else "morning" if hour < 12
+                else "afternoon" if hour < 18
+                else "evening"
+            )
+            key = (dow, bucket)
+            buckets.setdefault(key, []).append(e)
+            session_counts.setdefault(key, set()).add(s.session_id)
+
+    out = []
+    for (dow, bucket), events in sorted(buckets.items()):
+        rts = [float(e["response_time_ms"]) for e in events if e.get("response_time_ms") is not None and float(e["response_time_ms"]) > 0]
+        errors = [1 if e.get("error_flag") else 0 for e in events if "error_flag" in e]
+        mean_rt = round(sum(rts) / len(rts), 1) if rts else 0.0
+        err_rate = round(sum(errors) / len(errors), 3) if errors else 0.0
+        out.append({
+            "day_of_week": dow,
+            "time_of_day_bucket": bucket,
+            "mean_rt_ms": mean_rt,
+            "error_rate": err_rate,
+            "session_count": len(session_counts.get((dow, bucket), set())),
+        })
+    return out
+
+
 def build(key: str, sessions: list[Session], summaries: list[SessionSummary], state, h: int) -> dict:
     scored = [s for s in summaries if any(v is not None for v in s.pillars.values())]
     if len(scored) < PROFILE_MIN_SESSIONS:
@@ -309,6 +360,8 @@ def build(key: str, sessions: list[Session], summaries: list[SessionSummary], st
         "forecast_reason": forecast_reason,
         "collaboration": collaboration_section(key),
         "why_this": why_this(state.trail if state is not None else []),
+        "snapshots": snapshots_section(summaries, state),
+        "fatigue_grid": fatigue_grid_section(sessions),
     }
 
 

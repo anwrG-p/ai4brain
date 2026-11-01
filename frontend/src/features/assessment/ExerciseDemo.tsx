@@ -1,3 +1,4 @@
+import { useDevicePrefs } from '../../state/devicePrefs'
 import type { CSSProperties, ReactNode } from 'react'
 import type { SchemaType } from './telemetry/types'
 import { INK } from './tasks/Stroop'
@@ -20,11 +21,18 @@ const TEXT = { fontFamily: 'var(--font-sans)', fontWeight: 700, textAnchor: 'mid
 
 // Color Clash: a colour word whose ink keeps changing (the word and its ink never agree).
 function Stroop() {
-  const words: [string, string][] = [
-    ['RED', INK.blue!],
-    ['BLUE', INK.green!],
-    ['GREEN', INK.red!],
-  ]
+  const cvdSafe = useDevicePrefs((s) => s.cvdSafe)
+  const words: [string, string][] = cvdSafe
+    ? [
+        ['RED', INK.blue!],
+        ['BLUE', INK.yellow!],
+        ['YELLOW', INK.red!],
+      ]
+    : [
+        ['RED', INK.blue!],
+        ['BLUE', INK.green!],
+        ['GREEN', INK.red!],
+      ]
   return (
     <>
       {words.map(([w, ink], i) => (

@@ -39,10 +39,11 @@ export function weakestPillar(pillars: Pillars, among: readonly PillarId[] = PIL
 
 /** Pillars whose latest score is a real improvement (RCI >= 1.96) over their first measured score. */
 export function improvedPillars(sessions: readonly SessionRecord[]): PillarId[] {
-  const scored = byTime(sessions).map((s) => pillarScores(s.inputs))
+  const valid = sessions.filter((s) => !s.low_effort)
+  const scored = byTime(valid).map((s) => pillarScores(s.inputs))
   return PILLAR_IDS.filter((id) => {
     const values = scored.map((p) => p[id].score).filter((v): v is number => v !== null)
-    return values.length >= 2 && isRealImprovement(values.at(-1)!, values[0]!)
+    return values.length >= 3 && isRealImprovement(values.at(-1)!, values[0]!, values.length)
   })
 }
 
@@ -50,7 +51,8 @@ export type HistoryPoint = { at: string; score: number }
 
 /** The unified score of every session that has one, oldest first. */
 export function unifiedHistory(sessions: readonly SessionRecord[]): HistoryPoint[] {
-  return byTime(sessions).flatMap((s) => {
+  const valid = sessions.filter((s) => !s.low_effort)
+  return byTime(valid).flatMap((s) => {
     const score = unifiedScore(pillarScores(s.inputs))
     return score === null ? [] : [{ at: s.at, score }]
   })

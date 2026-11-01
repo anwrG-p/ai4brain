@@ -117,7 +117,15 @@ const MEASURES: Record<InputId, Measure> = {
     from: ['tower'],
     how: <>Mean of (fewest possible moves ÷ your moves); an unsolved puzzle counts as 0.</>,
   },
-  DDM_Caution: { name: 'Caution', from: null, how: null },
+  DDM_Caution: {
+    name: 'Caution',
+    from: ['stop_signal', 'flanker', 'stroop'],
+    how: (
+      <>
+        EZ-diffusion boundary separation: speed–accuracy trade-off on fast decisions. Scale: 0 → 0, 0.25 → 100.
+      </>
+    ),
+  },
   MST_LDI: {
     name: 'Telling similar things apart',
     from: ['mst'],
@@ -144,8 +152,14 @@ const MEASURES: Record<InputId, Measure> = {
   },
   ANT_Orienting: {
     name: 'Side vision',
-    from: ['ufov'],
-    how: <>Accuracy on the target at the side of the screen.</>,
+    from: ['flanker', 'ufov'],
+    note: 'estimated from Perceptual Radar without Arrow Focus cues',
+    how: (
+      <>
+        Arrow Focus: reaction time benefit of spatial cues over center cues (0 ms → 0, 100 ms → 100) × accuracy gate,
+        or side target accuracy in Perceptual Radar.
+      </>
+    ),
   },
 }
 
@@ -294,10 +308,12 @@ export default function MethodologyPage() {
                 </div>
               ))}
           </dl>
-          <p className="text-sm">
+          {UNSOURCED_INPUTS.length > 0 ? (
+            <p className="text-sm">
             {UNSOURCED_INPUTS.map((id) => MEASURES[id].name).join(' and ')} {UNSOURCED_INPUTS.length === 1 ? 'has' : 'have'}{' '}
             no exercise yet. The scale ends are working values we will tune as data comes in.
-          </p>
+            </p>
+          ) : null}
           <Sources>
             <li>d′ correction: Hautus 1995, Behavior Research Methods, Instruments, &amp; Computers.</li>
             <li>LDI: Stark et al. 2023, Frontiers in Behavioral Neuroscience.</li>
@@ -367,12 +383,13 @@ export default function MethodologyPage() {
               For now SD = {RCI_SD} points and r = {RCI_R} (how stable a score is from one test to the next).
             </li>
             <li>
-              A change counts as real when RCI ≥ {RCI_THRESHOLD} (p &lt; .05): about {RCI_POINTS} points.
+              A change counts as real when RCI ≥ {RCI_THRESHOLD} (p &lt; .05): about {RCI_POINTS} points, from your 3rd
+              session onward (practice plateau).
             </li>
             <li>Smaller changes are treated as normal day-to-day noise.</li>
           </ul>
           <Sources>
-            <li>Jacobson &amp; Truax 1991, the Reliable Change Index.</li>
+            <li>Chelune et al. 1993, practice-adjusted Reliable Change Index; Jacobson &amp; Truax 1991.</li>
           </Sources>
         </Topic>
       </div>

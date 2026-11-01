@@ -997,10 +997,18 @@ class Dispatcher:
         """
         path = self._path(key, directory)
         if directory is not None:
+            for _ in range(5):
+                try:
+                    path.unlink()
+                    return 1
+                except FileNotFoundError:
+                    return 0
+                except PermissionError:
+                    time.sleep(0.02)
             try:
                 path.unlink()
                 return 1
-            except FileNotFoundError:
+            except (FileNotFoundError, PermissionError):
                 return 0
         with self._held(key):
             with self._lock:
@@ -1012,10 +1020,22 @@ class Dispatcher:
             if isinstance(self.trials, TelemetryTrials):
                 self.trials.forget(key)
             with self._io_lock:
-                path.with_suffix(".json.tmp").unlink(missing_ok=True)  # a write cut short
+                try:
+                    path.with_suffix(".json.tmp").unlink(missing_ok=True)  # a write cut short
+                except PermissionError:
+                    pass
+                for _ in range(5):
+                    try:
+                        path.unlink()
+                        return 1
+                    except FileNotFoundError:
+                        return 0
+                    except PermissionError:
+                        time.sleep(0.02)
                 try:
                     path.unlink()
-                except FileNotFoundError:
+                    return 1
+                except (FileNotFoundError, PermissionError):
                     return 0
         return 1
 
