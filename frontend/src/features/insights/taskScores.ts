@@ -8,9 +8,14 @@ import type { InputScore, TaskScores } from './pillars'
 /** The exercise an event came from. The event has no schema_type and task_id is the server's own
     (only mock ids carry a prefix), so it is read from the trial_meta signature, which is unique per
     exercise (assessment_engine/README.md, "trial_meta by schema_type"). Matrix logs no extra keys,
-    so it is the pattern_induction event without relational's `hops`. */
+    so it is the pattern_induction event without relational's `hops`. The newer exercises are read
+    first: their keys are their own (stop_trial, pal_level; Arrow Focus logs `flanker`, never
+    Stroop's `congruent`). */
 export function schemaOf(e: TelemetryEvent): SchemaType | null {
   const m = e.trial_meta ?? {}
+  if ('stop_trial' in m) return 'stop_signal'
+  if ('pal_level' in m) return 'pal'
+  if ('flanker' in m) return 'flanker'
   if ('stream' in m) return 'n_back'
   if ('congruent' in m) return 'stroop'
   if ('angle_deg' in m) return 'mental_rotation'
@@ -63,6 +68,15 @@ export const PLAN_SHARE = 0.8 // OTS_Planning = 0.8 x solved in minimum moves + 
 export const PLAN_TIME_MAX_MS = 30_000 // half of the TOL-F 60 s limit
 export const UFOV_MIN_MS = 17 // one 60 Hz frame
 export const UFOV_MAX_MS = 500 // the top of the UFOV duration grid
+export const SSRT_BEST_MS = 150 // SSRT 150 ms -> 100, 450 ms -> 0
+export const SSRT_WORST_MS = 450
+const SST_CHANCE = 0.5 // two arrows on the go task
+export const FLANKER_COST_MAX_MS = 200 // flanker cost 0 ms -> 100, 200 ms -> 0
+const FLANKER_CHANCE = 0.5 // two arrows
+// Exclusion rules of the consensus guide (Verbruggen et al. 2019), evidence, not tuning: outside
+// this P(respond | signal) range the integration estimate is unreliable.
+export const SST_P_RESPOND_MIN = 0.25
+export const SST_P_RESPOND_MAX = 0.75
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length
@@ -98,21 +112,22 @@ export function taskScores(events: readonly TelemetryEvent[]): TaskScores {
     out.DCCS_SwitchCost = input((1 - cost / SWITCH_COST_MAX) * clamp01(d / D_PRIME_GATE), switches.length + quiet.length)
   }
 
-  // Stroop: RT cost on correct trials, gated by accuracy above chance so random or absent
-  // pressing (no RT difference) scores 0, not 100. Incongruent accuracy stands in for SSRT.
+  // ANT_Conflict: Arrow Focus's flanker cost when the session played it; else Stroop's RT cost.
+  // Both: RT cost on correct trials, gated by accuracy above chance so random or absent pressing
+  // (no RT difference) scores 0, not 100. Stroop's incongruent accuracy stands in for SSRT.
   const st = get('stroop')
   const inc = st.filter((e) => e.trial_meta?.congruent === false)
-  const incOk = inc.filter(ok)
-  const conOk = st.filter((e) => e.trial_meta?.congruent === true && ok(e))
-  const gate = st.length ? stroopGate(st) : 0
-  if (incOk.length && conOk.length) {
-    const cost = mean(incOk.map((e) => e.response_time_ms)) - mean(conOk.map((e) => e.response_time_ms))
-    // The RT term is clamped before the gate: a negative cost must not lift a guesser above the gate.
-    out.ANT_Conflict = input(clamp01(1 - cost / STROOP_COST_MAX_MS) * gate, incOk.length + conOk.length)
-  } else if (st.length && gate === 0) {
-    out.ANT_Conflict = input(0, st.length) // no cost to measure, and nothing above chance either
-  }
-  if (inc.length) out.SST_SSRT = { ...input(share(inc, ok), inc.length), proxy: true }
+  const fl = get('flanker')
+  const conflict = fl.length
+    ? conflictInput(fl, (e) => e.trial_meta?.flanker === 'incongruent', (e) => e.trial_meta?.flanker === 'congruent', FLANKER_CHANCE, FLANKER_COST_MAX_MS)
+    : conflictInput(st, (e) => e.trial_meta?.congruent === false, (e) => e.trial_meta?.congruent === true, STROOP_CHANCE, STROOP_COST_MAX_MS)
+  if (conflict) out.ANT_Conflict = conflict
+  // SST_SSRT: Stop Light's SSRT when the session played it; Stroop's stand-in only otherwise.
+  const ss = get('stop_signal')
+  if (ss.length) {
+    const sst = stopSignalInput(ss)
+    if (sst) out.SST_SSRT = sst
+  } else if (inc.length) out.SST_SSRT = { ...input(share(inc, ok), inc.length), proxy: true }
 
   // Tower: one event per problem.
   const tw = get('tower').filter((e) => num(e, 'l_min') !== null && num(e, 'l_user') !== null)
@@ -135,6 +150,11 @@ export function taskScores(events: readonly TelemetryEvent[]): TaskScores {
   if (mx.length) parts.push(share(mx, ok))
   if (rel.length) parts.push(rel.reduce((a, e) => a + (ok(e) ? hops(e) : 0), 0) / rel.reduce((a, e) => a + hops(e), 0))
   if (parts.length) out.FluidMatrices = input(mean(parts), mx.length + rel.length)
+
+  // Pair Finder: first-attempt memory over every pattern of the task, unreached stages counted as
+  // not recalled.
+  const pal = palInput(get('pal'))
+  if (pal) out.PAL_FirstTrialMemory = pal
 
   // MST: a timeout ('none') counts as not "similar".
   const ms = get('mst')
@@ -191,23 +211,138 @@ function nbackDPrime(nb: TelemetryEvent[]): number | null {
   return Math.max(0, dPrime(hits, signal.length, fas, noise.length))
 }
 
+/** Hyndman & Fan (1996) type-6 sample quantile of ascending `sorted` (R's quantile(type = 6), the
+    one the consensus guide's script uses): h = (n + 1) p, interpolated between the order statistics
+    around h, clamped to the first and last. */
+export function quantile6(sorted: readonly number[], p: number): number {
+  const n = sorted.length
+  const h = (n + 1) * p
+  if (h <= 1) return sorted[0]!
+  if (h >= n) return sorted[n - 1]!
+  const lo = Math.floor(h)
+  return sorted[lo - 1]! + (h - lo) * (sorted[lo]! - sorted[lo - 1]!)
+}
+
+const responded = (e: TelemetryEvent) => {
+  const r = e.trial_meta?.response
+  return typeof r === 'string' && r !== 'none'
+}
+const isStopTrial = (e: TelemetryEvent) => e.trial_meta?.stop_trial === true
+const isGoTrial = (e: TelemetryEvent) => e.trial_meta?.stop_trial === false
+
+/** Stop-signal reaction time by the integration method with go omissions replaced, as the consensus
+    guide recommends (Verbruggen et al. 2019, eLife 8:e46323):
+    - the go RT distribution is every go trial, choice errors included, with each omission
+      (response 'none') replaced by the slowest go RT;
+    - nth RT = its type-6 quantile at p = P(respond | signal);
+    - SSRT = nth RT - mean SSD over all stop trials.
+    Null (not estimable) under the guide's exclusion rules: no stop trial or no go response,
+    P(respond | signal) outside [0.25, 0.75], or a mean signal-respond RT not below the mean go RT
+    (responses on go trials only), which breaks the race model's independence. */
+export function ssrt(events: readonly TelemetryEvent[]): number | null {
+  const go = events.filter(isGoTrial)
+  const stop = events.filter(isStopTrial)
+  const goRts = go.filter(responded).map((e) => e.response_time_ms)
+  const ssds = stop.map((e) => num(e, 'ssd_ms')).filter((v): v is number => v !== null)
+  if (!stop.length || !goRts.length || ssds.length !== stop.length) return null
+  const pRespond = share(stop, responded)
+  if (pRespond < SST_P_RESPOND_MIN || pRespond > SST_P_RESPOND_MAX) return null
+  if (mean(stop.filter(responded).map((e) => e.response_time_ms)) >= mean(goRts)) return null
+  const slowest = Math.max(...goRts)
+  const dist = go.map((e) => (responded(e) ? e.response_time_ms : slowest)).sort((a, b) => a - b)
+  return quantile6(dist, pRespond) - mean(ssds)
+}
+
+/** SST_SSRT from one session's Stop Light events: SSRT scaled SSRT_BEST_MS -> 100, SSRT_WORST_MS -> 0,
+    times the go-task gate (go accuracy - 1/2) / (1/2) (omissions count wrong), so pressing at random
+    or not at all scores 0. A gate of 0 scores 0 even when no SSRT can be estimated; otherwise an
+    SSRT the guide excludes gives no input. `trials` = stop trials. */
+function stopSignalInput(ss: TelemetryEvent[]): InputScore | null {
+  const go = ss.filter(isGoTrial)
+  const stops = ss.filter(isStopTrial).length
+  if (!stops) return null
+  const gate = go.length ? clamp01((share(go, ok) - SST_CHANCE) / (1 - SST_CHANCE)) : 0
+  if (gate === 0) return input(0, stops)
+  const value = ssrt(ss)
+  if (value === null) return null
+  return input(clamp01((SSRT_WORST_MS - value) / (SSRT_WORST_MS - SSRT_BEST_MS)) * gate, stops)
+}
+
+/** PAL_FirstTrialMemory from Pair Finder events, per task (task_id):
+    - FAMS = recall events on attempt 1 that were right (CANTAB's first-attempt memory score);
+    - out of pal_total, every pattern of every stage, so the stages a failed run never reached count
+      as not recalled (CANTAB's "adjusted" convention for unreached stages);
+    - chance-corrected: (FAMS / pal_total - 1/boxes) / (1 - 1/boxes), clamped to 0..1 (A: one random
+      tap finds a pattern's box 1 time in `boxes`), so tapping at random scores 0.
+    Tasks are pooled weighted by pal_total; `trials` = the summed pal_total. A task without a valid
+    pal_total (>= 1) or boxes (>= 2) on its events is left out. */
+function palInput(pal: TelemetryEvent[]): InputScore | null {
+  const byTask = new Map<string, TelemetryEvent[]>()
+  for (const e of pal) byTask.set(e.task_id, [...(byTask.get(e.task_id) ?? []), e])
+  let total = 0
+  let weighted = 0
+  for (const es of byTask.values()) {
+    const first = es[0]!
+    const n = num(first, 'pal_total')
+    const boxes = num(first, 'boxes')
+    if (n === null || n < 1 || boxes === null || boxes < 2) continue
+    const fams = es.filter((e) => e.trial_meta?.attempt === 1 && ok(e)).length
+    const chance = 1 / boxes
+    total += n
+    weighted += n * clamp01((fams / n - chance) / (1 - chance))
+  }
+  return total ? input(weighted / total, total) : null
+}
+
+/** 0 at accuracy `chance` or below, 1 at perfect accuracy. */
+const accuracyGate = (es: TelemetryEvent[], chance: number) => clamp01((share(es, ok) - chance) / (1 - chance))
+
+/** A conflict cost input (Stroop, Arrow Focus): mean correct RT on incongruent trials minus mean
+    correct RT on congruent ones, scaled 0 ms -> 100, `costMax` -> 0 and clamped, then times the
+    accuracy gate (over all the task's trials). Without a correct trial in either condition: 0 over
+    all trials when the gate is 0 (nothing above chance), else no input. */
+function conflictInput(
+  es: TelemetryEvent[],
+  isInc: (e: TelemetryEvent) => boolean,
+  isCon: (e: TelemetryEvent) => boolean,
+  chance: number,
+  costMax: number,
+): InputScore | null {
+  if (!es.length) return null
+  const incOk = es.filter((e) => isInc(e) && ok(e))
+  const conOk = es.filter((e) => isCon(e) && ok(e))
+  const gate = accuracyGate(es, chance)
+  if (incOk.length && conOk.length) {
+    const cost = mean(incOk.map((e) => e.response_time_ms)) - mean(conOk.map((e) => e.response_time_ms))
+    // The RT term is clamped before the gate: a negative cost must not lift a guesser above the gate.
+    return input(clamp01(1 - cost / costMax) * gate, incOk.length + conOk.length)
+  }
+  return gate === 0 ? input(0, es.length) : null // no cost to measure, and nothing above chance either
+}
+
 /** 0 at chance accuracy (1 in 4 inks) or below, 1 at perfect accuracy. */
-const stroopGate = (st: TelemetryEvent[]) => clamp01((share(st, ok) - STROOP_CHANCE) / (1 - STROOP_CHANCE))
+const stroopGate = (st: TelemetryEvent[]) => accuracyGate(st, STROOP_CHANCE)
+
+/** Exercises whose errors are not the user's to recover from: Stop Light's staircase holds stop
+    trials near half wrong by design; in Pair Finder a wrong box is a memory miss, and the next
+    pattern is a separate memory, not a second try. A task is read by its first event's schema. */
+const NO_RECOVERY: ReadonlySet<SchemaType> = new Set<SchemaType>(['stop_signal', 'pal'])
 
 /** Accuracy on the trial right after an error, within each task. A trial is wrong when any of its
     events is; n-back logs one event per stream, and only its rule-stream event (which carries the
     trial's verdict, off-rule presses included) is read. Tasks played at chance or below (n-back d' 0,
     Stroop accuracy <= 1 in 4) are left out: a non-responder's next n-back trial is "correct" by
-    withholding, which is not recovery. */
+    withholding, which is not recovery. So are the NO_RECOVERY exercises. */
 function errorRecovery(events: readonly TelemetryEvent[]): InputScore | null {
   const byTask = new Map<string, TelemetryEvent[]>()
   for (const e of events) byTask.set(e.task_id, [...(byTask.get(e.task_id) ?? []), e])
   let after = 0
   let recovered = 0
   for (const taskEvents of byTask.values()) {
-    if (atChance(taskEvents)) continue
     const first = taskEvents[0]
-    const read = first && schemaOf(first) === 'n_back' ? ruleStream(taskEvents) : taskEvents
+    const schema = first ? schemaOf(first) : null
+    if ((schema && NO_RECOVERY.has(schema)) || atChance(taskEvents)) continue
+    const read = schema === 'n_back' ? ruleStream(taskEvents) : taskEvents
     const trials = new Map<number, boolean>()
     for (const e of read) trials.set(e.trial_index, (trials.get(e.trial_index) ?? true) && ok(e))
     const seq = [...trials.entries()].sort((x, y) => x[0] - y[0]).map(([, correct]) => correct)
@@ -225,5 +360,6 @@ function atChance(taskEvents: TelemetryEvent[]): boolean {
   const schema = first ? schemaOf(first) : null
   if (schema === 'n_back') return nbackDPrime(taskEvents) === 0
   if (schema === 'stroop') return stroopGate(taskEvents) === 0
+  if (schema === 'flanker') return accuracyGate(taskEvents, FLANKER_CHANCE) === 0
   return false
 }

@@ -5,12 +5,14 @@ import { TRAIN_EXERCISES } from '../train/catalog'
 import { EXERCISE_NAME } from './exercises'
 import { howToPlay, stepParts, words } from './howToPlay'
 import fixtures from './tasks/fixtures.json'
-import type { NBackParams, SchemaType, StroopParams, TaskPayload } from './telemetry/types'
+import type { NBackParams, PalParams, SchemaType, StroopParams, TaskPayload } from './telemetry/types'
 import { KEYS as ROTATION_KEYS } from './tasks/MentalRotation'
 import { KEYS as MST_KEYS } from './tasks/Mst'
 import { KEYS as NBACK_KEYS } from './tasks/NBack'
 import { KEYS as RELATIONAL_KEYS } from './tasks/Relational'
 import { DIR_KEYS, LETTER_KEYS } from './tasks/Ufov'
+import { ARROW_KEYS } from './tasks/useFixatedTrials'
+import { boxForKey } from './tasks/PairedAssociates'
 
 const SCHEMAS = Object.keys(EXERCISE_NAME) as SchemaType[]
 const task = (s: SchemaType) => (fixtures as TaskPayload[]).find((t) => t.schema_type === s)!
@@ -56,6 +58,14 @@ describe('How to play (INT-1 item 13)', () => {
     expect(keys('mental_rotation')).toEqual(caps(ROTATION_KEYS))
     expect(keys('tower')).toEqual([])
     expect(keys('matrix')).toEqual([])
+    // The arrow exercises read ArrowLeft / ArrowRight (tasks/useFixatedTrials.ts ARROW_KEYS).
+    const arrows = Object.values(ARROW_KEYS).map((d) => (d === 'left' ? '←' : '→'))
+    expect(keys('stop_signal')).toEqual(arrows)
+    expect(keys('flanker')).toEqual(arrows)
+    // Pair Finder: digit k picks box k (PairedAssociates.tsx boxForKey), 1 to the box count.
+    const { boxes } = task('pal').params as PalParams
+    expect(keys('pal')).toEqual(['1', String(boxes)])
+    expect([boxForKey('1', boxes), boxForKey(String(boxes), boxes), boxForKey(String(boxes + 1), boxes)]).toEqual([0, boxes - 1, null])
   })
 
   it('N-back follows its task: n and the streams it plays', () => {

@@ -1,9 +1,12 @@
 import type {
+  FlankerParams,
   MstParams,
   NBackParams,
+  PalParams,
   RelationalParams,
   RotationParams,
   SchemaType,
+  StopSignalParams,
   StroopParams,
   TaskPayload,
   UfovParams,
@@ -25,6 +28,9 @@ const LINE: Record<SchemaType, string> = {
   stroop: 'Pick the color of the ink, not the word.',
   matrix: 'Pick the piece that completes the pattern.',
   mental_rotation: 'Say if the right shape is the left one turned or mirrored.',
+  stop_signal: 'Press the way the arrow points. Stop for the sign.',
+  pal: 'Remember which box holds each shape. Then find it.',
+  flanker: 'Answer the middle arrow. Ignore the ones beside it.',
 }
 
 // The instruction screen: the name, one sentence on what to do (under 12 words, anti-slop rule 4)
@@ -57,10 +63,19 @@ export function trialCount(task: TaskPayload): number {
       return (p as UfovParams).trials.filter(isValidTrial).length
     case 'mst':
       return (p as MstParams).test.length
+    case 'stop_signal':
+      return (p as StopSignalParams).trials.length
+    case 'flanker':
+      return (p as FlankerParams).trials.length
+    case 'pal':
+      // One dot per pattern on its first attempt. ponytail: a repeated stage adds trials, so the
+      // dots can fill early (they cap at the total), and a failed last attempt ends with dots open.
+      return (p as PalParams).stages.reduce((n, s) => n + s.recall.length, 0)
     default:
       return 1 // matrix and tower: one trial
   }
 }
 
-// UFOV draws its own fixation cross before every trial, so the frame does not add one.
-export const OWN_FIXATION: ReadonlySet<SchemaType> = new Set<SchemaType>(['ufov'])
+// UFOV and the arrow exercises draw their own fixation cross before every trial, so the frame does
+// not add one.
+export const OWN_FIXATION: ReadonlySet<SchemaType> = new Set<SchemaType>(['ufov', 'stop_signal', 'flanker'])

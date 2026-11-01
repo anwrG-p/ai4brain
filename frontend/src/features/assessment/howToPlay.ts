@@ -1,6 +1,6 @@
 import type { PillarId } from '../insights/pillars'
 import { NBACK_RULE_STREAM } from './telemetry/types'
-import type { NBackParams, SchemaType, StroopParams, TaskPayload } from './telemetry/types'
+import type { NBackParams, PalParams, SchemaType, StroopParams, TaskPayload } from './telemetry/types'
 
 /* "How to play" for each exercise's instruction screen (INT-1 item 13; user: "add some explanation to
    the games", and keep it short). All the copy lives here, so it is easy to edit.
@@ -107,6 +107,34 @@ export function howToPlay(task: TaskPayload): HowToPlay | null {
         caption: 'Turned, not flipped → Turned',
         pillar: 'agility',
         more: ['It measures turning shapes in your mind.', 'Bigger turns take longer for everyone.'],
+      }
+    case 'stop_signal':
+      // StopSignal.tsx: ← / → or Left / Right on a go trial; on a stop trial any press is wrong. The
+      // consensus guide asks to say "do not wait for the stop sign" (Verbruggen et al. 2019).
+      return {
+        steps: ['Tap the way the arrow points, or [←]/[→].', 'Be quick: never wait for a stop.', 'Stop sign? Press nothing at all.'],
+        caption: 'An arrow, then the stop sign',
+        pillar: 'impulse',
+        more: ['It measures stopping an action you already started.', 'Each stop you make brings the next sign later.'],
+      }
+    case 'pal': {
+      // PairedAssociates.tsx: study, then pick the box (tap, or digit k for box k); a stage with a
+      // wrong box is studied again, up to max_attempts.
+      const { boxes } = p as PalParams
+      return {
+        steps: ['Watch which shape opens in each box.', `Then tap its box, or press ${range(Math.min(boxes, 9))}.`, 'A miss shows the boxes once more.'],
+        caption: 'The shape was in this box',
+        pillar: 'memory',
+        more: ['It measures remembering where things were.', 'Each round adds more shapes, up to eight.'],
+      }
+    }
+    case 'flanker':
+      // Flanker.tsx: right when ← / → (or Left / Right) matches the middle arrow; flankers ignored.
+      return {
+        steps: ['Look only at the middle arrow.', 'Tap its way, or press [←]/[→].', 'Ignore the arrows beside it.'],
+        caption: 'Middle points right → Right',
+        pillar: 'agility',
+        more: ['It measures keeping focus when nearby things disagree.', 'Mismatched arrows feel slower for everyone.'],
       }
     default:
       return null

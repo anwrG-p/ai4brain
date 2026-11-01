@@ -210,8 +210,7 @@ describe('getUserId', () => {
 describe('fixtures.json', () => {
   test('one entry per schema_type with the contract dimension', () => {
     const dims = Object.fromEntries(tasks.map((t) => [t.schema_type, t.dimension]))
-    expect(tasks).toHaveLength(8)
-    expect(dims).toEqual({
+    const expected = {
       n_back: 'working_memory',
       stroop: 'executive_function',
       matrix: 'pattern_induction',
@@ -220,8 +219,14 @@ describe('fixtures.json', () => {
       tower: 'executive_function',
       ufov: 'processing_speed',
       mst: 'episodic_memory',
-    } satisfies Record<SchemaType, string>)
-    expect(new Set(tasks.map((t) => t.task_id)).size).toBe(8)
+      stop_signal: 'executive_function',
+      pal: 'episodic_memory',
+      flanker: 'executive_function',
+    } satisfies Record<SchemaType, string>
+    const n = Object.keys(expected).length
+    expect(tasks).toHaveLength(n)
+    expect(dims).toEqual(expected)
+    expect(new Set(tasks.map((t) => t.task_id)).size).toBe(n)
     for (const t of tasks) expect(typeof t.surface_seed).toBe('number')
   })
 

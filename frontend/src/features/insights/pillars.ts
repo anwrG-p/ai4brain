@@ -35,16 +35,24 @@ export function isPillarId(value: unknown): value is PillarId {
                          those, (A) planning 0 s -> 1, 30 s -> 0
    OTS_Execution         tower: mean of l_min / l_user (0 when unsolved)
    FluidMatrices         mean of matrix accuracy and relational accuracy weighted by hops
-   ANT_Conflict          Stroop RT cost (incongruent - congruent, correct trials), (A) 0 ms -> 100,
-                         300 ms -> 0, times the gate (accuracy - 1/4) / (3/4) (chance = 4 inks);
-                         0 when accuracy is at chance and no cost can be measured
+   ANT_Conflict          Arrow Focus (flanker) RT cost (incongruent - congruent, correct trials),
+                         (A) 0 ms -> 100, 200 ms -> 0, times the gate (accuracy - 1/2) / (1/2).
+                         Only when the session has no Arrow Focus trials: Stroop RT cost, (A) 0 ms ->
+                         100, 300 ms -> 0, times the gate (accuracy - 1/4) / (3/4) (chance = 4 inks).
+                         Either is 0 when accuracy is at chance and no cost can be measured
    DCCS_SwitchCost       n-back accuracy on switch trials vs the rule stream's non-switch noise
                          trials, (A) cost 0 -> 100, 0.5 -> 0, times the gate min(1, d' / 1) (A)
    ErrorRecovery         accuracy on the trial right after an error, all exercises; tasks played at
                          chance (n-back d' 0, Stroop accuracy <= 1/4) are left out
-   SST_SSRT              PROXY: Stroop incongruent accuracy (no stop-signal task exists)
+   SST_SSRT              Stop Light (stop_signal): SSRT by the integration method with go omissions
+                         replaced (Verbruggen et al. 2019 consensus guide, taskScores.ts ssrt()), none
+                         when the guide's exclusion rules reject it; (A) 150 ms -> 100, 450 ms -> 0,
+                         times the go gate (go accuracy - 1/2) / (1/2). Only when the session has no
+                         Stop Light trials: PROXY, Stroop incongruent accuracy
    DDM_Caution           omitted: no source
-   PAL_FirstTrialMemory  omitted: no source
+   PAL_FirstTrialMemory  Pair Finder (pal): patterns placed right on the first attempt over all the
+                         task's patterns (unreached stages count as missed), chance-corrected for
+                         one box in `boxes` (A)
    MST_LDI               P(similar | lure) - P(similar | new), clamped to 0..1
    UFOV_SOA              QUEST threshold, 17 ms -> 100, 500 ms -> 0 (the payload's duration grid)
    ANT_Orienting         UFOV peripheral accuracy
@@ -101,7 +109,7 @@ export type PillarScore = {
 export const MIN_COVERAGE = 0.3
 const MAX_UNCERTAINTY = 50
 /** Inputs with no source by design: they lower `coverage` but do not widen the band forever. */
-export const UNSOURCED_INPUTS: readonly InputId[] = ['DDM_Caution', 'PAL_FirstTrialMemory']
+export const UNSOURCED_INPUTS: readonly InputId[] = ['DDM_Caution']
 
 /** Scores every pillar from the inputs that are there, renormalising the weights over them.
     Uncertainty: each input's standard error is taken as the worst-case binomial one, 50 / sqrt(trials)

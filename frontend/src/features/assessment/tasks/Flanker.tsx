@@ -1,0 +1,86 @@
+import { useCallback } from 'react'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { Card } from '../../../components/ui/Card'
+import type { FlankerParams } from '../telemetry/types'
+import type { TaskProps } from './TaskRunner'
+import { EXERCISE_NAME } from '../names'
+import { AnswerButton } from './StopSignal'
+import { useArrowKeys, useFixatedTrials } from './useFixatedTrials'
+
+type Dir = FlankerParams['trials'][number]['dir']
+
+/* The fixture's design (fixtures.json, mock-flanker-1): 96 trials, 48 congruent and 48 incongruent
+   (24 per direction each), the length of one ANT block (Fan, McCandliss, Sommer, Raz & Posner 2002,
+   J Cogn Neurosci 14:340-347), with its 1700 ms response window. A conflict cost is a difference
+   score, whose retest reliability is modest and rises with trials (Hedge, Powell & Sumner 2018,
+   Behav Res Methods 50:1166-1186), so not fewer than 48 per condition. The fixture test pins it. */
+export const FLANKER_DESIGN = { trials: 96, perCondition: 48, timeLimitMs: 1700 } as const
+
+// One arrow in a 100 x 100 cell, the same shape as Stop Light's; ink on the card's surface.
+const arrow = (x: number, dir: Dir) => (
+  <path
+    key={x}
+    d="M18 50 H78 M56 28 L80 50 L56 72"
+    transform={`translate(${x} 0)${dir === 'left' ? ' translate(100 0) scale(-1 1)' : ''}`}
+    fill="none"
+    stroke="var(--color-ink)"
+    strokeWidth={10}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  />
+)
+
+/** Five arrows: the middle one points `dir`; the flankers the same way when congruent. */
+export function FlankerRow({ dir, congruent }: { dir: Dir; congruent: boolean }) {
+  const flank: Dir = congruent ? dir : dir === 'left' ? 'right' : 'left'
+  return (
+    <svg data-flanker-row viewBox="0 0 500 100" className="h-auto w-full max-w-xs" role="img" aria-label="Five arrows">
+      {[0, 1, 2, 3, 4].map((k) => arrow(k * 100, k === 2 ? dir : flank))}
+    </svg>
+  )
+}
+
+// Arrow Focus: press the middle arrow's direction (← / → or the buttons); ignore the flankers.
+export function Flanker({ params, recorder, onDone }: TaskProps<FlankerParams>) {
+  const { trials, time_limit_ms, fixation_ms } = params
+  const onFinish = useCallback(
+    (k: number) => {
+      const t = trials[k]
+      return t && { flanker: t.congruent ? 'congruent' : 'incongruent', dir: t.dir, response: 'none' }
+    },
+    [trials],
+  )
+  const { i, showing, respond } = useFixatedTrials(recorder, trials.length, fixation_ms, time_limit_ms, onDone, onFinish)
+  const t = trials[i]
+
+  const answer = useCallback(
+    (dir: Dir) => {
+      if (t) respond(dir === t.dir, { response: dir })
+    },
+    [t, respond],
+  )
+  useArrowKeys(answer)
+
+  if (!t) return null
+  return (
+    <section aria-label={EXERCISE_NAME.flanker} className="flex w-full flex-col items-center gap-4">
+      <Card className="flex w-full max-w-sm items-center justify-center px-4" style={{ minHeight: 160 }}>
+        {showing ? (
+          <FlankerRow dir={t.dir} congruent={t.congruent} />
+        ) : (
+          <span role="img" aria-label="Look at the cross" className="select-none text-5xl font-bold text-ink">
+            +
+          </span>
+        )}
+      </Card>
+      <div className="flex justify-center gap-4">
+        <AnswerButton onPress={() => answer('left')} icon={<ArrowLeft size={24} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" />}>
+          Left
+        </AnswerButton>
+        <AnswerButton onPress={() => answer('right')} icon={<ArrowRight size={24} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" />} iconRight>
+          Right
+        </AnswerButton>
+      </div>
+    </section>
+  )
+}

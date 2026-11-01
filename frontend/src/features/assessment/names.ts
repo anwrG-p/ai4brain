@@ -11,4 +11,7 @@ export const EXERCISE_NAME: Record<SchemaType, string> = {
   stroop: 'Color Clash',
   matrix: 'Pattern Puzzle',
   mental_rotation: 'Shape Turn',
+  stop_signal: 'Stop Light',
+  pal: 'Pair Finder',
+  flanker: 'Arrow Focus',
 }
