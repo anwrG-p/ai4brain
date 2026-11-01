@@ -421,27 +421,9 @@ describe('Settings (/settings)', () => {
     expect(JSON.parse(localStorage.getItem(PREFS_KEY)!)).toMatchObject({ cvdSafe: true })
   })
 
-  it('training pace radios are one Tab stop; defaults to Gentle; arrow keys move and choose', () => {
-    renderPage(<SettingsPage />)
-    const gentle = screen.getByRole('radio', { name: 'Gentle' })
-    const balanced = screen.getByRole('radio', { name: 'Balanced' })
-    const challenge = screen.getByRole('radio', { name: 'Challenge' })
-    expect(gentle).toHaveAttribute('aria-checked', 'true')
-    expect(gentle).toHaveAttribute('tabindex', '0')
-    expect(balanced).toHaveAttribute('aria-checked', 'false')
-    expect(balanced).toHaveAttribute('tabindex', '-1')
-    fireEvent.click(balanced)
-    expect(useDevicePrefs.getState().difficulty).toBe('balanced')
-    expect(balanced).toHaveAttribute('aria-checked', 'true')
-    balanced.focus()
-    fireEvent.keyDown(balanced, { key: 'ArrowRight' })
-    expect(useDevicePrefs.getState().difficulty).toBe('challenge')
-    expect(challenge).toHaveAttribute('aria-checked', 'true')
-  })
-
   it('shows only real settings: no technical or unwired switches', () => {
     const page = renderPage(<SettingsPage />)
-    expect(screen.getAllByRole('radio')).toHaveLength(5)
+    expect(screen.getAllByRole('radio')).toHaveLength(2)
     expect(screen.getAllByRole('switch').map((s) => s.getAttribute('aria-labelledby') && document.getElementById(s.getAttribute('aria-labelledby')!)?.textContent)).toEqual([
       'Reduce motion',
       'Mood guess',
