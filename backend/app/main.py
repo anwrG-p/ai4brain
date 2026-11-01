@@ -19,6 +19,11 @@ REPO_ROOT = str(Path(__file__).resolve().parents[2])
 if REPO_ROOT not in sys.path:
     sys.path.append(REPO_ROOT)
 
+from app.settings import load_env_file  # noqa: E402
+
+# backend/.env, if it exists (GEMINI_API_KEY, ...). Real environment variables win; never required.
+load_env_file()
+
 from ai_coach.api import router as coach_module_router  # noqa: E402
 from app.api.routes.v1_auth import router as auth_router  # noqa: E402
 from app.lifecycle import lifespan  # noqa: E402

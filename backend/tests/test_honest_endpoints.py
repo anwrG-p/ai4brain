@@ -33,13 +33,6 @@ def assert_no_region_names(payload) -> None:
 # --- 501 until the module behind the route exists ------------------------------------------------
 
 NOT_YET = [
-    ("post", "/v1/coach/chat", {"json": {"user_id": "u1", "user_prompt": "hi"}}, "coach not available yet"),
-    (
-        "get",
-        "/v1/coach/collaboration-score",
-        {"params": {"user_id": "u1", "cluster_id": 3}},
-        "collaboration score not available yet",
-    ),
     (
         "post",
         "/v1/clustering/evaluate",
@@ -66,7 +59,11 @@ USER_ROUTES = [
     (
         "post",
         "/v1/coach/chat",
-        lambda uid: {"json": {"user_prompt": "hi"} | ({} if uid is None else {"user_id": uid})},
+        # A body that is valid apart from the id, so the 422 is about the id.
+        lambda uid: {
+            "json": {"transcript": [], "message": "hi", "kind": "typed"}
+            | ({} if uid is None else {"user_id": uid})
+        },
     ),
     ("post", "/v1/clustering/evaluate", lambda uid: {"json": {} if uid is None else {"user_id": uid}}),
 ]
@@ -92,14 +89,14 @@ def test_delete_removes_the_jsonl_and_counts_events(client, tmp_path):
 
     r = client.delete("/v1/user/telemetry", params={"user_id": "u_del"})
     assert r.status_code == 200
-    assert r.json() == {"deleted_events": 3, "deleted_files": 1}
+    assert r.json() == {"deleted_events": 3, "deleted_chat_turns": 0, "deleted_files": 1}
     assert not (tmp_path / "u_del.jsonl").exists()
 
 
 def test_delete_is_idempotent_and_reports_zero(client):
     r = client.delete("/v1/user/telemetry", params={"user_id": "nobody"})
     assert r.status_code == 200
-    assert r.json() == {"deleted_events": 0, "deleted_files": 0}
+    assert r.json() == {"deleted_events": 0, "deleted_chat_turns": 0, "deleted_files": 0}
 
 
 def test_delete_leaves_other_users_alone(client, tmp_path):

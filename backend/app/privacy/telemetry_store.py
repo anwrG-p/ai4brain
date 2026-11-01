@@ -1,4 +1,10 @@
-"""Telemetry files on disk: where they live, the lock over them, ingest and the privacy operations.
+"""Per-user files on disk: where they live, the lock over them, ingest and the privacy operations.
+
+Two built-in stores, one file per user in each, both covered by delete, export and retention:
+- telemetry: `{TELEMETRY_DIR}/{user_key}.jsonl` (ingest, below);
+- coach chat history: `{COACH_DIR}/{user_key}.jsonl` (written by `ai_coach/chat_store.py`).
+Other per-user stores (BE-04's task registry) join delete and export through
+`register_user_store()`.
 
 No FastAPI or pydantic here, so the retention CLI and other tools import it as is.
 The HTTP routes (`app/api/routes/v1_telemetry.py`, `v1_privacy.py`) are thin wrappers.
@@ -65,6 +71,12 @@ class ExportTooLarge(Exception):
 def telemetry_dir() -> Path:
     env = os.environ.get("TELEMETRY_DIR")
     return Path(env) if env else REPO_ROOT / "data" / "raw" / "telemetry"
+
+
+def coach_dir() -> Path:
+    """The coach chat history (only what the user saw and picked). data/processed/* is gitignored."""
+    env = os.environ.get("COACH_DIR")
+    return Path(env) if env else REPO_ROOT / "data" / "processed" / "coach"
 
 
 def check_user_id(user_id: str) -> None:
@@ -159,65 +171,88 @@ def append_events(
     return len(rows)
 
 
-def delete_user(user_id: str, directory: Path | None = None) -> dict[str, int]:
-    """Remove `{user_key}.jsonl`, every `{user_key}.*` state file and the user's records in every
-    registered store. Counts only what was removed. Raises StoreUnavailable if a store failed
-    (after trying all of them), LockTimeout if the telemetry lock stays busy.
+def _delete_owned(directory: Path, key: str) -> tuple[int, int]:
+    """(JSONL lines, files) removed for `key` in `directory`, under that directory's lock."""
+    lines = files = 0
+    if not directory.is_dir():
+        return 0, 0
+    with telemetry_lock(directory):
+        # Ids have no dots, so the part before the first dot is the owner: `u1` never matches
+        # `u10.jsonl`, and `.lock` (empty owner) is never anyone's.
+        for path in list(directory.iterdir()):
+            if path.name.split(".", 1)[0].lower() != key or not path.is_file():
+                continue
+            if path.suffix.lower() == ".jsonl":
+                text = path.read_text(encoding="utf-8")
+                lines += sum(1 for line in text.splitlines() if line.strip())
+            path.unlink()
+            files += 1
+    return lines, files
 
-    Matches file names case-insensitively, so a file written under another case before ids
-    were lowercased (possible on Linux) is still found and counted.
+
+def delete_user(
+    user_id: str, directory: Path | None = None, coach_directory: Path | None = None
+) -> dict[str, int]:
+    """Remove `{user_key}.jsonl` and every `{user_key}.*` state file in the telemetry and coach
+    stores, then the user's records in every registered store.
+
+    Counts only what was removed: telemetry lines as `deleted_events`, chat-history lines as
+    `deleted_chat_turns`, and files from every store (registered ones included) as
+    `deleted_files`. Matches file names case-insensitively, so a file written under another
+    case before ids were lowercased (possible on Linux) is still found and counted.
+    Raises StoreUnavailable if a registered store failed (after trying all of them),
+    LockTimeout if a lock stays busy.
     """
     key = user_key(user_id)
-    explicit = directory
-    directory = directory or telemetry_dir()
-    events = files = 0
-    if directory.is_dir():
-        with telemetry_lock(directory):
-            # Ids have no dots, so the part before the first dot is the owner: `u1` never matches
-            # `u10.jsonl`, and `.lock` (empty owner) is never anyone's.
-            for path in list(directory.iterdir()):
-                if path.name.split(".", 1)[0].lower() != key or not path.is_file():
-                    continue
-                if path.suffix.lower() == ".jsonl":
-                    text = path.read_text(encoding="utf-8")
-                    events += sum(1 for line in text.splitlines() if line.strip())
-                path.unlink()
-                files += 1
+    events, files = _delete_owned(directory or telemetry_dir(), key)
+    turns, chat_files = _delete_owned(coach_directory or coach_dir(), key)
+    files += chat_files
     failed = []
     for name, (delete, _) in list(_USER_STORES.items()):
         try:
-            files += delete(key, _store_dir(explicit, name))
+            files += delete(key, _store_dir(directory, name))
         except Exception as e:  # best effort: the other stores still go; no id in the log
             log.warning("user store %s: delete failed (%s)", name, type(e).__name__)
             failed.append(name)
     if failed:
         raise StoreUnavailable(f"could not delete from {', '.join(failed)}; retry")
-    return {"deleted_events": events, "deleted_files": files}
+    return {"deleted_events": events, "deleted_chat_turns": turns, "deleted_files": files}
+
+
+def _read_owned(path: Path, room: int, limit: int) -> bytes | None:
+    """The file's bytes, or None. ExportTooLarge if it is over `room`, what is left of `limit`."""
+    if not path.is_file():
+        return None
+    with telemetry_lock(path.parent):
+        try:
+            if path.stat().st_size > room:
+                raise ExportTooLarge(f"the export is over the {limit}-byte limit")
+            return path.read_bytes()
+        except FileNotFoundError:
+            return None
 
 
 def export_user(
-    user_id: str, directory: Path | None = None, max_bytes: int | None = None
+    user_id: str,
+    directory: Path | None = None,
+    max_bytes: int | None = None,
+    coach_directory: Path | None = None,
 ) -> bytes | None:
-    """The user's raw events as stored (JSONL), then one line per registered store that keeps
-    something for them (`{"store": name, "user_id": key, "data": ...}`); None if nothing is stored.
+    """Everything stored for the user as JSONL, or None if nothing is stored.
 
-    Read whole under the lock, so the caller can send it without holding the lock.
-    Raises ExportTooLarge above `max_bytes` (default EXPORT_MAX_BYTES), LockTimeout if busy,
+    The raw telemetry events as stored, then the coach chat history (rows with
+    `"record": "coach_turn"`), then one line per registered store that keeps something for
+    them (`{"record": name, "user_id": key, "data": ...}`). Each file is read whole under its
+    lock, so the caller can send the result without holding a lock. Raises ExportTooLarge when
+    everything together is over `max_bytes` (default EXPORT_MAX_BYTES), LockTimeout if busy,
     StoreUnavailable if a registered store fails.
     """
     key = user_key(user_id)
     limit = EXPORT_MAX_BYTES if max_bytes is None else max_bytes
-    path = (directory or telemetry_dir()) / f"{key}.jsonl"
-    data = None
-    if path.is_file():
-        with telemetry_lock(path.parent):
-            try:
-                size = path.stat().st_size
-                if size > limit:
-                    raise ExportTooLarge(f"{size} bytes is over the {limit}-byte export limit")
-                data = path.read_bytes()
-            except FileNotFoundError:
-                pass
+    telemetry = _read_owned((directory or telemetry_dir()) / f"{key}.jsonl", limit, limit)
+    room = limit - len(telemetry or b"")
+    chat = _read_owned((coach_directory or coach_dir()) / f"{key}.jsonl", room, limit)
+    room -= len(chat or b"")
     records, failed = [], []
     for name, (_, export) in list(_USER_STORES.items()):
         try:
@@ -227,10 +262,13 @@ def export_user(
             failed.append(name)
             continue
         if record is not None:
-            line = json.dumps({"store": name, "user_id": key, "data": record}, allow_nan=False)
+            line = json.dumps({"record": name, "user_id": key, "data": record}, allow_nan=False)
             records.append(line.encode("utf-8") + b"\n")
     if failed:
         raise StoreUnavailable(f"could not export from {', '.join(failed)}; retry")
-    if data is None and not records:
+    extra = b"".join(records)
+    if len(extra) > room:
+        raise ExportTooLarge(f"the export is over the {limit}-byte limit")
+    if telemetry is None and chat is None and not records:
         return None
-    return (data or b"") + b"".join(records)
+    return (telemetry or b"") + (chat or b"") + extra

@@ -1,12 +1,15 @@
-"""Telemetry retention: drop events received more than N days ago, and task registries
-(GET /v1/tasks/next's per-user files) nobody touched for N days.
+"""Retention: drop telemetry events and coach chat turns received more than N days ago, and task
+registries (GET /v1/tasks/next's per-user files) nobody touched for N days.
 
 Run from the repo root (e.g. daily from cron):  python -m backend.app.privacy.retention --days 30
 In the container (WORKDIR /srv is the repo root there too):
     docker compose exec backend python -m backend.app.privacy.retention --days 30
-Prints one JSON line: {"files", "kept", "dropped", "undated", "removed_files", "registries_removed"}.
-"dropped" counts expired lines; "undated" counts lines with no readable received_at,
-which are also removed. No FastAPI here: another server can import purge_expired as is.
+Prints one JSON line:
+{"files", "kept", "dropped", "undated", "removed_files", "coach": {...}, "registries_removed"}.
+The top-level counts are the telemetry store's; "coach" has the same counts for the chat history
+(COACH_DIR); "registries_removed" counts idle task registries deleted. "dropped" counts expired
+lines; "undated" counts lines with no readable received_at, which are also removed. No FastAPI
+here: another server can import purge_expired.
 """
 
 import argparse
@@ -19,7 +22,7 @@ from pathlib import Path
 
 # Relative, so the module runs as `backend.app.privacy.retention` from the repo root and
 # imports as `app.privacy.retention` inside the server and the tests.
-from .telemetry_store import LockTimeout, telemetry_dir, telemetry_lock
+from .telemetry_store import LockTimeout, coach_dir, telemetry_dir, telemetry_lock
 
 # GDPR Art 5(1)(e) storage limitation; the period README.md promises for raw telemetry.
 DEFAULT_DAYS = 30
@@ -101,7 +104,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--days", type=_days, default=DEFAULT_DAYS)
     args = parser.parse_args(argv)
     try:
-        report = purge_expired(telemetry_dir(), args.days, on_wait=_say_waiting)
+        telemetry = purge_expired(telemetry_dir(), args.days, on_wait=_say_waiting)
+        # The coach chat history follows the same period (the retention hook for ai_coach/chat_store).
+        coach = purge_expired(coach_dir(), args.days, on_wait=_say_waiting)
+        report = {**telemetry, "coach": coach}
     except LockTimeout as e:
         print(f"retention: {e}; run again later", file=sys.stderr)
         return 1

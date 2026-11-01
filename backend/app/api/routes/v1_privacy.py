@@ -42,7 +42,8 @@ def delete_telemetry(user_id: UserId) -> dict[str, int]:
     responses={404: {}, 413: {"description": f"export over {EXPORT_MAX_BYTES} bytes"}, 503: {}},
 )
 def export_telemetry(user_id: UserId) -> Response:
-    """The raw events stored for this id, as JSONL."""
+    """Everything stored for this id, as JSONL: the raw telemetry events, then the coach chat
+    history (rows with "record": "coach_turn")."""
     try:
         data = export_user(user_id)
     except LockTimeout:
@@ -52,11 +53,11 @@ def export_telemetry(user_id: UserId) -> Response:
     except ExportTooLarge as e:
         raise HTTPException(status_code=413, detail=str(e))
     if data is None:
-        raise HTTPException(status_code=404, detail="no telemetry stored for this id")
+        raise HTTPException(status_code=404, detail="nothing stored for this id")
     return Response(
         data,
         media_type="application/x-ndjson",
         headers={
-            "Content-Disposition": f'attachment; filename="{user_id.lower()}-telemetry.jsonl"'
+            "Content-Disposition": f'attachment; filename="{user_id.lower()}-my-data.jsonl"'
         },
     )

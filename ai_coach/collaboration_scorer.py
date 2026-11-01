@@ -20,7 +20,7 @@ Weights w_i(s_t) are dynamically tuned based on the active cognitive archetype
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Pattern
 from ai_coach.schemas import (
     ArchetypeTier,
     ChatMessage,
@@ -231,7 +231,7 @@ class CollaborationScorer:
         self,
         dimension_scores: DimensionScores,
         weights: DimensionWeights,
-        tier: ArchetypeTier
+        tier: Optional[ArchetypeTier]
     ) -> str:
         """Provide a dynamic growth-mindset tip based on the highest-weighted opportunity."""
         s_dict = dimension_scores.to_dict()
@@ -260,9 +260,89 @@ class CollaborationScorer:
         }
 
         tier_prefix = {
+            None: "",  # no archetype known: no tier claim
             ArchetypeTier.EXPLORER: "Foundational Step: ",
             ArchetypeTier.PRACTITIONER: "Skill Expansion: ",
             ArchetypeTier.STRATEGIST: "Mastery Refinement: ",
         }[tier]
 
         return tier_prefix + recommendations.get(priority_dim, "Keep exploring collaborative cognitive workflows!")
+
+    def score_stored_history(self, typed_turns: List[str]) -> Dict[str, Any]:
+        """The score from what the user typed to Loti, with evidence or not at all (OQ-3, R15).
+
+        `typed_turns`: the user's typed messages from ai_coach/chat_store. Clicked chips are our own
+        copy, so they never count. Telemetry is not used: response times say nothing about how
+        someone works with an AI.
+
+        Each dimension is the share of typed turns that show its markers (EVIDENCE_MARKERS),
+        0-100. A dimension with fewer than MIN_EVIDENCE_TURNS marked turns is null: no base value
+        stands in for missing evidence. responsible_use has only misuse markers, so it gets a
+        value only when misuse shows up, as 100 minus the misuse share.
+
+        {"status": "not_enough_data"} below MIN_TYPED_TURNS typed turns or MIN_DIMENSIONS
+        evidenced dimensions. The composite is the mean of the evidenced dimensions (equal weights;
+        no archetype is known until clustering lands, so none is claimed).
+        """
+        if len(typed_turns) < MIN_TYPED_TURNS:
+            return {"status": "not_enough_data"}
+        texts = [t.lower().replace("’", "'") for t in typed_turns]
+        marked = {
+            dim: sum(1 for t in texts if rx.search(t)) for dim, rx in EVIDENCE_MARKERS.items()
+        }
+        n = len(texts)
+        scores: Dict[str, Optional[float]] = {}
+        for dim, count in marked.items():
+            if count < MIN_EVIDENCE_TURNS:
+                scores[dim] = None
+            elif dim == CollaborationDimension.RESPONSIBLE_USE.value:
+                scores[dim] = round(100.0 * (1 - count / n), 1)
+            else:
+                scores[dim] = round(100.0 * count / n, 1)
+        evidenced = {k: v for k, v in scores.items() if v is not None}
+        if len(evidenced) < MIN_DIMENSIONS:
+            return {"status": "not_enough_data"}
+        weight = round(1 / len(evidenced), 4)
+        weakest = min(evidenced, key=evidenced.get)
+        tip_scores = DimensionScores(**{k: (0.0 if k == weakest else 100.0) for k in scores})
+        return {
+            "status": "ok",
+            "composite_score": round(sum(evidenced.values()) / len(evidenced), 1),
+            "dimension_scores": scores,
+            "dimension_weights": {k: (weight if v is not None else None) for k, v in scores.items()},
+            "growth_recommendation": self._generate_growth_recommendation(tip_scores, EQUAL_WEIGHTS, None),
+            "evidence": {"typed_turns": n, "marked_turns": marked},
+        }
+
+
+# GET /v1/coach/collaboration-score (see score_stored_history).
+MIN_TYPED_TURNS = 10
+MIN_EVIDENCE_TURNS = 2  # one phrase is a sentence, not a habit
+MIN_DIMENSIONS = 3
+# Markers on lowercased typed turns. A turn counts at most once per dimension.
+EVIDENCE_MARKERS: Dict[str, Pattern[str]] = {
+    CollaborationDimension.CLARIFICATION.value: re.compile(
+        r"\b(?:why|how (?:do|does|did|can|should|come)|what does|what do you mean|explain|clarify|"
+        r"for example|an example|break (?:it |this )?down|what is the (?:rule|goal|point of this))\b"
+    ),
+    CollaborationDimension.CRITICAL_VERIFICATION.value: re.compile(
+        r"\b(?:are you sure|is (?:that|this|it) (?:right|correct|true)|verify|double[- ]check|"
+        r"check (?:that|this|it|again)|source|what if|counter[- ]?example|evidence|assumption|validate)\b"
+    ),
+    CollaborationDimension.ITERATION.value: re.compile(
+        r"\b(?:instead|rather|another way|try again|one more time|tweak|adjust|modify|"
+        r"different (?:way|approach|strategy)|next time|refine)\b"
+    ),
+    CollaborationDimension.AUTONOMY.value: re.compile(
+        r"\b(?:i think|i tried|my approach|my strategy|i decided|i solved|my solution|i noticed|"
+        r"i figured|my guess|let me try|i'll try|i want to try)\b"
+    ),
+    # Misuse only: no phrase shows responsible use, so this dimension can only lose points.
+    CollaborationDimension.RESPONSIBLE_USE.value: re.compile(
+        r"\b(?:ignore (?:all |your |the |previous )*(?:instructions|rules)|jailbreak|cheat|bypass|"
+        r"just give me the answer|do it for me)\b"
+    ),
+}
+EQUAL_WEIGHTS = DimensionWeights(
+    clarification=0.2, critical_verification=0.2, iteration=0.2, autonomy=0.2, responsible_use=0.2
+)

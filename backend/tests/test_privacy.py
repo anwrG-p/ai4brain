@@ -35,7 +35,7 @@ def test_delete_removes_events_and_state_files(client, tmp_path):
     (tmp_path / "u10.jsonl").write_text("{}\n")  # another user sharing the prefix
     r = client.delete(DELETE, params={"user_id": "u1"})
     assert r.status_code == 200
-    assert r.json() == {"deleted_events": 3, "deleted_files": 2}
+    assert r.json() == {"deleted_events": 3, "deleted_chat_turns": 0, "deleted_files": 2}
     assert not (tmp_path / "u1.jsonl").exists()
     assert not (tmp_path / "u1.profile.json").exists()
     assert (tmp_path / "u10.jsonl").exists()
@@ -45,12 +45,12 @@ def test_delete_is_idempotent_and_honest(client, tmp_path):
     ingest(client, 2)
     client.delete(DELETE, params={"user_id": "u1"})
     r = client.delete(DELETE, params={"user_id": "u1"})
-    assert r.status_code == 200 and r.json() == {"deleted_events": 0, "deleted_files": 0}
+    assert r.status_code == 200 and r.json() == {"deleted_events": 0, "deleted_chat_turns": 0, "deleted_files": 0}
 
 
 def test_delete_unknown_user_claims_nothing(client, tmp_path):
     r = client.delete(DELETE, params={"user_id": "nobody"})
-    assert r.json() == {"deleted_events": 0, "deleted_files": 0}
+    assert r.json() == {"deleted_events": 0, "deleted_chat_turns": 0, "deleted_files": 0}
 
 
 def test_delete_then_ingest_starts_fresh(client, tmp_path):
@@ -81,7 +81,7 @@ def test_export_streams_the_users_jsonl(client, tmp_path):
     r = client.get(EXPORT, params={"user_id": "u1"})
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("application/x-ndjson")
-    assert "u1-telemetry.jsonl" in r.headers["content-disposition"]
+    assert "u1-my-data.jsonl" in r.headers["content-disposition"]
     assert r.content == (tmp_path / "u1.jsonl").read_bytes()
     rows = [json.loads(line) for line in r.text.splitlines()]
     assert [row["trial_index"] for row in rows] == [0, 1]
@@ -121,9 +121,9 @@ def test_delete_and_export_ignore_the_case_of_the_id(client, tmp_path, asked):
     ingest(client, 1, user_id="u1")
     r = client.get(EXPORT, params={"user_id": asked})
     assert r.status_code == 200 and len(r.text.splitlines()) == 3
-    assert "u1-telemetry.jsonl" in r.headers["content-disposition"]
+    assert "u1-my-data.jsonl" in r.headers["content-disposition"]
     r = client.delete(DELETE, params={"user_id": asked})
-    assert r.json() == {"deleted_events": 3, "deleted_files": 1}
+    assert r.json() == {"deleted_events": 3, "deleted_chat_turns": 0, "deleted_files": 1}
     assert sorted(p.name for p in tmp_path.iterdir()) == [".lock"]
 
 
@@ -131,7 +131,7 @@ def test_delete_finds_a_file_written_under_another_case(tmp_path):
     # A file named before ids were lowercased (possible on Linux) still belongs to the user.
     (tmp_path / "U1.jsonl").write_text("{}\n{}\n")
     (tmp_path / "U1.profile.json").write_text("{}")
-    assert delete_user("u1", tmp_path) == {"deleted_events": 2, "deleted_files": 2}
+    assert delete_user("u1", tmp_path) == {"deleted_events": 2, "deleted_chat_turns": 0, "deleted_files": 2}
     assert sorted(p.name for p in tmp_path.iterdir()) == [".lock"]
 
 
