@@ -22,6 +22,10 @@ BLOCKED = {
     "pub", "rat", "rib", "rob", "rot", "rub", "sad", "sat", "set", "sex", "sin", "sit", "sob", "sod",
     "sum", "sun", "tab", "tan", "tap", "ten", "tip", "top", "tub", "vet", "wet", "wig", "win", "wit",
     "zip",
+    # Rude words and slurs (English and French) the first list missed: found by BE-13, whose LLM
+    # content check (llm_worker.HARM_WORDS) holds procedural terms to the same bar.
+    "dik", "fag", "fap", "fuk", "jap", "jew", "jiz", "kok", "kon", "kul", "kum", "lez", "nig", "nik",
+    "nip", "nob", "pak", "pis", "tit", "wog", "wop", "zob",
 }
 
 
