@@ -15,14 +15,17 @@ Three layers of naming:
 | Pattern Puzzle | `matrix` | `pattern_induction` | FluidMatrices → Focus & Strategy |
 | Strategic Blueprint | `tower` | `executive_function` | OTS_Planning → Focus & Strategy; OTS_Execution → Impulse Control |
 | Memory Gauntlet | `n_back` | `working_memory` | OSPAN (n-back d′) → Focus & Strategy; DCCS_SwitchCost → Mental Agility |
-| Color Clash | `stroop` | `executive_function` | ANT_Conflict → Mental Agility; SST_SSRT (proxy) → Impulse Control |
+| Color Clash | `stroop` | `executive_function` | Proxies, only when the session lacks the exercise below: ANT_Conflict → Mental Agility (without Arrow Focus); SST_SSRT → Impulse Control (without Stop Light) |
 | Shape Turn | `mental_rotation` | `spatial_orientation` | none of its own |
 | Precision Archive | `mst` | `episodic_memory` | MST_LDI → Deep Memory |
 | Perceptual Radar | `ufov` | `processing_speed` | UFOV_SOA, ANT_Orienting → Visual Radar |
+| Stop Light | `stop_signal` | `executive_function` | SST_SSRT (stop-signal reaction time, integration method) → Impulse Control |
+| Pair Finder | `pal` | `episodic_memory` | PAL_FirstTrialMemory (first-attempt memory score) → Deep Memory |
+| Arrow Focus | `flanker` | `executive_function` | ANT_Conflict (flanker cost) → Mental Agility |
 
-ErrorRecovery (→ Mental Agility) uses the trial after an error in every exercise. DDM_Caution and PAL_FirstTrialMemory have no source yet, so they are left out. A skill below 30% coverage shows "Not measured yet".
+ErrorRecovery (→ Mental Agility) uses the trial after an error in every exercise except Stop Light (its staircase makes stop errors by design) and Pair Finder. DDM_Caution has no source yet, so it is left out. A skill below 30% coverage shows "Not measured yet".
 
-The Train tab lists each exercise under one skill (`frontend/src/features/train/catalog.ts`); the scoring above is what the numbers use. The **baseline** plays 6: Logic Web, Memory Gauntlet, Color Clash, Strategic Blueprint, Perceptual Radar, Precision Archive.
+The Train tab lists each exercise under one skill (`frontend/src/features/train/catalog.ts`); the scoring above is what the numbers use. The **baseline** plays 6: Logic Web, Memory Gauntlet, Color Clash, Strategic Blueprint, Perceptual Radar, Precision Archive. Stop Light, Pair Finder and Arrow Focus are in Train only. Their fixtures follow published designs: Stop Light 200 trials with 25% stop signs (Verbruggen et al. 2019), Pair Finder rounds of 2, 4, 6 and 8 shapes (CANTAB PAL), Arrow Focus 96 trials, one ANT block (Fan et al. 2002).
 
 ## 2. Dimension presets (judge tool)
 

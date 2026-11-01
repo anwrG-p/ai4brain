@@ -17,6 +17,9 @@ export type TaskSchemaType =
   | 'tower'
   | 'ufov'
   | 'mst'
+  | 'stop_signal'
+  | 'pal'
+  | 'flanker'
 
 export type MarkerShape =
   | 'circle'

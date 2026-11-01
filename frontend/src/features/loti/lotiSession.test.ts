@@ -136,6 +136,13 @@ describe('lotiSession', () => {
     expect(current.choices[8]!.action).toEqual({ kind: 'setGoal', pillar: 'focus', target: 100 })
   })
 
+  it('keeps a stored train action for each newer exercise (Stop Light, Pair Finder, Arrow Focus)', () => {
+    const choices = (['stop_signal', 'pal', 'flanker'] as const).map((schemaType, k) => ({ id: `n${k}`, label: 'N', action: { kind: 'train', schemaType } }))
+    const current = { id: 'day-great', text: 'Want to train?', choices }
+    sessionStorage.setItem(LOTI_SESSION_KEY, JSON.stringify({ version: 1, turns: [], current }))
+    expect(loadLotiSession().current!.choices.map((c) => c.action)).toEqual(choices.map((c) => c.action))
+  })
+
   it('still updates the talk when storage refuses to save', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('QuotaExceededError')

@@ -85,6 +85,13 @@ describe('fetchNextTask', () => {
       expect(fetchFn).toHaveBeenCalledWith('/v1/tasks/next?user_id=a%20b%26c')
     })
 
+    test.each(['stop_signal', 'pal', 'flanker'] as const)('a server payload of the newer exercise %s is accepted', async (schema) => {
+      real()
+      const payload = tasks.find((t) => t.schema_type === schema)!
+      const fetchFn = vi.fn(async (_url: string) => okResponse(payload))
+      expect((await fetchNextTask('u1', 0, { fetchFn })).schema_type).toBe(schema)
+    })
+
     test('a 500 rejects', async () => {
       real()
       const fetchFn = async () => new Response('boom', { status: 500 })
@@ -251,8 +258,7 @@ describe('getUserId', () => {
 describe('fixtures.json', () => {
   test('one entry per schema_type with the contract dimension', () => {
     const dims = Object.fromEntries(tasks.map((t) => [t.schema_type, t.dimension]))
-    expect(tasks).toHaveLength(8)
-    expect(dims).toEqual({
+    const expected = {
       n_back: 'working_memory',
       stroop: 'executive_function',
       matrix: 'pattern_induction',
@@ -261,8 +267,14 @@ describe('fixtures.json', () => {
       tower: 'executive_function',
       ufov: 'processing_speed',
       mst: 'episodic_memory',
-    } satisfies Record<SchemaType, string>)
-    expect(new Set(tasks.map((t) => t.task_id)).size).toBe(8)
+      stop_signal: 'executive_function',
+      pal: 'episodic_memory',
+      flanker: 'executive_function',
+    } satisfies Record<SchemaType, string>
+    const n = Object.keys(expected).length
+    expect(tasks).toHaveLength(n)
+    expect(dims).toEqual(expected)
+    expect(new Set(tasks.map((t) => t.task_id)).size).toBe(n)
     for (const t of tasks) expect(typeof t.surface_seed).toBe('number')
   })
 

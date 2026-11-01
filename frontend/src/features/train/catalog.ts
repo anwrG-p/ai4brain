@@ -7,12 +7,16 @@ import { dimensionFor, PILLAR_IDS, type PillarId } from '../insights/pillars'
    Focus, Memory Gauntlet (n_back) for Agility, Color Clash for Impulse. The others sit under a
    pillar whose inputs they feed (doc weights in pillars.ts):
    - Logic Web and Pattern Puzzle: FluidMatrices, Focus.
-   - Shape Turn feeds no pillar input except error recovery, which is Agility's. */
+   - Shape Turn feeds no pillar input except error recovery, which is Agility's.
+   - Stop Light: SST_SSRT, Impulse (the stop-signal measure; Color Clash only stands in without it).
+   - Pair Finder: PAL_FirstTrialMemory, Memory.
+   - Arrow Focus: ANT_Conflict, which pillars.ts weights in Agility (Color Clash stands in without it).
+   None of the newer exercises is in the six-exercise baseline (R10). */
 export const TRAIN_EXERCISES: Record<PillarId, readonly TaskSchemaType[]> = {
   focus: ['tower', 'relational', 'matrix'],
-  agility: ['n_back', 'mental_rotation'],
-  impulse: ['stroop'],
-  memory: ['mst'],
+  agility: ['n_back', 'mental_rotation', 'flanker'],
+  impulse: ['stroop', 'stop_signal'],
+  memory: ['mst', 'pal'],
   visual: ['ufov'],
 }
 

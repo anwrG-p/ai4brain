@@ -6,7 +6,7 @@ const MOVE_THROTTLE_MS = 50
 // Records hesitation-jitter inputs while active: keydown (not key repeat), pointerdown, and
 // pointermove throttled to one per 50 ms. Capture phase on window, so the input that commits a
 // response lands in the trial before the response handler finishes it.
-export function useInputCapture(recorder: TrialRecorder, active: boolean): void {
+export function useInputCapture(recorder: Pick<TrialRecorder, 'input'>, active: boolean): void {
   useEffect(() => {
     if (!active) return
     let lastMove = -Infinity

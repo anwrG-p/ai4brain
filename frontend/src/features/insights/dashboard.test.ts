@@ -165,6 +165,17 @@ describe('exerciseWeeks', () => {
     expect(h.rows.every((r) => r.values.some((v) => v !== null))).toBe(true) // empty exercises left out
   })
 
+  it('files the newer inputs under Stop Light, Arrow Focus and Pair Finder; a proxy under Color Clash', () => {
+    const real = { SST_SSRT: { score: 40, trials: 50 }, ANT_Conflict: { score: 60, trials: 90 }, PAL_FirstTrialMemory: { score: 70, trials: 20 } }
+    const stand = { SST_SSRT: { score: 20, trials: 4, proxy: true as const }, ANT_Conflict: { score: 30, trials: 4, proxy: true as const } }
+    const h = exerciseWeeks([rec('a', 9, real), rec('b', 9, stand)])
+    const row = (s: string) => h.rows.find((r) => r.schema === s)
+    expect(row('stop_signal')).toMatchObject({ name: 'Stop Light', values: [40] })
+    expect(row('flanker')).toMatchObject({ name: 'Arrow Focus', values: [60] })
+    expect(row('pal')).toMatchObject({ name: 'Pair Finder', values: [70] })
+    expect(row('stroop')).toMatchObject({ name: 'Color Clash', values: [25] }) // mean of the two stand-ins
+  })
+
   it('needs 20 cells for a heatmap', () => {
     expect(HEATMAP_MIN_CELLS).toBe(20)
   })
