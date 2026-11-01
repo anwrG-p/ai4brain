@@ -359,6 +359,19 @@ describe('Settings (/settings)', () => {
     expect(useDevicePrefs.getState().moodGuess).toBe(false)
   })
 
+  it('a hesitant guess reads "Unsure": the radio group checks none and its first choice is the one tab stop', () => {
+    useDevicePrefs.getState().setMoodGuess(true)
+    act(() => useEmilyStore.setState({ currentEmotion: 'hesitant' }))
+    renderPage(<SettingsPage />)
+    expect(screen.getByText("Momo's guess today: Unsure")).toBeInTheDocument()
+    expect(screen.queryByText(/Focused/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Change' }))
+    const radios = within(screen.getByRole('radiogroup', { name: 'How do you feel?' })).getAllByRole('radio')
+    expect(radios.filter((r) => r.getAttribute('aria-checked') === 'true')).toHaveLength(0)
+    expect(radios.filter((r) => r.tabIndex === 0)).toEqual([radios[0]])
+    expect(radios[0]).toHaveFocus()
+  })
+
   it('while on, the row shows today\'s guess and a quiet "Change" that opens a radio group of four moods', () => {
     useDevicePrefs.getState().setMoodGuess(true)
     act(() => useEmilyStore.setState({ currentEmotion: 'energized' }))

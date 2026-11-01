@@ -24,7 +24,9 @@ const CHOICES: { mood: MomoMood; label: string; emotion: EmilyEmotion }[] = [
   { mood: 'frustrated', label: 'Frustrated', emotion: 'frustrated' },
 ]
 
-const LABEL: Record<MomoMood, string> = { calm: 'Calm', happy: 'Happy', tired: 'Tired', frustrated: 'Frustrated', focused: 'Focused' }
+/** Today's guess in words. A hesitant guess (Momo's 'focused' face) reads "Unsure": not a choice
+    the user can pick, so the radio group then checks none and its first choice is the tab stop. */
+const LABEL: Record<MomoMood, string> = { calm: 'Calm', happy: 'Happy', tired: 'Tired', frustrated: 'Frustrated', focused: 'Unsure' }
 
 const STEP: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }
 

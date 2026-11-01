@@ -1,4 +1,4 @@
-import { WEEKLY_GOAL, weekKept } from '../insights/goals'
+import { weekKept } from '../insights/goals'
 import { PILLAR_IDS, PILLAR_LABELS, isPillarId } from '../insights/pillars'
 import type { LotiAction, LotiBrain, LotiContext, LotiMessage } from './types'
 
@@ -8,9 +8,6 @@ import type { LotiAction, LotiBrain, LotiContext, LotiMessage } from './types'
 export const MAX_MESSAGE_CHARS = 120
 /** Rule 4: about 12 words per line of UI text; the script tests hold every bubble to 14. */
 export const MAX_MESSAGE_WORDS = 14
-
-/** The weekly goal Home shows (research #10: 3 a week), so Loti and the Goals line agree. */
-export const WEEKLY_TARGET = WEEKLY_GOAL
 
 const GOAL_SIZES = [
   { id: '5', label: 'A little (+5)' },
