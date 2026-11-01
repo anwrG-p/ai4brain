@@ -79,6 +79,13 @@ def coach_dir() -> Path:
     return Path(env) if env else REPO_ROOT / "data" / "processed" / "coach"
 
 
+def state_bus_dir() -> Path:
+    """The state bus's per-user cluster state (BE-11, brain_twin_jepa/state_bus.py, a registered
+    store). Here so the retention CLI finds it without importing the bus."""
+    env = os.environ.get("STATE_BUS_DIR")
+    return Path(env) if env else REPO_ROOT / "data" / "processed" / "state_bus"
+
+
 def check_user_id(user_id: str) -> None:
     if not isinstance(user_id, str) or not re.fullmatch(ID_PATTERN, user_id):
         raise ValueError("user_id must match " + ID_PATTERN)

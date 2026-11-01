@@ -30,25 +30,6 @@ def assert_no_region_names(payload) -> None:
     assert "bottleneck" not in text
 
 
-# --- 501 until the module behind the route exists ------------------------------------------------
-
-NOT_YET = [
-    (
-        "post",
-        "/v1/clustering/evaluate",
-        {"json": {"user_id": "u1", "latent_vector": [0.1]}},
-        "clustering not available yet",
-    ),
-]
-
-
-@pytest.mark.parametrize("method,path,kwargs,detail", NOT_YET)
-def test_unbuilt_routes_are_501(client, method, path, kwargs, detail):
-    r = getattr(client, method)(path, **kwargs)
-    assert r.status_code == 501
-    assert r.json() == {"detail": detail}
-
-
 # --- user_id: required and file-safe on every /v1 route --------------------------------------
 
 USER_ROUTES = [
@@ -116,18 +97,19 @@ def test_delete_rejects_ids_that_are_not_file_safe(client, monkeypatch, tmp_path
     assert victim.exists()
 
 
-# --- profile: no numbers until the JSONL -> engine pipeline exists ---------------------------
+# --- profile: numbers only from events an exercise scorer reads (BE-11) ----------------------
 
 
-def test_profile_never_returns_numbers_today(client):
-    # Even with telemetry stored, nothing turns it into estimates yet.
+def test_profile_never_invents_numbers(client):
+    # Stored events that no exercise scorer reads (task "t1" is no exercise) score no skill, so
+    # the profile has nothing to show rather than a prior dressed up as a score (R15).
     setup = client.post(
         "/v1/telemetry/event", json=[{**EVENT, "user_id": "prof", "trial_index": i} for i in range(20)]
     )
     assert setup.status_code == 202
     r = client.get("/v1/dashboard/profile", params={"user_id": "prof"})
     assert r.status_code == 200
-    assert r.json() == {"user_id": "prof", "status": "not_enough_data", "estimates": [], "snapshots": []}
+    assert r.json() == {"user_id": "prof", "status": "not_enough_data", "sessions": 1, "min_sessions": 1}
 
 
 # --- health check -----------------------------------------------------------------------------
@@ -156,8 +138,7 @@ def test_api_routes_are_unmounted(client, method, path):
 
 
 def test_no_route_payload_names_a_region(client):
-    for method, path, kwargs, _ in NOT_YET:
-        assert_no_region_names(getattr(client, method)(path, **kwargs).json())
+    assert_no_region_names(client.post("/v1/clustering/evaluate", json={"user_id": "u1"}).json())
     assert_no_region_names(client.get("/v1/dashboard/profile", params={"user_id": "u1"}).json())
     assert_no_region_names(client.get("/").json())
 

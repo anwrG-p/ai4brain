@@ -27,7 +27,6 @@ load_env_file()
 from ai_coach.api import router as coach_module_router  # noqa: E402
 from app.api.routes.v1_auth import router as auth_router  # noqa: E402
 from app.lifecycle import lifespan  # noqa: E402
-from app.api.routes.v1_interop import router as v1_router  # noqa: E402
 from app.api.routes.v1_privacy import router as privacy_router  # noqa: E402
 from app.api.routes.v1_telemetry import router as v1_telemetry_router  # noqa: E402
 from brain_twin_jepa.api import router as brain_twin_router  # noqa: E402
@@ -44,7 +43,7 @@ def cors_origins() -> list[str]:
 
 app = FastAPI(
     title="SynapseTwin API",
-    description="Telemetry ingest and privacy; task, coach and profile routes land with their modules.",
+    description="Telemetry ingest and privacy, tasks, the coach, and the profile (each from its module).",
     version="1.4.0",
     # Modules register startup/shutdown hooks in app/lifecycle.py (the task worker process).
     lifespan=lifespan,
@@ -60,8 +59,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Every module owns one router; new routes go in the module, never here. Module routers come
-# before v1_interop, so a /v1 route a module adds (BE-04, BE-06, BE-11) shadows its stand-in there.
+# Every module owns one router; new routes go in the module, never here. The v1_interop stand-ins
+# are gone: BE-04, BE-06 and BE-11 replaced every one with its module route.
 for router in (
     v1_telemetry_router,
     privacy_router,
@@ -69,7 +68,6 @@ for router in (
     tasks_router,
     coach_module_router,
     brain_twin_router,
-    v1_router,
 ):
     app.include_router(router)
 # The agent engine's /api routes were unmounted and deleted in BE-00 (recoverable from 1085ec8).

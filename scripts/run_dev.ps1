@@ -11,6 +11,12 @@ if (-not (Test-Path (Join-Path $frontendDir "node_modules"))) {
     exit 1
 }
 
+# Fit the clustering model and train the twin if they are missing (about a minute the first time,
+# instant after). Without them the server still runs, with no archetype or forecast.
+Push-Location $repoRoot
+& $python -m brain_twin_jepa.bootstrap
+Pop-Location
+
 Start-Process -FilePath $python -WorkingDirectory $repoRoot -ArgumentList "-m", "uvicorn", "app.main:app", "--app-dir", "backend", "--reload", "--host", "127.0.0.1", "--port", "8000"
 
 Set-Location $frontendDir

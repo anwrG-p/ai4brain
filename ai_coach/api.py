@@ -56,6 +56,7 @@ from ai_coach.crisis_classifier import CrisisClassifier
 from ai_coach.llm_gemini import GeminiRunner, config_from_env
 from ai_coach.schemas import ChatMessage, ChatMessageRole, ChatRequest, ReplySource
 from app.privacy.telemetry_store import ID_PATTERN, LockTimeout, user_key
+from brain_twin_jepa import state_bus
 
 logger = logging.getLogger(__name__)
 
@@ -216,7 +217,19 @@ def coach_chat(
         llm_callable=turn,
         crisis_classifier=CrisisClassifier.from_runner(turn) if turn is not None else None,
     )
-    resp = agent.handle_chat(ChatRequest(user_id=key, message=req.message, chat_history=history))
+    # Member 3 -> Member 2 over the state bus (BE-11): Δc, its uncertainty and the latest
+    # adaptation, read server side. The agent turns them into words; the client never sends them.
+    context = state_bus.coach_context(key) or {}
+    resp = agent.handle_chat(
+        ChatRequest(
+            user_id=key,
+            message=req.message,
+            chat_history=history,
+            delta_vector=context.get("delta_vector"),
+            uncertainty=context.get("uncertainty"),
+            adaptation_reason=context.get("adaptation_reason"),
+        )
+    )
     source = resp.reply_source
     count(agent.reply_source_counts, turns=1, unverified_loti_turn_dropped=unverified)
     logger.info("coach chat turn answered (%s)", source.value)

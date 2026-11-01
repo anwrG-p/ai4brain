@@ -196,6 +196,9 @@ class ChatRequest(BaseModel):
     chat_history: List[ChatMessage] = Field(default_factory=list)
     active_cluster_id: Optional[int] = Field(default=None, ge=0, le=8)
     delta_vector: Optional[Dict[str, float]] = None
+    # From the state bus (BE-11), filled server side only, never from the client.
+    uncertainty: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    adaptation_reason: Optional[str] = None
 
 
 class CoachingResponse(BaseModel):

@@ -26,6 +26,7 @@ from app.lifecycle import on_shutdown, on_startup
 from app.privacy.retention import configured_days
 from app.privacy.telemetry_store import ID_PATTERN, register_user_store, telemetry_dir, user_key
 from app.tools.exercise_generator import ExerciseGenerator
+from brain_twin_jepa import state_bus
 
 from .cache_dispatcher import Dispatcher, NoFreshTask, TelemetryTrials, schemas_for
 from .generators import GenerationError
@@ -115,8 +116,12 @@ def make_dispatcher(**overrides: Any) -> Dispatcher:
         "difficulty_rule": ExerciseGenerator.apply_85_percent_rule,
         # The one retention setting (env RETENTION_DAYS), also the retention CLI's default.
         "retention_days": configured_days(),
-        # pillars: no server profile until BE-07/BE-11, so the projector has nothing and
-        # START_THETA seeds each staircase. archetype: NEUTRAL until BE-09/BE-11.
+        # BE-11 state bus: the user's cluster pool (NEUTRAL until a cluster exists), the latest
+        # pillar scores for a new staircase's seed (None: START_THETA), and each staircase step
+        # recorded as a plain "why this" reason.
+        "pillars": state_bus.task_pillars,
+        "archetype": state_bus.task_archetype,
+        "on_step": state_bus.record_step,
     }
     return Dispatcher(**(wiring | overrides))
 

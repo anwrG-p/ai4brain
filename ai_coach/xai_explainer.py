@@ -17,8 +17,20 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 from ai_coach.schemas import CognitiveDimension, StateBusEvent
 from ai_coach.safety_guardrails import SafetyGuardrailEngine
+from brain_twin_jepa.features import PILLAR_LABELS
 
 NEUTRAL_RATIONALE = "We adjusted this round to fit your recent results."
+
+# The state bus (BE-11) sends Δc keyed by pillar, in score points: μ_target − μ_active, where the
+# target is the runner-up practice style. It says which skill separates the user's style from the
+# nearest other one, not that a task changed, so it gets its own words (never a number).
+PROFILE_DELTA_MIN_POINTS = 5.0  # judgement: below this the two styles barely differ on any skill
+PROFILE_UNSETTLED = 0.5  # above this uncertainty (1 - posterior) the style is not settled yet
+STYLE_TAKING_SHAPE = "Your practice style is still taking shape."
+
+
+def is_profile_delta(delta_vector: Optional[Dict[str, float]]) -> bool:
+    return bool(delta_vector) and set(delta_vector) <= set(PILLAR_LABELS)
 
 
 class XAIExplainer:
@@ -35,6 +47,8 @@ class XAIExplainer:
         uncertainty: float = 0.0,
     ) -> str:
         """Translate Δc into a user-facing explanation of why tasks or pacing adapted."""
+        if is_profile_delta(delta_vector):
+            return self.profile_delta_line(delta_vector, uncertainty) or NEUTRAL_RATIONALE
         if not delta_vector:
             return (
                 "We maintained your current practice trajectory to reinforce stable baseline "
@@ -105,6 +119,47 @@ class XAIExplainer:
         # dimension key) is withheld whole, never reworded.
         safe_rationale, _ = self.safety_guardrail.sanitize(rationale, fallback=NEUTRAL_RATIONALE)
         return safe_rationale
+
+    def profile_delta_line(
+        self, delta_vector: Optional[Dict[str, float]], uncertainty: Optional[float] = None
+    ) -> Optional[str]:
+        """One short consumer line for a pillar-keyed Δc, or None when there is nothing to say.
+        At most 12 words, no numbers, lint-checked."""
+        if not is_profile_delta(delta_vector):
+            return None
+        if uncertainty is not None and uncertainty > PROFILE_UNSETTLED:
+            return STYLE_TAKING_SHAPE
+        pillar, delta = max(delta_vector.items(), key=lambda kv: abs(kv[1]))
+        if abs(delta) < PROFILE_DELTA_MIN_POINTS:
+            return None
+        # Δc compares the two styles' centres, not the user's own scores: say "style", not "you".
+        side = "lower" if delta > 0 else "higher"
+        line = f"Your style sits {side} on {PILLAR_LABELS[pillar]} than the nearest one."
+        safe, _ = self.safety_guardrail.sanitize(line, fallback="")
+        return safe or None
+
+    def format_profile_context(
+        self,
+        delta_vector: Optional[Dict[str, float]],
+        uncertainty: Optional[float] = None,
+        adaptation_reason: Optional[str] = None,
+    ) -> str:
+        """The state bus context for the LLM system prompt, in words only: the user never sees a
+        number from here, and the reply's number check rejects any that slips through."""
+        lines = ["### PRACTICE PROFILE CONTEXT (state bus; words only, never quote numbers):"]
+        if is_profile_delta(delta_vector):
+            settled = uncertainty is not None and uncertainty <= PROFILE_UNSETTLED
+            lines.append(f"- Practice style: {'settled' if settled else 'still taking shape'}.")
+            line = self.profile_delta_line(delta_vector, uncertainty)
+            if line:
+                lines.append(f'- How it differs from the nearest style: "{line}"')
+        if adaptation_reason:
+            lines.append(f'- Latest adaptation, as the user saw it: "{adaptation_reason}"')
+        lines.append(
+            "- Use these only to explain why rounds adapt. Exercise-level words; no numbers, "
+            "no percentages, no claims that a skill improved."
+        )
+        return "\n".join(lines)
 
     def describe_shift(self, delta: float) -> str:
         """Exercise-level word for one Δc entry: more challenge, more support, or steady."""

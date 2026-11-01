@@ -25,8 +25,13 @@ services:
       - task_registry:/data/task_registry
       # The coach chat history, same arrangement (COACH_DIR). Delete, export and retention cover it.
       - coach:/data/coach
+      # The state bus's per-user cluster state (STATE_BUS_DIR, BE-11). Delete, export and retention
+      # cover it. The models themselves are baked into the image at build time
+      # (python -m brain_twin_jepa.bootstrap in backend/Dockerfile).
+      - state_bus:/data/state_bus
 
 volumes:
   telemetry:
   task_registry:
   coach:
+  state_bus:
