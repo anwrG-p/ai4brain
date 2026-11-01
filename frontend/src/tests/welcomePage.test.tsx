@@ -126,7 +126,7 @@ describe('Welcome (/): Loti, one button, one link', () => {
   })
 
   const eyeX = (main: HTMLElement) =>
-    Number(within(main).getByRole('img', { name: /Loti/ }).querySelector('ellipse[rx="6"][ry="8"]')!.getAttribute('cx'))
+    Number(within(main).getByRole('img', { name: /Loti/ }).querySelector('ellipse[fill="var(--char-face)"]')!.getAttribute('cx'))
   const finePointer = (reduce: boolean) =>
     vi.stubGlobal(
       'matchMedia',

@@ -36,7 +36,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
     return (
       <div role="alert" className="mx-auto flex max-w-md flex-col items-center gap-4 py-12 text-center">
-        <Loti pose="idle" size="md" />
+        <Loti pose="low" size="md" />
         <h1 className="font-display text-3xl font-bold text-ink">Something went wrong.</h1>
         <p className="text-lg text-ink">Your answers are safe.</p>
         <Button size="lg" onClick={this.handleReset}>

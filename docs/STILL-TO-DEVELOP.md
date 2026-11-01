@@ -27,7 +27,7 @@ F-B changed the scorers and the 11-exercise contract, and the Python side catche
 | Branch on GitHub | What | State | Next step |
 |---|---|---|---|
 | `wip/srv-1-server-catchup` (local `worktree-agent-a7f8666a3f3925cf4`, head `faecef2`) | See the SRV-1 list below | All committed. It was stopped during its final evidence run, so it has no report. | 1. Merge `feat/ui-calm-clean` into it; there is **1 conflict, in `dynamic_cache/cache_dispatcher.py`**, against BE-11's `on_step` and BE-13's `variants` (keep all three). 2. Run `pytest -q -m "not benchmark"`: the 24 red tests above must turn green. 3. Review, then merge. |
-| `wip/art-1-brand-references` (local `worktree-agent-adfe1b349cf70dff9`, commits `f314147`, `5f830a7`, `a609053`) | See the ART-1 list below | Finished: qa:checks 1346 tests green and e2e 80/80, both on its own base. It merges cleanly into the branch. | Review, then merge. Then run `qa:checks` again, because F-B added exercises after its base. |
+| `wip/art-1-brand-references` | See the ART-1 list below | **MERGED at the owner's request** (qa:checks on the merged branch: 69 files, 1446 tests, 128 contrast pairs, build green) | An independent review is still recommended. Regenerate `docs/ui/screenshots/`. |
 
 **SRV-1 contains:**
 - the Python port of the Stop Light, Pair Finder and Arrow Focus scorers (golden from F-B `700af3c`);

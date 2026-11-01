@@ -20,8 +20,7 @@
 | Term | Meaning | Where |
 | :--- | :--- | :--- |
 | **Loti** | The guide: an axolotl coach who talks in short bubbles with answer chips. Scripted today; an AI mode only behind the crisis checks (R14). | Welcome, Home, the Loti tab, system pages |
-| **Dolphin** | The celebration character. It swims in to say "Good job!". | Results, milestones |
-| **Momo** | The mood companion. It shows an on-device *guess* of your mood (calm, happy, focused, tired, frustrated), which you can change. | Home |
+| **Momo** | The dolphin: the mood companion and the celebration character. It shows an on-device *guess* of your mood (calm, happy, focused, tired, frustrated), which you can change, and leaps to say "Good job!". | Home, Results |
 
 ### Skills (the 5 pillars)
 The UI says **skills**; code and docs say **pillars** (`frontend/src/features/insights/pillars.ts`). The table follows the Train grouping; which exercises feed which score is in [TASKS_AND_DIMENSIONS.md](architecture/TASKS_AND_DIMENSIONS.md).

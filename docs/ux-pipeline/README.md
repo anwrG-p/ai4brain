@@ -2,7 +2,7 @@
 
 This folder used to hold copies of the UX docs. The copies drifted (the `DECISIONS.md` copy stopped at DEC-008), so they were removed. Each link below points at the one maintained file.
 
-Brand v2 (Loti, Dolphin, Momo, the 5 skills, the classroom board) is specified in `.scratch/brand-v2/spec.md` and summarised in [the design system](../design/DESIGN.md). Docs marked *History* at their top describe the earlier BRIAN / Doodle UI and are kept as a record.
+Brand v2 (Loti, Momo, the 5 skills, the board with blobs) is specified in `.scratch/brand-v2/spec.md` and summarised in [the design system](../design/DESIGN.md). Docs marked *History* at their top describe the earlier BRIAN / Doodle UI and are kept as a record.
 
 ## 1. Strategy and journey
 
