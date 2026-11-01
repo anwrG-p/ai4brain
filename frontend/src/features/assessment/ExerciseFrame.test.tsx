@@ -221,6 +221,27 @@ test('a block of more than 40 trials (Stop Light) shows one bar, not a dot per t
   expect(bar.querySelector<HTMLElement>('[data-bar-fill]')!.style.width).toBe(`${100 / n}%`)
 })
 
+test('Pair Finder: a retried round fills no new dots (one dot per pattern, first attempt only)', () => {
+  const { task } = setup('pal')
+  const p = task.params as { study_ms: number; stages: { items: unknown[] }[] }
+  space()
+  advance(FIXATION_MS)
+  const bar = screen.getByRole('progressbar', { name: 'Progress' })
+  expect(bar).toHaveAttribute('aria-valuemax', '20')
+  const studyRound = () => {
+    for (const _ of p.stages[0]!.items) advance(p.study_ms)
+  }
+  const missAll = () => {
+    for (const _ of p.stages[0]!.items) act(() => void fireEvent.pointerDown(screen.getByRole('button', { name: 'Box 1' })))
+  }
+  studyRound()
+  missAll() // box 1 holds none of round 1's shapes
+  expect(bar).toHaveAttribute('aria-valuenow', '2')
+  studyRound()
+  missAll() // attempt 2
+  expect(bar).toHaveAttribute('aria-valuenow', '2')
+})
+
 test('N-back: two events per trial (one per stream) advance the dots by one', () => {
   const { task } = setup('n_back')
   const p = task.params as { trials: unknown[]; streams: string[]; interval_ms: number }

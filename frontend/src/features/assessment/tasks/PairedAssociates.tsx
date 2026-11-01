@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Card } from '../../../components/ui/Card'
-import type { TrialRecorder } from '../telemetry/tracker'
 import type { PalParams } from '../telemetry/types'
-import { pressProps, useTimedTrials } from '../telemetry/useTimedTrials'
+import { pressProps, useTimedTrials, type TrialRecording } from '../telemetry/useTimedTrials'
 import type { TaskProps } from './TaskRunner'
 import { EXERCISE_NAME } from '../names'
 
@@ -110,17 +109,18 @@ function Study({ stage, boxes, ms, again, onEnd }: { stage: Stage; boxes: number
 /* Each recorder call shifted by `offset`: useTimedTrials counts from 0 in every recall, while the
    task's trial_index (and so item_id) must stay unique across stages and attempts. Every call is
    forwarded, so the error burst and the open trial stay the real recorder's. */
-function shifted(recorder: TrialRecorder, offset: number): TrialRecorder {
-  const view: Pick<TrialRecorder, 'start' | 'input' | 'finish' | 'abort'> = {
+function shifted(recorder: TrialRecording, offset: number): TrialRecording {
+  return {
     start: (k) => recorder.start(offset + k),
     input: (kind) => recorder.input(kind),
     finish: (r) => recorder.finish(r),
     abort: () => recorder.abort(),
   }
-  return view as unknown as TrialRecorder // ponytail: a structural view; the class has private fields
 }
 
-// Recall: one timed trial per pattern in `recall` order; right when the chosen box is its box.
+// Recall: one timed trial per pattern in `recall` order; right when the chosen box is its box. The
+// stage passes only when every pattern was answered right: a pattern dropped by a hidden page (the
+// standalone safety net) leaves it untested, so the attempt counts as missed, never as passed.
 function Recall({
   stage,
   params,
@@ -133,16 +133,16 @@ function Recall({
   params: PalParams
   attempt: number
   total: number
-  recorder: TrialRecorder
+  recorder: TrialRecording
   onEnd: (allRight: boolean) => void
 }) {
-  const wrong = useRef(0)
+  const right = useRef(0)
   const order = stage.recall
   const onFinish = useCallback(
     (j: number, correct: boolean) => {
       const item = stage.items[order[j] ?? -1]
       if (!item) return undefined
-      if (!correct) wrong.current++
+      if (correct) right.current++
       return {
         pal_level: stage.items.length,
         attempt,
@@ -160,7 +160,7 @@ function Recall({
   useLayoutEffect(() => {
     onEndRef.current = onEnd
   })
-  const done = useCallback(() => onEndRef.current(wrong.current === 0), [])
+  const done = useCallback(() => onEndRef.current(right.current === order.length), [order.length])
   const { i, paused, respond } = useTimedTrials(recorder, order.length, params.time_limit_ms, done, onFinish)
   const item = stage.items[order[i] ?? -1]
 

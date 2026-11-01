@@ -222,7 +222,7 @@ function FlankerArrow({ cx, left, mark }: { cx: number; left: boolean; mark: boo
   )
 }
 function Flanker() {
-  const xs = [32, 56, 80, 104, 128]
+  const xs = [24, 52, 80, 108, 136] // 28 apart: a clear gap between arrows
   return (
     <>
       {[false, true].map((against, i) => (

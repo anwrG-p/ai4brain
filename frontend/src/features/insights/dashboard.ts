@@ -112,20 +112,28 @@ export function curveWindow(history: readonly HistoryPoint[], now: Date) {
 /* Past results per exercise and week, for the heatmap behind "Further explore my training". Each input
    belongs to the exercise it is measured in (pillars.ts header). ErrorRecovery spans every exercise,
    so it is left out. ponytail: FluidMatrices mixes Pattern Puzzle and Logic Web; it is shown as Logic
-   Web, the one in the six-exercise baseline. */
+   Web, the one in the six-exercise baseline.
+   SST_SSRT and ANT_Conflict come from Stop Light and Arrow Focus, or, flagged `proxy`, from Color
+   Clash standing in (taskScores.ts). ponytail: sessions stored before Arrow Focus existed hold an
+   unflagged Color Clash ANT_Conflict, which reads as Arrow Focus here. */
 const INPUT_EXERCISE: Partial<Record<InputId, SchemaType>> = {
   OSPAN: 'n_back',
   DCCS_SwitchCost: 'n_back',
   OTS_Planning: 'tower',
   OTS_Execution: 'tower',
   FluidMatrices: 'relational',
-  ANT_Conflict: 'stroop',
-  SST_SSRT: 'stroop',
+  ANT_Conflict: 'flanker',
+  SST_SSRT: 'stop_signal',
   MST_LDI: 'mst',
+  PAL_FirstTrialMemory: 'pal',
   UFOV_SOA: 'ufov',
   ANT_Orienting: 'ufov',
 }
-const EXERCISE_ORDER: readonly SchemaType[] = ['relational', 'n_back', 'tower', 'ufov', 'mst', 'stroop']
+/** The Color Clash stand-ins, for an input flagged `proxy`. */
+const PROXY_EXERCISE: Partial<Record<InputId, SchemaType>> = { ANT_Conflict: 'stroop', SST_SSRT: 'stroop' }
+const exerciseOf = (id: InputId, input: { proxy?: true }): SchemaType | undefined =>
+  (input.proxy && PROXY_EXERCISE[id]) || INPUT_EXERCISE[id]
+const EXERCISE_ORDER: readonly SchemaType[] = ['relational', 'n_back', 'tower', 'ufov', 'mst', 'stroop', 'stop_signal', 'pal', 'flanker']
 
 /** Below this many filled cells the past results show as a list, not a heatmap (spec charts table). */
 export const HEATMAP_MIN_CELLS = 20
@@ -146,8 +154,8 @@ export function exerciseWeeks(sessions: readonly SessionRecord[]) {
   for (const s of sorted) {
     const col = weeks.indexOf(weekStart(new Date(s.at)).getTime())
     const per = new Map<SchemaType, number[]>()
-    for (const [id, input] of Object.entries(s.inputs) as [InputId, { score: number }][]) {
-      const ex = INPUT_EXERCISE[id]
+    for (const [id, input] of Object.entries(s.inputs) as [InputId, { score: number; proxy?: true }][]) {
+      const ex = exerciseOf(id, input)
       if (ex) per.set(ex, [...(per.get(ex) ?? []), input.score])
     }
     for (const [ex, scores] of per) {

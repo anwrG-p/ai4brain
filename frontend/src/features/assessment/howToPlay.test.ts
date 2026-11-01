@@ -11,7 +11,7 @@ import { KEYS as MST_KEYS } from './tasks/Mst'
 import { KEYS as NBACK_KEYS } from './tasks/NBack'
 import { KEYS as RELATIONAL_KEYS } from './tasks/Relational'
 import { DIR_KEYS, LETTER_KEYS } from './tasks/Ufov'
-import { ARROW_KEYS } from './tasks/useFixatedTrials'
+import { ARROW_KEYS } from './tasks/arrows'
 import { boxForKey } from './tasks/PairedAssociates'
 
 const SCHEMAS = Object.keys(EXERCISE_NAME) as SchemaType[]
@@ -58,7 +58,7 @@ describe('How to play (INT-1 item 13)', () => {
     expect(keys('mental_rotation')).toEqual(caps(ROTATION_KEYS))
     expect(keys('tower')).toEqual([])
     expect(keys('matrix')).toEqual([])
-    // The arrow exercises read ArrowLeft / ArrowRight (tasks/useFixatedTrials.ts ARROW_KEYS).
+    // The arrow exercises read ArrowLeft / ArrowRight (tasks/arrows.tsx ARROW_KEYS).
     const arrows = Object.values(ARROW_KEYS).map((d) => (d === 'left' ? '←' : '→'))
     expect(keys('stop_signal')).toEqual(arrows)
     expect(keys('flanker')).toEqual(arrows)

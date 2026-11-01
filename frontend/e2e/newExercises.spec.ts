@@ -32,9 +32,11 @@ const endCard = (page: Page) => page.getByText('Nice work')
 async function playArrows(page: Page, schema: string) {
   let signShot = false
   for (let k = 0; k < 1200 && !(await endCard(page).isVisible()); k++) {
-    await page.clock.runFor(600)
+    await page.clock.runFor(600) // past the cross
+    await page.clock.runFor(400) // 400 ms into the arrow: a stop sign with a shorter delay is up
     // Stop Light: one picture of a stop sign (shape and word), then answer as usual.
-    if (!signShot && (await page.locator('[data-stop-sign]').count())) {
+    // The sign stays mounted, hidden; it counts once it is visible.
+    if (!signShot && (await page.locator('[data-stop-sign]').isVisible())) {
       await expect(page.getByText('Stop', { exact: true })).toBeVisible()
       await page.screenshot({ path: shot(`${schema}-stop-sign-375.png`) })
       signShot = true

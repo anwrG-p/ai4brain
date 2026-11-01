@@ -49,7 +49,8 @@ const show = (ms: number) => {
 const key = (k: string, opts: Partial<KeyboardEventInit> = {}) => act(() => void fireEvent.keyDown(window, { key: k, ...opts }))
 const tap = (name: 'Left' | 'Right') => act(() => void fireEvent.pointerDown(screen.getByRole('button', { name })))
 const cross = () => screen.queryByRole('img', { name: 'Look at the cross' })
-const sign = () => document.querySelector('[data-stop-sign]')
+// The sign stays mounted; its timer flips it visible straight in the DOM.
+const signUp = () => document.querySelector<HTMLElement>('[data-stop-sign]')?.style.visibility === 'visible'
 const setHidden = (h: boolean) =>
   act(() => {
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => h })
@@ -129,19 +130,17 @@ describe('Stop Light', () => {
   test('stop trial: the sign appears at the SSD (shape and word); no press is a stop and the next SSD is 50 ms later', () => {
     setup(params([stop('left'), stop('right')]))
     show(249)
-    expect(sign()).toBeNull()
-    expect(screen.getByText('Stop')).toHaveClass('invisible')
+    expect(signUp()).toBe(false)
     advance(1)
-    expect(sign()).not.toBeNull()
-    expect(screen.getByText('Stop')).not.toHaveClass('invisible')
+    expect(signUp()).toBe(true)
     advance(LIMIT - 250)
     expect(pushed[0]).toMatchObject({ error_flag: false, score_norm: 1, response_time_ms: LIMIT })
     expect(pushed[0]!.trial_meta).toEqual({ item_id: 't:0', stop_trial: true, dir: 'left', response: 'none', ssd_ms: 250 })
     // Trial 2: the sign now comes at 300 ms.
     show(299)
-    expect(sign()).toBeNull()
+    expect(signUp()).toBe(false)
     advance(1)
-    expect(sign()).not.toBeNull()
+    expect(signUp()).toBe(true)
     advance(LIMIT - 300)
     expect(pushed[1]!.trial_meta).toMatchObject({ ssd_ms: 300, response: 'none' })
   })
@@ -154,11 +153,11 @@ describe('Stop Light', () => {
     expect(pushed[0]!.trial_meta).toMatchObject({ stop_trial: true, response: 'left', ssd_ms: 250 })
     show(100)
     key('ArrowLeft') // before the sign (200 ms): still a failed stop
-    expect(sign()).toBeNull()
+    expect(signUp()).toBe(false)
     expect(pushed[1]).toMatchObject({ error_flag: true, response_time_ms: 100 })
     expect(pushed[1]!.trial_meta).toMatchObject({ ssd_ms: 200 })
     advance(5000)
-    expect(sign()).toBeNull() // no sign on a go trial
+    expect(signUp()).toBe(false) // no sign on a go trial
   })
 
   test('tap targets answer like the keys (pointerdown); keyboard-activated buttons too', () => {

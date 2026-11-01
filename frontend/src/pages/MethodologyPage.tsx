@@ -108,7 +108,7 @@ const MEASURES: Record<InputId, Measure> = {
     how: (
       <>
         Stop Light: go time at rank P(press | sign) − mean sign delay; {SSRT_BEST_MS} ms → 100, {SSRT_WORST_MS} ms → 0,
-        × (go accuracy − ½) ÷ ½. Unscored outside ¼–¾ presses.
+        × (go accuracy − ½) ÷ ½. Unscored outside ¼–¾ presses, or if presses on signs aren’t faster.
       </>
     ),
   },

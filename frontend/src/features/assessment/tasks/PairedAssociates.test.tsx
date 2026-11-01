@@ -208,7 +208,7 @@ describe('Pair Finder', () => {
     expect(openBox()).toBe('5')
   })
 
-  test('a hidden page during recall drops that choice and moves on', () => {
+  test('a hidden page during recall drops that choice; the stage cannot pass with it untested', () => {
     setup()
     study(2)
     setHidden(true)
@@ -216,8 +216,9 @@ describe('Pair Finder', () => {
     advance(LIMIT * 2)
     expect(pushed).toHaveLength(0)
     setHidden(false)
-    tap(2) // now asking for pattern 0
+    tap(2) // now asking for pattern 0: right, but pattern 1 was never answered
     expect(pushed.map((e) => [e.trial_index, e.error_flag])).toEqual([[1, false]])
+    expect(screen.getByText('Once more: watch the boxes')).toBeInTheDocument() // attempt 2, not stage 2
   })
 
   test('pause/exit unmounts it: no event and no onDone afterwards', () => {

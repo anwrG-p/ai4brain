@@ -9,6 +9,7 @@ import type {
   StopSignalParams,
   StroopParams,
   TaskPayload,
+  TelemetryEvent,
   UfovParams,
 } from './telemetry/types'
 import { howToPlay, type HowToPlay } from './howToPlay'
@@ -68,12 +69,19 @@ export function trialCount(task: TaskPayload): number {
     case 'flanker':
       return (p as FlankerParams).trials.length
     case 'pal':
-      // One dot per pattern on its first attempt. ponytail: a repeated stage adds trials, so the
-      // dots can fill early (they cap at the total), and a failed last attempt ends with dots open.
+      // One dot per pattern on its first attempt; retries fill none (countsAsProgress). A failed
+      // last attempt ends the run with the unreached stages' dots open, as it should.
       return (p as PalParams).stages.reduce((n, s) => n + s.recall.length, 0)
     default:
       return 1 // matrix and tower: one trial
   }
+}
+
+/** Whether an event fills a progress dot: every trial, except Pair Finder's retries (attempt > 1),
+    whose patterns already have their dot from the first attempt. */
+export function countsAsProgress(e: TelemetryEvent): boolean {
+  const m = e.trial_meta
+  return !(m && 'pal_level' in m && typeof m.attempt === 'number' && m.attempt > 1)
 }
 
 // UFOV and the arrow exercises draw their own fixation cross before every trial, so the frame does

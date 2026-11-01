@@ -15,7 +15,7 @@ import { Button } from '../../components/ui/Button'
 import { PILLAR_LABELS } from '../insights/pillars'
 import { ExerciseDemo } from './ExerciseDemo'
 import { stepParts } from './howToPlay'
-import { introFor, OWN_FIXATION, trialCount, type Intro } from './exercises'
+import { countsAsProgress, introFor, OWN_FIXATION, trialCount, type Intro } from './exercises'
 import { StimulusCard, usesLightPlate } from './tasks/Stroop'
 import { tracker } from './telemetry/tracker'
 import type { NBackParams, SchemaType, StroopParams, TaskPayload } from './telemetry/types'
@@ -65,7 +65,7 @@ function useTrialsDone(taskId: string) {
   useEffect(() => {
     const seen = new Set<number>()
     return tracker.onEvent((e) => {
-      if (e.task_id !== taskId || seen.has(e.trial_index)) return
+      if (e.task_id !== taskId || seen.has(e.trial_index) || !countsAsProgress(e)) return
       seen.add(e.trial_index)
       setDone(seen.size)
     })

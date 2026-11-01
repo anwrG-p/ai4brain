@@ -146,6 +146,32 @@ describe('Arrow Focus', () => {
     expect(pushed.map((e) => e.trial_index)).toEqual([0, 2])
   })
 
+  test('a page hidden during the cross skips nothing: that trial gets a fresh cross, then runs', () => {
+    setup(params([con('left'), inc('right')]))
+    show(100)
+    key('ArrowLeft') // trial 0 done; trial 1's cross is up
+    advance(200)
+    act(() => {
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    advance(10_000)
+    act(() => {
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => false })
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    expect(cross()).not.toBeNull()
+    advance(FIX - 1)
+    expect(cross()).not.toBeNull() // a full cross again
+    advance(1)
+    expect(arrows()).toBe('LLRLL') // trial 1, not skipped
+    key('ArrowRight')
+    expect(pushed.map((e) => [e.trial_index, e.error_flag])).toEqual([
+      [0, false],
+      [1, false],
+    ])
+  })
+
   test('pause/exit unmounts it: no event and no onDone afterwards', () => {
     const { onDone, unmount } = setup(params([con('left')]))
     show(100)

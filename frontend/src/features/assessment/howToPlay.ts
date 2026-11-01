@@ -120,9 +120,13 @@ export function howToPlay(task: TaskPayload): HowToPlay | null {
     case 'pal': {
       // PairedAssociates.tsx: study, then pick the box (tap, or digit k for box k); a stage with a
       // wrong box is studied again, up to max_attempts.
-      const { boxes } = p as PalParams
+      const { boxes, max_attempts } = p as PalParams
       return {
-        steps: ['Watch which shape opens in each box.', `Then tap its box, or press ${range(Math.min(boxes, 9))}.`, 'A miss shows the boxes once more.'],
+        steps: [
+          'Watch which shape opens in each box.',
+          `Then tap its box, or press ${range(Math.min(boxes, 9))}.`,
+          `Miss a round ${max_attempts} times and it ends.`,
+        ],
         caption: 'The shape was in this box',
         pillar: 'memory',
         more: ['It measures remembering where things were.', 'Each round adds more shapes, up to eight.'],
