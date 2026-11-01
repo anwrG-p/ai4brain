@@ -164,6 +164,29 @@ describe('EMILY Behavioral Emotion Engine (Circumplex Affective Model)', () => {
     })
   })
 
+  describe('2b. Answer errors are not strain (ADR 0002: the staircase causes errors on purpose)', () => {
+    it('the classifier and the store take pointer and key events only: there is no error input', () => {
+      // Arity guards the API: an error count can no longer be passed to either.
+      expect(classifyEmilyEmotion.length).toBe(1)
+      expect(useEmilyStore.getState().updateTelemetry.length).toBe(1)
+    })
+
+    it('steady pointer movement stays calm however many answers were wrong; only rage clicks propose a strained mood', () => {
+      const now = Date.now()
+      const steady: EmilyInteractionEvent[] = Array.from({ length: 10 }, (_, i) => ({
+        type: 'pointermove',
+        x: 100 + i * 20,
+        y: 100,
+        timestamp: now - 1000 + i * 100,
+      }))
+      // Even after a run of wrong answers (the staircase's ~15%), the guess reads the pointer only.
+      const extra = { consecutiveErrors: 9 } as unknown as never
+      expect((classifyEmilyEmotion as (...a: unknown[]) => string)(computeEmilyMetrics(steady), extra)).toBe('calm_flow')
+      useEmilyStore.getState().updateTelemetry(steady)
+      expect(useEmilyStore.getState()).toMatchObject({ currentEmotion: 'calm_flow', proposedEmotion: null })
+    })
+  })
+
   describe('3. Human Override & Pending Proposal State (useEmilyStore)', () => {
     it('initializes with calm_flow, no pending proposal, and autoAdapt disabled by default', () => {
       const state = useEmilyStore.getState()

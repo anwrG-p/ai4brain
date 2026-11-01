@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { PastResults, heatBin } from './PastResults'
+import { PastResults, TIME_OF_DAY_MIN_SESSIONS, heatBin, partOfDay, timeOfDay } from './PastResults'
 import type { TaskScores } from './pillars'
 import type { SessionRecord } from './sessionStore'
 
@@ -145,5 +145,73 @@ describe('PastResults', () => {
       render(<PastResults sessions={weeks(4)} />)
       expect(screen.queryByText(/Scroll for earlier weeks/)).toBeNull()
     })
+  })
+})
+
+describe('When you train (time of day, FE-14)', () => {
+  // Local times, so the weekday and part of the day do not depend on the test machine's zone.
+  const one = (local: string, s: number, id = local): SessionRecord => ({ id, at: new Date(local).toISOString(), inputs: five(s) })
+  // Mon 26 Oct morning x2 (60, 80), Mon evening (40), Tue afternoon (50), Wed 00:30 (night: evening), Sat morning (90).
+  const six = [
+    one('2026-10-26T08:00:00', 60),
+    one('2026-10-26T11:59:00', 80),
+    one('2026-10-26T19:00:00', 40),
+    one('2026-10-27T13:00:00', 50),
+    one('2026-10-28T00:30:00', 30),
+    one('2026-10-31T09:00:00', 90),
+  ]
+
+  it('parts of the day: morning 05-12, afternoon 12-17, evening the rest', () => {
+    expect([4, 5, 11, 12, 16, 17, 23, 0].map(partOfDay)).toEqual([2, 0, 0, 1, 1, 2, 2, 2])
+  })
+
+  it('stays hidden below 6 sessions', () => {
+    expect(timeOfDay(six.slice(0, 5))).toBeNull()
+    render(<PastResults sessions={six.slice(0, 5)} />)
+    expect(screen.queryByRole('grid', { name: 'When you train' })).toBeNull()
+    expect(TIME_OF_DAY_MIN_SESSIONS).toBe(6)
+  })
+
+  it('from 6 sessions: weekday rows x morning/afternoon/evening, each cell printing the average score', () => {
+    const slots = timeOfDay(six)!
+    expect(slots).toHaveLength(7)
+    expect(slots[0]).toEqual([{ sessions: 2, score: 70 }, { sessions: 0, score: null }, { sessions: 1, score: 40 }])
+    expect(slots[1]![1]).toEqual({ sessions: 1, score: 50 })
+    expect(slots[2]![2]).toEqual({ sessions: 1, score: 30 })
+    expect(slots[5]![0]).toEqual({ sessions: 1, score: 90 })
+
+    const { container } = render(<PastResults sessions={six} />)
+    const grid = screen.getByRole('grid', { name: 'When you train' })
+    expect(within(grid).getAllByRole('rowheader').map((h) => h.textContent)).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])
+    expect(within(grid).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Day', 'Morning', 'Afternoon', 'Evening'])
+    const filled = grid.querySelectorAll('td[data-value]')
+    expect([...filled].map((c) => c.textContent)).toEqual(['70', '40', '50', '30', '90'])
+    for (const c of filled) expect(c.className).toMatch(/\bheat-[0-4]\b/)
+    expect(within(grid).getByRole('gridcell', { name: 'Monday morning: 2 sessions, average 70' })).toBeInTheDocument()
+    expect(within(grid).getByRole('gridcell', { name: 'Thursday evening: no session' })).toBeInTheDocument()
+    expect(container.innerHTML).not.toMatch(/red|danger/)
+  })
+
+  it('is one tab stop with a roving tabindex; focus is announced once and echoed for sighted users', () => {
+    render(<PastResults sessions={six} />)
+    const grid = screen.getByRole('grid', { name: 'When you train' })
+    const cells = () => [...grid.querySelectorAll<HTMLElement>('[role="gridcell"]')]
+    expect(cells()).toHaveLength(21)
+    expect(cells().filter((c) => c.tabIndex === 0)).toEqual([cells()[0]])
+    act(() => cells()[0]!.focus())
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(cells()[3])
+    fireEvent.keyDown(document.activeElement!, { key: 'End' })
+    expect(document.activeElement).toBe(cells()[5])
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowRight' }) // stops at the edge
+    expect(document.activeElement).toBe(cells()[5])
+    fireEvent.keyDown(document.activeElement!, { key: 'Home' })
+    expect(document.activeElement).toBe(cells()[3])
+    expect(cells().filter((c) => c.tabIndex === 0)).toEqual([cells()[3]])
+    const echo = grid.parentElement!.querySelector('[data-focus-echo]')!
+    expect(echo).toHaveAttribute('aria-hidden', 'true')
+    expect(echo).toHaveTextContent('Tuesday morning: no session')
+    // Named once: the cell's own label, with no live region repeating it.
+    expect(grid.parentElement!.querySelector('[aria-live]')).toBeNull()
   })
 })

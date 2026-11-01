@@ -200,6 +200,7 @@ describe('TaskRunnerPage mounts the real exercises', () => {
       droppedCount: 4,
       maxCapacity: 500,
       consent: 'denied',
+      coachConsent: 'pending',
     })
     renderAt('/task/episodic_pattern_separation?judge=1')
     await begin('Precision Archive')

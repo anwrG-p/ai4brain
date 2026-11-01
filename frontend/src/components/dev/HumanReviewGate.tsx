@@ -190,7 +190,7 @@ export function HumanReviewGate({
       { type: 'pointermove', x: 228, y: 320, timestamp: now - 20 },
       { type: 'pointermove', x: 215, y: 305, timestamp: now },
     ]
-    updateTelemetry(syntheticEvents, { consecutiveErrors: 2 })
+    updateTelemetry(syntheticEvents)
   }
 
   const simulateWandering = () => {

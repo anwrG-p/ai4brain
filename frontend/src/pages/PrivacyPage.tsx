@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 import { Button } from '../components/ui/Button'
 import { tracker, type Consent } from '../features/assessment/telemetry/tracker'
+import { ConsentChoices, type ConsentChoice } from '../features/flow/ConsentChoices'
+import { COACH_ENABLED } from '../features/loti/coachAdapter'
 import { deleteMyData, downloadMyData } from '../features/privacy/myData'
 
 const CONSENT_LINE: Record<Consent, string> = {
@@ -9,23 +11,30 @@ const CONSENT_LINE: Record<Consent, string> = {
   denied: 'Your answers are kept on this device only.',
 }
 
+const COACH_LINE: Record<Consent, string> = {
+  pending: 'AI replies from Loti: not chosen yet.',
+  // While the AI path is off (R14) no reply exists yet, so the line says when it would apply.
+  granted: COACH_ENABLED ? 'Loti may use AI to reply.' : "Loti may use AI to reply when it's available.",
+  denied: 'Loti uses scripted replies only.',
+}
+
 const subscribeTracker = (onChange: () => void) => tracker.subscribe(onChange)
-const currentConsent = () => tracker.getStatus().consent
+const currentStatus = () => tracker.getStatus()
 
 const QUIET = 'focus-ring inline-flex min-h-11 cursor-pointer items-center rounded-sm text-sm font-medium underline underline-offset-4'
 
-/* Privacy: the consent status in one line with one control to change it (R3, equal choices),
-   one sentence on what is recorded, then two quiet links: "Export my data" (one JSON file) and
-   "Delete my data" behind a confirmation (rules 13, 14: no primary button, quiet controls only). */
+/* Privacy: each purpose's status in one line (research #6: saving answers, AI replies from Loti)
+   with one control that opens both switches to change them (R3, equal weight), one sentence on what
+   is recorded, then two quiet links: "Export my data" (one JSON file) and "Delete my data" behind a
+   confirmation (rules 13, 14: the only primary button is inside the open choice). */
 export default function PrivacyPage() {
-  const consent = useSyncExternalStore(subscribeTracker, currentConsent)
+  const { consent, coachConsent } = useSyncExternalStore(subscribeTracker, currentStatus)
   const [choosing, setChoosing] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [deleted, setDeleted] = useState(false)
 
-  const choose = (save: boolean) => {
-    if (save) tracker.grantConsent()
-    else tracker.denyConsent()
+  const choose = (choice: ConsentChoice) => {
+    tracker.choose(choice)
     setChoosing(false)
     setDeleted(false)
   }
@@ -35,24 +44,24 @@ export default function PrivacyPage() {
       <h1 className="font-display text-3xl font-bold text-ink">Privacy</h1>
 
       <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-x-3">
+        <div>
           <p data-testid="consent-line" aria-live="polite" className="text-lg text-ink">
             {CONSENT_LINE[consent]}
           </p>
+          <p data-testid="coach-line" aria-live="polite" className="text-lg text-ink">
+            {COACH_LINE[coachConsent]}
+          </p>
           <button type="button" aria-expanded={choosing} onClick={() => setChoosing((o) => !o)} className={`${QUIET} text-brand`}>
-            {consent === 'pending' ? 'Choose' : 'Change'}
+            {consent === 'pending' && coachConsent === 'pending' ? 'Choose' : 'Change'}
           </button>
         </div>
         {choosing && (
-          // Equal weight (R3): same style, same size, the same words as the login sheet.
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Button variant="secondary" onClick={() => choose(true)}>
-              Save my answers
-            </Button>
-            <Button variant="secondary" onClick={() => choose(false)}>
-              Keep them on this device only
-            </Button>
-          </div>
+          // Equal weight (R3): the same two switches and words as the consent step, set to what holds now.
+          <ConsentChoices
+            initial={{ telemetry: consent === 'granted', coach: coachConsent === 'granted' }}
+            submitLabel="Done"
+            onSubmit={choose}
+          />
         )}
       </div>
 
