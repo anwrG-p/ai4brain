@@ -3,7 +3,8 @@
 Mounted by backend/app/main.py. The logic is in cache_dispatcher.py; this module wires it to the
 server: user ids through telemetry_store.user_key() (R13), trials from the telemetry JSONL,
 Hamza's 85% rule, the privacy delete/export hooks for the task registry, the start/stop of the
-worker process, and a per-id rate limit.
+worker process, a per-id rate limit, and the LLM pool worker (BE-13, llm_worker.py), which runs
+only when GEMINI_API_KEY is set.
 
 A plain `def` route on purpose: FastAPI runs it in its thread pool, so an inline build (empty pool)
 never blocks the event loop.
@@ -29,6 +30,7 @@ from app.tools.exercise_generator import ExerciseGenerator
 
 from .cache_dispatcher import Dispatcher, NoFreshTask, TelemetryTrials, schemas_for
 from .generators import GenerationError
+from .llm_worker import LlmPoolWorker, VariantArchive
 
 router = APIRouter()
 
@@ -115,6 +117,8 @@ def make_dispatcher(**overrides: Any) -> Dispatcher:
         "difficulty_rule": ExerciseGenerator.apply_85_percent_rule,
         # The one retention setting (env RETENTION_DAYS), also the retention CLI's default.
         "retention_days": configured_days(),
+        # Session replays of LLM variants (BE-13) read the body back from their archive.
+        "variants": VariantArchive().get,
         # pillars: no server profile until BE-07/BE-11, so the projector has nothing and
         # START_THETA seeds each staircase. archetype: NEUTRAL until BE-09/BE-11.
     }
@@ -147,6 +151,36 @@ def shutdown() -> None:
 # start() does not wait for the worker; a worker that cannot start leaves the server serving inline.
 on_startup("dynamic_cache", lambda: get_dispatcher().start())
 on_shutdown("dynamic_cache", shutdown)
+
+
+# The LLM pool worker (BE-13). None without a key (or with LLM_POOL_RPM / LLM_POOL_DAILY_CAP at 0):
+# then no call is ever made and the procedural generators serve alone. It reads the current
+# dispatcher each cycle and never creates one.
+_llm_worker: LlmPoolWorker | None = None
+
+
+def _current_dispatcher() -> Dispatcher | None:
+    with _dispatcher_lock:
+        return _dispatcher
+
+
+def start_llm_pool() -> None:
+    global _llm_worker
+    worker = LlmPoolWorker.from_env(_current_dispatcher)
+    if worker is not None:
+        worker.start()
+    _llm_worker = worker
+
+
+def stop_llm_pool() -> None:
+    global _llm_worker
+    worker, _llm_worker = _llm_worker, None
+    if worker is not None:
+        worker.stop()
+
+
+on_startup("llm_pool", start_llm_pool)
+on_shutdown("llm_pool", stop_llm_pool)
 
 
 # The registry is per-user data: the privacy delete removes it and the export includes it. With an

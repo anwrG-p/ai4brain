@@ -121,10 +121,13 @@ class GeminiRunner:
         relax_safety: bool = False,
         temperature: float = 0.4,
         deadline: Optional[float] = None,
+        max_output_tokens: int = MAX_OUTPUT_TOKENS,
     ) -> str:
         """One generateContent call; returns the reply text. Raises GeminiError / GeminiBlocked.
 
         `deadline` is a time.monotonic() value; the call never waits past it.
+        `max_output_tokens` defaults to Loti's short replies; the task-pool worker (BE-13) asks for
+        whole task blocks and passes more.
         `relax_safety` turns Gemini's own content filter off. Only the crisis classifier sets it:
         it must be able to read a message about self-harm to route it, and it only emits JSON.
         """
@@ -136,7 +139,7 @@ class GeminiRunner:
             raise GeminiError("deadline exceeded")
         config: Dict[str, Any] = {
             "temperature": temperature,
-            "maxOutputTokens": MAX_OUTPUT_TOKENS,
+            "maxOutputTokens": max_output_tokens,
             # No thinking: it costs seconds the turn deadline does not have.
             "thinkingConfig": {"thinkingBudget": 0},
         }

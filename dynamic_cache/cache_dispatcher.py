@@ -27,6 +27,9 @@
   which the retention CLI runs). Both read one setting, env RETENTION_DAYS (default 30): the
   server passes it in through dynamic_cache.api, the CLI uses it as its --days default.
   forget() and export() back the privacy delete and export.
+- LLM variants (BE-13, llm_worker.py): offer() puts already-validated entries with a non-procedural
+  `source` into the same pools. Their session recipe records that source, and a replay looks the
+  body up through `variants` (they cannot be rebuilt from a seed).
 
 Thread safety: a per-user lock serialises one user's calls (so a double GET in the same session
 cannot hand out two tasks); one dispatcher lock guards the pools and the user table.
@@ -90,7 +93,11 @@ class NoFreshTask(RuntimeError):
 class Entry(NamedTuple):
     task_id: str
     body: bytes  # the TaskPayload as JSON
-    seed: int
+    seed: int  # meaningless unless source == PROCEDURAL
+    source: str = "procedural"  # or "llm" (BE-13): not rebuildable from the seed
+
+
+PROCEDURAL = "procedural"
 
 
 class Served(NamedTuple):
@@ -345,6 +352,7 @@ class Dispatcher:
         pool_size: int = POOL_SIZE,
         max_users: int = MAX_USERS,
         retention_days: int = RETENTION_DAYS,
+        variants: Callable[[str], bytes | None] = lambda task_id: None,
         background: bool = True,
     ) -> None:
         self.registry_dir = registry_dir
@@ -357,6 +365,7 @@ class Dispatcher:
         self.pool_size = pool_size
         self.max_users = max_users
         self.retention_days = retention_days  # the server passes RETENTION_DAYS from the env
+        self.variants = variants  # task_id -> body of a non-procedural entry (session replays)
 
         # Pools, the user table, pins, the dirty set. Re-entrant: a refill future that is already
         # done runs its callback (which takes the lock) in the submitting thread.
@@ -666,6 +675,8 @@ class Dispatcher:
             if body is not None:
                 self._replays.move_to_end(rec["task_id"])
                 return body
+        if rec.get("source", PROCEDURAL) != PROCEDURAL:
+            return self.variants(rec["task_id"])  # None: the session gets a new task
         try:
             entry = build_entry(rec.get("archetype", NEUTRAL), rec["schema"], rec["theta"], rec["seed"])
         except (KeyError, TypeError, ValueError, RuntimeError):
@@ -745,6 +756,7 @@ class Dispatcher:
                     "schema": chosen,
                     "theta": level,
                     "seed": entry.seed,
+                    "source": entry.source,
                     "archetype": archetype,
                     "task_id": entry.task_id,
                     "at": now,
@@ -753,6 +765,28 @@ class Dispatcher:
             st.prune(now)
             self._mark_dirty(key)
             return Served(entry.body, entry.task_id, chosen, level, False)
+
+    # --- LLM variants (BE-13) ----------------------------------------------------------------------
+
+    def offer(self, archetype: str, schema_type: str, level: float, entries: Sequence[Entry]) -> int:
+        """Add validated non-procedural entries to a pool; returns how many went in. The caller
+        (llm_worker) has already run the served schema, the solvers and the content checks. A pool
+        holds at most twice pool_size, so offers can never grow memory without bound."""
+        pool_key = (archetype, schema_type, theta_level(schema_type, level))
+        with self._lock:
+            if self._closed:
+                return 0
+            pool = self._pools.setdefault(pool_key, deque())
+            room = max(0, 2 * self.pool_size - len(pool))
+            taken = [e for e in entries if e.source != PROCEDURAL][:room]
+            pool.extend(taken)
+            return len(taken)
+
+    def pool_stock(self) -> dict[tuple[str, str, float], tuple[int, int]]:
+        """Every pool's (entries, non-procedural entries): which pools exist and how many LLM
+        variants each holds, so the LLM worker fills the pools that are used."""
+        with self._lock:
+            return {k: (len(p), sum(e.source != PROCEDURAL for e in p)) for k, p in self._pools.items()}
 
     def close(self) -> None:
         """Stop the worker process and the writer, and write what is pending. Idempotent."""
