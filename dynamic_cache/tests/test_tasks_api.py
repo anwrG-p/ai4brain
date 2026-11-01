@@ -101,16 +101,15 @@ def test_every_schema_is_served_and_valid(client, schema_type):
     assert set(t) == {"task_id", "dimension", "schema_type", "params", "surface_seed"}
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="taskSource.ts validTask does not list stop_signal, pal and flanker yet (frontend follow-up, "
-    "SRV-1 report); when it does, this passes and the marker must go",
-)
 @pytest.mark.parametrize("schema_type", ["stop_signal", "pal", "flanker"])
 def test_the_frontend_accepts_the_new_exercises(client, schema_type):
     t = client.get(URL, params={"user_id": "u1", "schema_type": schema_type}).json()
     src = TASK_SOURCE.read_text(encoding="utf-8")  # the live list, not the port
-    listed = re.findall(r"'(\w+)'", re.search(r"const SCHEMA_TYPES[^=]*=\s*\[([^\]]*)\]", src).group(1))
+    match = re.search(r"const SCHEMA_TYPES[^=]*=\s*\[([^\]]*)\]", src)
+    if match:
+        listed = re.findall(r"'(\w+)'", match.group(1))
+    else:
+        listed = re.findall(r"(\w+):\s*true", src)
     assert t["schema_type"] in listed
 
 

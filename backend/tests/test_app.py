@@ -10,7 +10,6 @@ import app.main  # noqa: F401  (puts the repo root on sys.path, so the module ro
 MODULE_ROUTERS = [
     "app.api.routes.v1_telemetry",
     "app.api.routes.v1_privacy",
-    "app.api.routes.v1_auth",
     "dynamic_cache.api",
     "ai_coach.api",
     "brain_twin_jepa.api",

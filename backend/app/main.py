@@ -25,7 +25,6 @@ from app.settings import load_env_file  # noqa: E402
 load_env_file()
 
 from ai_coach.api import router as coach_module_router  # noqa: E402
-from app.api.routes.v1_auth import router as auth_router  # noqa: E402
 from app.lifecycle import lifespan  # noqa: E402
 from app.api.routes.v1_privacy import router as privacy_router  # noqa: E402
 from app.api.routes.v1_telemetry import router as v1_telemetry_router  # noqa: E402
@@ -64,7 +63,6 @@ app.add_middleware(
 for router in (
     v1_telemetry_router,
     privacy_router,
-    auth_router,
     tasks_router,
     coach_module_router,
     brain_twin_router,

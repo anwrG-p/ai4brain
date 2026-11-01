@@ -49,7 +49,8 @@ export function isPillarId(value: unknown): value is PillarId {
                          when the guide's exclusion rules reject it; (A) 150 ms -> 100, 450 ms -> 0,
                          times the go gate (go accuracy - 1/2) / (1/2). Only when the session has no
                          Stop Light trials: PROXY, Stroop incongruent accuracy
-   DDM_Caution           omitted: no source
+   DDM_Caution           EZ-diffusion boundary separation (a) on speeded 2AFC decisions
+                         (Stop Light go trials, Arrow Focus, Color Clash); (A) 0 -> 0, 0.25 -> 100
    PAL_FirstTrialMemory  Pair Finder (pal): patterns placed right on the first attempt over all the
                          task's patterns (unreached stages count as missed), CANTAB's first-attempt
                          memory score with no chance correction

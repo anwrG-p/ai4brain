@@ -84,7 +84,6 @@ export async function fetchNextTask(
   if (opts.schemaType) extras.push(`schema_type=${encodeURIComponent(opts.schemaType)}`)
   if (opts.sessionId) extras.push(`session_id=${encodeURIComponent(opts.sessionId)}`)
   if (seq > 0 || opts.sessionId) extras.push(`seq=${seq}`)
-  if (!cvd && opts.inks && opts.inks !== 'classic') extras.push(`inks=${encodeURIComponent(opts.inks)}`)
 
   const res = await fetchFn(extras.length > 0 ? `${base}&${extras.join('&')}` : base)
   if (!res.ok) {

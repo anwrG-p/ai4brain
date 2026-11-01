@@ -6,7 +6,7 @@ Every value comes from the user's own telemetry or is left out with a reason (R1
   session that scored it, and how many did.
 - uncertainty: the app's own method (pillars.ts, ported in features.pillar_scores): a 95%
   half-width from the worst-case binomial SE of each input, weighted, divided by coverage, capped
-  at 50. Hamza's Kalman filter (app/tools/digital_brain_updater.py) is NOT used: its noise terms
+  at 50. A cortical Kalman filter is NOT used: its noise terms
   are fixed constants on a T-score scale (R = 2.25, a 1.5-point SD per session, far tighter than
   the ~11 points a 20-trial binomial input allows) with no data behind them, its transition matrix
   pulls every node toward a cross-node mean, and its observation map is per cortical node, with
@@ -64,6 +64,9 @@ EXERCISE_NAME = {
     "stroop": "Color Clash",
     "matrix": "Pattern Puzzle",
     "mental_rotation": "Shape Turn",
+    "stop_signal": "Stop Light",
+    "pal": "Pair Finder",
+    "flanker": "Arrow Focus",
 }
 
 
