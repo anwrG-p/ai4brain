@@ -1,8 +1,8 @@
 # SynapseTwin
 
-SynapseTwin is a calm, privacy-first cognitive training platform developed for the **CISTAC 1.0 (AI4Brain)** challenge. It combines 11 gamified cognitive exercises based on validated neuropsychological paradigms with an adaptive procedural generator, an explainable AI coach (**Loti**), and a milestone celebration mascot (**Momo**).
+SynapseTwin is a calm, privacy-first cognitive-training web platform developed for the **CISTAC 1.0 (AI4Brain)** challenge that helps users train, track, and reflect on their mental fitness without medical claims or clinical jargon. Built on validated neuropsychological paradigms (such as oMST, UFOV, Stroop, Flanker, and Stop Signal), the platform offers 11 gamified exercises that map into five core skills—Focus & Strategy, Mental Agility, Impulse Control, Deep Memory, and Visual Radar—driven by an adaptive procedural task generator that dynamically calibrates difficulty using an 85% success-rate rule. Users are guided through their training by **Loti**, an explainable, non-clinical AI axolotl coach equipped with crisis safety guardrails and transparent adaptation reasoning, alongside **Momo**, a dolphin companion who celebrates milestones and supports opt-in mood reflection. Under the hood, an in-process state bus connects performance telemetry to non-clinical practice style archetypes (GMM) and a Joint-Embedding Predictive Architecture (JEPA) digital brain twin for longitudinal session forecasting, all while upholding strict privacy principles through anonymous device identifiers, client-side scoring, full data export/deletion controls, and automated 30-day data retention.
 
-SynapseTwin is built strictly for personal training, habit building, and self-reflection. In accordance with spec U5, **it is not a medical or diagnostic tool** ("we don't measure your brain"; no clinical claims or brain-region names are surfaced to users).
+In accordance with spec U5, **SynapseTwin is strictly for personal training and self-reflection, not a medical or diagnostic tool** ("we don't measure your brain"; no clinical claims or brain-region names are surfaced to users).
 
 ---
 
