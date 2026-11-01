@@ -1,5 +1,69 @@
 # Ticket BE-13 report: LLM pool worker
 
+## Review round 1 (this section wins over the rest where they disagree)
+
+- **Merged first.** `ce15688` merges main `feat/ui-calm-clean` (`1ad9e5f`, BE-04 `86670de` hot pools included) into this branch. Every fix below was made on the merged tree. On it, 7 of the 45 old tests failed with `KeyError` in `_take`, because the old `offer` extended the deque without `_key_bytes`.
+- **Fix commit:** `386beb5`, no AI attribution. The report commit follows it.
+- **Tests:** one `pytest -q` from the repo root on the merged tree gives **1449 passed, 1 failed, 1 xfailed, 0 warnings**.
+  - **The one failure is not BE-13's.** It is `dynamic_cache/tests/test_tasks_api.py::test_the_port_matches_task_source_ts`, BE-04's drift guard, and it fails on main `1ad9e5f` too.
+  - F-D (`e50298e`) changed `taskSource.ts` to ``/v1/tasks/next?user_id=${...}${cvd ? '&inks=cvd_safe' : ''}``, and the guard still expects the old URL template.
+  - The server also ignores `inks`, so `cvd_safe` is never served. Routed to BE-04 / F-D, see Requests.
+  - `test_llm_worker.py` now has **57 tests** (all pass).
+
+### CRITICAL: `offer()` on hot pools (`cache_dispatcher.py`, inside `offer`/`pool_stock` only; `_sweep` untouched)
+
+1. It returns 0 when the pool does not exist (`self._pools.get`, no `setdefault`), when `_floor(pool_key, now) == 0`, or after `close()`.
+2. Every entry is stocked through `self._add`, so `_key_bytes`, `_pool_bytes` and `pool_bytes_max` hold. The offer stops at the first refusal. The byte cap and the growth budget are checked **before** a procedural entry is evicted, so a refused offer never costs stock.
+3. Room is bounded by `_want(pool_key, now)`. When the pool is at its target, an LLM entry takes the place of the rightmost procedural entry (via `_take`). It stops when only paid entries are left. **Why:** at steady demand the pool sits at its target, so `want - len(pool)` alone would almost always be 0 and every paid variant would be wasted. The length never passes `_want`. Entries landing above the floor count into `_growth_bytes`, as `_refilled` counts them. An evicted entry above the floor is subtracted.
+4. **LLM entries go to the left** (`_add`, then `appendleft(pop())`). They are served first, and `_sweep` trims from the right, so they are never what it trims while the pool is in use. An idle pool (floor 0) is emptied whole, as before.
+5. `_active_at`, `_demand` and `_inflight` are not touched (tested).
+6. `pool_stock()` lists only pools in use (floor > 0).
+7. Docstrings: the module docstring and `offer`.
+
+**Tests (merged tree):**
+
+| Requirement | Test |
+|---|---|
+| `_pool_bytes == sum(len(body))` after offers and pops | `test_pool_bytes_stay_exact_through_offers_and_pops`; also checks `_key_bytes` per pool, LLM first, the three procedural entries that made way, and the served order |
+| Offered entries survive a sweep at low demand | `test_offered_entries_survive_a_sweep_at_low_demand`: wave target 20, 3 offers, demand decays, sweep to 8, and the 3 paid entries stay |
+| An offer stops at `pool_bytes_max` | `test_an_offer_stops_at_pool_bytes_max`: cap 25 000, 10 kB entries, 2 taken |
+| An offer to a pool created by a request's `setdefault` doesn't KeyError | `test_offer_to_a_pool_created_by_a_request_does_not_raise`: then 5 pops, with the tallies exact after each |
+| Pools not in use | `test_offer_needs_a_pool_in_use` (no pool, an idle pool, closed; `pool_stock` excludes idle pools) |
+| Other cases | `test_a_full_pool_of_paid_entries_takes_no_more`, `test_an_offer_is_not_demand` |
+
+### IMPORTANT 1: term safety is structural
+
+- **Renaming.** After validation and before hashing, `rename_terms` gives every relational item fresh procedural tokens: `relational._token`, so CONSONANTS × VOWELS × CONSONANTS minus `BLOCKED`.
+  - The renaming is consistent within each item (a term keeps one new name across its premises and question).
+  - It is seeded by the content, so equal LLM output still gives an equal variant and id.
+- **Re-check.** The renamed payload goes through `validate_payload` again; a failure there would be a renaming bug, and the variant is still not served. The task_id is the hash of what is served.
+- **Stroop** stays an allowlist.
+- **Denylist** stays as defence in depth. It gains the four-letter-plus slurs (`kike`, `spic`, `coon`, `chink`, `gook`, `wetback`, ...), which it lacked.
+- **Tests:**
+  - `test_relational_terms_are_always_procedural_tokens`: a variant using kike, spic, coon, chink, gook, wetback, patient, iq, killab and black is **served**. None of those strings is in its body, every term is a procedural CVC outside `BLOCKED`, and answers, hops, inversions and relations are unchanged.
+  - `test_the_denylist_still_flags_bad_relational_terms[6]` checks the denylist directly.
+
+### IMPORTANT 2: per-pool cool-down
+
+- A call that accepts 0 variants (parse failure or all rejected) puts its pool on a cool-down: `POOL_COOL_FIRST_S = 300 s`, doubling up to 1 h. An accepted variant clears it.
+- `_target` skips cooling pools.
+- **Test:** `test_a_pool_that_is_always_rejected_does_not_starve_the_others`. Over 12 cycles at 30 s, the always-wrong relational pool gets 2 calls (0 s and 300 s) and the stroop pool gets 10, with 20 variants accepted.
+
+### Minors
+
+- **More blocked words.** `vag vaj zeb fak fok git fek nit dum nul jip neg kut lul kuk pik kus` are added to `relational.BLOCKED` and to the worker denylist. The relational golden hash is re-recorded as `04fe4f0e…`.
+- **Budget, unreadable file:** it is logged once and rewritten as `{day: today, calls: cap}`. Today counts as spent, and the next UTC day starts at 0. Test: `test_an_unreadable_budget_is_spent_today_and_rewritten` (one warning, no call today, a call tomorrow).
+- **Budget and archive writes** use a per-pid tmp name plus `os.replace` (`test_writes_use_a_per_process_tmp_name`).
+- **`VariantArchive.get` re-runs the content gate** on replay (`test_a_replay_runs_the_content_gate_again`).
+- **The purge removes stale `*.tmp`** files older than `STALE_TMP_S = 1 h` (`test_the_purge_removes_stale_tmp_files`).
+- **Report corrected.** All 22 first-round `BLOCKED` additions were servable and being served: every one is a CVC the generator can spell. They were not limited to the 4 my 300-seed sample happened to show. The same holds for the 17 added in this round. That makes 39 in total. The section below is corrected.
+
+### Merge with BE-04's last-minors round
+
+- My dispatcher edits in this round are only inside `offer()` and `pool_stock()`, plus their docstring and the one module-docstring bullet.
+- The hook from round 0 stays: `Entry.source`, the `variants` lookup in `_replay`, and `source` in the session recipe.
+- The "one line needed after the merge" note further down is obsolete: the merge is done, and `offer` uses `_add`.
+
 - **Branch:** `worktree-agent-acbeb86e4db59c962`, reset to `e36227e` (as instructed, not `ae67522`).
 - **Commits** (no AI attribution):
   - `3851670 fix(dynamic_cache): relational terms never spell slurs or rude words`. A BE-03 fix found by this ticket. It is a separate commit so it can be reviewed, or dropped, on its own.
@@ -105,8 +169,9 @@ Not touched: `brain_twin_jepa/**`, `docs/ui/contracts.md`, the `v1_interop` stan
 
 ## Found and fixed: the procedural relational generator spelled slurs
 
-- Running the procedural terms through this content check, as the bar both sources should meet, found 4 hits. Over 300 relational payloads (seeds 100–399), the CVC generator produced `fag` (90), `jew` (89), `tit` (92) and `fap` (73). Its `BLOCKED` list missed them.
+- Running the procedural terms through this content check, as the bar both sources should meet, found hits. In a sample of 300 relational payloads (seeds 100–399), the CVC generator produced `fag` (90), `jew` (89), `tit` (92) and `fap` (73). Its `BLOCKED` list missed them.
 - `3851670` adds them to `BLOCKED`, plus 18 more three-letter rude or slur spellings in English and French: dik, fuk, jap, jiz, kok, kon, kul, kum, lez, nig, nik, nip, nob, pak, pis, wog, wop, zob.
+- **Correction (review round 1):** all 22 were being served, not only the 4 the sample showed. Every one is a CVC the generator can spell, so each appeared at some rate. Round 1 adds 17 more (39 in total).
 - The relational golden hash is re-recorded; that is the only golden that changed.
 - `test_procedural_terms_meet_the_same_bar` enumerates all 1280 CVC spellings and asserts that none left unblocked hits the worker's harm list.
 - **Side effect:** an already-stored relational session recipe now rebuilds a different payload. `_replay` sees the id mismatch and serves a new task (BE-04's documented fallback).
@@ -173,7 +238,12 @@ The worker found no pool at boot and waited `IDLE_S` = 30 s. It then targeted th
 
 ## Requests
 
+- **BE-04 / F-D (round 1):** `test_the_port_matches_task_source_ts` fails on main `1ad9e5f`.
+  - F-D added `&inks=cvd_safe` to the `taskSource.ts` URL, and the guard still expects the old template.
+  - `GET /v1/tasks/next` has no `inks` parameter, so the cvd_safe setting does nothing on the server. FastAPI ignores unknown query parameters.
+  - One of these is needed: the route accepts `inks` (with cvd_safe only once `black` is mapped), or the guard is updated.
+
 - **Hot-pools merge (`98f1381`):** add the one `_pool_bytes` line in `offer` (above). Optionally cap at `pool_max`.
-- **BE-03 owner / reviewer:** please confirm the `BLOCKED` additions and the re-recorded relational golden hash (`3851670`). Drop that commit if you would rather fix it differently, but the four words above were being served.
+- **BE-03 owner / reviewer:** please confirm the `BLOCKED` additions and the re-recorded relational golden hash (`3851670`). Drop that commit if you would rather fix it differently, but all of those words were being served.
 - **Ops:** the volume `llm_variants` is in compose. With a key set, watch the `LLM pool:` INFO line for the rejection mix. `LLM_POOL_RPM=0` switches the worker off without removing the key, so the coach keeps its LLM.
 - **Live key run (whoever holds the key):** start the server with the key, request each of the three schemas once, wait about 2 minutes, and read `worker.stats` / the log. If Gemini rejects the converted schema for relational (HTTP 400 on every relational call), drop `responseSchema` for that schema and keep only the JSON mime type: the local gates do not depend on it.
