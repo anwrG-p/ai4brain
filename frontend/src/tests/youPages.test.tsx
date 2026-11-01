@@ -64,8 +64,7 @@ describe('You (/you)', () => {
     expect(page.querySelector('a[href="/privacy"]')).not.toBeNull()
     expect(page.querySelector('a[href="/settings"]')).not.toBeNull()
     expect(page.querySelector('a[href="/methodology"]')).not.toBeNull()
-    expect(page.textContent).not.toMatch(/sign(ed)? (in|out)/i)
-    expect(screen.queryByRole('button')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument()
   })
 
   it('a stored name still shows (no account behind it)', () => {
@@ -73,6 +72,16 @@ describe('You (/you)', () => {
     const page = renderPage(<YouPage />)
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Mazen')
     expect(page.textContent).not.toMatch(/sign(ed)? (in|out)|m@example\.com/i)
+  })
+
+  it('clicking Log out clears authentication and logs out the user', () => {
+    useAppStore.getState().loginUser({ preferredName: 'Mazen', email: 'm@example.com', focusGoal: 'x' })
+    renderPage(<YouPage />)
+    expect(useAppStore.getState().isAuthenticated).toBe(true)
+    const btn = screen.getByRole('button', { name: 'Log out' })
+    fireEvent.click(btn)
+    expect(useAppStore.getState().isAuthenticated).toBe(false)
+    expect(useAppStore.getState().userProfile).toBeNull()
   })
 
   it('keeps to 60 words and no technical words', () => {

@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import { AppShell } from './components/layout/AppShell'
 import { ErrorBoundary } from './components/layout/ErrorBoundary'
 import { useSessionStore } from './features/insights/sessionStore'
+import { useAppStore } from './state/useAppStore'
 
 const WelcomePage = React.lazy(() => import('./pages/WelcomePage'))
 const BaselinePage = React.lazy(() => import('./pages/BaselinePage'))
@@ -55,7 +56,9 @@ function RedirectKeepQuery({ to }: { to: string }) {
    is the explicit retake (no button links to it; Train plays any exercise). */
 function FirstVisitOnly({ children, allowAgain = false }: { children: React.ReactNode; allowAgain?: boolean }) {
   const { search } = useLocation()
-  const [returning] = useState(() => useSessionStore.getState().sessions.length > 0)
+  const [returning] = useState(
+    () => useSessionStore.getState().sessions.length > 0 || useAppStore.getState().isAuthenticated,
+  )
   const again = allowAgain && new URLSearchParams(search).get('again') === '1'
   return returning && !again ? <Navigate to="/dashboard" replace /> : <>{children}</>
 }

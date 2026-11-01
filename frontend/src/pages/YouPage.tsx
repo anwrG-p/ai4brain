@@ -1,18 +1,25 @@
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
-import { BookOpen, ChevronRight, Settings, ShieldCheck, UserRound, type LucideIcon } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { BookOpen, ChevronRight, LogOut, Settings, ShieldCheck, UserRound, type LucideIcon } from 'lucide-react'
+import { Button } from '../components/ui/Button'
 import { useAppStore } from '../state/useAppStore'
 
 const ICON = { size: 20, strokeWidth: 1.75, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true } as const
 const ROW = 'focus-ring flex min-h-14 w-full cursor-pointer items-center gap-3 px-4 text-left text-base font-medium text-ink no-underline hover:bg-surface-raised'
 
-/* You: who you are, then three rows (Privacy, Settings, How we calculate this). One list in one
-   container, no cards in cards (anti-slop rules 6, 13). Users stay anonymous (R13), so there is no
-   sign-in row and no account line: the name is "Guest" unless one is stored on this device.
+/* You: who you are, then three rows (Privacy, Settings, How we calculate this) and a Log out button.
+   One list in one container, no cards in cards (anti-slop rules 6, 13).
    "Delete my data" lives inside Privacy. */
 export default function YouPage() {
+  const navigate = useNavigate()
   const profile = useAppStore((s) => (s.isAuthenticated ? s.userProfile : null))
+  const logoutUser = useAppStore((s) => s.logoutUser)
   const name = profile ? profile.preferredName || 'Friend' : 'Guest'
+
+  const handleLogout = () => {
+    logoutUser()
+    navigate('/')
+  }
 
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-8 pb-12">
@@ -45,6 +52,18 @@ export default function YouPage() {
           </li>
         </ul>
       </nav>
+
+      <div className="pt-2">
+        <Button
+          variant="secondary"
+          size="lg"
+          className="w-full"
+          leftIcon={<LogOut size={20} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" />}
+          onClick={handleLogout}
+        >
+          Log out
+        </Button>
+      </div>
     </div>
   )
 }

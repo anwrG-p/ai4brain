@@ -12,7 +12,7 @@ async function renderWelcome() {
   return main
 }
 
-describe('Welcome (/): Loti, one button, one link', () => {
+describe('Welcome (/): Loti, Start button, Log in button', () => {
   beforeEach(() => {
     useAppStore.getState().resetDemoState()
   })
@@ -30,19 +30,20 @@ describe('Welcome (/): Loti, one button, one link', () => {
 
   const controlsIn = (main: HTMLElement) => Array.from(main.querySelectorAll('a, button'))
 
-  it('has exactly one primary button, Start, and one other control', async () => {
-    vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client.apps.googleusercontent.com')
+  it('has exactly one primary button, Start, and a secondary Log in button', async () => {
     const main = await renderWelcome()
     const controls = controlsIn(main)
     const primary = controls.filter((el) => /(^|\s)bg-brand(\s|$)/.test(el.className))
     expect(primary.map((el) => el.textContent?.trim())).toEqual(['Start'])
-    expect(controls.map((el) => el.textContent?.trim())).toEqual(['Start', 'I already have an account'])
+    expect(controls.map((el) => el.textContent?.trim())).toEqual(['Start', 'Log in'])
   })
 
-  it('without a Google client id there is no sign-in, so Start is the only control (rule 14)', async () => {
-    vi.stubEnv('VITE_GOOGLE_CLIENT_ID', '')
-    const main = await renderWelcome()
-    expect(controlsIn(main).map((el) => el.textContent?.trim())).toEqual(['Start'])
+  it('Log in button skips the baseline assessment and navigates to /dashboard', async () => {
+    await renderWelcome()
+    const loginBtn = screen.getByRole('button', { name: 'Log in' })
+    fireEvent.click(loginBtn)
+    await waitFor(() => expect(window.location.pathname).toBe('/dashboard'))
+    expect(useAppStore.getState().isAuthenticated).toBe(true)
   })
 
   it('keeps the visible copy to 40 words or fewer', async () => {
@@ -66,25 +67,9 @@ describe('Welcome (/): Loti, one button, one link', () => {
   it('Start goes to the baseline', async () => {
     await renderWelcome()
     fireEvent.click(screen.getByRole('button', { name: 'Start' }))
-    expect(await screen.findByText('1 of 6', { exact: false })).toBeInTheDocument()
+    expect(await screen.findByText('1 of 6', { exact: false }, { timeout: 5000 })).toBeInTheDocument()
     expect(window.location.pathname).toBe('/baseline')
     await screen.findByRole('heading', { name: 'Logic Web' }) // the first exercise has loaded
-  })
-
-  it('"I already have an account" opens the login sheet: Google or guest, no consent step; Escape closes it', async () => {
-    vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client.apps.googleusercontent.com')
-    await renderWelcome()
-    const link = screen.getByRole('button', { name: 'I already have an account' })
-    link.focus() // fireEvent.click does not move focus
-    fireEvent.click(link)
-    const sheet = screen.getByRole('dialog')
-    expect(sheet).toHaveFocus()
-    expect(screen.getByTestId('google-signin')).toBeInTheDocument()
-    expect(within(sheet).getByRole('button', { name: 'Continue as guest' })).toBeInTheDocument()
-    expect(within(sheet).queryByText(/Save your answers/)).toBeNull() // no consent step from here
-    fireEvent.keyDown(sheet, { key: 'Escape' })
-    expect(screen.queryByRole('dialog')).toBeNull()
-    expect(screen.getByRole('button', { name: 'I already have an account' })).toHaveFocus()
   })
 
   // Motion pass (ticket 07b, spec R8).

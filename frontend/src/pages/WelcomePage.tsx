@@ -3,9 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import type { LotiPose } from '../components/features/characters'
 import { useCharacterMotion } from '../components/features/characters/shared'
 import { Button } from '../components/ui/Button'
-import { googleClientId } from '../features/flow/GoogleSignIn'
-import { LoginSheet } from '../features/flow/LoginSheet'
 import { LotiSays } from '../features/loti/LotiBubbles'
+import { useAppStore } from '../state/useAppStore'
 
 // Motion timeline (tokens.css, "Motion pass"): Loti rises (400 ms) and waves 3 times once landed,
 // then settles; the bubble follows and its words reveal; Start fades up at 900 ms.
@@ -37,15 +36,14 @@ const loadBaseline = () =>
    Total 330 s = 5.5 min, rounded up: about 6 minutes. Recount when the baseline or its tasks change. */
 const MINUTES = 6
 
-/* Welcome: Loti says hello, one button starts the baseline, and, only with Google sign-in set up,
-   one quiet link opens the login sheet. Nothing else (Landing page doc: "VERY SIMPLE UI early on";
-   anti-slop rules 13 and 14). Motion (spec R8, "Loti welcomes you into the app"): an entrance, a
+/* Welcome: Loti says hello, Start begins the baseline assessment, and Log in skips the assessment
+   directly to the dashboard. Motion (spec R8, "Loti welcomes you into the app"): an entrance, a
    breathing idle, eyes that follow a mouse, a cheer on Start. With reduced motion every piece is
    off and Start goes at once. Once Start is pressed the page is inert: no second key or click. */
 export default function WelcomePage() {
   const navigate = useNavigate()
   const { search } = useLocation()
-  const [signIn, setSignIn] = useState(false)
+  const loginUser = useAppStore((s) => s.loginUser)
   const motion = useCharacterMotion()
   const [pose, setPose] = useState<LotiPose>('wave')
   const [leaving, setLeaving] = useState(false)
@@ -94,6 +92,12 @@ export default function WelcomePage() {
     )
   }
 
+  const handleLogin = () => {
+    if (leaving) return
+    loginUser({ preferredName: 'Friend', email: '', focusGoal: 'balanced-360-twin' })
+    navigate({ pathname: '/dashboard', search })
+  }
+
   return (
     <div
       ref={root}
@@ -119,18 +123,15 @@ export default function WelcomePage() {
         <Button size="lg" className={`min-w-40 ${a('anim-press')}`} onClick={start}>
           Start
         </Button>
-        {/* Without Google sign-in there is nothing to sign in with (rule 14: fewer controls). */}
-        {googleClientId() !== null && (
-          <button
-            type="button"
-            onClick={() => setSignIn(true)}
-            className="focus-ring inline-flex min-h-11 cursor-pointer items-center rounded-sm text-sm font-medium text-brand underline underline-offset-4"
-          >
-            I already have an account
-          </button>
-        )}
+        <Button
+          variant="secondary"
+          size="lg"
+          className={`min-w-40 ${a('anim-press')}`}
+          onClick={handleLogin}
+        >
+          Log in
+        </Button>
       </div>
-      {signIn && <LoginSheet askConsent={false} onClose={() => setSignIn(false)} onFinish={() => navigate('/dashboard')} />}
     </div>
   )
 }
