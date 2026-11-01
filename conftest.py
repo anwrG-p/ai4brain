@@ -3,6 +3,14 @@
 import pytest
 
 
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "benchmark: wall-clock latency test; budget P99_BUDGET_MS (10 ms, 20 ms when CI is set); "
+        'leave out with -m "not benchmark"',
+    )
+
+
 @pytest.fixture(autouse=True)
 def _isolated_task_registry(tmp_path_factory, monkeypatch):
     """Every test serves tasks from, and deletes/exports against, a temporary task registry, never

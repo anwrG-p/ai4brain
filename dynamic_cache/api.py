@@ -22,7 +22,7 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel
 
-from app.lifecycle import on_shutdown, on_startup
+from app.lifecycle import FatalStartupError, on_shutdown, on_startup
 from app.privacy.retention import configured_days
 from app.privacy.telemetry_store import ID_PATTERN, register_user_store, telemetry_dir, user_key
 from app.tools.exercise_generator import ExerciseGenerator
@@ -144,8 +144,18 @@ def shutdown() -> None:
         d.close()
 
 
-# start() does not wait for the worker; a worker that cannot start leaves the server serving inline.
-on_startup("dynamic_cache", lambda: get_dispatcher().start())
+def startup() -> None:
+    """Server startup: a bad RETENTION_DAYS stops the boot (logged) rather than every task call
+    answering 500; then the worker processes are spawned. start() does not wait for them, and
+    workers that cannot start leave the server building tasks inline while it retries."""
+    try:
+        configured_days()
+    except ValueError as e:
+        raise FatalStartupError(str(e)) from None
+    get_dispatcher().start()
+
+
+on_startup("dynamic_cache", startup)
 on_shutdown("dynamic_cache", shutdown)
 
 

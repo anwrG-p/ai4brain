@@ -6,10 +6,12 @@
   - `f0169f6 docs(sdd): BE-04 (+BE-12) report: ...` (first version of this report)
   - `0471e25 fix(dynamic_cache): BE-04 review: staircase windup, test isolation, bounded memory, worker lifecycle`
   - `bb3ba28 docs(sdd): BE-04 report: review round ...`
-  - the re-review commit (this report's last update is in it; see "Re-review round" below).
-- **Tests:** one `pytest -q` from the repo root: **1029 passed, 1 xfailed, 0 warnings**. It also passes with `-W error`.
+  - `e820e54 fix(dynamic_cache): BE-04 re-review: resilient startup, real lifespan test, retention setting, flush race`
+  - `98f1381 fix(dynamic_cache): BE-04 hot pools: demand-sized pools, prioritised refills, baseline-wave test`
+  - the hot-pool review commit after it (this report's last update is in it; see "Hot-pool review round" below).
+- **Tests:** one `pytest -q` from the repo root: **1052 passed, 1 xfailed, 0 warnings**. It also passes with `-W error`.
   - The base had 858 passed + 1 xfailed.
-  - 6 tests were removed (the `/tasks/next` 501 stand-in tests) and 177 added.
+  - 6 tests were removed (the `/tasks/next` 501 stand-in tests) and 200 added.
 - **Venv:** `.venv` inside the worktree (git-ignored), built from the root `requirements.txt` on CPython 3.13.14. No new dependencies.
 
 ## Files
@@ -60,8 +62,12 @@
 ## How it works
 
 **Pools**
-- Keyed by `(archetype, schema, theta level)`, levels on a 0.1 grid, `POOL_SIZE = 16` payloads each, already serialised to JSON.
-- A pop that leaves a pool half empty queues a refill in a **spawn worker process**. The refill is submitted outside the dispatcher lock.
+- Keyed by `(archetype, schema, theta level)`, levels on a 0.1 grid, holding payloads already serialised to JSON.
+- Each pool is sized to its demand: 2 s of its recent pop rate, up to `POOL_MAX = 128`.
+  - Its floor is `POOL_SIZE = 16` while in use, and 0 once idle for 10 min; stock above the target is trimmed.
+  - All pools together are under a hard 96 MiB cap, of which at most 32 MiB may sit above the floors.
+- A pool at half its target is topped up by the **spawn worker processes** (2, or 1 on a 2-vCPU host), in small jobs. The latest pool goes first: its time to run dry minus the time to rebuild its whole deficit.
+- Jobs are submitted outside the dispatcher lock. Failures back off, and hung jobs time out. Details in "Hot-pool round" and "Hot-pool review round" below.
 - An empty pool builds one task inline, in the request thread.
 - The worker is started by the lifespan startup hook, which runs off the event loop and does not wait for the spawn. It is stopped by the shutdown hook (`close()`).
 - If the worker cannot start, the server logs it and serves every task inline; boot never fails on it.
@@ -159,7 +165,70 @@ Found and fixed while testing round 2 (not in the review):
 - Re-runs gave p99 20–25 ms. The cause is the workload, not this round's code: the slow calls are all MST with an empty pool.
 - The test now staggers the users across the battery (user u has played u % 8 tasks), so consecutive calls ask for different schemas, as real traffic does.
 - Three runs: **p99 0.71, 0.64 and 0.71 ms** (p50 about 0.25 ms).
-- The concentrated case (everyone on one pool at once, p99 about 20–25 ms) and the unpaced HTTP burst (p99 about 8 ms) are stated in the test's docstring as not covered. Deeper pools or more workers would cover them.
+- The concentrated case (everyone on one pool at once, p99 about 20–25 ms) and the unpaced HTTP burst (p99 about 8 ms) were stated in the test's docstring as not covered. The hot-pool round below fixes the concentrated case.
+
+## Hot-pool round: demand-sized pools, prioritised refills
+
+**Why.** Every new user plays the baseline in the same fixed order (relational, n_back, stroop, tower, ufov, mst), so a wave of sign-ups hits one pool at a time. With fixed 16-deep pools and one worker refilling in arrival order, a hot MST pool drained and each call built MST inline (p99 20–25 ms).
+
+**What changed** (`dynamic_cache/cache_dispatcher.py`, all inside the dispatcher):
+
+| Change | How |
+|---|---|
+| Pools sized to demand | Each pool has a decaying pop-rate estimate: +1/τ per pop and e^(−Δt/τ) decay, τ = `DEMAND_TAU_S` = 2 s. Its target is the pops expected in `POOL_HORIZON_S` = 2 s, clamped to [`POOL_SIZE` = 16, `POOL_MAX` = 128]. A burst grows the pool within about a second; when the wave passes, the target decays back to 16 |
+| Memory bounded | Growth above 16 stops while the pools together hold `POOL_BYTES_MAX` = 64 MiB (bytes tracked on every add and pop). One pool never exceeds `POOL_MAX` |
+| Low-water refill | A pool at or under half its target is topped back up to its target. The top-up is cut into jobs of about `BATCH_S` = 30 ms of build time (4 MST, 10 relational, 100 tower), so results come back fast and priorities are re-weighed after every job |
+| Priority | The free worker takes the pool with the least slack: (stock + in flight) / pop rate − the batch's build time. A slow schema (MST, mental rotation) therefore starts before a cheap one with the same stock and demand, and an empty pool before a stocked one. Build costs start from a measured table (`BUILD_COST_S`) and are learned per schema from the workers' timings (moving average) |
+| Two workers | `WORKERS` = 2 spawn processes. Both can work on one hot pool at once. They are started at boot and watched by the same exit-with-parent thread |
+| Plumbing | Refill results are handled on a small pumper thread, not the process pool's own thread. A worker that dies gets a new pool, and late results from the old one don't skew the counts (epoch). A worker that cannot spawn still falls back to inline building |
+
+**Tests**
+
+- **`test_p99_under_10_ms_for_a_baseline_wave`** (production defaults):
+  - 150 new users arrive at 50 a second, each walking the 6-task baseline in order, 0.3–0.8 s apart (compressed play time).
+  - That is 900 calls in about 7 s, each pool taking a burst of up to ~50 calls/s.
+  - Three runs: **p99 0.72, 1.20 and 1.24 ms**, with pools grown to 64–72.
+- **`test_p99_under_10_ms_with_users_in_step`:** round 2's failing workload (40 users in step at 100 calls/s, ending with 40 MST calls in 0.4 s). Three runs: **p99 0.99, 1.96 and 1.43 ms** (was 20–25 ms).
+- **Mixed traffic** (`..._at_production_pool_size_paced`): p99 0.75–1.08 ms.
+- **Warm 48-deep pools:** p99 0.16–0.26 ms.
+- **Mechanism tests:**
+  - `test_a_hot_pool_grows_with_demand_and_shrinks_back`: the target grows within 1 s, tracks the rate at 3τ, and is back to 16 after the wave; other pools are unaffected.
+  - `test_pool_growth_is_capped_per_pool_and_in_bytes`
+  - `test_refill_starts_at_the_low_water_mark`: no job at 9 of 16; at 8, one job for 8.
+  - `test_a_slow_schema_is_refilled_before_a_cheap_one`: same stock and demand, MST goes first, in a small batch.
+  - `test_the_pool_that_runs_dry_first_is_refilled_first`
+  - `test_both_workers_can_serve_one_hot_pool`
+  - `test_background_refill_keeps_the_pool_warm`: back to target, cost learned.
+
+**Still not covered.** An unpaced HTTP burst far above any real arrival rate (200 back-to-back calls) can still outrun two workers on a cold pool. A pool also needs about a second of demand before it grows. Raise `WORKERS` or `POOL_SIZE` for a launch-day spike.
+
+## Hot-pool review round: each item
+
+Every review repro (`rr-be04-hot/`) was run before and after the fix.
+
+| # | Finding | Fix | Repro after / tests |
+|---|---|---|---|
+| 1 | **Spawn-death deadlock.** `start()`'s callback ran on the process pool's manager thread, which holds the pool's shutdown lock, and called `shutdown` | Every process-pool callback (`start()`'s and the refill jobs') only hands over to the pumper thread (`_hand_over`). Worker failures go through `_worker_failed` there | `deadlock_repro.py`: was a hang (killed by `timeout`, exit 124). Now `start future done: True`, `shutdown_lock held: False`, served inline, **exit 0**. Test `test_a_worker_that_dies_at_spawn_does_not_deadlock` runs the same thing (a real spawn pool whose initializer is `os._exit(3)`) in a subprocess with a 90 s timeout: falls back, serves, `close()` returns, exit 0 |
+| 2 | **Refill error hot loop** (936 MST submits/s) | A refill that raises puts its pool on an exponential back-off (0.5 s doubling to 30 s), off the top-up list. So does a refill that stocks nothing (no payloads back, or no room under the caps): the repro's tower half also looped, at 430 submits in 0.5 s. A broken worker pool is replaced after the same kind of back-off (`_pool_failures`). Warnings are rate-limited to one per kind per 30 s, with a count of those held back | `errloop_repro.py`: **mst 2** (one per worker, then back-off) and **tower 1** in 1.5 s. Tests: `test_a_failing_refill_backs_off_instead_of_looping` (exactly 1 submit, retries at 0.5, 1 and 2 s, other pools still refilled, 1 log line), `test_a_refill_that_stocks_nothing_backs_off_too`, `test_broken_worker_pools_are_replaced_after_a_growing_back_off` (20 s of traffic against pools that always break: 4–8 replacements, 1 log line, every call served inline) |
+| 3 | **The byte budget was neither a bound nor scaled to 9 archetypes** | **A hard cap:** `POOL_BYTES_MAX` = 96 MiB for all pools, every archetype together. It is checked on every stocking (refills and warm-up), and jobs are sized to the room left. **Growth budget:** only bytes above the pools' floors count, at most `POOL_GROWTH_BYTES` = 32 MiB. **Demand-based floor:** 16 while a pool is in use, 0 once idle for `POOL_IDLE_S` = 10 min. **Trimming:** a sweep (at most every 0.25 s) cuts stock above each pool's demand target, so a wave's growth goes back and idle pools empty out | `sizes.py` shows floors of 100.6 MiB for 9 archetypes. `test_memory_stays_under_the_hard_cap_with_nine_archetypes` uses 702 pools, every one used, with ~18 KB payloads and a 40 MiB cap: the held bytes equal the tally and stay ≤ the cap at every check (the cap binds). A wave stays within the growth budget, and after 10 idle minutes everything is empty. `test_a_wave_s_growth_is_handed_back` trims a grown pool to 16 |
+| 4 | **The slow-schema priority was a rounding artifact**: n·cost ≈ `BATCH_S`, so the term cancelled | **Lateness** = (stock + in flight) / pop rate − deficit × build time, where deficit = target − stock − in flight, so it counts the whole deficit, not the batch | `prio.py`: both empty, MST/mental_rotation/relational go first in either registration order, now by 112/96/48 ms of lateness against tower's 5 ms, not by rounding. "Slow has 1 left, tower 0" gives **tower** there, and that is right at that script's rate (~4 pops/s): the one MST payload lasts ~250 ms, longer than its 105 ms rebuild. Tests: `test_with_equal_stock_and_demand_the_slow_schema_goes_first[both orders]`; `test_a_slow_pool_with_stock_can_still_go_before_an_empty_cheap_one` (at 50 pops/s the MST payload lasts 20 ms against a 105 ms rebuild, so **MST** goes first; at 5 pops/s, tower); `test_the_pool_that_runs_dry_first_is_refilled_first` |
+| 5 | p99 tests on CI | **Benchmarks with a CI threshold** (chosen over reshaping the tests). They are marked `benchmark` (registered in the root `conftest.py`; `-m "not benchmark"` leaves them out). The budget is `P99_BUDGET_MS`: 10 ms locally (the AC), **20 ms when `CI` is set**, which still catches the 20–40 ms regressions seen so far. Also `WORKERS` = min(2, cores − 1), so a 2-vCPU runner or server runs one worker beside the server instead of oversubscribing | Documented in the test module and the marker help |
+| 6 | Bad `RETENTION_DAYS` gave a 500 on every tasks call | The `dynamic_cache` startup hook validates it and raises `lifecycle.FatalStartupError`. The lifespan logs `startup hook dynamic_cache: RETENTION_DAYS must be ...; the server does not start`, undoes what started, and the boot fails | `badret.py`: the boot stops with that log line, no 500s. `test_a_bad_retention_setting_stops_the_boot`, `test_a_fatal_startup_hook_stops_the_boot_and_undoes_what_started` |
+| 7 | Lifespan test too weak | It now waits until a refill came back from a worker process (`_refills_done > 0`), and after shutdown asserts the worker processes exited and the pumper refuses work | `test_lifespan_runs_a_real_worker_process_and_stops_it` |
+| 8 | Hung worker job | Each job records its start. The sweep finds any job older than `JOB_TIMEOUT_S` (10 s), marks that worker pool broken, kills its processes and replaces it after back-off | `test_a_hung_job_marks_the_workers_broken` |
+| 9 | Transient spawn `OSError` made inline permanent; a failure could clear a pool that had replaced a stale one | A failed pool is replaced after back-off; inline is only for the meantime. `_worker_failed(executor, ...)` acts only if `executor` is still the current pool | `test_a_transient_spawn_error_is_retried_not_permanent`, `test_a_stale_failure_report_does_not_drop_the_replacement` |
+| 10 | `CancelledError` / `KeyboardInterrupt` during startup | The startup loop catches `BaseException`. It shuts down (synchronously, since the task may be cancelled) every hook that started, the interrupted one included, then re-raises | `test_a_cancelled_startup_still_shuts_down_what_started[CancelledError, KeyboardInterrupt]` |
+
+**Latency after this round,** three runs each:
+
+| Test | p99 |
+|---|---|
+| Baseline wave | 1.20, 1.35, 0.71 ms (largest pool 59–62) |
+| Users in step | 2.42, 0.36, 0.62 ms |
+| Mixed | 1.02, 1.13, 0.43 ms |
+| Warm 48-deep | 0.21–0.84 ms |
+
+**Scope.** All changes are inside the dispatcher's pool internals, plus `lifecycle.py` (`FatalStartupError`, abort cleanup), the `dynamic_cache.api` startup hook, the root `conftest.py` marker and tests. The constructor gained no parameters in this round (tunables are instance attributes), to keep out of BE-11's and BE-13's hooks.
 
 ## Acceptance criteria → evidence
 
@@ -175,7 +244,7 @@ Found and fixed while testing round 2 (not in the review):
 | Projector monotone and bounded | `test_monotone_in_every_pillar[8]`, `test_bounded_for_any_input[8]`, `test_no_relevant_score_is_none_not_a_made_up_level`, `test_projection_feeds_the_generators[24]` |
 | 85% rule over recent telemetry accuracy | `test_85_percent_rule_moves_theta_from_recent_accuracy[3]`, `test_the_rule_steps_only_on_trials_it_has_not_counted`, `test_perfect_play_walks_up_to_harder_levels_and_stays_bounded`, `test_single_trial_tasks_do_not_wind_the_staircase_up[2]` |
 | Stroop classic only | `test_stroop_is_served_with_the_classic_inks_only` |
-| p99 < 10 ms | `test_p99_under_10_ms_with_warm_pools`, `test_p99_under_10_ms_at_production_pool_size_paced` |
+| p99 < 10 ms | `test_p99_under_10_ms_with_warm_pools`, `test_p99_under_10_ms_at_production_pool_size_paced`, `test_p99_under_10_ms_for_a_baseline_wave`, `test_p99_under_10_ms_with_users_in_step` |
 | Frontend contract shape | `test_the_frontends_exact_request_gets_a_valid_task`, `test_the_port_matches_task_source_ts`, `test_openapi_documents_the_payload` |
 | Stand-in replaced | `test_no_route_shadows_a_v1_interop_stand_in_by_accident`, `test_intentional_overrides_are_answered_by_their_module` |
 
