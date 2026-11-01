@@ -23,6 +23,7 @@ from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel
 
 from app.lifecycle import on_shutdown, on_startup
+from app.privacy.retention import configured_days
 from app.privacy.telemetry_store import ID_PATTERN, register_user_store, telemetry_dir, user_key
 from app.tools.exercise_generator import ExerciseGenerator
 
@@ -112,6 +113,8 @@ def make_dispatcher(**overrides: Any) -> Dispatcher:
     wiring: dict[str, Any] = {
         "trials": TelemetryTrials(telemetry_dir),
         "difficulty_rule": ExerciseGenerator.apply_85_percent_rule,
+        # The one retention setting (env RETENTION_DAYS), also the retention CLI's default.
+        "retention_days": configured_days(),
         # pillars: no server profile until BE-07/BE-11, so the projector has nothing and
         # START_THETA seeds each staircase. archetype: NEUTRAL until BE-09/BE-11.
     }
@@ -141,6 +144,7 @@ def shutdown() -> None:
         d.close()
 
 
+# start() does not wait for the worker; a worker that cannot start leaves the server serving inline.
 on_startup("dynamic_cache", lambda: get_dispatcher().start())
 on_shutdown("dynamic_cache", shutdown)
 

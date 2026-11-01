@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
@@ -10,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from dynamic_cache import api
+from dynamic_cache import api, cache_dispatcher
 from dynamic_cache.generators import DIMENSION_OF, SCHEMA_TYPES
 
 URL = "/v1/tasks/next"
@@ -182,6 +183,8 @@ def test_a_pre_existing_registry_file_outside_tmp_is_never_touched(client):
     real = Path(cache_dispatcher.__file__).resolve().parents[1] / "data" / "processed" / "task_registry"
     created = [p for p in (real.parent, real) if not p.exists()]  # removed again, innermost first
     probe = real / "never-touch-probe.json"
+    if probe.exists():  # a real user's registry under this id: never write over it
+        pytest.skip("a real registry file uses the probe id")
     real.mkdir(parents=True, exist_ok=True)
     probe.write_text('{"v": 1, "probe": true}')
     stamp = probe.stat().st_mtime_ns
@@ -294,3 +297,53 @@ def test_lifespan_starts_and_stops_the_dispatcher(client):
     with TestClient(app) as c:
         assert c.get(URL, params={"user_id": "u1"}).status_code == 200
     assert d._closed and api._dispatcher is None
+
+
+def test_lifespan_runs_a_real_worker_process_and_stops_it(tmp_path):
+    """Startup spawns the worker (without blocking boot), requests are served while it refills,
+    and shutdown stops it and writes the registry."""
+    d = api.make_dispatcher(registry_dir=lambda: tmp_path / "live", background=True)
+    previous = api.set_dispatcher(d)
+    try:
+        with TestClient(app) as c:
+            pid = d._workers.submit(cache_dispatcher.worker_pid).result(timeout=60)  # spawned at startup
+            procs = list(d._workers._processes.values())
+            assert [p.pid for p in procs] == [pid] and pid != os.getpid()
+            for _ in range(12):  # drains the pool below half: a refill runs in the worker
+                assert c.get(URL, params={"user_id": "u1", "schema_type": "tower"}).status_code == 200
+        assert d._closed and api._dispatcher is None
+        assert all(p.exitcode is not None for p in procs)  # the worker process has exited
+        assert (tmp_path / "live" / "u1.json").exists()  # pending registry written on shutdown
+    finally:
+        api.set_dispatcher(previous)
+        d.close()
+
+
+def test_a_worker_that_cannot_start_leaves_the_server_serving_inline(tmp_path, caplog):
+    class NoSpawn:
+        def submit(self, *a, **k):
+            raise OSError("no processes for you")
+
+        def shutdown(self, *a, **k):
+            pass
+
+    d = api.make_dispatcher(registry_dir=lambda: tmp_path / "live", background=True)
+    real_pool, d._workers = d._workers, NoSpawn()
+    previous = api.set_dispatcher(d)
+    try:
+        with TestClient(app) as c:  # boots despite the failed spawn
+            assert c.get(URL, params={"user_id": "u1"}).status_code == 200
+            assert d._workers is None  # inline from now on
+        assert "task worker process unavailable (OSError)" in caplog.text
+    finally:
+        api.set_dispatcher(previous)
+        real_pool.shutdown()
+        d.close()
+
+
+def test_server_retention_days_come_from_the_one_setting(monkeypatch):
+    monkeypatch.setenv("RETENTION_DAYS", "7")
+    d = api.make_dispatcher(background=False)
+    assert d.retention_days == 7
+    monkeypatch.delenv("RETENTION_DAYS")
+    assert api.make_dispatcher(background=False).retention_days == 30

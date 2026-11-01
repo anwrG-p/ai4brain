@@ -28,6 +28,22 @@ from .telemetry_store import LockTimeout, coach_dir, telemetry_dir, telemetry_lo
 DEFAULT_DAYS = 30
 
 
+def configured_days() -> int:
+    """The one retention setting: env RETENTION_DAYS (whole days, at least 1), else DEFAULT_DAYS.
+    This CLI's default, and the server's task registry (dynamic_cache.api passes it to the
+    dispatcher, which drops registries idle that long), both read it."""
+    raw = os.environ.get("RETENTION_DAYS", "").strip()
+    if not raw:
+        return DEFAULT_DAYS
+    try:
+        days = int(raw)
+    except ValueError:
+        days = 0
+    if days < 1:
+        raise ValueError(f"RETENTION_DAYS must be a whole number of days, at least 1; got {raw!r}")
+    return days
+
+
 def _received_at(line: str) -> datetime | None:
     try:
         ts = datetime.fromisoformat(json.loads(line)["received_at"])
@@ -101,21 +117,26 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m backend.app.privacy.retention", description=__doc__
     )
-    parser.add_argument("--days", type=_days, default=DEFAULT_DAYS)
+    parser.add_argument("--days", type=_days, default=None, help="default: env RETENTION_DAYS, else 30")
     args = parser.parse_args(argv)
     try:
-        telemetry = purge_expired(telemetry_dir(), args.days, on_wait=_say_waiting)
+        days = args.days if args.days is not None else configured_days()
+    except ValueError as e:
+        print(f"retention: {e}", file=sys.stderr)
+        return 2
+    try:
+        telemetry = purge_expired(telemetry_dir(), days, on_wait=_say_waiting)
         # The coach chat history follows the same period (the retention hook for ai_coach/chat_store).
-        coach = purge_expired(coach_dir(), args.days, on_wait=_say_waiting)
+        coach = purge_expired(coach_dir(), days, on_wait=_say_waiting)
         report = {**telemetry, "coach": coach}
     except LockTimeout as e:
         print(f"retention: {e}; run again later", file=sys.stderr)
         return 1
-    # The task registry (BE-04) under the same period: files idle longer than --days go.
+    # The task registry (BE-04) under the same period: files idle longer than that go.
     # Imported here so the store and this module still load without the task package.
     from dynamic_cache.cache_dispatcher import default_registry_dir, purge_idle
 
-    report["registries_removed"] = purge_idle(default_registry_dir(), args.days)
+    report["registries_removed"] = purge_idle(default_registry_dir(), days)
     print(json.dumps(report))
     return 0
 

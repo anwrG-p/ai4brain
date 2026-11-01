@@ -5,10 +5,11 @@
   - `c580939 feat(dynamic_cache): GET /v1/tasks/next dispatcher, Bloom/TTL registry, parameter projector (BE-04, BE-12)`
   - `f0169f6 docs(sdd): BE-04 (+BE-12) report: ...` (first version of this report)
   - `0471e25 fix(dynamic_cache): BE-04 review: staircase windup, test isolation, bounded memory, worker lifecycle`
-  - this report's update, in the commit after it.
-- **Tests:** one `pytest -q` from the repo root: **1012 passed, 1 xfailed, 0 warnings**. It also passes with `-W error`.
+  - `bb3ba28 docs(sdd): BE-04 report: review round ...`
+  - the re-review commit (this report's last update is in it; see "Re-review round" below).
+- **Tests:** one `pytest -q` from the repo root: **1029 passed, 1 xfailed, 0 warnings**. It also passes with `-W error`.
   - The base had 858 passed + 1 xfailed.
-  - 6 tests were removed (the `/tasks/next` 501 stand-in tests) and 160 added.
+  - 6 tests were removed (the `/tasks/next` 501 stand-in tests) and 177 added.
 - **Venv:** `.venv` inside the worktree (git-ignored), built from the root `requirements.txt` on CPython 3.13.14. No new dependencies.
 
 ## Files
@@ -62,7 +63,8 @@
 - Keyed by `(archetype, schema, theta level)`, levels on a 0.1 grid, `POOL_SIZE = 16` payloads each, already serialised to JSON.
 - A pop that leaves a pool half empty queues a refill in a **spawn worker process**. The refill is submitted outside the dispatcher lock.
 - An empty pool builds one task inline, in the request thread.
-- The worker is started by the lifespan startup hook and stopped by the shutdown hook (`close()`).
+- The worker is started by the lifespan startup hook, which runs off the event loop and does not wait for the spawn. It is stopped by the shutdown hook (`close()`).
+- If the worker cannot start, the server logs it and serves every task inline; boot never fails on it.
 - Its initializer starts a thread that `os._exit`s when the parent's sentinel fires, so a hard-killed server leaves no orphan.
 
 **Stroop:** always `inks="classic"`, validated with `allow_unserved=False`. `cvd_safe` is never served.
@@ -102,16 +104,16 @@ A false positive only skips a fresh task; it never lets a repeat through.
 
 **Registry**
 - **Storage.** One `{key}.json` per user (Bloom slices as base64, session recipes, staircases, `last` served time) under `TASK_REGISTRY_DIR` (default `data/processed/task_registry`).
-- **Writes.** A writer thread writes behind the request, as tmp + `os.replace`. Failed writes are logged with no user id and retried.
+- **Writes.** A writer thread writes behind the request, as tmp + `os.replace`. Each user is serialised under its own lock, so a concurrent serve cannot change it mid-dump. Failed writes are logged with no user id and retried.
 - **Memory is a bounded cache; the file is the source of truth.**
   - At most `MAX_USERS = 5000` users are kept, least recently used first out.
   - Only users whose latest generation is on disk, with no call in flight, are evicted.
   - A change made during a write keeps the user dirty.
   - Per-user locks exist only while a call is in flight.
 - **Reads** of a registry no longer wait on the writer's file lock. That wait put the writer's disk time on requests.
-- **Retention**
-  - A registry idle for 30 days starts afresh when its user returns.
-  - `purge_idle(dir, days)` removes files whose mtime is older than that. The retention CLI (`python -m backend.app.privacy.retention --days 30`) runs it.
+- **Retention.** One setting, env `RETENTION_DAYS` (default 30):
+  - A registry idle that long starts afresh when its user returns; the server passes the setting to the dispatcher.
+  - `purge_idle(dir, days)` removes files whose mtime is older than that. The retention CLI (`python -m backend.app.privacy.retention`) runs it, with the setting as its `--days` default.
 
 **Privacy (delete/export)**
 - **Hooks.** `register_user_store(name, delete(key, directory), export(key, directory))`.
@@ -134,11 +136,30 @@ A false positive only skips a fresh task; it never lets a repeat through.
 | 7 | Registry retention | 30-day idle reset in memory; `purge_idle`; wired into the retention CLI | `test_a_registry_idle_past_retention_starts_afresh`, `test_purge_idle_removes_registry_files_untouched_for_30_days`, `test_the_retention_cli_purges_idle_registries`. Live CLI: `{"files": 0, ..., "registries_removed": 2}` (two files set 40 days old out of 93) |
 | 8 | Bloom docstring | Correct per-slice and 15-slice false-positive table | `bloom.py` docstring; `test_false_positive_rate_is_small` |
 | 9 | Rate limit | 120/hour and 400/day per id, fixed windows, 429 + Retry-After, at most 50k ids tracked | `test_too_many_calls_for_one_id_are_429` (case-insensitive id, per id, next window), `test_rate_limiter_windows_and_bound`, `test_default_limits`. Live: 125 calls → 120 × 200, 5 × 429, `retry-after: 3456` |
-| 10 | p99 at production POOL_SIZE, paced | New paced test at 16 deep, 100 calls/s; the unpaced burst is stated in its docstring | `test_p99_under_10_ms_at_production_pool_size_paced`: last run **p50 0.14 ms, p99 0.47 ms**. The warm 48-deep test: p50 0.02 ms, p99 1.08 ms |
+| 10 | p99 at production POOL_SIZE, paced | New paced test at 16 deep, 100 calls/s; the unpaced burst is stated in its docstring | `test_p99_under_10_ms_at_production_pool_size_paced` (see the re-review correction below). The warm 48-deep test: p50 0.02 ms, p99 0.16–0.24 ms |
 
 Found and fixed while testing round 2 (not in the review):
 - Registry reads waited on the writer's file lock. Fixed as above.
 - The real-registry probe test left an empty `data/processed/`. It now removes every directory it created.
+
+## Re-review round: each item
+
+| # | Item | Fix | Evidence |
+|---|---|---|---|
+| 1 | Isolation probe could collide with a real id | The test skips if a real `never-touch-probe.json` already exists, so it never writes over one; it still plants and removes its own file otherwise | `test_a_pre_existing_registry_file_outside_tmp_is_never_touched` |
+| 2 | Startup hooks could block or break boot | `lifecycle.lifespan` runs each startup hook through `run_in_threadpool` (off the event loop), one at a time. A failing hook is logged by name and exception class; its own shutdown hook runs at once to undo what it half started; boot goes on; it is not shut down twice. `Dispatcher.start()` no longer waits for the worker: it queues the spawn and returns a future. If the spawn fails (at submit or when the future resolves), the dispatcher logs `task worker process unavailable (<Error>); building tasks inline` and serves inline. A runtime refill that cannot spawn a worker does the same; a worker that died (`BrokenProcessPool`) gets a replacement | `test_a_failing_startup_hook_does_not_block_boot` (server answers, the hook was undone, the next hook ran), `test_startup_hooks_run_off_the_event_loop` (no running event loop inside the hook), `test_start_does_not_wait_for_the_worker` (< 0.5 s), `test_a_worker_that_dies_at_spawn_falls_back_to_inline`, `test_a_worker_that_cannot_start_leaves_the_server_serving_inline` (the full app boots and serves with a spawn that raises) |
+| 3 | Lifespan test with a real worker | Added | `test_lifespan_runs_a_real_worker_process_and_stops_it`: a `background=True` dispatcher, `with TestClient(app)`. The worker pid is spawned at startup and differs from ours; 12 requests drain the pool so a refill runs in the worker; after shutdown the dispatcher is closed, the worker process has exited, and the pending registry is on disk |
+| 4 | `trials_since` froze without a `received_at` | If the stored marker is gone and there is no `received_at` to compare (on the marker, or on any trial), it returns the newest `ACCURACY_WINDOW` trials. The staircase steps once if at least 10, then re-anchors on a marker it can find | `test_trials_since_without_a_received_at_takes_the_newest_window[2]`, `test_a_staircase_whose_marker_vanished_steps_then_reanchors` (steps, re-anchors on the newest trial, then holds with no new trials) |
+| 5 | Two retention settings | One setting, env `RETENTION_DAYS` (whole days ≥ 1, default 30), read by `app.privacy.retention.configured_days()`. The CLI uses it as its `--days` default (`--days` still overrides one run); `dynamic_cache.api.make_dispatcher` passes it to `Dispatcher(retention_days=...)` for the in-memory idle reset. A bad value is refused (CLI exit 2) | `test_the_idle_reset_uses_the_configured_retention_days`, `test_the_retention_cli_default_is_the_same_setting` (the same 10-day-idle file is kept under 30 and removed under 7), `test_a_bad_retention_setting_is_refused[4]`, `test_server_retention_days_come_from_the_one_setting`; documented in `backend/.env.example` |
+| 6 | `flush()` serialised under `self._lock` while `next_task` mutated under the user lock | `flush` snapshots the dirty keys, then serialises each user under that user's lock (the one `next_task` mutates under), reading the generation in the same hold; the disk write happens after releasing it, with the identity check as before | `test_serving_and_flushing_at_once_never_breaks_a_dump`: 3 threads × 300 serves (a new session answer each, so the dict keeps changing) against a thread flushing in a loop; no exception, and the last state lands on disk |
+
+**Correction to round 2's p99 number.**
+- The round-2 paced test (`paced{k % 40}`) passed at 0.47 ms once. That was luck at the margin.
+- Its users walk the schemas in step, so calls arrive in blocks of 40 for one schema; at the end that is 40 MST calls in 0.4 s. That drains the 16-deep MST pool, and each empty-pool call builds MST inline.
+- Re-runs gave p99 20–25 ms. The cause is the workload, not this round's code: the slow calls are all MST with an empty pool.
+- The test now staggers the users across the battery (user u has played u % 8 tasks), so consecutive calls ask for different schemas, as real traffic does.
+- Three runs: **p99 0.71, 0.64 and 0.71 ms** (p50 about 0.25 ms).
+- The concentrated case (everyone on one pool at once, p99 about 20–25 ms) and the unpaced HTTP burst (p99 about 8 ms) are stated in the test's docstring as not covered. Deeper pools or more workers would cover them.
 
 ## Acceptance criteria → evidence
 
@@ -227,7 +248,8 @@ GET /v1/user/export -> 404
 
 - **F-C (frontend):** send `schema_type` and `session_id` + a per-run `seq`. Never reuse a `(session_id, seq)` for a retake. Handle 429 and 503 by waiting `Retry-After`. (The coordinator is routing this.)
 - **BE-06 / any per-user store:** the hook signature is now `delete(key, directory)` / `export(key, directory)`, best effort, with `StoreUnavailable` → 503. With an explicit directory, keep to `directory/<name>/`. Expect a small merge in `telemetry_store.py`.
-- **Any module with background work:** register start/stop with `app.lifecycle.on_startup` / `on_shutdown` instead of editing `main.py`.
+- **Any module with background work:** register start/stop with `app.lifecycle.on_startup` / `on_shutdown` instead of editing `main.py`. Startup hooks run in a worker thread, so they must not need the event loop. A hook that raises is undone through its shutdown hook and boot continues, so make the shutdown hook safe to run after a half-done start.
+- **Ops:** `RETENTION_DAYS` is the one retention setting (CLI default and the server's registry idle reset).
 - **BE-11:** pass `pillars=` and `archetype=` to `api.make_dispatcher(...)`.
 - **BE-13:** LLM variants can enter the same pools as `Entry`. Their session recipes need a source field, since an LLM variant cannot be rebuilt from a seed.
 - **Ops:** run the retention CLI daily, as before; it now also prunes idle task registries.

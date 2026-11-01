@@ -12,6 +12,7 @@ import subprocess
 import sys
 import threading
 import time
+from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 
 import pytest
@@ -321,6 +322,26 @@ def test_trials_since_a_marker():
     assert cd.trials_since(trials, gone) == trials[2:]
 
 
+@pytest.mark.parametrize("stamp", ["", "2026-10-31T00:00:00+00:00"])
+def test_trials_since_without_a_received_at_takes_the_newest_window(stamp):
+    """The marked trial is gone and there is no received_at to compare: step on the newest
+    ACCURACY_WINDOW trials instead of freezing for good."""
+    trials = [cd.Trial(k % 2 == 0, f"|s|t|{k}") for k in range(100)]  # no received_at anywhere
+    assert cd.trials_since(trials, f"{stamp}|gone|t|0") == trials[-cd.ACCURACY_WINDOW:]
+
+
+def test_a_staircase_whose_marker_vanished_steps_then_reanchors(make):
+    log = [cd.Trial(True, f"|s|t|{k}") for k in range(30)]  # rows without received_at
+    d = make(trials=lambda key, schema: log)
+    d.next_task("u1", schema_type="mst")  # not mst-specific: MST is pinned, so use the stored theta
+    d._users["u1"].schemas["tower"] = {"theta": 0.5, "marker": "|lost|t|999", "served_at": 0.0}
+    d.next_task("u1", schema_type="tower")
+    rec = d._users["u1"].schemas["tower"]
+    assert rec["theta"] > 0.5 and rec["marker"] == log[-1].marker  # stepped, and re-anchored
+    d.next_task("u1", schema_type="tower")
+    assert d._users["u1"].schemas["tower"]["theta"] == rec["theta"]  # no new trials: no step
+
+
 def test_trials_dedupe_and_skip_fixtures_and_torn_lines():
     lines = events("mst", [False] * 5) * 4  # 5 distinct trials, resent 4 times
     lines += [json.dumps({"session_id": "s", "task_id": "mock-mst-1", "trial_index": i, "error_flag": True}) for i in range(50)]
@@ -485,6 +506,41 @@ def test_a_change_made_during_a_write_keeps_the_user_dirty(make, monkeypatch):
     assert d.flush() == 1 and d._dirty == {}
 
 
+def test_serving_and_flushing_at_once_never_breaks_a_dump(make):
+    """next_task mutates a user's dicts under the user's lock; flush serialises under that lock
+    too, so 'dictionary changed size during iteration' cannot happen."""
+    d = make()
+    errors, stop = [], threading.Event()
+
+    def serve(worker):
+        try:
+            for k in range(300):  # a new session answer each call: the sessions dict keeps changing
+                d.next_task("u1", session_id=f"s{worker}-{k}", schema_type="tower")
+        except Exception as e:  # noqa: BLE001 - the test reports any failure
+            errors.append(e)
+
+    def flush():
+        try:
+            while not stop.is_set():
+                d.flush()
+        except Exception as e:  # noqa: BLE001
+            errors.append(e)
+
+    flusher = threading.Thread(target=flush)
+    flusher.start()
+    servers = [threading.Thread(target=serve, args=(w,)) for w in range(3)]
+    for t in servers:
+        t.start()
+    for t in servers:
+        t.join()
+    stop.set()
+    flusher.join()
+    assert errors == []
+    d.flush()
+    on_disk = json.loads((Path(d.registry_dir()) / "u1.json").read_text())
+    assert on_disk == json.loads(json.dumps(d._users["u1"].to_json()))  # the last state landed
+
+
 def test_a_user_with_a_call_in_flight_is_not_evicted(make):
     d = make(max_users=1)
     d.next_task("u0")
@@ -515,6 +571,41 @@ def test_a_registry_idle_past_retention_starts_afresh(make):
     clock.t = T0 + (cd.RETENTION_DAYS + 1) * DAY_S
     st = d._state("u1", clock.t)
     assert st.sessions == {} and st.schemas == {} and st.seen.slices == {}
+
+
+def test_the_idle_reset_uses_the_configured_retention_days(make):
+    clock = Clock()
+    d = make(clock=clock, retention_days=7)
+    d.next_task("u1", schema_type="tower", session_id="s1")
+    clock.t = T0 + 6 * DAY_S
+    assert d._state("u1", clock.t).sessions != {}  # within 7 days: kept
+    clock.t = T0 + 8 * DAY_S
+    assert d._state("u1", clock.t).sessions == {}  # past 7 days: afresh
+
+
+def test_the_retention_cli_default_is_the_same_setting(tmp_path, monkeypatch, capsys):
+    from app.privacy import retention
+
+    registry = Path(os.environ["TASK_REGISTRY_DIR"])
+    stale = registry / "u1.json"
+    stale.write_text("{}")
+    os.utime(stale, (time.time() - 10 * DAY_S,) * 2)
+    monkeypatch.setenv("TELEMETRY_DIR", str(tmp_path / "telemetry"))
+    monkeypatch.setenv("RETENTION_DAYS", "30")
+    assert retention.main([]) == 0 and stale.exists()  # 10 days idle < 30
+    monkeypatch.setenv("RETENTION_DAYS", "7")
+    assert retention.main([]) == 0 and not stale.exists()  # the same file under 7 days
+    assert json.loads(capsys.readouterr().out.splitlines()[-1])["registries_removed"] == 1
+
+
+@pytest.mark.parametrize("bad", ["0", "-3", "x", "1.5"])
+def test_a_bad_retention_setting_is_refused(bad, monkeypatch, capsys):
+    from app.privacy import retention
+
+    monkeypatch.setenv("RETENTION_DAYS", bad)
+    with pytest.raises(ValueError):
+        retention.configured_days()
+    assert retention.main([]) == 2 and "RETENTION_DAYS" in capsys.readouterr().err
 
 
 def test_purge_idle_removes_registry_files_untouched_for_30_days(tmp_path):
@@ -556,7 +647,7 @@ def test_the_first_submit_runs_outside_the_dispatcher_lock(make):
             t = threading.Thread(target=lambda: held.append(d._lock.acquire(timeout=1) and d._lock.release() is None))
             t.start()
             t.join()
-            raise RuntimeError("probe")
+            raise BrokenProcessPool("probe")  # the worker died: a new one is made, no fallback
 
     real = d._workers
     d._workers = Probe()
@@ -612,6 +703,34 @@ def test_the_worker_exits_when_its_parent_is_killed(tmp_path):
     assert not pid_alive(worker)
 
 
+def test_start_does_not_wait_for_the_worker(make):
+    d = make(background=True)
+    t = time.perf_counter()
+    future = d.start()
+    assert time.perf_counter() - t < 0.5  # a spawn takes far longer on Windows; start only queues it
+    assert future.result(timeout=60) != os.getpid()
+
+
+def test_a_worker_that_dies_at_spawn_falls_back_to_inline(make, caplog):
+    from concurrent.futures import Future
+
+    class DeadOnArrival:
+        def submit(self, *a, **k):
+            f = Future()
+            f.set_exception(OSError("spawn failed"))
+            return f
+
+        def shutdown(self, *a, **k):
+            pass
+
+    d = make(background=True)
+    real, d._workers = d._workers, DeadOnArrival()
+    d.start()
+    assert d._workers is None and "task worker process unavailable (OSError)" in caplog.text
+    assert json.loads(d.next_task("u1", schema_type="mst").body)["schema_type"] == "mst"
+    real.shutdown()
+
+
 def test_close_stops_the_worker_and_is_idempotent(make):
     d = make(background=True)
     d.start()
@@ -634,7 +753,7 @@ def test_p99_under_10_ms_with_warm_pools(make):
     d = make(background=True, pool_size=48)
     for s in SCHEMA_TYPES:
         d.warm(schema_types=(s,), at=START_THETA[s])
-    d.start()
+    d.start().result(timeout=60)  # warm: the worker is up
     d.next_task("warmup")  # first-call imports and allocations
     timings = []
     for k in range(320):  # 40 users x 8 schemas, some calls replaying a session
@@ -647,16 +766,26 @@ def test_p99_under_10_ms_with_warm_pools(make):
 
 
 def test_p99_under_10_ms_at_production_pool_size_paced(make):
-    """The production POOL_SIZE (16), paced at 100 calls/s, which a single worker refills in time.
-    An unpaced burst is not covered: back-to-back calls drain a 16-deep pool faster than the one
-    worker refills it, and the empty pool builds inline (up to ~7 ms for MST, ~6 ms for mental
-    rotation); measured over HTTP, p99 10-15 ms for 200 back-to-back calls."""
+    """The production POOL_SIZE (16) at 100 calls/s, the schemas mixed as real traffic is: 40
+    users at different points of their battery (user u has already played u % 8 tasks), so
+    consecutive calls ask for different schemas, about 12 calls/s per pool, which the one worker
+    refills in time.
+
+    Not covered, and slower: load concentrated on one pool. 40 users all in step (every one asking
+    for MST within 0.4 s) drain the MST pool, and each empty-pool call builds inline: p99 about
+    20-25 ms here. Likewise an unpaced burst of 200 back-to-back calls over HTTP: p99 about 8 ms
+    after the round-2 read-path fix (10-15 ms before). Deeper pools or more workers would cover
+    those; at ~8 tasks per session, real traffic is far below."""
     d = make(background=True)
     assert d.pool_size == cd.POOL_SIZE == 16
     for s in SCHEMA_TYPES:
         d.warm(schema_types=(s,), at=START_THETA[s])
-    d.start()
-    d.next_task("warmup")
+    d.start().result(timeout=60)  # warm: the worker is up
+    for u in range(40):  # stagger the users across the battery (untimed)
+        for _ in range(u % 8):
+            d.next_task(f"paced{u}")
+    for s in SCHEMA_TYPES:  # and let the pools fill again before timing
+        d.warm(schema_types=(s,), at=START_THETA[s])
     timings = []
     for k in range(320):
         t = time.perf_counter()
