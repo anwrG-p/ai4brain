@@ -10,7 +10,10 @@
     (popped or warmed within POOL_IDLE_S) and 0 once idle; stock above the target is trimmed, so a
     wave's growth is handed back and idle pools empty out.
   - Memory: all pools together never hold more than POOL_BYTES_MAX (a hard cap, every archetype
-    included); of that, at most POOL_GROWTH_BYTES may sit above the pools' floors.
+    included). It is split in two: the floors get POOL_BYTES_MAX - POOL_GROWTH_BYTES, and when
+    the pools in use would need more, the least recently used ones give their floor up (popped
+    again, a pool gets it back); POOL_GROWTH_BYTES stays for stock above the floors, so a hot pool
+    can always grow, however many pools are in use.
   - Low-water refill: a pool at or under half its target is topped back up to it, in small jobs
     (about BATCH_S of build time each), so results come back and priorities are re-weighed often.
   - Priority: the free worker takes the latest pool: the one whose stock runs out soonest
@@ -20,8 +23,10 @@
   - Failures: a refill that raises puts its pool on an exponential back-off (BACKOFF_FIRST_S
     doubling to BACKOFF_MAX_S); a worker pool that breaks (a dead or hung worker, a job past
     JOB_TIMEOUT_S, a spawn that fails) is replaced after the same kind of back-off, the server
-    building inline meanwhile. Warnings are rate-limited. Callbacks from the process pool only
-    hand over to the pumper thread: the pool's manager thread runs them holding its own locks.
+    building inline meanwhile. A new worker pool gets SPAWN_TIMEOUT_S to answer its first job
+    before it counts as hung, so spawn time is not held against JOB_TIMEOUT_S. Warnings are
+    rate-limited. Callbacks from the process pool, and the kill of a hung pool, only hand over to
+    the pumper thread: the pool's manager thread runs callbacks holding its own locks.
 - Archetype: until clustering (BE-09/BE-11) assigns one, every user is NEUTRAL.
 - Stroop inks: the caller picks the preset ("classic" or "cvd_safe", the colour-blind-safe set the
   frontend's setting asks for). It is part of the pool key and of the session's idempotency key,
@@ -106,6 +111,7 @@ POOL_GROWTH_BYTES = 32 << 20  # of which, at most this much above the pools' flo
 WORKERS = max(1, min(2, (os.cpu_count() or 2) - 1))
 BATCH_S = 0.03  # build time per refill job: short, so priorities are re-weighed often
 JOB_TIMEOUT_S = 10.0  # a refill job this late means a hung worker: the pool is replaced
+SPAWN_TIMEOUT_S = 60.0  # the same, for a worker pool that has not answered once yet (spawning)
 BACKOFF_FIRST_S = 0.5  # first back-off after a failed refill or a broken worker pool
 BACKOFF_MAX_S = 30.0  # back-offs double up to this
 LOG_EVERY_S = 30.0  # one warning of a kind per this many seconds, with a count of the rest
@@ -444,6 +450,9 @@ class Dispatcher:
         self._pool_bytes = 0
         self._inflight_bytes = 0  # guessed size of what the running jobs will bring
         self._growth_bytes = 0  # bytes above the pools' floors (tallied by the sweep)
+        self._floor_bytes = 0  # bytes within the pools' floors (tallied by the sweep)
+        self._no_floor: set[PoolKey] = set()  # in use, but floor given up (LRU)
+        self._workers_ready = False  # the current worker pool has answered a job
         self._busy = 0  # refill jobs in flight
         self._refills_done = 0  # jobs whose payloads came back from a worker
         self._key_retry: dict[PoolKey, tuple[float, int]] = {}  # pool -> (retry at, failures)
@@ -493,6 +502,10 @@ class Dispatcher:
             error = None if f.cancelled() else f.exception()
             if error is not None:
                 self._worker_failed(workers, error)
+            elif not f.cancelled():
+                with self._lock:
+                    if workers is self._workers:
+                        self._workers_ready = True
             left[0] -= 1
             if left[0] == 0 and not done.done():
                 errors = [g.exception() for g in futures if not g.cancelled() and g.exception()]
@@ -580,6 +593,7 @@ class Dispatcher:
         archetype, schema_type, level, inks = pool_key
         with self._lock:
             self._active_at[pool_key] = self._mono()
+            self._no_floor.discard(pool_key)
         while True:
             with self._lock:
                 if len(self._pools.setdefault(pool_key, deque())) >= self.pool_size:
@@ -600,10 +614,25 @@ class Dispatcher:
         """Called with self._lock held."""
         self._demand[pool_key] = (self._rate(pool_key, now) + 1.0 / DEMAND_TAU_S, now)
         self._active_at[pool_key] = now
+        self._no_floor.discard(pool_key)  # in use again: it gets its floor back
 
     def _floor(self, pool_key: PoolKey, now: float) -> int:
-        """POOL_SIZE while the pool is in use, 0 once idle for pool_idle_s (or never used)."""
+        """POOL_SIZE while the pool is in use, 0 once idle for pool_idle_s (or never used), or
+        while it has given its floor up to more recently used pools."""
+        if pool_key in self._no_floor:
+            return 0
         return self.pool_size if now - self._active_at.get(pool_key, -math.inf) <= self.pool_idle_s else 0
+
+    @property
+    def floor_bytes_max(self) -> int:
+        """The floors' share of the cap; the rest is kept for growth."""
+        return self.pool_bytes_max - self.pool_growth_bytes
+
+    def _avg_bytes(self, pool_key: PoolKey) -> float:
+        pool = self._pools.get(pool_key)
+        if pool:
+            return self._key_bytes[pool_key] / len(pool)
+        return self._entry_bytes.get(pool_key[1], ENTRY_BYTES_GUESS)
 
     def _want(self, pool_key: PoolKey, now: float) -> int:
         """Called with self._lock held: the demand-based target, POOL_HORIZON_S of pops within
@@ -635,7 +664,20 @@ class Dispatcher:
         if now - self._swept_at < SWEEP_EVERY_S:
             return None
         self._swept_at = now
-        growth = 0
+        # The floors of the pools in use, least recently used first: past floor_bytes_max, the
+        # oldest give theirs up, so the growth share always stays free for a hot pool.
+        floors = sorted(
+            (at, pool_key)
+            for pool_key, at in self._active_at.items()
+            if pool_key not in self._no_floor and now - at <= self.pool_idle_s
+        )
+        need = sum(self.pool_size * self._avg_bytes(k) for _, k in floors)
+        for _, pool_key in floors:
+            if need <= self.floor_bytes_max:
+                break
+            need -= self.pool_size * self._avg_bytes(pool_key)
+            self._no_floor.add(pool_key)
+        growth = held_floor = 0
         for pool_key, pool in list(self._pools.items()):
             want = self._want(pool_key, now)
             while len(pool) > want:
@@ -646,12 +688,17 @@ class Dispatcher:
                 del self._pools[pool_key]
                 self._key_bytes.pop(pool_key, None)
                 continue
-            floor = self._floor(pool_key, now)
-            if len(pool) > floor:
-                growth += self._key_bytes[pool_key] * (len(pool) - floor) // len(pool)
+            if not pool:
+                continue  # kept for a refill in flight: holds nothing yet
+            held = self._key_bytes.get(pool_key, 0)
+            within = held * min(len(pool), self._floor(pool_key, now)) // len(pool)
+            held_floor += within
+            growth += held - within
         self._growth_bytes = growth
+        self._floor_bytes = held_floor
+        limit = self.job_timeout_s if self._workers_ready else max(self.job_timeout_s, SPAWN_TIMEOUT_S)
         for executor, _, _, started, _ in self._running.values():
-            if now - started > self.job_timeout_s and executor is self._workers:
+            if now - started > limit and executor is self._workers:
                 return executor
         return None
 
@@ -666,9 +713,10 @@ class Dispatcher:
             if now < self._respawn_at:
                 return []
             self._workers = worker_pool(self.workers)  # after the back-off: try again
+            self._workers_ready = False
         jobs = []
         while self._busy < self.workers:
-            best = None
+            ranked = []
             for pool_key in list(self._topping):
                 have = len(self._pools.get(pool_key, ()))
                 inflight = self._inflight.get(pool_key, 0)
@@ -679,16 +727,16 @@ class Dispatcher:
                     continue
                 cost = self._cost.get(pool_key[1], 0.005)
                 lateness = (have + inflight) / max(self._rate(pool_key, now), 1e-3) - deficit * cost
-                if best is None or lateness < best[0]:
-                    best = (lateness, pool_key, deficit, cost)
-            if best is None:
-                break
-            _, pool_key, deficit, cost = best
-            size = self._entry_bytes.get(pool_key[1], ENTRY_BYTES_GUESS)
-            room = (self.pool_bytes_max - self._pool_bytes - self._inflight_bytes) // max(1, int(size))
-            n = min(deficit, max(1, math.ceil(BATCH_S / cost)), room)
-            if n <= 0:
-                break  # the byte cap: nothing more is built until stock is used or trimmed
+                ranked.append((lateness, pool_key, deficit, cost))
+            ranked.sort(key=lambda r: r[0])
+            room_bytes = self.pool_bytes_max - self._pool_bytes - self._inflight_bytes
+            for _, pool_key, deficit, cost in ranked:
+                size = self._entry_bytes.get(pool_key[1], ENTRY_BYTES_GUESS)
+                n = min(deficit, max(1, math.ceil(BATCH_S / cost)), room_bytes // max(1, int(size)))
+                if n > 0:
+                    break  # the latest pool that fits under the cap (a smaller payload may)
+            else:
+                break  # nothing fits: nothing more is built until stock is used or trimmed
             guess = int(n * size)
             self._inflight[pool_key] = self._inflight.get(pool_key, 0) + n
             self._inflight_bytes += guess
@@ -703,7 +751,9 @@ class Dispatcher:
             now = self._mono()
             hung = self._sweep(now)
         if hung is not None:
-            self._worker_failed(hung, TimeoutError(f"a refill job ran over {self.job_timeout_s:g} s"))
+            # Killing processes and shutting a pool down is slow: never on a request thread.
+            self._hand_over(self._worker_failed, hung, TimeoutError("a refill job ran over its time limit"))
+            return
         with self._lock:
             jobs = self._jobs(self._mono())
             workers = self._workers
@@ -734,6 +784,7 @@ class Dispatcher:
                 else:
                     self._inflight.pop(pool_key, None)
             stocked = None
+            capped = False  # payloads came back but the caps had no room: back-pressure, not a fault
             if not future.cancelled() and error is None:
                 entries, seconds = future.result()
                 now = self._mono()
@@ -744,18 +795,24 @@ class Dispatcher:
                         break
                     above = len(self._pools.get(pool_key, ())) >= floor
                     if above and self._growth_bytes + len(entry.body) > self.pool_growth_bytes:
-                        break  # the growth budget
+                        break  # the growth share
+                    if not above and self._floor_bytes + len(entry.body) > self.floor_bytes_max:
+                        break  # the floors' share (the sweep frees it from the least recently used)
                     if not self._add(pool_key, entry):
                         break  # the hard cap
                     stocked += 1
                     if above:
                         self._growth_bytes += len(entry.body)
+                    else:
+                        self._floor_bytes += len(entry.body)
+                capped = bool(entries) and stocked == 0
                 if entries:
                     old = self._cost.get(pool_key[1], seconds / len(entries))
                     self._cost[pool_key[1]] = 0.8 * old + 0.2 * seconds / len(entries)
                     self._refills_done += 1
                 if executor is self._workers:
                     self._pool_failures = 0  # this worker pool works
+                    self._workers_ready = True
             failed = error is not None and not isinstance(error, BrokenProcessPool)
             # A job that raised, or stocked nothing (no payloads back, or no room under the caps),
             # would be resubmitted at once and forever: the pool waits instead, doubling.
@@ -768,7 +825,7 @@ class Dispatcher:
                 self._key_retry.pop(pool_key, None)
         if isinstance(error, BrokenProcessPool):
             self._worker_failed(executor, error)
-        elif backoff is not None:
+        elif backoff is not None and not capped:
             # A generator bug: the pool stays short, an empty pool builds inline, and the bug
             # surfaces there as a 503 instead of passing silently.
             self._warn(
@@ -1096,6 +1153,7 @@ class Dispatcher:
             self._closed = True
             workers = self._workers
         for ex in (workers, self._pumper, self._writer):
-            if ex is not None:
-                ex.shutdown(wait=True, cancel_futures=True)
+            shutdown = getattr(ex, "shutdown", None)
+            if shutdown is not None:
+                shutdown(wait=True, cancel_futures=True)
         self.flush()

@@ -62,17 +62,29 @@ def test_the_port_matches_task_source_ts():
     dims = re.search(r"const DIMENSIONS[^=]*=\s*\[([^\]]*)\]", src).group(1)
     assert re.findall(r"'(\w+)'", dims) == FE_DIMENSIONS
     assert "const TASK_ID = /^[\\w:.-]{1,48}$/" in src
-    # The request it sends: only user_id, so every other query parameter must stay optional.
-    assert "`/v1/tasks/next?user_id=${encodeURIComponent(userId)}`" in src
+    # The request it sends: user_id, plus inks=cvd_safe when the colour-blind setting is on (F-D),
+    # so every other query parameter must stay optional.
+    assert "`/v1/tasks/next?user_id=${encodeURIComponent(userId)}${cvd ? '&inks=cvd_safe' : ''}`" in src
 
 
-def test_the_frontends_exact_request_gets_a_valid_task(client):
-    r = client.get(f"{URL}?user_id={UUID}")
+@pytest.mark.parametrize("suffix", ["", "&inks=cvd_safe"])
+def test_the_frontends_exact_request_gets_a_valid_task(client, suffix):
+    r = client.get(f"{URL}?user_id={UUID}{suffix}")
     assert r.status_code == 200
     assert r.headers["content-type"] == "application/json"
     t = r.json()
     assert valid_task(t)
     assert set(t) == {"task_id", "dimension", "schema_type", "params", "surface_seed"}  # TaskPayload
+
+
+def test_the_frontends_cvd_request_gets_black_ink_stroop(client):
+    # what taskSource.ts sends with the setting on, until the battery reaches Stroop
+    for _ in range(len(SCHEMA_TYPES)):
+        t = client.get(f"{URL}?user_id={UUID}&inks=cvd_safe").json()
+        if t["schema_type"] == "stroop":
+            assert set(t["params"]["colors"]) == {"blue", "yellow", "red", "black"}
+            return
+    pytest.fail("no Stroop in one round of the battery")
 
 
 @pytest.mark.parametrize("schema_type", SCHEMA_TYPES)

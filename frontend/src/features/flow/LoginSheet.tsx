@@ -5,6 +5,7 @@ import { Loti } from '../../components/features/characters'
 import { Button } from '../../components/ui/Button'
 import { useAppStore } from '../../state/useAppStore'
 import { tracker } from '../assessment/telemetry/tracker'
+import { ConsentChoices, type ConsentChoice } from './ConsentChoices'
 import { GoogleButton, googleClientId, type GoogleProfile } from './GoogleSignIn'
 
 export interface LoginSheetProps {
@@ -53,9 +54,8 @@ export function LoginSheet({ askConsent, onClose, onFinish }: LoginSheetProps) {
     loginUser({ preferredName: p.name || 'Friend', email: p.email, focusGoal: 'balanced-360-twin' })
     signedIn()
   }
-  const choose = (save: boolean) => {
-    if (save) tracker.grantConsent()
-    else tracker.denyConsent()
+  const choose = (choice: ConsentChoice) => {
+    tracker.choose(choice)
     onFinish()
   }
 
@@ -109,19 +109,12 @@ export function LoginSheet({ askConsent, onClose, onFinish }: LoginSheetProps) {
           <div className="flex flex-col gap-5">
             <div className="space-y-2">
               <h2 id={consentId} ref={consentHeading} tabIndex={-1} className="font-display text-2xl font-bold text-ink outline-none">
-                Save your answers?
+                Your choices
               </h2>
               <p className="text-base text-ink">We record answer timing and accuracy only. No camera, no microphone.</p>
             </div>
-            {/* Equal weight (R3): same style, same size. */}
-            <div className="flex flex-col gap-3">
-              <Button variant="secondary" size="lg" onClick={() => choose(true)}>
-                Save my answers
-              </Button>
-              <Button variant="secondary" size="lg" onClick={() => choose(false)}>
-                Keep them on this device only
-              </Button>
-            </div>
+            {/* Two purposes, equal weight (R3), both off until turned on (research #6). */}
+            <ConsentChoices onSubmit={choose} />
             <Link
               to="/privacy"
               className="focus-ring self-center inline-flex min-h-11 items-center rounded-sm text-sm font-medium text-brand underline underline-offset-4"

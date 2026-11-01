@@ -130,10 +130,38 @@ test.describe('Page 06: Home (/dashboard)', () => {
     await expect(page.locator('[data-line="keep"]')).toHaveCount(1)
   })
 
-  test('six sessions: the heatmap behind "Further explore"; axe and overflow in light and dark', async ({ page }, info) => {
+  test('six sessions: the heatmap and "When you train" behind "Further explore"; axe and overflow in light and dark', async ({ page }, info) => {
     await checkHome(page, info, 6)
     await expect(page.getByRole('grid', { name: 'Past results by week' })).toBeVisible()
     await expect(page.getByRole('list', { name: 'Score scale' })).toBeVisible()
+    const when = page.getByRole('grid', { name: 'When you train' })
+    await expect(when).toBeVisible()
+    await expect(when.getByRole('rowheader')).toHaveText(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])
+    // One tab stop: arrows move inside the grid.
+    await when.getByRole('gridcell').first().focus()
+    await page.keyboard.press('ArrowDown')
+    await expect(when.getByRole('gridcell').nth(3)).toBeFocused()
+    // The weekly goal sits in the Goals block as one plain line.
+    await expect(page.getByTestId('weekly-goal')).toHaveText(/^\d+ (of 3 )?this week( · week kept)?$/)
+  })
+
+  test('mood guess opt-in: Home has no notice and Momo is no control; after opting in under Settings, Momo shows the picked mood', async ({ page }) => {
+    await seed(page, 2)
+    await page.goto('/dashboard', { waitUntil: 'networkidle' })
+    await expect(page.getByRole('note')).toHaveCount(0)
+    await expect(page.getByText(/Momo guesses your mood/)).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /Momo/ })).toHaveCount(0)
+    await expect(page.getByRole('img', { name: 'Momo' })).toBeVisible() // still and neutral
+    await expect(page.locator('[data-page="home"]')).toHaveAttribute('data-mood', 'calm')
+    // Opt in where the notice is, correct the guess there, and Home follows.
+    await page.getByRole('link', { name: 'You' }).first().click()
+    await page.getByRole('link', { name: 'Settings' }).click()
+    await page.getByRole('switch', { name: 'Mood guess' }).click()
+    await page.getByRole('button', { name: 'Change' }).click()
+    await page.getByRole('radio', { name: 'Tired' }).click()
+    await page.getByRole('link', { name: 'Home' }).first().click()
+    await expect(page.getByRole('img', { name: 'Momo looks tired' })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Momo/ })).toHaveCount(0)
   })
 
   test('"View as table" shows the 5 rows with ranges; "Start today\'s session" trains the weakest pillar', async ({ page }) => {

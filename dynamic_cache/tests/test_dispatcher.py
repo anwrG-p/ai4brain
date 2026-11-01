@@ -501,9 +501,11 @@ def test_growth_stops_at_the_per_pool_cap_and_the_growth_budget(make):
 
 def test_memory_stays_under_the_hard_cap_with_nine_archetypes(make):
     """BE-11 brings 9 archetypes: 702 pools at 16 deep of ~18 KB payloads would be ~200 MiB. Every
-    pool is used, then one wave grows a pool, then everything goes idle: the pools never hold more
-    than pool_bytes_max, never more than pool_growth_bytes above the floors, and hand it all back
-    once idle. (Instant payloads, so the whole refill path runs in a second.)"""
+    pool is used, then one wave hits one pool, then everything goes idle. The pools never hold
+    more than pool_bytes_max; the floors never more than their share (pool_bytes_max -
+    pool_growth_bytes), so the wave's pool still grows (review repro wave9.py: it was stuck at 15
+    once 400 pools were in use); and it is all handed back once idle. (Instant payloads, so the
+    whole refill path runs in a second.)"""
     mono = MonoClock()
     d = make(background=True, pool_bytes_max=40 << 20)
     d.pool_growth_bytes = 8 << 20
@@ -525,11 +527,14 @@ def test_memory_stays_under_the_hard_cap_with_nine_archetypes(make):
     peak = max(peak, d._pool_bytes)
     held = sum(len(e.body) for pool in d._pools.values() for e in pool)
     assert held == d._pool_bytes <= d.pool_bytes_max and peak <= d.pool_bytes_max
-    assert d._pool_bytes > 0.9 * d.pool_bytes_max  # the cap binds here (floors alone exceed it)
-    # A wave on one pool: growth stays inside the budget and the cap.
+    # The floors alone would need ~200 MiB: their share binds, and leaves the growth share free.
+    assert 0.8 * d.floor_bytes_max < d._pool_bytes <= d.floor_bytes_max
+    # A wave on the least recently used pool: growth stays inside its share and the cap, and the
+    # pool grows to its demand target.
     hot = keys[0]
-    for k in range(400):
-        mono.t += 0.005
+    grown = 0
+    for k in range(300):
+        mono.t += 0.01  # 100 pops/s
         with d._lock:
             pool = d._pools.get(hot)
             if pool:
@@ -537,9 +542,12 @@ def test_memory_stays_under_the_hard_cap_with_nine_archetypes(make):
             d._note_pop(hot, mono.t)
             d._check_low_water(hot, mono.t)
         d._pump()
-    quiet(d)
-    assert d._pool_bytes <= d.pool_bytes_max
+        quiet(d)
+        grown = max(grown, len(d._pools.get(hot, ())))
+        assert d._pool_bytes <= d.pool_bytes_max
+    assert grown == cd.POOL_MAX  # 100 pops/s x 2 s = 200, capped at 128
     assert d._growth_bytes <= d.pool_growth_bytes + 18_000
+    assert d._floor_bytes <= d.floor_bytes_max
     # Everyone leaves: after POOL_IDLE_S every pool is trimmed empty.
     mono.t += cd.POOL_IDLE_S + 1
     d._pump()
@@ -604,9 +612,15 @@ def test_with_equal_stock_and_demand_the_slow_schema_goes_first(make, order):
 
 
 def test_a_slow_pool_with_stock_can_still_go_before_an_empty_cheap_one(make):
-    """MST has 1 payload left, tower none. At 50 pops/s the MST payload lasts 20 ms, but rebuilding
-    MST's deficit (15 x 7 ms) takes 105 ms: MST is later than tower (0 - 16 x 0.3 ms), so it goes
-    first. At 5 pops/s the MST payload lasts 200 ms, more than its rebuild: tower goes first."""
+    """MST has 1 payload left, tower none, both at the same demand.
+
+    At 50 pops/s each target is 100 (2 s of demand). The MST payload lasts 20 ms, but rebuilding
+    MST's deficit takes 99 x 7 ms = 693 ms: lateness 20 - 693 = -673 ms, against tower's
+    0 - 100 x 0.3 ms = -30 ms. MST goes first.
+
+    At 5 pops/s the targets are the floor, 16. The MST payload lasts 200 ms, and its rebuild takes
+    15 x 7 ms = 105 ms: lateness +95 ms, against tower's 0 - 16 x 0.3 ms = -4.8 ms. Tower goes
+    first."""
     assert first_job(make, {"mst": (1, 50.0), "tower": (0, 50.0)}) == ["mst"]
     assert first_job(make, {"mst": (1, 5.0), "tower": (0, 5.0)}) == ["tower"]
 
@@ -746,6 +760,57 @@ def test_a_transient_spawn_error_is_retried_not_permanent(make, monkeypatch):
     assert isinstance(d._workers, Recorder) and d._workers.jobs  # back to refilling
 
 
+def test_a_new_worker_pool_gets_time_to_spawn(make):
+    """A respawned pool's first job includes the spawn itself: not hung after JOB_TIMEOUT_S, only
+    after SPAWN_TIMEOUT_S; once the pool has answered, the plain timeout applies."""
+    mono = MonoClock()
+    d = recording(make)
+    d._mono = mono
+    assert not d._workers_ready
+    d.next_task("u1", schema_type="mst")
+    mono.t += cd.JOB_TIMEOUT_S + 1
+    d.next_task("u2", schema_type="tower")
+    d._pumper.submit(lambda: None).result(timeout=30)  # anything handed over has run
+    assert isinstance(d._workers, Recorder)  # still spawning, not hung
+    mono.t += cd.SPAWN_TIMEOUT_S
+    d.next_task("u3", schema_type="tower")
+    wait_for(lambda: d._workers is None)
+
+
+def test_the_hung_kill_never_runs_on_the_request_thread(make, monkeypatch):
+    mono = MonoClock()
+    d = recording(make)
+    d._mono = mono
+    d._workers_ready = True
+    d.next_task("u1", schema_type="mst")
+    threads = []
+    real = d._worker_failed
+    monkeypatch.setattr(d, "_worker_failed", lambda *a: (threads.append(threading.current_thread().name), real(*a)))
+    mono.t += cd.JOB_TIMEOUT_S + 1
+    d.next_task("u2", schema_type="tower")
+    wait_for(lambda: threads)
+    assert threads[0].startswith("task-pool") and threads[0] != threading.current_thread().name
+
+
+def test_when_the_latest_pool_does_not_fit_a_smaller_one_still_refills(make):
+    """Under the cap, an MST payload (~18 KB) may not fit where a tower payload (~0.3 KB) does:
+    the free worker takes the tower pool instead of stopping."""
+    d = recording(make, workers=1)
+    with d._lock:
+        now = d._mono()
+        for schema, size in (("mst", 18_000), ("tower", 300)):
+            key = ("neutral", schema, 0.5, "")
+            d._pools[key] = deque()
+            d._entry_bytes[schema] = size
+            d._demand[key] = (8.0, now)
+            d._active_at[key] = now
+            d._topping.add(key)
+        d._pool_bytes = d.pool_bytes_max - 5_000  # room for tower payloads only
+    d._pump()
+    assert [job[1] for job in d._workers.jobs] == ["tower"]
+    assert len(d._workers.jobs[0][4]) == 5_000 // 300  # (archetype, schema, level, inks, seeds)
+
+
 def test_a_stale_failure_report_does_not_drop_the_replacement(make):
     d = recording(make)
     old = d._workers
@@ -760,12 +825,14 @@ def test_a_hung_job_marks_the_workers_broken(make, monkeypatch, caplog):
     mono = MonoClock()
     d = recording(make)
     d._mono = mono
+    d._workers_ready = True  # this pool has answered before: the plain job timeout applies
     d.next_task("u1", schema_type="mst")  # a job that never finishes
     hung = d._workers
     assert hung.jobs and d._busy == len(hung.jobs)
     mono.t += cd.JOB_TIMEOUT_S + 1
-    d.next_task("u2", schema_type="tower")
-    assert d._workers is None and d._busy == 0  # replaced after back-off, inline meanwhile
+    d.next_task("u2", schema_type="tower")  # finds it; the kill runs on the pumper thread
+    wait_for(lambda: d._workers is None)
+    assert d._busy == 0  # replaced after back-off, inline meanwhile
     assert "task worker process unavailable (TimeoutError)" in caplog.text
     monkeypatch.setattr(cd, "worker_pool", lambda *a, **k: Recorder())
     mono.t += cd.BACKOFF_FIRST_S + 0.01

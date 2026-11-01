@@ -1,11 +1,13 @@
 /**
- * EMILY (Emotion & Micro-Interaction Listener for You)
- * 
- * 100% Client-Side Behavioral Emotion Engine grounded in James Russell's
- * Circumplex Model of Affect (Valence x Arousal).
- * 
- * Complies with EU AI Act Article 5(1)(f) zero-biometric rules by analyzing
- * passive DOM pointer kinematics and interaction rhythm without webcams or mics.
+ * EMILY: Momo's mood guess, made on this device only (ADR 0002).
+ *
+ * Hand-written rules (not a trained model) turn pointer and key timing into a proposed mood. It is
+ * a guess the user can correct or turn off, never a reading: the evidence linking pointer movement
+ * to emotion is weak (ADR 0002). The label never leaves the device: telemetry and the coach request
+ * never carry it.
+ *
+ * Errors are not strain: the difficulty staircase causes errors on purpose, so answer accuracy
+ * never feeds the frustrated rule (ADR 0002 consequences, research §5).
  */
 
 import {
@@ -275,17 +277,9 @@ export function computeEmilyMetrics(
 /**
  * Classifies computed kinematic & interaction metrics into one of 5 canonical states.
  */
-export function classifyEmilyEmotion(
-  metrics: EmilyMetrics,
-  options?: { consecutiveErrors?: number },
-): EmilyEmotion {
-  // 1. Frustrated (Gentle De-Escalation)
-  if (
-    metrics.clickBurstCount >= 1 ||
-    metrics.cursorJerk > 0.8 ||
-    metrics.isHeavyPress ||
-    (options?.consecutiveErrors !== undefined && options.consecutiveErrors >= 2)
-  ) {
+export function classifyEmilyEmotion(metrics: EmilyMetrics): EmilyEmotion {
+  // 1. Frustrated (Gentle De-Escalation). Pointer signals only: wrong answers are never strain.
+  if (metrics.clickBurstCount >= 1 || metrics.cursorJerk > 0.8 || metrics.isHeavyPress) {
     return 'frustrated'
   }
 
