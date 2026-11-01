@@ -1,6 +1,6 @@
 """Task dispatcher behind GET /v1/tasks/next (BE-04).
 
-- Pools: per (archetype, schema_type, theta level), in memory, holding pre-built payloads already
+- Pools: per (archetype, schema_type, theta level, Stroop inks), in memory, holding pre-built payloads already
   serialised to JSON, refilled by WORKERS worker processes, so the BE-03 generators (sync,
   CPU-bound) never run on the event loop, rarely on a request, and never hold the GIL against
   request threads. An empty pool builds one task inline, in the request's worker thread. The
@@ -29,6 +29,10 @@
     the pumper thread: the pool's manager thread runs callbacks holding its own locks.
 - Archetype: the state bus (BE-11) names the user's pool. Every cluster maps to NEUTRAL until
   per-style generator options exist (see state_bus.pool_name).
+- Stroop inks: the caller picks the preset ("classic" or "cvd_safe", the colour-blind-safe set the
+  frontend's setting asks for). It is part of the pool key and of the session's idempotency key,
+  so a classic pool never hands out a cvd_safe block or the other way round. The other schemas
+  have no inks: their key holds "" and their pools are shared by both kinds of user.
 - No repeats: a per-user TimedBloom (bloom.py) of served task ids; nothing seen in the last 14 days
   is served again.
 - Idempotent per (user, session_id, seq, filter): the same call in the same session returns the
@@ -88,9 +92,21 @@ from .parameter_projector import BOUNDS, START_THETA, clamp, project
 log = logging.getLogger(__name__)
 
 NEUTRAL = "neutral"
-# Generator options per archetype. Stroop is pinned to the classic inks: cvd_safe needs `black`,
-# which Stroop.tsx does not paint yet (BE-03), so it is never served.
-ARCHETYPE_OPTIONS: dict[str, dict[str, dict[str, Any]]] = {NEUTRAL: {"stroop": {"inks": "classic"}}}
+# Stroop ink presets a caller may ask for (generators/stroop.py INK_PRESETS, both served).
+INKS: tuple[str, ...] = ("classic", "cvd_safe")
+DEFAULT_INKS = "classic"
+# (archetype, schema_type, theta level, inks); inks is "" for every schema but Stroop.
+PoolKey = tuple[str, str, float, str]
+# Generator options per archetype, as the LLM worker's reference payloads use them (the default-inks
+# pools). Only NEUTRAL: per-style options don't exist yet (see brain_twin_jepa.state_bus.pool_name).
+ARCHETYPE_OPTIONS: dict[str, dict[str, dict[str, Any]]] = {NEUTRAL: {"stroop": {"inks": DEFAULT_INKS}}}
+
+
+def pool_inks(schema_type: str, inks: str) -> str:
+    """The inks part of a pool key: the preset for Stroop, "" for the schemas that have none."""
+    if inks not in INKS:
+        raise ValueError(f"inks must be one of {INKS}, got {inks!r}")
+    return inks if schema_type == "stroop" else ""
 
 LEVEL_STEP = 0.1  # pools are keyed by theta snapped to this grid
 POOL_SIZE = 16  # the floor of a pool in use
@@ -119,6 +135,9 @@ BUILD_COST_S: dict[str, float] = {
     "stroop": 0.0007,
     "matrix": 0.0003,
     "tower": 0.0003,
+    "stop_signal": 0.0003,
+    "pal": 0.0001,
+    "flanker": 0.0002,
 }
 ENTRY_BYTES_GUESS = 16_000  # payload size before any is seen for a schema (MST ~18 KB, tower ~0.3 KB)
 SESSIONS_KEPT = 64  # idempotency answers kept per user (and none older than the TTL)
@@ -194,20 +213,21 @@ def rule_step(rule: Callable[..., float], theta: float, accuracy: float) -> floa
 # --- building payloads (also in the worker process) -------------------------------------------------
 
 
-def build_entry(archetype: str, schema_type: str, level: float, seed: int) -> Entry:
-    """One payload, built and serialised. Module level, so the worker process can run it."""
-    options = ARCHETYPE_OPTIONS.get(archetype, ARCHETYPE_OPTIONS[NEUTRAL]).get(schema_type, {})
-    # validate=True (the default): the served schema and the solvers check every payload, and
-    # allow_unserved stays False, so no unserved content (black ink) can get through.
+def build_entry(archetype: str, schema_type: str, level: float, inks: str, seed: int) -> Entry:
+    """One payload, built and serialised. Module level, so the worker process can run it.
+    `inks` is the pool key's: a Stroop preset, or "" for the other schemas. The archetype does not
+    change the payload yet (no per-archetype options until BE-11)."""
+    options = {"inks": inks} if inks else {}
+    # validate=True (the default): the served schema and the solvers check every payload.
     payload = generate(schema_type, level, seed, **options)
     body = json.dumps(payload, separators=(",", ":"), allow_nan=False).encode("utf-8")
     return Entry(payload["task_id"], body, seed)
 
 
-def build_entries(archetype: str, schema_type: str, level: float, seeds: list[int]) -> tuple[list[Entry], float]:
+def build_entries(archetype: str, schema_type: str, level: float, inks: str, seeds: list[int]) -> tuple[list[Entry], float]:
     """The payloads for `seeds`, and the seconds it took (the dispatcher learns build costs)."""
     t = time.perf_counter()
-    entries = [build_entry(archetype, schema_type, level, seed) for seed in seeds]
+    entries = [build_entry(archetype, schema_type, level, inks, seed) for seed in seeds]
     return entries, time.perf_counter() - t
 
 
@@ -435,24 +455,24 @@ class Dispatcher:
         # done runs its callback (which takes the lock) in the submitting thread.
         self._lock = threading.RLock()
         self._io_lock = threading.Lock()  # registry files
-        self._pools: dict[tuple[str, str, float], deque[Entry]] = {}
-        self._key_bytes: dict[tuple[str, str, float], int] = {}  # payload bytes per pool
-        self._active_at: dict[tuple[str, str, float], float] = {}  # last pop or warm, per pool
-        self._topping: set[tuple[str, str, float]] = set()  # pools being topped up to their target
-        self._inflight: dict[tuple[str, str, float], int] = {}  # payloads being built, per pool
+        self._pools: dict[PoolKey, deque[Entry]] = {}
+        self._key_bytes: dict[PoolKey, int] = {}  # payload bytes per pool
+        self._active_at: dict[PoolKey, float] = {}  # last pop or warm, per pool
+        self._topping: set[PoolKey] = set()  # pools being topped up to their target
+        self._inflight: dict[PoolKey, int] = {}  # payloads being built, per pool
         self._running: dict[Future, tuple] = {}  # job -> (executor, pool, n, started, bytes guess)
-        self._demand: dict[tuple[str, str, float], tuple[float, float]] = {}  # pool -> (pops/s, at)
+        self._demand: dict[PoolKey, tuple[float, float]] = {}  # pool -> (pops/s, at)
         self._cost: dict[str, float] = dict(BUILD_COST_S)  # seconds per payload, learned
         self._entry_bytes: dict[str, float] = {}  # payload size per schema, learned
         self._pool_bytes = 0
         self._inflight_bytes = 0  # guessed size of what the running jobs will bring
         self._growth_bytes = 0  # bytes above the pools' floors (tallied by the sweep)
         self._floor_bytes = 0  # bytes within the pools' floors (tallied by the sweep)
-        self._no_floor: set[tuple[str, str, float]] = set()  # in use, but floor given up (LRU)
+        self._no_floor: set[PoolKey] = set()  # in use, but floor given up (LRU)
         self._workers_ready = False  # the current worker pool has answered a job
         self._busy = 0  # refill jobs in flight
         self._refills_done = 0  # jobs whose payloads came back from a worker
-        self._key_retry: dict[tuple[str, str, float], tuple[float, int]] = {}  # pool -> (retry at, failures)
+        self._key_retry: dict[PoolKey, tuple[float, int]] = {}  # pool -> (retry at, failures)
         self._respawn_at = 0.0  # no new worker pool before this (monotonic)
         self._pool_failures = 0  # consecutive broken worker pools
         self._swept_at = 0.0
@@ -568,7 +588,7 @@ class Dispatcher:
         self._running.clear()
         self._inflight_bytes = 0
 
-    def _add(self, pool_key: tuple[str, str, float], entry: Entry) -> bool:
+    def _add(self, pool_key: PoolKey, entry: Entry) -> bool:
         """Called with self._lock held: stock one payload, unless that would pass POOL_BYTES_MAX."""
         size = len(entry.body)
         if self._pool_bytes + size > self.pool_bytes_max:
@@ -580,14 +600,14 @@ class Dispatcher:
         self._entry_bytes[pool_key[1]] = 0.8 * old + 0.2 * size
         return True
 
-    def _take(self, pool_key: tuple[str, str, float], entry: Entry) -> None:
+    def _take(self, pool_key: PoolKey, entry: Entry) -> None:
         """Called with self._lock held: account for a payload leaving the pool."""
         self._key_bytes[pool_key] -= len(entry.body)
         self._pool_bytes -= len(entry.body)
 
-    def _fill(self, pool_key: tuple[str, str, float]) -> None:
+    def _fill(self, pool_key: PoolKey) -> None:
         """Top the pool up to POOL_SIZE in the caller's thread (warm-up); it counts as in use."""
-        archetype, schema_type, level = pool_key
+        archetype, schema_type, level, inks = pool_key
         with self._lock:
             self._active_at[pool_key] = self._mono()
             self._no_floor.discard(pool_key)
@@ -595,7 +615,7 @@ class Dispatcher:
             with self._lock:
                 if len(self._pools.setdefault(pool_key, deque())) >= self.pool_size:
                     return
-            entry = build_entry(archetype, schema_type, level, self.seed_source())  # outside the lock
+            entry = build_entry(archetype, schema_type, level, inks, self.seed_source())  # outside the lock
             with self._lock:
                 if not self._add(pool_key, entry):
                     return  # the byte cap
@@ -603,17 +623,17 @@ class Dispatcher:
     # Demand: an exponentially decaying event-rate estimate per pool. Each pop adds 1/tau; between
     # pops it decays by e^(-dt/tau), so at a steady rate it settles on that rate (pops per second).
 
-    def _rate(self, pool_key: tuple[str, str, float], now: float) -> float:
+    def _rate(self, pool_key: PoolKey, now: float) -> float:
         rate, at = self._demand.get(pool_key, (0.0, now))
         return rate * math.exp(-(now - at) / DEMAND_TAU_S)
 
-    def _note_pop(self, pool_key: tuple[str, str, float], now: float) -> None:
+    def _note_pop(self, pool_key: PoolKey, now: float) -> None:
         """Called with self._lock held."""
         self._demand[pool_key] = (self._rate(pool_key, now) + 1.0 / DEMAND_TAU_S, now)
         self._active_at[pool_key] = now
         self._no_floor.discard(pool_key)  # in use again: it gets its floor back
 
-    def _floor(self, pool_key: tuple[str, str, float], now: float) -> int:
+    def _floor(self, pool_key: PoolKey, now: float) -> int:
         """POOL_SIZE while the pool is in use, 0 once idle for pool_idle_s (or never used), or
         while it has given its floor up to more recently used pools."""
         if pool_key in self._no_floor:
@@ -625,20 +645,20 @@ class Dispatcher:
         """The floors' share of the cap; the rest is kept for growth."""
         return self.pool_bytes_max - self.pool_growth_bytes
 
-    def _avg_bytes(self, pool_key: tuple[str, str, float]) -> float:
+    def _avg_bytes(self, pool_key: PoolKey) -> float:
         pool = self._pools.get(pool_key)
         if pool:
             return self._key_bytes[pool_key] / len(pool)
         return self._entry_bytes.get(pool_key[1], ENTRY_BYTES_GUESS)
 
-    def _want(self, pool_key: tuple[str, str, float], now: float) -> int:
+    def _want(self, pool_key: PoolKey, now: float) -> int:
         """Called with self._lock held: the demand-based target, POOL_HORIZON_S of pops within
         [floor, pool_max]. Stock above it is trimmed."""
         # Rounded, not ceiled: a rate decayed to almost nothing must not keep one payload alive.
         want = math.floor(self._rate(pool_key, now) * POOL_HORIZON_S + 0.5)
         return max(self._floor(pool_key, now), min(self.pool_max, want))
 
-    def _target(self, pool_key: tuple[str, str, float], now: float) -> int:
+    def _target(self, pool_key: PoolKey, now: float) -> int:
         """Called with self._lock held: what refills aim for. Growth above the floor only while the
         growth budget has room."""
         floor = self._floor(pool_key, now)
@@ -646,7 +666,7 @@ class Dispatcher:
             return floor
         return self._want(pool_key, now)
 
-    def _check_low_water(self, pool_key: tuple[str, str, float], now: float) -> None:
+    def _check_low_water(self, pool_key: PoolKey, now: float) -> None:
         """Called with self._lock held: at or under half its target, the pool is topped up
         (unless it is backing off after a failed refill)."""
         if now < self._key_retry.get(pool_key, (0.0, 0))[0]:
@@ -765,7 +785,7 @@ class Dispatcher:
                     self._running[future] = (workers, pool_key, len(seeds), self._mono(), guess)
             future.add_done_callback(lambda f, w=workers, k=pool_key: self._hand_over(self._refilled, w, k, f))
 
-    def _refilled(self, executor: object, pool_key: tuple[str, str, float], future: Future) -> None:
+    def _refilled(self, executor: object, pool_key: PoolKey, future: Future) -> None:
         """On the pumper thread: stock a job's payloads, learn costs, or handle its failure."""
         error = None if future.cancelled() else future.exception()
         backoff = None
@@ -839,13 +859,16 @@ class Dispatcher:
         archetypes: tuple[str, ...] = (NEUTRAL,),
         schema_types: tuple[str, ...] = SCHEMA_TYPES,
         at: float | None = None,
+        inks: tuple[str, ...] = (DEFAULT_INKS,),
     ) -> int:
         """Fill the pools to POOL_SIZE now, in the caller's thread: every level, or only the one
-        theta `at` falls on. Returns how many payloads the pools hold."""
+        theta `at` falls on; Stroop once per preset in `inks`. Returns how many payloads the pools
+        hold."""
         for archetype in archetypes:
             for schema_type in schema_types:
                 for level in levels(schema_type) if at is None else [theta_level(schema_type, at)]:
-                    self._fill((archetype, schema_type, level))
+                    for ink in sorted({pool_inks(schema_type, i) for i in inks}):
+                        self._fill((archetype, schema_type, level, ink))
         with self._lock:
             return sum(len(p) for p in self._pools.values())
 
@@ -893,7 +916,7 @@ class Dispatcher:
         # put its disk time (antivirus scans of the new file included) on the request path.
         try:
             return UserState.from_json(json.loads(path.read_text(encoding="utf-8")))
-        except FileNotFoundError:
+        except (FileNotFoundError, NotADirectoryError):  # NotADirectoryError: a file where the folder should be (POSIX)
             return None
         except (ValueError, TypeError, AttributeError):
             return UserState()  # an unreadable registry only forgets what was served
@@ -1044,7 +1067,7 @@ class Dispatcher:
         if rec.get("source", PROCEDURAL) != PROCEDURAL:
             return self.variants(rec["task_id"])  # None: the session gets a new task
         try:
-            entry = build_entry(rec.get("archetype", NEUTRAL), rec["schema"], rec["theta"], rec["seed"])
+            entry = build_entry(rec.get("archetype", NEUTRAL), rec["schema"], rec["theta"], rec.get("inks", ""), rec["seed"])
         except (KeyError, TypeError, ValueError, RuntimeError):
             return None
         # Byte-identical rebuilds are promised on one CPython minor only (BE-03): a mismatch means
@@ -1065,19 +1088,25 @@ class Dispatcher:
         dimension: str | None = None,
         session_id: str | None = None,
         seq: int = 0,
+        inks: str = DEFAULT_INKS,
     ) -> Served:
-        """The next task for user `key` (telemetry_store.user_key() output).
+        """The next task for user `key` (telemetry_store.user_key() output). `inks` picks the
+        Stroop preset; it only matters when Stroop is the schema served.
 
-        Raises ValueError when the filters match no schema, NoFreshTask when nothing unseen is left.
+        Raises ValueError when the filters match no schema or `inks` is unknown, NoFreshTask when
+        nothing unseen is left.
         """
         candidates = schemas_for(schema_type, dimension)
         if not candidates:
             raise ValueError("schema_type and dimension match no schema")
+        pool_inks("stroop", inks)  # an unknown preset is the caller's error, whatever is chosen
         self._path(key)  # checks the key before anything is kept for it
         with self._held(key):
             now = self.clock()
             st = self._state(key, now)
-            ikey = f"{session_id}|{seq}|{schema_type or ''}|{dimension or ''}" if session_id else None
+            # The default inks keep the key the registry files already hold.
+            ink_part = "" if inks == DEFAULT_INKS else f"|{inks}"
+            ikey = f"{session_id}|{seq}|{schema_type or ''}|{dimension or ''}{ink_part}" if session_id else None
             if ikey and ikey in st.sessions:
                 rec = st.sessions[ikey]
                 body = self._replay(rec)
@@ -1089,7 +1118,8 @@ class Dispatcher:
             theta, marker = self._theta(key, st, chosen)
             level = theta_level(chosen, theta)
             archetype = self.archetype(key)
-            pool_key = (archetype, chosen, level)
+            ink = pool_inks(chosen, inks)
+            pool_key = (archetype, chosen, level, ink)
 
             entry = None
             with self._lock:
@@ -1113,7 +1143,7 @@ class Dispatcher:
                 if tries == FRESH_TRIES:
                     raise NoFreshTask(f"no unseen {chosen} task after {FRESH_TRIES} tries")
                 tries += 1
-                e = build_entry(archetype, chosen, level, self.seed_source())
+                e = build_entry(archetype, chosen, level, ink, self.seed_source())
                 if not st.seen.seen(e.task_id, now):
                     entry = e
 
@@ -1133,6 +1163,7 @@ class Dispatcher:
                     "seed": entry.seed,
                     "source": entry.source,
                     "archetype": archetype,
+                    "inks": ink,
                     "task_id": entry.task_id,
                     "at": now,
                 }
@@ -1158,7 +1189,9 @@ class Dispatcher:
           the right).
         Demand, activity and in-flight counts are not touched: an offer is not a pop.
         """
-        pool_key = (archetype, schema_type, theta_level(schema_type, level))
+        # ponytail: LLM variants go to the default-inks pools only (cvd_safe Stroop stays procedural);
+        # add an inks argument here and in pool_stock when the worker validates per ink preset.
+        pool_key = (archetype, schema_type, theta_level(schema_type, level), pool_inks(schema_type, DEFAULT_INKS))
         with self._lock:
             now = self._mono()
             pool = self._pools.get(pool_key)
@@ -1199,13 +1232,14 @@ class Dispatcher:
 
     def pool_stock(self) -> dict[tuple[str, str, float], tuple[int, int]]:
         """The pools in use (floor > 0) as (entries, non-procedural entries), so the LLM worker
-        fills only pools that serve someone."""
+        fills only pools that serve someone. Keys are (archetype, schema, level): only the
+        default-inks pools are listed, the ones offer() stocks."""
         with self._lock:
             now = self._mono()
             return {
-                k: (len(p), sum(e.source != PROCEDURAL for e in p))
+                k[:3]: (len(p), sum(e.source != PROCEDURAL for e in p))
                 for k, p in self._pools.items()
-                if self._floor(k, now) > 0
+                if self._floor(k, now) > 0 and k[3] == pool_inks(k[1], DEFAULT_INKS)
             }
 
     def close(self) -> None:

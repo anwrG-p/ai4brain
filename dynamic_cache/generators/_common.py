@@ -18,10 +18,13 @@ SCHEMA_TYPES: tuple[str, ...] = (
     "tower",
     "ufov",
     "mst",
+    "stop_signal",
+    "pal",
+    "flanker",
 )
 
 # The dimension each schema type reports under, as in frontend/.../tasks/fixtures.json and the
-# contract table in assessment_engine/README.md.
+# contract table in assessment_engine/README.md (the last three: F-B's fixtures).
 DIMENSION_OF: dict[str, str] = {
     "n_back": "working_memory",
     "stroop": "executive_function",
@@ -31,6 +34,9 @@ DIMENSION_OF: dict[str, str] = {
     "tower": "executive_function",
     "ufov": "processing_speed",
     "mst": "episodic_memory",
+    "stop_signal": "executive_function",
+    "pal": "episodic_memory",
+    "flanker": "executive_function",
 }
 
 # The client's check (taskSource.ts). JS `\w` is ASCII-only, hence re.ASCII.

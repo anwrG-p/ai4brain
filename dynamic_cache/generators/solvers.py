@@ -28,6 +28,14 @@ How independent they are, per schema:
 - tower: forward breadth-first search gives l_min; the optimal moves are replayed and the
   counter-intuitive steps recomputed.
 - ufov, mst: structural checks (UFOV has no derived answer; MST checks old/lure/new by geometry).
+- stop_signal: replays the block as the client plays it (the SSD staircase included) and checks
+  what the integration SSRT needs: go trials first, stops a minority and never bunched, both
+  arrows balanced in each trial kind, and an SSD that starts inside the go window.
+- pal: rebuilds each stage's box map and derives the box every recall step asks for; the map must
+  be one-to-one and the recall order a reshuffle covering every pattern once.
+- flanker: draws the five-arrow row as Flanker.tsx does and reads the answer (the middle arrow)
+  and the condition back from it; checks the cells are balanced and never run over 3.
+All three share no code with their generators.
 """
 
 from __future__ import annotations
@@ -561,7 +569,133 @@ def verify_mst(p: dict) -> list[str]:
     return out
 
 
+# ---------------------------------------------------------------------------------------------
+# stop_signal
+
+SST_FIRST_GO = 2  # the first press is never a stop (the client's fixture opens on go trials)
+SST_MAX_STOP_SHARE = 1 / 3  # above this, waiting for the signal pays (Verbruggen et al. 2019)
+SST_MAX_STOP_RUN = 2  # stops are spread through the block, never bunched
+
+
+def sst_replay(p: dict, respond_on_stop: list[bool]) -> list[int]:
+    """The SSD each stop trial gets when the client's one-up/one-down staircase (StopSignal.tsx
+    nextSsd) meets these stop outcomes: later after a stop, earlier after a failed stop, within
+    [0, time_limit_ms]."""
+    ssd, out = p["ssd_start_ms"], []
+    for responded in respond_on_stop:
+        out.append(ssd)
+        ssd = min(p["time_limit_ms"], max(0, ssd + (-1 if responded else 1) * p["ssd_step_ms"]))
+    return out
+
+
+def verify_stop_signal(p: dict) -> list[str]:
+    out: list[str] = []
+    trials = p["trials"]
+    kinds = ["stop" if t["stop"] else "go" for t in trials]
+    n_stop = kinds.count("stop")
+    if n_stop == 0 or n_stop == len(trials):
+        out.append("a block needs both go and stop trials (SSRT)")
+        return out
+    if "stop" in kinds[:SST_FIRST_GO]:
+        out.append(f"one of the first {SST_FIRST_GO} trials is a stop trial")
+    if n_stop / len(trials) > SST_MAX_STOP_SHARE:
+        out.append(f"stop share {n_stop / len(trials):.2f} over {SST_MAX_STOP_SHARE:.2f} (invites waiting)")
+    run = 0
+    for i, k in enumerate(kinds):
+        run = run + 1 if k == "stop" else 0
+        if run > SST_MAX_STOP_RUN:
+            out.append(f"trial {i}: {run} stop trials in a row")
+            break
+    for kind in ("go", "stop"):
+        dirs = [t["dir"] for t, k in zip(trials, kinds) if k == kind]
+        if abs(dirs.count("left") - dirs.count("right")) > 1:
+            out.append(f"{kind} trials: left {dirs.count('left')} vs right {dirs.count('right')}")
+    if not 0 <= p["ssd_start_ms"] < p["time_limit_ms"]:
+        out.append("the first stop signal would come after the go window")
+    if not 0 < p["ssd_step_ms"] < p["time_limit_ms"]:
+        out.append("ssd_step_ms must be positive and inside the go window")
+    # Every SSD the staircase can reach stays inside the go window, whatever the user does.
+    reach = sst_replay(p, [False] * n_stop) + sst_replay(p, [True] * n_stop)
+    if any(not 0 <= s <= p["time_limit_ms"] for s in reach):
+        out.append("the staircase leaves the go window")
+    return out
+
+
+# ---------------------------------------------------------------------------------------------
+# pal
+
+PAL_PATTERNS = 8  # PairedAssociates.tsx draws 8 shapes, ids 0..7
+
+
+def pal_answers(stage: dict) -> list[int]:
+    """The box each recall step of a stage asks for: the box its pattern was studied in."""
+    box_of = {it["pattern"]: it["box"] for it in stage["items"]}
+    return [box_of[stage["items"][k]["pattern"]] for k in stage["recall"]]
+
+
+def verify_pal(p: dict) -> list[str]:
+    out: list[str] = []
+    for s, stage in enumerate(p["stages"]):
+        items, recall = stage["items"], stage["recall"]
+        boxes = [it["box"] for it in items]
+        patterns = [it["pattern"] for it in items]
+        if len(set(boxes)) != len(boxes):
+            out.append(f"stage {s}: two patterns share a box")
+        if len(set(patterns)) != len(patterns):
+            out.append(f"stage {s}: a pattern is shown twice")
+        if any(not 0 <= b < p["boxes"] for b in boxes):
+            out.append(f"stage {s}: a box outside 0..{p['boxes'] - 1}")
+        if any(not 0 <= q < PAL_PATTERNS for q in patterns):
+            out.append(f"stage {s}: a pattern outside 0..{PAL_PATTERNS - 1}")
+        if sorted(recall) != list(range(len(items))):
+            out.append(f"stage {s}: recall does not ask for every pattern once")
+            continue
+        if len(items) > 1 and recall == list(range(len(items))):
+            out.append(f"stage {s}: recall repeats the study order")
+        answers = pal_answers(stage)
+        if len(set(answers)) != len(answers):
+            out.append(f"stage {s}: two recall steps have the same box")
+    return out
+
+
+# ---------------------------------------------------------------------------------------------
+# flanker
+
+FLANKER_MAX_RUN = 3  # no cell (direction x congruency) more than 3 times in a row
+
+
+def flanker_row(t: dict) -> list[str]:
+    """The five arrows Flanker.tsx FlankerRow draws for a trial."""
+    other = "right" if t["dir"] == "left" else "left"
+    flank = t["dir"] if t["congruent"] else other
+    return [flank, flank, t["dir"], flank, flank]
+
+
+def verify_flanker(p: dict) -> list[str]:
+    out: list[str] = []
+    cells = []
+    for i, t in enumerate(p["trials"]):
+        row = flanker_row(t)
+        answer, congruent = row[2], len(set(row)) == 1
+        if answer != t["dir"] or congruent != t["congruent"]:
+            out.append(f"trial {i}: the row {row} does not show dir {t['dir']} / congruent {t['congruent']}")
+        cells.append((answer, congruent))
+    counts = {c: cells.count(c) for c in (("left", True), ("left", False), ("right", True), ("right", False))}
+    if min(counts.values()) == 0 or max(counts.values()) - min(counts.values()) > 1:
+        out.append(f"unbalanced cells {counts}")
+    run = 0
+    for i, c in enumerate(cells):
+        run = run + 1 if i and c == cells[i - 1] else 1
+        if run > FLANKER_MAX_RUN:
+            out.append(f"trial {i}: the same cell {run} times in a row")
+            break
+    return out
+
+
 VERIFIERS: dict[str, Callable[[dict], list[str]]] = {
+    "stop_signal": verify_stop_signal,
+    "pal": verify_pal,
+    "flanker": verify_flanker,
     "n_back": verify_n_back,
     "stroop": verify_stroop,
     "matrix": verify_matrix,

@@ -80,6 +80,91 @@ def test_every_exercise_is_present_with_its_trial_meta_signature(small):
     assert keys["ufov"] >= {"shown_ms", "peripheral_ok", "quest_threshold_ms"}
     assert keys["mst"] >= {"kind", "delta", "response"}
     assert keys["matrix"] == {"item_id"}
+    # F-B's exercises, with the signatures taskScores.ts schemaOf() reads first
+    assert keys["stop"] == {"item_id", "stop_trial", "dir", "response", "ssd_ms"}
+    assert keys["flanker"] == {"item_id", "flanker", "dir", "response"}
+    assert keys["pal"] == {"item_id", "pal_level", "attempt", "pattern", "box", "chosen", "pal_total", "boxes"}
+
+
+def test_the_scorers_see_every_input_the_exercises_feed(small):
+    """Twin and clustering read features.session_features: every sourced input shows up, and the
+    new exercises replace the Stroop stand-ins."""
+    from brain_twin_jepa.features import INPUT_IDS, UNSOURCED_INPUTS, session_features
+    from brain_twin_jepa.telemetry_io import dedupe, group_sessions
+
+    seen, proxies = set(), set()
+    for f in sorted(small.glob("*.jsonl")):
+        for session in group_sessions(dedupe(lines(f))):
+            inputs = session_features(session.events)["inputs"]
+            seen |= set(inputs)
+            proxies |= {k for k, v in inputs.items() if v.get("proxy")}
+    assert seen == set(INPUT_IDS) - set(UNSOURCED_INPUTS)
+    assert proxies == set()  # SSRT from Stop Light, ANT_Conflict from Arrow Focus
+
+
+def test_nback_follows_r16_with_off_rule_lures_and_presses():
+    events, _ = simulate_user(seed=4, index=0, sessions=6, params=QUIET)
+    nb = [e for e in events if e["task_id"].startswith("syn-nback")]
+    by_trial: dict = {}
+    for e in nb:
+        by_trial.setdefault((e["session_id"], e["trial_index"]), []).append(e)
+    assert all([x["trial_meta"]["stream"] for x in es] == ["position", "symbol"] for es in by_trial.values())
+    rules = {e["trial_meta"]["rule"] for e in nb}
+    assert rules == {"position", "symbol"}  # switch trials flip the hint
+    off = [e for e in nb if e["trial_meta"]["stream"] != e["trial_meta"]["rule"]]
+    assert {e["trial_meta"]["trial_type"] for e in off} == {"lure_stream", "standard"}
+    pressed = [e for e in off if e["error_flag"]]
+    assert pressed, "some off-rule presses"
+    lure_rate = statistics.fmean(e["error_flag"] for e in off if e["trial_meta"]["trial_type"] == "lure_stream")
+    plain_rate = statistics.fmean(e["error_flag"] for e in off if e["trial_meta"]["trial_type"] == "standard")
+    assert lure_rate > plain_rate  # a match on the other stream pulls the off-rule key
+    for es in by_trial.values():
+        rule_e = next(x for x in es if x["trial_meta"]["stream"] == x["trial_meta"]["rule"])
+        off_e = next(x for x in es if x is not rule_e)
+        if off_e["error_flag"]:  # an off-rule press makes the trial's verdict wrong (R16)
+            assert rule_e["error_flag"]
+        assert rule_e["trial_meta"]["item_id"] == off_e["trial_meta"]["item_id"]
+
+
+def test_ssrt_and_flanker_cost_are_recovered_from_the_emitted_events():
+    """The integration SSRT tracks the user's true SSRT, and the flanker RT cost the true cost."""
+    from brain_twin_jepa.features import ssrt
+
+    est, true, cost, true_cost = [], [], [], []
+    for i in range(80):
+        events, truth = simulate_user(seed=21, index=i, sessions=2, params=QUIET)
+        for t in truth["sessions"]:
+            es = [e for e in events if e["session_id"] == t["session_id"]]
+            value = ssrt([e for e in es if "stop_trial" in e["trial_meta"]])
+            if value is not None:
+                est.append(value)
+                true.append(t["ssrt_ms"])
+            fl = [e for e in es if "flanker" in e["trial_meta"] and not e["error_flag"]]
+            inc = [e["response_time_ms"] for e in fl if e["trial_meta"]["flanker"] == "incongruent"]
+            con = [e["response_time_ms"] for e in fl if e["trial_meta"]["flanker"] == "congruent"]
+            cost.append(statistics.fmean(inc) - statistics.fmean(con))
+            true_cost.append(t["flanker_cost_ms"])
+    assert len(est) >= 150  # the staircase keeps P(respond | signal) inside the guide's range
+    assert statistics.correlation(est, true) > 0.4
+    assert abs(statistics.fmean(est) - statistics.fmean(true)) < 25
+    assert statistics.correlation(cost, true_cost) > 0.3
+    assert abs(statistics.fmean(cost) - statistics.fmean(true_cost)) < 15
+
+
+def test_pal_stops_at_the_first_stage_failed_three_times():
+    events, _ = simulate_user(seed=8, index=3, sessions=8, params=QUIET)
+    pal = [e for e in events if e["task_id"].startswith("syn-pal")]
+    for sid in {e["session_id"] for e in pal}:
+        es = [e for e in pal if e["session_id"] == sid]
+        stages = [e["trial_meta"]["pal_level"] for e in es]
+        assert stages == sorted(stages) and stages[0] == 2
+        for level in set(stages):
+            attempts = [e for e in es if e["trial_meta"]["pal_level"] == level]
+            last = max(e["trial_meta"]["attempt"] for e in attempts)
+            failed_last = any(e["error_flag"] for e in attempts if e["trial_meta"]["attempt"] == last)
+            if failed_last:  # a stage failed on its 3rd attempt ends the task
+                assert last == 3 and level == max(stages)
+        assert all(e["trial_meta"]["pal_total"] == 20 and e["trial_meta"]["boxes"] == 8 for e in es)
 
 
 def test_ground_truth_sidecar_stays_out_of_the_ingest_glob(small):

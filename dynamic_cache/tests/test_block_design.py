@@ -8,6 +8,7 @@ from itertools import groupby
 import pytest
 
 from dynamic_cache.generators import SCHEMA_TYPES, generate, generate_block, validate_payload
+from dynamic_cache.parameter_projector import BOUNDS
 
 SEEDS = range(0, 60, 7)
 
@@ -115,7 +116,58 @@ LENGTH = {
     "mst": ({"repeats": 3, "lures": 4, "foils": 2}, lambda p: len(p["test"]) == 9 and len(p["encode"]) == 7),
     "tower": ({"l_min": 4}, lambda p: p["l_min"] == 4),
     "matrix": ({"n_options": 5}, lambda p: len(p["options"]) == 5),
+    "stop_signal": ({"trials": 64}, lambda p: len(p["trials"]) == 64 and sum(t["stop"] for t in p["trials"]) == 16),
+    "pal": ({"stages": [2, 3]}, lambda p: [len(s["items"]) for s in p["stages"]] == [2, 3]),
+    "flanker": ({"trials": 32}, lambda p: len(p["trials"]) == 32),
 }
+
+
+# ---- F-B's exercises: the designs their fixtures and research pin --------------------------------
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_stop_signal_follows_the_consensus_guide(seed):
+    """200 trials, 25% stops (50, the guide's minimum), spread 2 per 8 trials, opening on go."""
+    p = generate("stop_signal", 0.5, seed)["params"]
+    trials = p["trials"]
+    stops = [t["stop"] for t in trials]
+    assert len(trials) == 200 and sum(stops) == 50
+    assert all(sum(stops[i : i + 8]) == 2 for i in range(0, 200, 8))
+    assert stops[:2] == [False, False]
+    assert (p["time_limit_ms"], p["fixation_ms"], p["ssd_start_ms"], p["ssd_step_ms"]) == (1250, 500, 250, 50)
+    for kind in (True, False):
+        dirs = Counter(t["dir"] for t in trials if t["stop"] is kind)
+        assert dirs["left"] == dirs["right"]
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_pal_is_cantab_pal_2_to_8(seed):
+    p = generate("pal", 0.5, seed)["params"]
+    assert [len(s["items"]) for s in p["stages"]] == [2, 4, 6, 8]  # 20 patterns in all
+    assert (p["boxes"], p["study_ms"], p["time_limit_ms"], p["max_attempts"]) == (8, 2000, 20000, 3)
+    for s in p["stages"]:
+        assert len({x["box"] for x in s["items"]}) == len({x["pattern"] for x in s["items"]}) == len(s["items"])
+        assert sorted(s["recall"]) == list(range(len(s["items"]))) != s["recall"]
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_flanker_is_one_ant_block(seed):
+    trials = generate("flanker", 0.5, seed)["params"]["trials"]
+    assert len(trials) == 96
+    assert set(Counter((t["dir"], t["congruent"]) for t in trials).values()) == {24}
+    assert max(len(list(g)) for _, g in groupby((t["dir"], t["congruent"]) for t in trials)) <= 3
+
+
+@pytest.mark.parametrize("schema_type", ["mst", "stop_signal", "pal", "flanker"])
+def test_fixed_designs_ignore_theta(schema_type):
+    # the protocol fixes these blocks (only the shuffle follows the seed), so the dispatcher pins
+    # them to one theta level
+    def design(theta):
+        p = generate(schema_type, theta, 6)["params"]
+        return {k: v for k, v in p.items() if k not in ("trials", "stages", "encode", "test")}
+
+    assert design(0.0) == design(1.0)
+    assert BOUNDS[schema_type] == (0.5, 0.5)
 
 
 def test_every_schema_has_a_length_or_size_knob():
@@ -129,7 +181,9 @@ def test_length_option(schema_type):
     assert check(payload["params"]) and validate_payload(payload) == []
 
 
-@pytest.mark.parametrize("schema_type", ["n_back", "stroop", "mental_rotation", "relational", "ufov", "mst"])
+@pytest.mark.parametrize(
+    "schema_type", ["n_back", "stroop", "mental_rotation", "relational", "ufov", "mst", "stop_signal", "pal", "flanker"]
+)
 def test_single_payload_blocks(schema_type):
     assert generate_block(schema_type, 0.5, 4) == [generate(schema_type, 0.5, 4)]
     with pytest.raises(ValueError):

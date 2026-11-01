@@ -600,7 +600,7 @@ def disp(tmp_path):
         d.close()
 
 
-KEY_S = ("neutral", "stroop", 0.5)
+KEY_S = ("neutral", "stroop", 0.5, "classic")  # the dispatcher's key; pool_stock lists it as KEY_S[:3]
 
 
 def test_offer_needs_a_pool_in_use(disp):
@@ -608,12 +608,23 @@ def test_offer_needs_a_pool_in_use(disp):
     assert d.offer("neutral", "stroop", 0.5, llm_entries(2)) == 0  # no such pool: never created
     assert KEY_S not in d._pools and d.pool_stock() == {}
     d.warm(schema_types=("stroop",), at=0.5)
-    assert d.pool_stock() == {KEY_S: (8, 0)}
+    assert d.pool_stock() == {KEY_S[:3]: (8, 0)}
     mono.t += d.pool_idle_s + 1  # idle: floor 0
     assert d.offer("neutral", "stroop", 0.5, llm_entries(2)) == 0
     assert d.pool_stock() == {}  # only pools in use are listed
     d.close()
     assert d.offer("neutral", "stroop", 0.5, llm_entries(2)) == 0
+
+
+def test_cvd_safe_stroop_pools_are_never_offered_llm_variants(disp):
+    """LLM Stroop variants are checked against the classic inks only, so a colour-blind-safe pool
+    (SRV-1's inks key) is neither listed nor stocked."""
+    d, _ = disp()
+    d.next_task("u0", schema_type="stroop", inks="cvd_safe")
+    assert ("neutral", "stroop", 0.5, "cvd_safe") in d._pools
+    assert d.pool_stock() == {}
+    assert d.offer("neutral", "stroop", 0.5, llm_entries(2)) == 0  # no classic pool in use
+    assert not any(e.source == lw.LLM_SOURCE for e in d._pools[("neutral", "stroop", 0.5, "cvd_safe")])
 
 
 def test_offer_to_a_pool_created_by_a_request_does_not_raise(disp):
