@@ -101,7 +101,7 @@ The maintained client is `frontend/src/features/assessment/`. Member 1 owns that
 **The flow.**
 1. `/` Welcome: Loti says hi, one button, Start.
 2. `/baseline`: **six exercises in a row** (R10): Logic Web, Memory Gauntlet, Color Clash, Strategic Blueprint, Perceptual Radar, Precision Archive. One session is saved on the device at the end.
-3. `/results`: the 5-skill chart blurred, the Dolphin, then the data choice, then the chart un-blurs.
+3. `/results`: the 5-skill chart blurred, Momo's leap, then the data choice, then the chart un-blurs.
 4. `/dashboard` (Home).
 
 A **returning device** (one saved session or more) skips Welcome and the baseline: `/` and `/baseline` redirect to Home. `/baseline?again=1` is the retake.

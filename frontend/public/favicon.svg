@@ -1,30 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
-  <rect width="256" height="256" rx="56" fill="#0F172A"/>
-  <path fill="#F8FAFC" fill-rule="evenodd" d="
-    M 56,32
-    H 136
-    C 176,32 206,56 206,90
-    C 206,112 192,122 168,124
-    C 148,126 124,126 100,126
-    C 124,130 148,130 168,132
-    C 192,134 212,146 212,174
-    C 212,206 178,224 136,224
-    H 56
-    C 48,224 44,220 44,212
-    V 44
-    C 44,36 48,32 56,32
-    Z
-    M 84,60
-    H 132
-    C 156,60 172,70 172,88
-    C 172,106 156,114 132,114
-    H 84
-    Z
-    M 84,142
-    H 132
-    C 158,142 176,152 176,170
-    C 176,188 158,196 132,196
-    H 84
-    Z
-  "/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- The SynapseTwin mark: Loti's bust in an open circle arc (src/components/features/brand/Logo.tsx). -->
+  <defs>
+    <clipPath id="bust">
+      <circle cx="32" cy="35" r="26"/>
+    </clipPath>
+  </defs>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <g id="gills">
+      <path d="M22 18 C20 13 16 9 15 4" stroke="#F7937A" stroke-width="7.2"/>
+      <path d="M22 18 C20 13 16 9 15 4" stroke="#D6EEF9" stroke-width="3"/>
+      <path d="M18 23 C13 19 9 16 4 15" stroke="#F7937A" stroke-width="7.2"/>
+      <path d="M18 23 C13 19 9 16 4 15" stroke="#D6EEF9" stroke-width="3"/>
+      <path d="M17 30 C12 30 8 31 4 33" stroke="#F7937A" stroke-width="7.2"/>
+      <path d="M17 30 C12 30 8 31 4 33" stroke="#D6EEF9" stroke-width="3"/>
+    </g>
+    <use href="#gills" transform="translate(64 0) scale(-1 1)"/>
+    <path d="M22 36 C21 46 15 54 10 64 L54 64 C49 54 43 46 42 36 Z" fill="#A6DAF0" stroke="#33698C" stroke-width="2.4" clip-path="url(#bust)"/>
+    <path d="M27 50 C26 54 26 58 27 61" stroke="#33698C" stroke-width="2" clip-path="url(#bust)"/>
+    <ellipse cx="32" cy="27" rx="17" ry="12.5" fill="#A6DAF0" stroke="#33698C" stroke-width="2.4"/>
+    <ellipse cx="26.5" cy="27" rx="1.9" ry="2.2" fill="#1A3747"/>
+    <ellipse cx="37.5" cy="27" rx="1.9" ry="2.2" fill="#1A3747"/>
+    <path d="M27.5 32 Q32 35.5 36.5 32" stroke="#1A3747" stroke-width="1.8"/>
+    <path d="M7.6 43.9 A26 26 0 0 0 56.4 43.9" stroke="#33698C" stroke-width="2.6"/>
+  </g>
 </svg>

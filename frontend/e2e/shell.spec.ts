@@ -53,7 +53,7 @@ test.describe('App shell (ticket 09a)', () => {
     }
   }
 
-  // INT-1: the board (#root) fills the wood frame exactly; nothing adds height to a short page.
+  // INT-1: the board (#root) fills the page margin exactly; nothing adds height to a short page.
   for (const [width, height] of [[375, 812], [1440, 900]] as const) {
     for (const url of ['/you', '/task/working_memory?schema=n_back']) {
       test(`at ${width}px a short page (${url}) is no taller than the viewport`, async ({ page }) => {
@@ -75,7 +75,7 @@ test.describe('App shell (ticket 09a)', () => {
     })
   }
 
-  test('the phone tabs sit on the board, inside the wood frame; header, footer and tabs are the board', async ({ page }) => {
+  test('the phone tabs sit on the board, inside the page margin; header, footer and tabs are the board', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 })
     await page.goto('/you', { waitUntil: 'networkidle' })
     for (const theme of ['light', 'dark'] as const) {

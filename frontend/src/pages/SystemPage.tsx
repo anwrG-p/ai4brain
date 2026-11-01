@@ -4,9 +4,9 @@ import { Loti, type LotiPose } from '../components/features/characters'
 export type SystemView = 'not-found' | 'offline' | 'error'
 
 const VIEWS: Record<SystemView, { pose: LotiPose; title: string; line: string }> = {
-  'not-found': { pose: 'think', title: "This page isn't here.", line: "Let's go back home." },
-  offline: { pose: 'idle', title: "You're offline.", line: 'Your answers are saved on this device.' },
-  error: { pose: 'idle', title: 'Something went wrong.', line: 'Your answers are safe. Try again from home.' },
+  'not-found': { pose: 'low', title: "This page isn't here.", line: "Let's go back home." },
+  offline: { pose: 'low', title: "You're offline.", line: 'Your answers are saved on this device.' },
+  error: { pose: 'low', title: 'Something went wrong.', line: 'Your answers are safe. Try again from home.' },
 }
 
 /* The three plain states (ticket 09a): an unknown route, offline and an error. Loti, one heading,
