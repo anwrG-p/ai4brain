@@ -1143,8 +1143,8 @@ class Dispatcher:
         - The pool never passes its demand target (_want): when it is full, an LLM entry takes the
           place of a procedural one (the rightmost), and stops when only paid entries are left.
         - Every entry goes through _add, so the byte tallies and POOL_BYTES_MAX hold; the first
-          refusal stops the offer. Entries above the floor count into the growth budget, as
-          _refilled counts them.
+          refusal stops the offer. As in _refilled, an entry above the floor counts into the growth
+          share and one within it into the floors' share (floor_bytes_max).
         - LLM entries go to the left: served first, and never the ones _sweep trims (it pops from
           the right).
         Demand, activity and in-flight counts are not touched: an offer is not a pop.
@@ -1166,19 +1166,25 @@ class Dispatcher:
                 # Every check before the eviction, so a refused offer never costs a procedural entry.
                 size, out = len(entry.body), len(pool[-1].body) if evict else 0
                 above = len(pool) - evict >= floor
-                freed = out if evict and len(pool) > floor else 0
+                freed = out if evict and len(pool) > floor else 0  # the evicted entry sat above the floor
+                out_within = out if evict and len(pool) <= floor else 0  # ... or within it
                 if above and self._growth_bytes - freed + size > self.pool_growth_bytes:
-                    break  # the growth budget
+                    break  # the growth share
+                if not above and self._floor_bytes - out_within + size > self.floor_bytes_max:
+                    break  # the floors' share
                 if self._pool_bytes - out + size > self.pool_bytes_max:
                     break  # the hard cap
                 if evict:
                     self._take(pool_key, pool.pop())
                     self._growth_bytes -= freed
+                    self._floor_bytes -= out_within
                 if not self._add(pool_key, entry):
                     break  # the hard cap (not reached: checked above)
                 pool.appendleft(pool.pop())  # _add appended it on the right
                 if above:
-                    self._growth_bytes += len(entry.body)
+                    self._growth_bytes += size
+                else:
+                    self._floor_bytes += size
                 taken += 1
             return taken
 

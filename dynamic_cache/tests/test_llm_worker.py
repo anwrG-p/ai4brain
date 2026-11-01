@@ -470,6 +470,21 @@ def test_the_daily_budget_is_respected_and_survives_a_restart(setup, tmp_path):
     assert again.run_once() == "ok" and len(fake2.requests) == 1
 
 
+def test_variants_the_dispatcher_refuses_cool_the_pool(setup, monkeypatch):
+    """Accepted but not stocked (no room): a miss, so the pool cools down instead of being asked
+    again at once."""
+    clock = Clock()
+    seeds = iter(range(1, 100))
+    d, worker, fake = setup(lambda request: reply([params("matrix", 0.5, next(seeds))]), schema="matrix", clock=clock)
+    monkeypatch.setattr(d, "offer", lambda *a, **k: 0)
+    assert worker.run_once() == "ok"
+    assert worker.stats["accepted"] == 1 and worker.stats["offered"] == 0
+    clock.t += 60
+    assert worker.run_once() == "no_target" and len(fake.requests) == 1  # cooling
+    clock.t += lw.POOL_COOL_FIRST_S
+    assert worker.run_once() == "ok" and len(fake.requests) == 2
+
+
 def test_an_unreadable_budget_is_spent_today_and_rewritten(setup, tmp_path, caplog):
     clock = Clock()
     d, worker, fake = setup(reply([params("relational", 0.5, 1)]), clock=clock)
@@ -638,11 +653,41 @@ def test_a_full_pool_of_paid_entries_takes_no_more(disp):
 
 
 def test_an_offer_stops_at_pool_bytes_max(disp):
-    d, _ = disp(pool_bytes_max=25_000)
+    # The growth share below the cap, as in test_dispatcher (else the floors' share is negative and
+    # the pool loses its floor); the floors' share still covers 8 entries at the 16 KB size guess.
+    d, _ = disp(pool_bytes_max=300_000)
+    d.pool_growth_bytes = 1_000
     d.next_task("u0", schema_type="stroop")
-    assert d.offer("neutral", "stroop", 0.5, llm_entries(5, size=10_000)) == 2
-    assert d._pool_bytes == 20_000 <= d.pool_bytes_max
+    assert d.offer("neutral", "stroop", 0.5, llm_entries(5, size=100_000)) == 2
+    assert d._pool_bytes == 200_000 <= d.pool_bytes_max
     bytes_consistent(d)
+
+
+def test_an_offer_keeps_the_floor_share_tally(disp):
+    """Entries landing within the floor count into _floor_bytes and stop at floor_bytes_max, as in
+    _refilled; an evicted procedural entry within the floor is taken off it. The tally after an
+    offer matches the sweep's own recount."""
+    d, mono = disp()
+    d.pool_growth_bytes = d.pool_bytes_max - 150_000  # floors' share: 150 000 bytes
+    d.next_task("u0", schema_type="stroop")
+    assert d.offer("neutral", "stroop", 0.5, llm_entries(3, size=100_000)) == 1  # the 2nd passes it
+    assert d._floor_bytes == 100_000 <= d.floor_bytes_max
+
+    d2, mono2 = disp()
+    d2.warm(schema_types=("stroop",), at=0.5)  # 8 procedural entries, all within the floor
+    with d2._lock:
+        d2._swept_at = 0.0
+        d2._sweep(mono2.t)
+        tallied = d2._floor_bytes
+    out = len(d2._pools[KEY_S][-1].body)
+    new = llm_entries(1)
+    assert d2.offer("neutral", "stroop", 0.5, new) == 1  # full: the rightmost procedural one makes way
+    assert d2._floor_bytes == tallied - out + len(new[0].body)
+    with d2._lock:
+        d2._swept_at = 0.0
+        d2._sweep(mono2.t)
+    assert d2._floor_bytes == tallied - out + len(new[0].body)  # the sweep agrees
+    bytes_consistent(d2)
 
 
 def test_offered_entries_survive_a_sweep_at_low_demand(disp):
@@ -691,8 +736,10 @@ def test_a_pool_that_is_always_rejected_does_not_starve_the_others(setup):
     clock = Clock()
     d, worker, _ = setup(answer, clock=clock, rpm=60, per_pool=100)
     d.next_task("warm2", schema_type="stroop")  # a second pool in use
-    for _ in range(12):  # t = 0, 30, ..., 330 s
+    for k in range(12):  # t = 0, 30, ..., 330 s
         worker.run_once()
+        for u in range(2):  # stroop is played, so its pool keeps room for the 2 new variants
+            d.next_task(f"player{k}-{u}", schema_type="stroop")
         clock.t += 30
     # relational: at 0 s, then when its first cool-down (300 s) ended; the next one is 600 s
     assert calls["relational"] == 2 and worker.stats["rejected_solver"] == 2

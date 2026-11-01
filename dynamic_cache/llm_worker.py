@@ -27,8 +27,9 @@ cache_dispatcher.schema_of() working, so trials on LLM variants step the stairca
 Each accepted variant is also written to a content-addressed archive (LLM_VARIANT_DIR), so a
 session replay after a restart serves the same bytes: an LLM variant cannot be rebuilt from a seed.
 
-A call that yields no accepted variant puts its pool on a cool-down (POOL_COOL_FIRST_S, doubling
-to MAX_BACKOFF_S), so one pool whose replies are always rejected cannot take the whole budget.
+A call that puts no variant in the pool (none accepted, or the dispatcher had no room) puts its
+pool on a cool-down (POOL_COOL_FIRST_S, doubling to MAX_BACKOFF_S), so one pool whose replies are
+always rejected, or that has no room, cannot take the whole budget.
 
 Fail safe. With no GEMINI_API_KEY, with LLM_POOL_RPM=0 or LLM_POOL_DAILY_CAP=0, or with a bad
 setting, no worker exists and no call is made. A Gemini error, a safety block, a 429 or no network
@@ -606,7 +607,7 @@ class LlmPoolWorker:
         return min(wanted)[1] if wanted else None
 
     def _miss(self, target: tuple[str, str, float], now: float) -> None:
-        """A call that yielded no accepted variant: that pool cools down, doubling per miss."""
+        """A call that put no variant in the pool: that pool cools down, doubling per miss."""
         _, misses = self._cool.get(target, (0.0, 0))
         self._cool[target] = (now + min(MAX_BACKOFF_S, POOL_COOL_FIRST_S * 2**misses), misses + 1)
 
@@ -679,12 +680,12 @@ class LlmPoolWorker:
                 continue
             entries.append(Entry(payload["task_id"], serialise(payload), 0, LLM_SOURCE))
         self.stats["accepted"] += len(entries)
-        if entries:
+        offered = d.offer(archetype, schema_type, level, entries) if entries and not self._stop.is_set() else 0
+        self.stats["offered"] += offered
+        if offered:
             self._cool.pop(target, None)
-        else:
+        else:  # nothing accepted, or the dispatcher had no room: either way, this pool waits
             self._miss(target, now)
-        if entries and not self._stop.is_set():
-            self.stats["offered"] += d.offer(archetype, schema_type, level, entries)
         day = Budget.day(now)
         if day != self._purged_day:
             self._purged_day = day

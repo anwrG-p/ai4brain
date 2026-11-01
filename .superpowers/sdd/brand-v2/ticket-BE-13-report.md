@@ -1,5 +1,26 @@
 # Ticket BE-13 report: LLM pool worker
 
+## Final round (this section wins over everything below where they disagree)
+
+- **Merged first.** `feat/ui-calm-clean` `bca71d8` is merged in. It brings BE-04's floor share: `floor_bytes_max`, `_floor_bytes`, `_no_floor`, `pool_growth_bytes`.
+- **`test_an_offer_stops_at_pool_bytes_max`.**
+  - **Cause:** with a 25 000-byte cap and the default 32 MB growth share, the floors' share was negative. The sweep then took the pool's floor away, so `offer` refused it.
+  - **Fix:** the test now sets `d.pool_growth_bytes = 1_000`, as `test_dispatcher.py` does.
+  - The cap is 300 000 so the floors' share still covers 8 entries at the 16 KB size guess. Two of the 100 kB entries are taken.
+- **`offer()` mirrors `_refilled`'s floor-share tally.**
+  - An entry landing within the floor stops the offer if `_floor_bytes - out_within + size > floor_bytes_max`.
+  - Otherwise `_floor_bytes` gains `size`, and loses `out` when the evicted procedural entry sat within the floor.
+  - The growth-share and hard-cap checks run beforehand too, so a refused offer never costs stock.
+  - Test `test_an_offer_keeps_the_floor_share_tally`:
+    - with a 150 000-byte floors' share, one 100 kB entry is taken and the second is refused;
+    - in a full warmed pool, an eviction within the floor moves `_floor_bytes` by `+size - out`;
+    - a sweep's recount agrees with that tally.
+- **`llm_worker`: offered == 0 is a miss.** Variants that pass the gates but that the dispatcher does not stock now cool the pool. Only `offered > 0` clears a cool-down.
+  - Test `test_variants_the_dispatcher_refuses_cool_the_pool`: accepted 1 and offered 0, then `no_target` while the pool cools, then a call once the 300 s are over.
+  - `test_a_pool_that_is_always_rejected_does_not_starve_the_others` now plays 2 stroop tasks per cycle. Without that, the stroop pool fills with paid entries and, correctly, cools.
+- **Report:** the obsolete "add the one `_pool_bytes` line" request is removed.
+- **Tests:** `pytest -q -W error -m "not benchmark"` from the repo root on this tree gives **1450 passed, 1 failed, 4 deselected, 1 xfailed**. The failure is `test_tasks_api.py::test_the_port_matches_task_source_ts`, known red on main (SRV-1 owns it). `test_llm_worker.py` has 59 tests.
+
 ## Review round 1 (this section wins over the rest where they disagree)
 
 - **Merged first.** `ce15688` merges main `feat/ui-calm-clean` (`1ad9e5f`, BE-04 `86670de` hot pools included) into this branch. Every fix below was made on the merged tree. On it, 7 of the 45 old tests failed with `KeyError` in `_take`, because the old `offer` extended the deque without `_key_bytes`.
@@ -26,7 +47,7 @@
 |---|---|
 | `_pool_bytes == sum(len(body))` after offers and pops | `test_pool_bytes_stay_exact_through_offers_and_pops`; also checks `_key_bytes` per pool, LLM first, the three procedural entries that made way, and the served order |
 | Offered entries survive a sweep at low demand | `test_offered_entries_survive_a_sweep_at_low_demand`: wave target 20, 3 offers, demand decays, sweep to 8, and the 3 paid entries stay |
-| An offer stops at `pool_bytes_max` | `test_an_offer_stops_at_pool_bytes_max`: cap 25 000, 10 kB entries, 2 taken |
+| An offer stops at `pool_bytes_max` | `test_an_offer_stops_at_pool_bytes_max`: cap 300 000 with a 1 000-byte growth share (since the final round), 100 kB entries, 2 taken |
 | An offer to a pool created by a request's `setdefault` doesn't KeyError | `test_offer_to_a_pool_created_by_a_request_does_not_raise`: then 5 pops, with the tallies exact after each |
 | Pools not in use | `test_offer_needs_a_pool_in_use` (no pool, an idle pool, closed; `pool_stock` excludes idle pools) |
 | Other cases | `test_a_full_pool_of_paid_entries_takes_no_more`, `test_an_offer_is_not_demand` |
@@ -62,7 +83,7 @@
 
 - My dispatcher edits in this round are only inside `offer()` and `pool_stock()`, plus their docstring and the one module-docstring bullet.
 - The hook from round 0 stays: `Entry.source`, the `variants` lookup in `_replay`, and `source` in the session recipe.
-- The "one line needed after the merge" note further down is obsolete: the merge is done, and `offer` uses `_add`.
+- The hot-pools merge is done, and `offer` stocks every entry through `_add`.
 
 - **Branch:** `worktree-agent-acbeb86e4db59c962`, reset to `e36227e` (as instructed, not `ae67522`).
 - **Commits** (no AI attribution):
@@ -96,17 +117,7 @@ Not touched: `brain_twin_jepa/**`, `docs/ui/contracts.md`, the `v1_interop` stan
 - `Entry` gains `source: str = "procedural"` (a NamedTuple default, so every existing constructor still works). `PROCEDURAL` is a new constant.
 - The constructor gains `variants: Callable[[str], bytes | None]`, a task_id → body lookup for replays. It sits next to `archetype`, away from the hot-pools edits.
 - The session recipe now records `"source": entry.source` (BE-04's request). `_replay` reads a recipe that is not procedural through `variants` and does not rebuild from the seed. When the variant is missing, the session gets a new task, the same fallback as a runtime mismatch.
-- `offer(archetype, schema_type, level, entries) -> int` adds non-procedural entries only, up to 2 × `pool_size` per pool. It refuses everything after `close()`.
-- `pool_stock()` returns `{pool_key: (entries, llm_entries)}`, so the worker fills only pools that are in use.
-
-**Merge with `98f1381` (checked).**
-- `git merge-tree` shows no conflict.
-- I trial-merged in this worktree, ran the LLM worker, dispatcher and tasks-API suites (163 passed, `-W error`), then aborted the merge.
-- **One line is needed after the merge**, because hot pools count pool bytes and decrement them on every pop. In `offer`, after `pool.extend(taken)`, add:
-  ```python
-  self._pool_bytes += sum(len(e.body) for e in taken)
-  ```
-- After the merge, the reviewer may also want the cap at `self.pool_max` rather than `2 * self.pool_size`.
+- `offer(archetype, schema_type, level, entries) -> int` and `pool_stock()`: as described in the review-round sections at the top, which supersede the round-0 version.
 
 ## How it works
 
@@ -243,7 +254,6 @@ The worker found no pool at boot and waited `IDLE_S` = 30 s. It then targeted th
   - `GET /v1/tasks/next` has no `inks` parameter, so the cvd_safe setting does nothing on the server. FastAPI ignores unknown query parameters.
   - One of these is needed: the route accepts `inks` (with cvd_safe only once `black` is mapped), or the guard is updated.
 
-- **Hot-pools merge (`98f1381`):** add the one `_pool_bytes` line in `offer` (above). Optionally cap at `pool_max`.
 - **BE-03 owner / reviewer:** please confirm the `BLOCKED` additions and the re-recorded relational golden hash (`3851670`). Drop that commit if you would rather fix it differently, but all of those words were being served.
 - **Ops:** the volume `llm_variants` is in compose. With a key set, watch the `LLM pool:` INFO line for the rejection mix. `LLM_POOL_RPM=0` switches the worker off without removing the key, so the coach keeps its LLM.
 - **Live key run (whoever holds the key):** start the server with the key, request each of the three schemas once, wait about 2 minutes, and read `worker.stats` / the log. If Gemini rejects the converted schema for relational (HTTP 400 on every relational call), drop `responseSchema` for that schema and keep only the JSON mime type: the local gates do not depend on it.
