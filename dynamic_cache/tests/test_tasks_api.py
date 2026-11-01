@@ -127,7 +127,7 @@ def test_delete_clears_the_registry(client, tmp_path):
     assert (reg / "u1.json").exists() and (reg / "u2.json").exists()
 
     r = client.delete("/v1/user/telemetry", params={"user_id": "U1"})
-    assert r.status_code == 200 and r.json() == {"deleted_events": 0, "deleted_files": 1}
+    assert r.status_code == 200 and r.json() == {"deleted_events": 0, "deleted_chat_turns": 0, "deleted_files": 1}
     assert not (reg / "u1.json").exists()
     assert (reg / "u2.json").exists()  # other users untouched
     assert api.get_dispatcher().export("u1") is None  # memory too, not only the file
@@ -140,7 +140,7 @@ def test_export_includes_the_registry(client):
     r = client.get("/v1/user/export", params={"user_id": "u1"})
     assert r.status_code == 200
     rows = [json.loads(line) for line in r.text.splitlines()]
-    assert len(rows) == 1 and rows[0]["store"] == "task_registry" and rows[0]["user_id"] == "u1"
+    assert len(rows) == 1 and rows[0]["record"] == "task_registry" and rows[0]["user_id"] == "u1"
     assert set(rows[0]["data"]) == {"v", "seen", "sessions", "schemas", "last"}
 
 
@@ -161,7 +161,7 @@ def test_export_puts_the_registry_after_the_events(client):
     assert client.post("/v1/telemetry/event", json=event).status_code == 202
     client.get(URL, params={"user_id": "u1"})
     rows = [json.loads(line) for line in client.get("/v1/user/export", params={"user_id": "u1"}).text.splitlines()]
-    assert rows[0]["task_id"] == "n_back-1-abc" and rows[1]["store"] == "task_registry"
+    assert rows[0]["task_id"] == "n_back-1-abc" and rows[1]["record"] == "task_registry"
 
 
 def test_openapi_documents_the_payload(client):
@@ -212,7 +212,7 @@ def test_store_hooks_keep_to_an_explicit_directory(client, tmp_path):
     (tool_dir / "task_registry" / "u1.json").write_text('{"v": 1}')
     rows = export_user("u1", tool_dir).decode().splitlines()
     assert [json.loads(r)["data"] for r in rows] == [{"v": 1}]
-    assert delete_user("u1", tool_dir) == {"deleted_events": 0, "deleted_files": 1}
+    assert delete_user("u1", tool_dir) == {"deleted_events": 0, "deleted_chat_turns": 0, "deleted_files": 1}
     assert not (tool_dir / "task_registry" / "u1.json").exists()
     assert served.read_bytes() == before  # the served registry is untouched
 

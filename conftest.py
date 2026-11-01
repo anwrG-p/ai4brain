@@ -21,3 +21,10 @@ def _isolated_task_registry(tmp_path_factory, monkeypatch):
     yield
     api.set_dispatcher(previous)
     dispatcher.close()
+
+
+@pytest.fixture(autouse=True)
+def _isolated_coach_store(tmp_path_factory, monkeypatch):
+    """Every suite (not only backend/tests) deletes and exports against a temporary coach chat
+    history, never the real data/processed/coach: the privacy delete and export cover that store."""
+    monkeypatch.setenv("COACH_DIR", str(tmp_path_factory.mktemp("coach")))
