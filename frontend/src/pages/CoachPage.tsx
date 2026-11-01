@@ -35,9 +35,9 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
     voicePace,
     isSpeaking,
     isListening,
+    isPromptingMic,
     micError,
     synthesisSupported,
-    recognitionSupported,
     toggleVoice,
     setVoicePace,
     speak,
@@ -277,40 +277,46 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
         </div>
       )}
 
-      {/* Free-text chat input form with optional speech dictation */}
+      {/* Free-text chat input form with speech dictation */}
       <form onSubmit={handleSend} className="flex flex-col gap-1.5 pt-2">
         <div className="flex items-center gap-2">
-          {recognitionSupported && (
-            <Button
-              type="button"
-              variant={isListening ? 'primary' : 'secondary'}
-              size="sm"
-              onClick={() =>
-                listen((finalTranscript) => {
-                  setInput((prev) => (prev ? `${prev} ${finalTranscript}` : finalTranscript))
-                })
-              }
-              aria-label={isListening ? 'Stop listening' : 'Speak to Loti'}
-              title={isListening ? 'Stop listening' : 'Speak to Loti'}
-              className={isListening ? 'animate-pulse' : ''}
-              leftIcon={
-                isListening ? (
-                  <MicOff size={16} strokeWidth={1.75} aria-hidden="true" />
-                ) : (
-                  <Mic size={16} strokeWidth={1.75} aria-hidden="true" />
-                )
-              }
-            >
-              <span className="sr-only sm:not-sr-only sm:inline">{isListening ? 'Listening' : 'Speak'}</span>
-            </Button>
-          )}
+          <Button
+            type="button"
+            variant={isListening ? 'primary' : 'secondary'}
+            size="sm"
+            onClick={() =>
+              listen((finalTranscript) => {
+                setInput((prev) => (prev ? `${prev} ${finalTranscript}` : finalTranscript))
+              })
+            }
+            aria-label={isListening ? 'Stop listening' : isPromptingMic ? 'Allow microphone' : 'Speak to Loti'}
+            title={isListening ? 'Stop listening' : isPromptingMic ? 'Allow microphone' : 'Speak to Loti'}
+            className={isListening ? 'animate-pulse' : ''}
+            leftIcon={
+              isListening ? (
+                <MicOff size={16} strokeWidth={1.75} aria-hidden="true" />
+              ) : (
+                <Mic size={16} strokeWidth={1.75} aria-hidden="true" />
+              )
+            }
+          >
+            <span className="sr-only sm:not-sr-only sm:inline">
+              {isPromptingMic ? 'Allow mic' : isListening ? 'Listening' : 'Speak'}
+            </span>
+          </Button>
 
           <input
             ref={inputRef}
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={isListening ? 'Listening to you speak...' : 'Ask Loti a question...'}
+            placeholder={
+              isPromptingMic
+                ? 'Waiting for microphone permission in browser...'
+                : isListening
+                  ? 'Listening to you speak...'
+                  : 'Ask Loti a question...'
+            }
             className="focus-ring flex-1 rounded-xl border border-border bg-surface px-4 py-2 text-base text-ink placeholder:text-ink-muted"
             aria-label="Message to Loti"
             disabled={sending}
@@ -320,7 +326,22 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
           </Button>
         </div>
 
-        {micError && <p className="text-xs text-ink-muted">{micError}</p>}
+        {micError && (
+          <div role="alert" className="flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink-muted">
+            <p>{micError}</p>
+            <button
+              type="button"
+              onClick={() =>
+                listen((finalTranscript) => {
+                  setInput((prev) => (prev ? `${prev} ${finalTranscript}` : finalTranscript))
+                })
+              }
+              className="ml-2 font-medium underline hover:text-ink"
+            >
+              Retry
+            </button>
+          </div>
+        )}
       </form>
 
       {turns.length > 0 && (

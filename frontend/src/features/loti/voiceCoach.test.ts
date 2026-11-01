@@ -4,6 +4,7 @@ import {
   cleanSpokenText,
   isRecognitionSupported,
   isSynthesisSupported,
+  requestMicPermission,
   speakLoti,
   startListening,
   stopLotiSpeech,
@@ -47,6 +48,7 @@ describe('voiceCoach module (seam: Web Speech API)', () => {
   let originalSpeechSynthesis: typeof window.speechSynthesis
   let originalSpeechRecognition: unknown
   let originalWebkitSpeechRecognition: unknown
+  let originalMediaDevices: unknown
 
   let mockSpeak: ReturnType<typeof vi.fn>
   let mockCancel: ReturnType<typeof vi.fn>
@@ -56,6 +58,7 @@ describe('voiceCoach module (seam: Web Speech API)', () => {
     originalSpeechSynthesis = window.speechSynthesis
     originalSpeechRecognition = (window as unknown as Record<string, unknown>).SpeechRecognition
     originalWebkitSpeechRecognition = (window as unknown as Record<string, unknown>).webkitSpeechRecognition
+    originalMediaDevices = navigator.mediaDevices
 
     mockSpeak = vi.fn((utterance: MockSpeechSynthesisUtterance) => {
       utterance.onstart?.()
@@ -87,6 +90,11 @@ describe('voiceCoach module (seam: Web Speech API)', () => {
     })
     ;(window as unknown as Record<string, unknown>).SpeechRecognition = originalSpeechRecognition
     ;(window as unknown as Record<string, unknown>).webkitSpeechRecognition = originalWebkitSpeechRecognition
+    Object.defineProperty(navigator, 'mediaDevices', {
+      writable: true,
+      configurable: true,
+      value: originalMediaDevices,
+    })
   })
 
   describe('cleanSpokenText', () => {
@@ -110,6 +118,44 @@ describe('voiceCoach module (seam: Web Speech API)', () => {
 
       expect(isSynthesisSupported()).toBe(false)
       expect(isRecognitionSupported()).toBe(false)
+    })
+  })
+
+  describe('requestMicPermission', () => {
+    it('triggers mediaDevices.getUserMedia to prompt browser permission and stops tracks', async () => {
+      const stopTrack = vi.fn()
+      const mockGetUserMedia = vi.fn(async () => ({
+        getTracks: () => [{ stop: stopTrack }],
+      }))
+
+      Object.defineProperty(navigator, 'mediaDevices', {
+        writable: true,
+        configurable: true,
+        value: { getUserMedia: mockGetUserMedia },
+      })
+
+      const res = await requestMicPermission()
+      expect(res.ok).toBe(true)
+      expect(mockGetUserMedia).toHaveBeenCalledWith({ audio: true })
+      expect(stopTrack).toHaveBeenCalled()
+    })
+
+    it('returns clear instructions when permission is denied', async () => {
+      const mockGetUserMedia = vi.fn(async () => {
+        const err = new Error('Permission denied')
+        err.name = 'NotAllowedError'
+        throw err
+      })
+
+      Object.defineProperty(navigator, 'mediaDevices', {
+        writable: true,
+        configurable: true,
+        value: { getUserMedia: mockGetUserMedia },
+      })
+
+      const res = await requestMicPermission()
+      expect(res.ok).toBe(false)
+      expect(res.error).toMatch(/address bar/i)
     })
   })
 
@@ -168,12 +214,12 @@ describe('voiceCoach module (seam: Web Speech API)', () => {
       const mockInstance = (recognizer as unknown as { instance: MockSpeechRecognition }).instance
       mockInstance.onerror?.({ error: 'not-allowed' })
 
-      expect(onError).toHaveBeenCalledWith('Microphone access was not allowed.')
+      expect(onError).toHaveBeenCalledWith('Microphone access was denied. Click the lock icon in your browser address bar to allow microphone access.')
     })
   })
 
   describe('useVoiceCoach hook', () => {
-    it('allows toggling voice and controlling speech playback and mic input', () => {
+    it('allows toggling voice and controlling speech playback and mic input', async () => {
       const { result } = renderHook(() => useVoiceCoach())
 
       expect(result.current.isListening).toBe(false)
@@ -191,6 +237,11 @@ describe('voiceCoach module (seam: Web Speech API)', () => {
       })
       expect(mockCancel).toHaveBeenCalled()
       expect(result.current.isSpeaking).toBe(false)
+
+      await act(async () => {
+        result.current.listen()
+      })
+      expect(result.current.isListening).toBe(true)
     })
   })
 })

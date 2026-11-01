@@ -46,6 +46,45 @@ export function isRecognitionSupported(): boolean {
   return Boolean(w.SpeechRecognition || w.webkitSpeechRecognition)
 }
 
+/**
+ * Prompts the browser for microphone access via getUserMedia.
+ * This guarantees the browser displays its native permission prompt dialog to the user.
+ * Releasing tracks immediately once granted.
+ */
+export async function requestMicPermission(): Promise<{ ok: boolean; error?: string }> {
+  if (
+    typeof window !== 'undefined' &&
+    window.isSecureContext === false &&
+    window.location.hostname !== 'localhost' &&
+    window.location.hostname !== '127.0.0.1'
+  ) {
+    return { ok: false, error: 'Microphone requires a secure connection (HTTPS or localhost).' }
+  }
+
+  if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+    return { ok: true }
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    // Stop all audio tracks immediately to release the microphone hardware
+    stream.getTracks().forEach((t) => t.stop())
+    return { ok: true }
+  } catch (err: unknown) {
+    const e = err as { name?: string; message?: string }
+    if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+      return {
+        ok: false,
+        error: 'Microphone access was denied. Click the lock icon in your browser address bar to allow microphone access.',
+      }
+    }
+    if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
+      return { ok: false, error: 'No microphone found on your device.' }
+    }
+    return { ok: false, error: 'Could not access microphone.' }
+  }
+}
+
 /** Best-effort selection of a calm, natural English voice for Loti. */
 export function getLotiVoice(): SpeechSynthesisVoice | null {
   if (!isSynthesisSupported()) return null
@@ -126,7 +165,7 @@ export function stopLotiSpeech(): void {
  */
 export function startListening(callbacks: SpeechListenerCallbacks): SpeechListenerController | null {
   if (!isRecognitionSupported()) {
-    callbacks.onError?.('Speech recognition is not supported in this browser.')
+    callbacks.onError?.('Speech recognition is supported in Chrome, Edge, and Safari.')
     callbacks.onEnd?.()
     return null
   }
@@ -176,7 +215,7 @@ export function startListening(callbacks: SpeechListenerCallbacks): SpeechListen
       const err = event?.error
       let message = 'Speech recognition error.'
       if (err === 'not-allowed') {
-        message = 'Microphone access was not allowed.'
+        message = 'Microphone access was denied. Click the lock icon in your browser address bar to allow microphone access.'
       } else if (err === 'no-speech') {
         message = 'No speech was detected.'
       }
@@ -211,6 +250,7 @@ export interface VoiceCoachHookState {
   voicePace: number
   isSpeaking: boolean
   isListening: boolean
+  isPromptingMic: boolean
   transcript: string
   micError: string | null
   synthesisSupported: boolean
@@ -233,6 +273,7 @@ export function useVoiceCoach(): VoiceCoachHookState {
 
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [isListening, setIsListening] = useState(false)
+  const [isPromptingMic, setIsPromptingMic] = useState(false)
   const [transcript, setTranscript] = useState('')
   const [micError, setMicError] = useState<string | null>(null)
 
@@ -257,6 +298,7 @@ export function useVoiceCoach(): VoiceCoachHookState {
       listenerRef.current = null
     }
     setIsListening(false)
+    setIsPromptingMic(false)
   }, [])
 
   const speak = useCallback(
@@ -273,14 +315,30 @@ export function useVoiceCoach(): VoiceCoachHookState {
   )
 
   const listen = useCallback(
-    (onFinalTranscript?: (text: string) => void) => {
-      if (isListening) {
+    async (onFinalTranscript?: (text: string) => void) => {
+      if (isListening || isPromptingMic) {
         stop()
         return
       }
 
       setMicError(null)
       setTranscript('')
+
+      if (!recognitionSupported) {
+        setMicError('Speech recognition is supported in Chrome, Edge, and Safari.')
+        return
+      }
+
+      // Explicitly trigger browser microphone permission prompt
+      setIsPromptingMic(true)
+      const perm = await requestMicPermission()
+      setIsPromptingMic(false)
+
+      if (!perm.ok) {
+        setMicError(perm.error ?? 'Microphone access was denied.')
+        return
+      }
+
       setIsListening(true)
 
       const ctrl = startListening({
@@ -299,9 +357,13 @@ export function useVoiceCoach(): VoiceCoachHookState {
         },
       })
 
-      listenerRef.current = ctrl
+      if (!ctrl) {
+        setIsListening(false)
+      } else {
+        listenerRef.current = ctrl
+      }
     },
-    [isListening, stop],
+    [isListening, isPromptingMic, recognitionSupported, stop],
   )
 
   const toggleVoice = useCallback(() => {
@@ -317,6 +379,7 @@ export function useVoiceCoach(): VoiceCoachHookState {
     voicePace,
     isSpeaking,
     isListening,
+    isPromptingMic,
     transcript,
     micError,
     synthesisSupported,

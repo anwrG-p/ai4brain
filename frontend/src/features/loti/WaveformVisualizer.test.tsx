@@ -21,3 +21,4 @@ describe('WaveformVisualizer', () => {
     expect(hasStyles).toBe(true)
   })
 })
+
