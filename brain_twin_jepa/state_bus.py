@@ -58,6 +58,7 @@ import numpy as np
 
 from app.privacy.retention import configured_days
 from app.privacy.telemetry_store import (
+    LockTimeout,
     register_user_store,
     state_bus_dir,
     telemetry_dir,
@@ -75,6 +76,7 @@ SESSION_IDLE = timedelta(minutes=30)
 FRAMES_KEPT = 200  # seen session ids remembered per user (only the newest one decides what is new)
 TRAIL_KEPT = 10
 TAIL_MAX_BYTES = 1 << 20  # a light refresh never reads more than this; past it, a full refresh
+STAT_LOCK_S = 0.05  # how long a stat waits for the telemetry lock before giving up on the identity
 TOPICS = ("tasks", "coach")
 
 
@@ -245,13 +247,25 @@ def _now(now: datetime | None) -> datetime:
 
 def _stat(key: str) -> list | None:
     """[size, mtime_ns, identity] of the user's JSONL, or None. The identity is a hash of its first
-    line: a retention rewrite changes it, an append does not."""
-    path = telemetry_dir() / f"{key}.jsonl"
+    line: a retention rewrite changes it, an append does not.
+
+    The first line is read under the telemetry lock: an open handle on Windows would make a
+    concurrent privacy delete or retention unlink fail (WinError 32). When the lock is busy past
+    STAT_LOCK_S the identity is None (unknown), which makes a light refresh read in full."""
+    directory = telemetry_dir()
+    path = directory / f"{key}.jsonl"
     try:
         st = path.stat()
-        with open(path, "rb") as f:
-            first = f.readline(4096)
     except OSError:
+        return None
+    try:
+        with telemetry_lock(directory, timeout=STAT_LOCK_S):
+            st = path.stat()
+            with open(path, "rb") as f:
+                first = f.readline(4096)
+    except LockTimeout:
+        return [st.st_size, st.st_mtime_ns, None]
+    except OSError:  # deleted meanwhile
         return None
     return [st.st_size, st.st_mtime_ns, hashlib.sha256(first).hexdigest()[:16]]
 
@@ -482,7 +496,13 @@ def refresh_light(user_id: str, *, now: datetime | None = None) -> UserState | N
         same_model = st is not None and st.model_id == (model.model_id if model else None)
         # The same file: the first line is unchanged. A retention rewrite drops old lines from the
         # top, so after one the byte offsets saved with the state mean nothing.
-        same_file = st is not None and st.telemetry is not None and stat is not None and st.telemetry[2:] == stat[2:]
+        same_file = (
+            st is not None
+            and st.telemetry is not None
+            and stat is not None
+            and stat[2:3] != [None]  # identity unknown (the lock was busy): read in full
+            and st.telemetry[2:] == stat[2:]
+        )
         if same_model and same_file:
             idle = st.open_session is not None and now - datetime.fromisoformat(st.open_session["last_received"]) >= SESSION_IDLE
             if stat == st.telemetry and not idle:
