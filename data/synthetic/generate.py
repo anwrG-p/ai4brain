@@ -1,4 +1,4 @@
-"""Synthetic telemetry: simulated users playing the eight exercises over many sessions (BE-08).
+"""Synthetic telemetry: simulated users playing the eleven exercises over many sessions (BE-08).
 
     python -m data.synthetic.generate --users N --sessions M --seed S --out DIR
 
@@ -32,8 +32,24 @@ noted. Evidence marks follow that doc: H primary/meta-analysis, M single study, 
   (3/week: in Lampit et al. 2014, more than 3 sessions a week was not more effective in healthy
   older adults, H. That finding is about efficacy, not adherence; the schedule just uses it.)
 - Day-to-day state: a session-wide shift of `state_sd` SD (J).
+- N-back follows R16 (scoring follows the hint): two events per trial, one per stream, as
+  NBack.tsx logs them. The rule-stream event carries the trial's verdict, so a press of the
+  off-rule key makes it wrong (a false alarm on a noise trial, a miss on a target). The off-rule
+  event is `lure_stream` when that stream matched n back (`lure_stream_rate`, J), else `standard`;
+  its error means its key was pressed. Withholding that press is an impulse-control skill.
+- Stop Light, Arrow Focus and Pair Finder (F-B) run shortened blocks so a session stays near
+  its old size: 64 Stop Light trials (16 stops, 2 per 8, an SSD staircase from 250 ms in 50 ms
+  steps), 32 Arrow Focus trials (8 per cell) and the full Pair Finder 2-4-6-8 series.
+  - Stop Light is a race (the independent race model behind the integration SSRT, Logan &
+    Cowan 1984): a stop trial is answered when the go RT beats SSD + the user's SSRT. The true
+    SSRT (`ssrt_ms` in the truth file) depends on impulse ability and practice only (J sizes).
+  - Arrow Focus adds a conflict cost to incongruent RTs, set by agility ability and practice
+    (`flanker_cost_ms` in the truth file; J sizes).
+  - Pair Finder: P(right box) falls with the stage size and rises with each retry (J); a stage
+    failed on its last attempt ends the task, so later stages are never reached.
 
-ponytail: one n-back stream, no device or input-kind context, no voice, hours treated as UTC.
+ponytail: no device or input-kind context, no voice, hours treated as UTC; n-back rules are
+position and symbol only (no parity), and the shortened blocks above are not the served lengths.
 """
 
 from __future__ import annotations
@@ -69,6 +85,18 @@ STROOP_COST_MS = 110.0  # cost at ability 0 (J)
 STROOP_COST_FLOOR_MS = 15.0
 
 LOW_EFFORT_TIMEOUT = 0.25  # share of timed trials a low-effort session lets run out (J)
+
+# Stop Light: SSRT at ability 0 and its spread per ability SD (J: typical healthy-adult SSRTs
+# are about 200-250 ms, Verbruggen et al. 2019), go RTs as the fixture's 1250 ms window allows.
+SSRT_MS = 230.0
+SSRT_SLOPE_MS = 25.0
+SSRT_FLOOR_MS = 120.0
+SSRT_TRIAL_SD_MS = 20.0  # trial-to-trial jitter of the stop process
+# Arrow Focus: the flanker cost at ability 0 and per ability SD (J; ANT conflict effects are
+# around 80-100 ms, Fan et al. 2002).
+FLANKER_COST_MS = 90.0
+FLANKER_COST_SLOPE_MS = 25.0
+FLANKER_COST_FLOOR_MS = 10.0
 
 
 @dataclass(frozen=True)
@@ -128,7 +156,7 @@ def _iso_ms(t: datetime) -> str:
 
 
 class _Session:
-    def __init__(self, rng, user_id, session_id, index, start, theta, low, stroop_cost):
+    def __init__(self, rng, user_id, session_id, index, start, theta, low, stroop_cost, ssrt=SSRT_MS, flanker_cost=FLANKER_COST_MS):
         self.rng = rng
         self.user_id = user_id
         self.session_id = session_id
@@ -137,6 +165,8 @@ class _Session:
         self.theta = theta
         self.low = low
         self.stroop_cost = stroop_cost
+        self.ssrt = ssrt
+        self.flanker_cost = flanker_cost
         self.events: list[dict] = []
 
     def lazy(self, limit_ms: float | None) -> float | None:
@@ -160,16 +190,29 @@ class _Block:
         self.burst = 0
         self.trials = 0
 
-    def emit(self, correct: bool, rt_ms: float, *, score: float | None = None, first_press_ms: float | None = -1.0, meta: dict | None = None) -> None:
-        """`first_press_ms` -1 means "the response itself"; None means no key or pointer press."""
+    def emit(
+        self,
+        correct: bool,
+        rt_ms: float,
+        *,
+        score: float | None = None,
+        first_press_ms: float | None = -1.0,
+        meta: dict | None = None,
+        closes_trial: bool = True,
+    ) -> None:
+        """`first_press_ms` -1 means "the response itself"; None means no key or pointer press.
+        `closes_trial` False: another event of the same trial follows (n-back's other stream), so
+        the trial index, the error burst and the clock stay put."""
         s = self.s
         rng = s.rng
         rt = round(min(600_000.0, max(0.0, rt_ms)), 1)
         press = rt if first_press_ms == -1.0 else first_press_ms
-        self.burst = 0 if correct else self.burst + 1
+        if closes_trial:
+            self.burst = 0 if correct else self.burst + 1
         # Pointer answers add moves, so jitter (std of input gaps) is non-zero; a single key gives 0.
         jitter = round(rng.lognormvariate(math.log(40), 0.5), 1) if press is not None and rng.random() < 0.35 else 0.0
-        s.clock += timedelta(milliseconds=rt)
+        if closes_trial:
+            s.clock += timedelta(milliseconds=rt)
         s.events.append(
             {
                 "user_id": s.user_id,
@@ -190,8 +233,9 @@ class _Block:
                 "client_ts": _iso_ms(s.clock),
             }
         )
-        self.trials += 1
-        s.clock += timedelta(milliseconds=rng.uniform(300, 700))
+        if closes_trial:
+            self.trials += 1
+            s.clock += timedelta(milliseconds=rng.uniform(300, 700))
 
 
 # --- the eight exercises (payload shapes and trial_meta keys as the frontend logs them) ----------
@@ -199,27 +243,53 @@ class _Block:
 NBACK_INTERVAL_MS = 2000.0
 NBACK_TYPES = ["target", "standard", "lure_minus", "lure_plus", "switch"]
 NBACK_DIFFICULTY = {"target": -0.3, "standard": -2.0, "lure_minus": 0.0, "lure_plus": 0.0, "switch": 0.3}
+NBACK_STREAMS = ("position", "symbol")  # NBack.tsx logs the streams in the payload's order
+LURE_STREAM_RATE = 0.2  # share of trials whose off-rule stream matched n back (J)
+# Withholding the off-rule key (impulse): easy on a plain trial, harder on an other-stream match (J).
+NBACK_OFFRULE_DIFFICULTY = {"standard": -3.0, "lure_stream": -1.2}
 
 
 def _nback(s: _Session) -> None:
+    """Two streams, scored on the rule's stream (R16). A switch trial flips the rule (the hint)."""
     rng, b = s.rng, s.block("nback", 0, "working_memory")
+    rule = "position"
     for _ in range(20):
         kind = rng.choices(NBACK_TYPES, weights=[0.3, 0.35, 0.1, 0.1, 0.15])[0]
+        if kind == "switch":
+            rule = "symbol" if rule == "position" else "position"
+        off_kind = "lure_stream" if rng.random() < LURE_STREAM_RATE else "standard"
         target = kind == "target"
         if s.low:
-            rt = s.lazy(None) if rng.random() < 0.4 else None
-            pressed = rt is not None
+            rule_rt = s.lazy(None) if rng.random() < 0.4 else None
+            off_rt = s.lazy(None) if rng.random() < 0.3 else None
         else:
             theta = s.theta["agility" if kind == "switch" else "focus"]
             ok = rng.random() < _p(theta, NBACK_DIFFICULTY[kind], 0.5)
-            pressed = target == ok
-            rt = min(NBACK_INTERVAL_MS - 50, _rt(rng, 650, theta)) if pressed else None
-        b.emit(
-            pressed == target,
-            NBACK_INTERVAL_MS if rt is None else rt,
-            first_press_ms=-1.0 if pressed else None,
-            meta={"trial_type": kind, "rule": "position", "stream": "position"},
-        )
+            rule_rt = min(NBACK_INTERVAL_MS - 50, _rt(rng, 650, theta)) if target == ok else None
+            withheld = rng.random() < _p(s.theta["impulse"], NBACK_OFFRULE_DIFFICULTY[off_kind], 0.0)
+            off_rt = None if withheld else min(NBACK_INTERVAL_MS - 50, _rt(rng, 700, theta))
+        for k, stream in enumerate(NBACK_STREAMS):
+            last = k == len(NBACK_STREAMS) - 1
+            if stream == rule:
+                # The verdict: the rule key's press-or-withhold matches the answer and the off-rule
+                # key was not pressed. A rule event answered only by an off-rule press takes its time.
+                pressed = rule_rt is not None
+                rt = rule_rt if pressed else (off_rt if off_rt is not None else NBACK_INTERVAL_MS)
+                b.emit(
+                    pressed == target and off_rt is None,
+                    rt,
+                    first_press_ms=-1.0 if pressed or off_rt is not None else None,
+                    meta={"trial_type": kind, "rule": rule, "stream": stream},
+                    closes_trial=last,
+                )
+            else:
+                b.emit(
+                    off_rt is None,
+                    NBACK_INTERVAL_MS if off_rt is None else off_rt,
+                    first_press_ms=None if off_rt is None else -1.0,
+                    meta={"trial_type": off_kind, "rule": rule, "stream": stream},
+                    closes_trial=last,
+                )
 
 
 def _stroop(s: _Session) -> None:
@@ -411,7 +481,125 @@ def _rotation(s: _Session) -> None:
             b.emit(ok, rt, meta=meta)
 
 
-EXERCISES = [_nback, _stroop, _matrix, _relational, _tower, _ufov, _mst, _rotation]
+SST_TRIALS = 64  # 16 stops: shortened from the served 200 (50 stops) to keep sessions small
+SST_LIMIT_MS = 1250.0
+SSD_START_MS = 250
+SSD_STEP_MS = 50
+
+
+def _other(d: str) -> str:
+    return "right" if d == "left" else "left"
+
+
+def _stop_signal(s: _Session) -> None:
+    """Stop Light as StopSignal.tsx logs it, played as an independent race (see the docstring)."""
+    rng, b = s.rng, s.block("stop", 0, "executive_function")
+    stops: list[bool] = []
+    for start in range(0, SST_TRIALS, 8):  # 2 stops per 8 trials, never in the first 2 trials
+        picks = set(rng.sample(range(max(start, 2), start + 8), 2))
+        stops += [i in picks for i in range(start, start + 8)]
+    theta = s.theta["agility"]
+    ssd = SSD_START_MS
+    for stop in stops:
+        d = rng.choice(["left", "right"])
+        if s.low:
+            go_rt = s.lazy(SST_LIMIT_MS)
+            choice = rng.choice(["left", "right"])
+        else:
+            go_rt = _rt(rng, 520, theta)
+            go_rt = None if go_rt >= SST_LIMIT_MS else go_rt
+            choice = d if rng.random() < _p(theta, -3.0, 0.5) else _other(d)
+        responded = go_rt is not None
+        meta = {"stop_trial": stop, "dir": d}
+        if stop:
+            # The race: the stop process finishes at SSD + SSRT; a low-effort session ignores it.
+            if responded and not s.low and go_rt >= ssd + rng.gauss(s.ssrt, SSRT_TRIAL_SD_MS):
+                responded = False
+            meta |= {"response": choice if responded else "none", "ssd_ms": ssd}
+            correct = not responded
+            ssd = min(int(SST_LIMIT_MS), max(0, ssd + (SSD_STEP_MS if correct else -SSD_STEP_MS)))
+        else:
+            meta["response"] = choice if responded else "none"
+            correct = responded and choice == d
+        if responded:
+            b.emit(correct, go_rt, meta=meta)
+        else:
+            b.emit(correct, SST_LIMIT_MS, first_press_ms=None, meta=meta)
+
+
+FLANKER_PER_CELL = 8  # 32 trials: shortened from the served 96 (24 per cell)
+FLANKER_LIMIT_MS = 1700.0
+
+
+def _flanker(s: _Session) -> None:
+    rng, b = s.rng, s.block("flanker", 0, "executive_function")
+    cells = [(d, c) for d in ("left", "right") for c in (True, False)] * FLANKER_PER_CELL
+    rng.shuffle(cells)
+    theta = s.theta["agility"]
+    for d, congruent in cells:
+        meta = {"flanker": "congruent" if congruent else "incongruent", "dir": d}
+        if s.low:
+            rt, ok = s.lazy(FLANKER_LIMIT_MS), rng.random() < 0.5
+        else:
+            ok = rng.random() < _p(theta, -3.0 if congruent else -2.0, 0.5)
+            rt = _rt(rng, 480, theta, 60.0, 60.0) + (0 if congruent else s.flanker_cost)
+            rt = None if rt >= FLANKER_LIMIT_MS else rt
+        if rt is None:
+            b.emit(False, FLANKER_LIMIT_MS, first_press_ms=None, meta=meta | {"response": "none"})
+        else:
+            b.emit(ok, rt, meta=meta | {"response": d if ok else _other(d)})
+
+
+PAL_STAGES = (2, 4, 6, 8)
+PAL_BOXES = 8
+PAL_ATTEMPTS = 3
+PAL_LIMIT_MS = 20_000.0
+
+
+def _pal(s: _Session) -> None:
+    """Pair Finder as PairedAssociates.tsx logs it: one event per recall choice; a stage with a
+    wrong box is studied again, and failing its last attempt ends the task."""
+    rng, b = s.rng, s.block("pal", 0, "episodic_memory")
+    theta = s.theta["memory"]
+    for size in PAL_STAGES:
+        boxes = rng.sample(range(PAL_BOXES), size)
+        patterns = rng.sample(range(PAL_BOXES), size)
+        for attempt in range(1, PAL_ATTEMPTS + 1):
+            order = list(range(size))
+            rng.shuffle(order)
+            stage_ok = True
+            for k in order:
+                if s.low:
+                    rt, ok = s.lazy(PAL_LIMIT_MS), rng.random() < 1 / PAL_BOXES
+                else:
+                    ok = rng.random() < _p(theta, -1.0 + 0.45 * (size - 2) - 0.9 * (attempt - 1), 1 / PAL_BOXES)
+                    rt = _rt(rng, 1800 + 150 * size, theta)
+                    rt = None if rt >= PAL_LIMIT_MS else rt
+                if rt is None:
+                    ok, chosen = False, -1
+                else:
+                    chosen = boxes[k] if ok else rng.choice([x for x in range(PAL_BOXES) if x != boxes[k]])
+                meta = {
+                    "pal_level": size,
+                    "attempt": attempt,
+                    "pattern": patterns[k],
+                    "box": boxes[k],
+                    "chosen": chosen,
+                    "pal_total": sum(PAL_STAGES),
+                    "boxes": PAL_BOXES,
+                }
+                if rt is None:
+                    b.emit(False, PAL_LIMIT_MS, first_press_ms=None, meta=meta)
+                else:
+                    b.emit(ok, rt, meta=meta)
+                stage_ok = stage_ok and ok
+            if stage_ok:
+                break
+        else:
+            return  # the last attempt failed: later stages are never reached
+
+
+EXERCISES = [_nback, _stroop, _matrix, _relational, _tower, _ufov, _mst, _rotation, _stop_signal, _flanker, _pal]
 
 
 # --- users and sessions ---------------------------------------------------------------------------
@@ -454,12 +642,15 @@ def simulate_user(seed: int, index: int, sessions: int, params: Params = Params(
         # The cost carries no state or time-of-day term, so its retest noise is the trial noise
         # stroop_cost_slope() was solved for.
         cost = max(STROOP_COST_FLOOR_MS, STROOP_COST_MS - slope * (ability["agility"] + practice))
+        # Likewise the true SSRT and flanker cost: ability plus practice, no state or time of day.
+        ssrt = max(SSRT_FLOOR_MS, SSRT_MS - SSRT_SLOPE_MS * (ability["impulse"] + practice))
+        flanker_cost = max(FLANKER_COST_FLOOR_MS, FLANKER_COST_MS - FLANKER_COST_SLOPE_MS * (ability["agility"] + practice))
         start = datetime.combine(p.start + timedelta(days=day), time(), tzinfo=timezone.utc) + timedelta(hours=hour)
         sid = f"{uid}-{k:03d}"
         # Trials draw from their own stream, so outcomes never shift the schedule: changing a
         # parameter that only alters trials (forgetting, say) keeps every user's days and flags.
         trials_rng = random.Random(f"synapsetwin:{seed}:{index}:{k}")
-        s = _Session(trials_rng, uid, sid, k, start, theta, low, cost)
+        s = _Session(trials_rng, uid, sid, k, start, theta, low, cost, ssrt, flanker_cost)
         for exercise in EXERCISES:
             exercise(s)
         events += s.events
@@ -476,6 +667,8 @@ def simulate_user(seed: int, index: int, sessions: int, params: Params = Params(
                 "tod_shift": round(tod, 4),
                 "low_effort": low,
                 "stroop_cost_ms": round(cost, 1),
+                "ssrt_ms": round(ssrt, 1),
+                "flanker_cost_ms": round(flanker_cost, 1),
                 "received_at": (s.clock + timedelta(seconds=2)).isoformat(),
             }
         )
