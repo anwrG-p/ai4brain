@@ -23,8 +23,10 @@
 - Registry: the Bloom slices, session answers and staircases are one JSON file per user under
   data/processed/task_registry/, written behind the request by a background thread. The file is
   the source of truth: memory keeps at most MAX_USERS users and evicts clean, idle ones first.
-  A registry idle for RETENTION_DAYS is dropped (in memory on next use, on disk by purge_idle,
-  which the retention CLI runs). forget() and export() back the privacy delete and export.
+  A registry idle for `retention_days` is dropped (in memory on next use, on disk by purge_idle,
+  which the retention CLI runs). Both read one setting, env RETENTION_DAYS (default 30): the
+  server passes it in through dynamic_cache.api, the CLI uses it as its --days default.
+  forget() and export() back the privacy delete and export.
 
 Thread safety: a per-user lock serialises one user's calls (so a double GET in the same session
 cannot hand out two tasks); one dispatcher lock guards the pools and the user table.
@@ -44,6 +46,7 @@ import time
 from collections import OrderedDict, deque
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from concurrent.futures import Future, ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -211,15 +214,23 @@ def trials_by_schema(lines: list[str]) -> dict[str, list[Trial]]:
 
 
 def trials_since(trials: Sequence[Trial], marker: str | None) -> list[Trial]:
-    """The trials after the one `marker` names. If that trial left the window (retention, the
-    tail limit), the trials received after its received_at."""
+    """The trials after the one `marker` names.
+
+    If that trial left the window (retention, the tail limit): the trials received after its
+    received_at. When there is no received_at to compare (the marked trial or every trial lacks
+    one), the newest ACCURACY_WINDOW trials, so the staircase steps once and re-anchors on a
+    marker it can find, instead of freezing for good.
+    """
     if marker is None:
         return list(trials)
     for i in range(len(trials) - 1, -1, -1):
         if trials[i].marker == marker:
             return list(trials[i + 1 :])
     received = marker.split("|", 1)[0]
-    return [t for t in trials if t.marker.split("|", 1)[0] > received]
+    stamps = [t.marker.split("|", 1)[0] for t in trials]
+    if not received or not any(stamps):
+        return list(trials[-ACCURACY_WINDOW:])
+    return [t for t, stamp in zip(trials, stamps) if stamp > received]
 
 
 class TelemetryTrials:
@@ -333,6 +344,7 @@ class Dispatcher:
         seed_source: Callable[[], int] = lambda: random.SystemRandom().randrange(2**32),
         pool_size: int = POOL_SIZE,
         max_users: int = MAX_USERS,
+        retention_days: int = RETENTION_DAYS,
         background: bool = True,
     ) -> None:
         self.registry_dir = registry_dir
@@ -344,6 +356,7 @@ class Dispatcher:
         self.seed_source = seed_source
         self.pool_size = pool_size
         self.max_users = max_users
+        self.retention_days = retention_days  # the server passes RETENTION_DAYS from the env
 
         # Pools, the user table, pins, the dirty set. Re-entrant: a refill future that is already
         # done runs its callback (which takes the lock) in the submitting thread.
@@ -365,10 +378,29 @@ class Dispatcher:
 
     # --- building payloads -----------------------------------------------------------------------
 
-    def start(self) -> None:
-        """Spawn the worker process now (server startup), so no request pays for it."""
-        if self._workers is not None:
-            self._workers.submit(worker_pid).result()
+    def start(self) -> Future | None:
+        """Spawn the worker process now (server startup), so no request pays for it. Does not
+        wait: the returned future resolves to the worker's pid. If the worker cannot start, the
+        dispatcher logs it and builds every task inline from then on, rather than failing."""
+        with self._lock:
+            workers = self._workers
+        if workers is None:
+            return None
+        try:
+            future = workers.submit(worker_pid)
+        except Exception as e:  # spawn refused outright (shut down, no processes allowed, ...)
+            self._no_workers(e)
+            return None
+        future.add_done_callback(lambda f: f.cancelled() or f.exception() is None or self._no_workers(f.exception()))
+        return future
+
+    def _no_workers(self, error: BaseException) -> None:
+        log.warning("task worker process unavailable (%s); building tasks inline", type(error).__name__)
+        with self._lock:
+            workers, self._workers = self._workers, None
+            self._refilling.clear()
+        if workers is not None:
+            workers.shutdown(wait=False, cancel_futures=True)
 
     def _fill(self, pool_key: tuple[str, str, float]) -> None:
         """Top the pool up in the caller's thread (warm-up)."""
@@ -395,13 +427,26 @@ class Dispatcher:
         if job is None:
             return
         pool_key, seeds = job
-        try:
-            future = self._workers.submit(build_entries, *pool_key, seeds)
-        except RuntimeError:  # BrokenProcessPool (the worker died) or shut down
+        with self._lock:
+            workers = self._workers
+        if workers is None:  # gone inline meanwhile
             with self._lock:
                 self._refilling.discard(pool_key)
-                if not self._closed:
-                    self._workers = worker_pool()  # the next refill uses a new worker
+            return
+        try:
+            future = workers.submit(build_entries, *pool_key, seeds)
+        except BrokenProcessPool:  # the worker died: the next refill uses a new one
+            with self._lock:
+                self._refilling.discard(pool_key)
+                if not self._closed and self._workers is workers:
+                    self._workers = worker_pool()
+            return
+        except Exception as e:  # shut down, or a new worker cannot be spawned: serve inline
+            with self._lock:
+                self._refilling.discard(pool_key)
+                closed = self._closed
+            if not closed:
+                self._no_workers(e)
             return
         future.add_done_callback(lambda f: self._refilled(pool_key, f))
 
@@ -486,7 +531,7 @@ class Dispatcher:
                 self._users.move_to_end(key)
         if st is None:
             st = self._read(self._path(key)) or UserState()
-        if st.last and now - st.last > RETENTION_DAYS * DAY_S:
+        if st.last and now - st.last > self.retention_days * DAY_S:
             st = UserState()  # idle past retention: start afresh (the next write replaces the file)
         with self._lock:
             self._users[key] = st
@@ -506,18 +551,23 @@ class Dispatcher:
         """Write every changed user's registry file. Returns how many were written.
 
         A user stays dirty (so never evicted) until the generation written is its latest: a write
-        that fails, or a change made while it ran, keeps it for the next flush."""
+        that fails, or a change made while it ran, keeps it for the next flush.
+
+        Each user is serialised under its own lock, the one next_task mutates it under, so a
+        serve running meanwhile cannot change its dicts mid-dump; the disk write happens after."""
         with self._lock:
             self._flush_queued = False
             for k in [k for k in self._dirty if k not in self._users]:
                 del self._dirty[k]  # nothing in memory to write
-            todo = [
-                (k, gen, self._users[k], json.dumps(self._users[k].to_json()))
-                for k, gen in self._dirty.items()
-                if k in self._users
-            ]
+            keys = list(self._dirty)
         written = 0
-        for key, gen, st, text in todo:
+        for key in keys:
+            with self._held(key):
+                with self._lock:
+                    st, gen = self._users.get(key), self._dirty.get(key)
+                if st is None or gen is None:
+                    continue  # forgotten, or written by another flush, meanwhile
+                text = json.dumps(st.to_json())
             path = self._path(key)
             with self._io_lock:
                 with self._lock:

@@ -32,6 +32,38 @@ def test_a_failing_shutdown_hook_does_not_stop_the_others(hooks, caplog):
     assert calls == ["first"] and "broken" in caplog.text
 
 
+def test_a_failing_startup_hook_does_not_block_boot(hooks, caplog):
+    calls = []
+    lifecycle.on_startup("broken", lambda: 1 / 0)
+    lifecycle.on_shutdown("broken", lambda: calls.append("undo broken"))
+    lifecycle.on_startup("fine", lambda: calls.append("start fine"))
+    lifecycle.on_shutdown("fine", lambda: calls.append("stop fine"))
+    with TestClient(app) as c:
+        assert c.get("/").status_code == 200  # the server booted
+        # The failed hook's shutdown ran at once, to undo what it half started; the next still ran.
+        assert calls == ["undo broken", "start fine"]
+    assert calls == ["undo broken", "start fine", "stop fine"]  # not undone twice
+    assert "startup hook broken failed (ZeroDivisionError)" in caplog.text
+
+
+def test_startup_hooks_run_off_the_event_loop(hooks):
+    import asyncio
+
+    on_loop = []
+
+    def probe():
+        try:
+            asyncio.get_running_loop()
+            on_loop.append(True)  # called straight from the lifespan coroutine
+        except RuntimeError:
+            on_loop.append(False)  # a worker thread: no loop running here
+
+    lifecycle.on_startup("probe", probe)
+    with TestClient(app):
+        pass
+    assert on_loop == [False]
+
+
 def test_dynamic_cache_registers_its_worker_hooks():
     import dynamic_cache.api  # noqa: F401
 
