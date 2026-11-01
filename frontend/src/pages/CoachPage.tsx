@@ -1,6 +1,6 @@
 import { tracker } from '../features/assessment/telemetry/tracker'
 import { useEffect, useId, useRef, useState } from 'react'
-import { RotateCcw } from 'lucide-react'
+import { Mic, MicOff, RotateCcw, Volume2, VolumeX } from 'lucide-react'
 import { Loti } from '../components/features/characters'
 import { useCharacterMotion } from '../components/features/characters/shared'
 import { Button } from '../components/ui/Button'
@@ -10,12 +10,15 @@ import { useLotiContext } from '../features/loti/lotiContext'
 import { nextTurnId, useLotiSession } from '../features/loti/lotiSession'
 import { useLotiActions } from '../features/loti/useLotiActions'
 import type { LotiChoice, LotiMessage } from '../features/loti/types'
+import { useVoiceCoach } from '../features/loti/voiceCoach'
+import { WaveformVisualizer } from '../features/loti/WaveformVisualizer'
 
 /* /coach: the whole talk with Loti in one column. Loti's bubbles on the left, the user's picks on the
    right, the open question's chips at the bottom, and a chat input to ask Loti anything.
+   Includes multimodal voice coaching: spoken responses from Loti with speech synthesis,
+   speech recognition for user voice input, audio speed tuning, and accessible waveform visuals.
    The talk lives in the session (lotiSession), so a talk started on another page's Loti bubble
    continues here, and leaving and coming back resumes it.
-   The brain goes through the coach adapter; when connected, it forwards typed messages to the AI coach.
    Escape does nothing here: the only control that clears anything is "Start over". */
 export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }) {
   const context = useLotiContext()
@@ -26,6 +29,21 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
   const [coachConsent, setCoachConsent] = useState(() => tracker.getStatus().coachConsent === 'granted')
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+
+  const {
+    voiceEnabled,
+    voicePace,
+    isSpeaking,
+    isListening,
+    micError,
+    synthesisSupported,
+    recognitionSupported,
+    toggleVoice,
+    setVoicePace,
+    speak,
+    listen,
+    stop: stopVoice,
+  } = useVoiceCoach()
 
   const grantConsent = () => {
     tracker.setCoachConsent(true)
@@ -53,6 +71,13 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
     return () => window.clearTimeout(t)
   }, [beat])
 
+  // Auto-speak Loti's bubble when voice is enabled
+  useEffect(() => {
+    if (voiceEnabled && current?.text) {
+      speak(current.text)
+    }
+  }, [current?.id, current?.text, voiceEnabled, speak])
+
   useEffect(() => {
     if (focusNext.current === 'chips') chipsRef.current?.querySelector('button')?.focus()
     if (focusNext.current === 'log') logRef.current?.focus()
@@ -62,6 +87,7 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
 
   const pick = (choice: LotiChoice) => {
     if (!current) return
+    stopVoice()
     const next = brain.respond(current.id, choice.id, context)
     record(current, choice, next)
     focusNext.current = next && next.choices.length > 0 ? 'chips' : 'log'
@@ -72,6 +98,8 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
     e.preventDefault()
     const trimmed = input.trim()
     if (!trimmed || sending) return
+
+    stopVoice()
 
     if (!coachConsent) {
       grantConsent()
@@ -112,6 +140,7 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
   }
 
   const startOver = () => {
+    stopVoice()
     clear()
     const opening = brain.opening(context)
     if (opening) begin(opening)
@@ -119,16 +148,69 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
   }
 
   const enter = motion ? 'anim-bubble' : ''
+  const isLotiTalking = talking || isSpeaking
 
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-6 pt-4 pb-12">
-      <div className="flex items-center gap-4">
-        <Loti key={beat} size="md" pose={talking ? 'talk' : (current?.pose ?? 'idle')} alive={motion} className="shrink-0" />
-        <div>
-          <h1 className="font-display text-2xl font-bold text-ink sm:text-3xl">Talk with Loti</h1>
-          {brain.enabled && <p className="mt-1 text-sm text-ink-muted">Loti is an AI guide, not a doctor.</p>}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Loti key={beat} size="md" pose={isLotiTalking ? 'talk' : (current?.pose ?? 'idle')} alive={motion} className="shrink-0" />
+          <div>
+            <h1 className="font-display text-2xl font-bold text-ink sm:text-3xl">Talk with Loti</h1>
+            {brain.enabled && <p className="mt-1 text-sm text-ink-muted">Loti is an AI guide, not a doctor.</p>}
+          </div>
         </div>
+
+        {synthesisSupported && (
+          <div className="flex items-center gap-2">
+            {voiceEnabled && (
+              <WaveformVisualizer
+                active={isSpeaking || isListening}
+                mode={isListening ? 'listening' : isSpeaking ? 'speaking' : 'idle'}
+                barCount={10}
+                className="hidden sm:inline-flex"
+              />
+            )}
+            <Button
+              variant={voiceEnabled ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={toggleVoice}
+              aria-pressed={voiceEnabled}
+              leftIcon={
+                voiceEnabled ? (
+                  <Volume2 size={16} strokeWidth={1.75} aria-hidden="true" />
+                ) : (
+                  <VolumeX size={16} strokeWidth={1.75} aria-hidden="true" />
+                )
+              }
+            >
+              {voiceEnabled ? 'Voice on' : 'Voice off'}
+            </Button>
+          </div>
+        )}
       </div>
+
+      {voiceEnabled && synthesisSupported && (
+        <div role="group" aria-label="Speech pace" className="flex items-center justify-end gap-1.5 text-xs text-ink-muted">
+          <span>Pace:</span>
+          {([0.9, 1.0, 1.1] as const).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setVoicePace(p)}
+              className={`rounded-md px-2 py-0.5 font-medium transition-colors ${
+                Math.abs(voicePace - p) < 0.05
+                  ? 'bg-brand text-surface'
+                  : 'bg-surface hover:text-ink border border-border'
+              }`}
+              aria-pressed={Math.abs(voicePace - p) < 0.05}
+            >
+              {p === 0.9 ? 'Calm' : p === 1.0 ? 'Normal' : 'Prompt'}
+            </button>
+          ))}
+        </div>
+      )}
+
       {brain.enabled && !coachConsent && (
         <div data-testid="coach-consent-banner" className="flex items-center justify-between gap-4 rounded-xl border border-border bg-surface px-4 py-3">
           <p className="text-sm text-ink">Let Loti use AI to reply to your questions.</p>
@@ -151,7 +233,11 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
         {[
           ...turns.map((turn) =>
             turn.from === 'loti' ? (
-              <LotiLine key={turn.n} text={turn.text} />
+              <LotiLine
+                key={turn.n}
+                text={turn.text}
+                onPlay={synthesisSupported ? () => speak(turn.text) : undefined}
+              />
             ) : (
               <div key={turn.n} data-from="you" className="flex justify-end">
                 <p className="max-w-md rounded-xl rounded-tr-sm bg-brand-subtle px-4 py-2 text-base text-ink">
@@ -161,7 +247,17 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
               </div>
             ),
           ),
-          ...(current ? [<LotiLine key={beat} text={current.text} textId={questionId} className={enter} />] : []),
+          ...(current
+            ? [
+                <LotiLine
+                  key={beat}
+                  text={current.text}
+                  textId={questionId}
+                  className={enter}
+                  onPlay={synthesisSupported ? () => speak(current.text) : undefined}
+                />,
+              ]
+            : []),
         ]}
       </div>
 
@@ -181,21 +277,50 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
         </div>
       )}
 
-      {/* Free-text chat input form */}
-      <form onSubmit={handleSend} className="flex items-center gap-2 pt-2">
-        <input
-          ref={inputRef}
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask Loti a question..."
-          className="focus-ring flex-1 rounded-xl border border-border bg-surface px-4 py-2 text-base text-ink placeholder:text-ink-muted"
-          aria-label="Message to Loti"
-          disabled={sending}
-        />
-        <Button type="submit" size="sm" disabled={!input.trim() || sending}>
-          {sending ? '...' : 'Send'}
-        </Button>
+      {/* Free-text chat input form with optional speech dictation */}
+      <form onSubmit={handleSend} className="flex flex-col gap-1.5 pt-2">
+        <div className="flex items-center gap-2">
+          {recognitionSupported && (
+            <Button
+              type="button"
+              variant={isListening ? 'primary' : 'secondary'}
+              size="sm"
+              onClick={() =>
+                listen((finalTranscript) => {
+                  setInput((prev) => (prev ? `${prev} ${finalTranscript}` : finalTranscript))
+                })
+              }
+              aria-label={isListening ? 'Stop listening' : 'Speak to Loti'}
+              title={isListening ? 'Stop listening' : 'Speak to Loti'}
+              className={isListening ? 'animate-pulse' : ''}
+              leftIcon={
+                isListening ? (
+                  <MicOff size={16} strokeWidth={1.75} aria-hidden="true" />
+                ) : (
+                  <Mic size={16} strokeWidth={1.75} aria-hidden="true" />
+                )
+              }
+            >
+              <span className="sr-only sm:not-sr-only sm:inline">{isListening ? 'Listening' : 'Speak'}</span>
+            </Button>
+          )}
+
+          <input
+            ref={inputRef}
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={isListening ? 'Listening to you speak...' : 'Ask Loti a question...'}
+            className="focus-ring flex-1 rounded-xl border border-border bg-surface px-4 py-2 text-base text-ink placeholder:text-ink-muted"
+            aria-label="Message to Loti"
+            disabled={sending}
+          />
+          <Button type="submit" size="sm" disabled={!input.trim() || sending}>
+            {sending ? '...' : 'Send'}
+          </Button>
+        </div>
+
+        {micError && <p className="text-xs text-ink-muted">{micError}</p>}
       </form>
 
       {turns.length > 0 && (
@@ -215,14 +340,35 @@ export default function CoachPage({ brain = coachBrain }: { brain?: CoachBrain }
   )
 }
 
-/** One of Loti's bubbles, open or answered. */
-function LotiLine({ text, textId, className = '' }: { text: string; textId?: string; className?: string }) {
+/** One of Loti's bubbles, open or answered, with optional speech playback. */
+function LotiLine({
+  text,
+  textId,
+  className = '',
+  onPlay,
+}: {
+  text: string
+  textId?: string
+  className?: string
+  onPlay?: () => void
+}) {
   return (
-    <div data-from="loti" className={`flex justify-start ${className}`}>
+    <div data-from="loti" className={`flex items-start gap-2 justify-start ${className}`}>
       <p className="max-w-md rounded-xl rounded-tl-sm border border-border bg-surface px-4 py-3 text-base text-ink">
         <span className="sr-only">Loti: </span>
         <span id={textId}>{text}</span>
       </p>
+      {onPlay && (
+        <button
+          type="button"
+          onClick={onPlay}
+          aria-label="Listen to this message"
+          title="Listen to this message"
+          className="mt-2 text-ink-muted hover:text-ink transition-colors p-1 rounded-md"
+        >
+          <Volume2 size={15} strokeWidth={1.75} aria-hidden="true" />
+        </button>
+      )}
     </div>
   )
 }

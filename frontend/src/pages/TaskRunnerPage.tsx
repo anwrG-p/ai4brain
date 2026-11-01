@@ -4,8 +4,10 @@ import { X, Pause } from 'lucide-react'
 import { getDimensionsByPreset, DIMENSION_PRESETS } from '../config/dimensions'
 import type { DimensionConfig, TaskSchemaType } from '../types'
 import { useAppStore } from '../state/useAppStore'
+import { useDevicePrefs } from '../state/devicePrefs'
 import { ExerciseHost } from '../features/assessment/ExerciseHost'
 import { EXERCISE_NAME } from '../features/assessment/names'
+import { adaptTaskForDifficulty } from '../features/assessment/tasks/taskDifficulty'
 import { tracker } from '../features/assessment/telemetry/tracker'
 import type { TelemetryEvent } from '../features/assessment/telemetry/types'
 import { saveRun } from '../features/insights/sessionStore'
@@ -36,7 +38,7 @@ function EventsTable({ events }: { events: readonly TelemetryEvent[] }) {
             <th scope="col" className="py-1.5 ps-2 text-start">Error</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-border">
+        <tbody className="divide-y border-border">
           {events.map((ev, i) => (
             <tr key={`${ev.task_id}-${ev.trial_index}-${i}`} className="text-ink">
               <td className="py-1.5 pe-2 font-bold">#{ev.trial_index}</td>
@@ -63,6 +65,7 @@ export default function TaskRunnerPage() {
   const navigate = useNavigate()
   const judge = useJudgeMode()
   const { theme, toggleTheme, dimensionPreset, setDimensionPreset } = useAppStore()
+  const difficulty = useDevicePrefs((s) => s.difficulty)
 
   const activeDimensions = useMemo(() => getDimensionsByPreset(dimensionPreset), [dimensionPreset])
 
@@ -216,6 +219,7 @@ export default function TaskRunnerPage() {
           <ExerciseHost
             schemaType={schemaType}
             attempt={attempt}
+            prepare={(t) => adaptTaskForDifficulty(t, difficulty)}
             onDone={complete}
             onTask={onTask}
             onBlockEnd={handleBlockEnd}

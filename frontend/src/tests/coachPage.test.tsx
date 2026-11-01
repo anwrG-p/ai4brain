@@ -264,4 +264,71 @@ describe('CoachPage (/coach)', () => {
     expect(within(log()).getByText('How can I stay focused?')).toBeInTheDocument()
     expect(within(log()).getByText('Great focus strategy!')).toBeInTheDocument()
   })
+
+  describe('voice coaching integration', () => {
+    it('renders voice toggle and allows toggling spoken guidance', async () => {
+      const user = userEvent.setup()
+      const mockSpeak = vi.fn()
+      const mockCancel = vi.fn()
+      Object.defineProperty(window, 'speechSynthesis', {
+        writable: true,
+        configurable: true,
+        value: {
+          speak: mockSpeak,
+          cancel: mockCancel,
+          getVoices: () => [],
+        },
+      })
+      ;(window as unknown as Record<string, unknown>).SpeechSynthesisUtterance = class {
+        text: string
+        constructor(t: string) {
+          this.text = t
+        }
+      }
+
+      renderAt()
+      const voiceBtn = screen.getByRole('button', { name: /voice off/i })
+      expect(voiceBtn).toBeInTheDocument()
+
+      await user.click(voiceBtn)
+      expect(screen.getByRole('button', { name: /voice on/i })).toBeInTheDocument()
+      expect(screen.getByRole('group', { name: /speech pace/i })).toBeInTheDocument()
+    })
+
+    it('renders speech recognition mic button when supported', () => {
+      ;(window as unknown as Record<string, unknown>).SpeechRecognition = class {
+        start = vi.fn()
+        stop = vi.fn()
+      }
+      renderAt()
+      expect(screen.getByRole('button', { name: /speak to loti/i })).toBeInTheDocument()
+    })
+
+    it('provides replay audio buttons on Loti messages', async () => {
+      const user = userEvent.setup()
+      const mockSpeak = vi.fn()
+      Object.defineProperty(window, 'speechSynthesis', {
+        writable: true,
+        configurable: true,
+        value: {
+          speak: mockSpeak,
+          cancel: vi.fn(),
+          getVoices: () => [],
+        },
+      })
+      ;(window as unknown as Record<string, unknown>).SpeechSynthesisUtterance = class {
+        text: string
+        constructor(t: string) {
+          this.text = t
+        }
+      }
+
+      renderAt()
+      const playBtn = screen.getByRole('button', { name: /listen to this message/i })
+      expect(playBtn).toBeInTheDocument()
+
+      await user.click(playBtn)
+      expect(mockSpeak).toHaveBeenCalled()
+    })
+  })
 })
